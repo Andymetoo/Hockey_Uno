@@ -137,6 +137,104 @@
       display: grid;
       grid-template-columns: 1fr;
       gap: 12px;
+      align-items: start;
+    }
+
+    .hand-panel {
+      min-width: 0;
+      transition: border-color 120ms ease, background-color 120ms ease, box-shadow 120ms ease;
+    }
+
+    .hand-panel.possession {
+      border-color: #c42a2a;
+      box-shadow: 0 0 0 2px #f7c2c2 inset;
+      background: #fff6f6;
+    }
+
+    .active-middle {
+      border: 1px dashed #a7b7d4;
+      border-radius: 10px;
+      padding: 10px;
+      background: #f8fbff;
+      text-align: center;
+      min-height: 110px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .active-middle.possession {
+      border-color: #d16d6d;
+      background: #fff2f2;
+    }
+
+    .active-middle .label {
+      font-size: 0.72rem;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+
+    .active-card-pill {
+      display: inline-block;
+      border: 2px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 12px;
+      min-width: 110px;
+      font-weight: 700;
+      background: #fff;
+      margin: 0 auto;
+    }
+
+    .active-card-pill.pace {
+      color: var(--pace);
+      border-color: var(--pace);
+    }
+
+    .active-card-pill.finesse {
+      color: var(--finesse);
+      border-color: var(--finesse);
+    }
+
+    .active-card-pill.grit {
+      color: var(--grit);
+      border-color: var(--grit);
+    }
+
+    .event-banner {
+      border: 1px solid #d6dde9;
+      background: #ffffff;
+      border-radius: 8px;
+      padding: 6px 8px;
+      min-height: 32px;
+      font-size: 0.84rem;
+      font-weight: 700;
+      color: #243247;
+    }
+
+    .event-banner.contain {
+      border-color: #7e9ecf;
+      color: #21497a;
+      background: #f1f7ff;
+    }
+
+    .event-banner.turnover {
+      border-color: #e6ad5d;
+      color: #8a4c03;
+      background: #fff7e9;
+    }
+
+    .event-banner.shot {
+      border-color: #d67a7a;
+      color: #862121;
+      background: #fff0f0;
+    }
+
+    .event-banner.goal {
+      border-color: #cb5252;
+      color: #ffffff;
+      background: #b62c2c;
     }
 
     .cards {
@@ -158,6 +256,11 @@
       background: #f5f9ff;
     }
 
+    .card-btn.combo-legal {
+      box-shadow: 0 0 0 2px #ffe4aa inset;
+      background: #fff8ea;
+    }
+
     .card-btn.illegal {
       opacity: 0.45;
     }
@@ -175,6 +278,18 @@
     .card-btn.grit {
       border-color: var(--grit);
       color: var(--grit);
+    }
+
+    .card-btn.cpu-preview {
+      animation: cpuBlink 1s linear infinite;
+      box-shadow: 0 0 0 3px #ffd27a inset;
+      background: #fff3d9;
+    }
+
+    @keyframes cpuBlink {
+      0% { opacity: 1; }
+      50% { opacity: 0.35; }
+      100% { opacity: 1; }
     }
 
     .legend {
@@ -219,7 +334,7 @@
 
     @media (min-width: 900px) {
       .hands {
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: 1fr 220px 1fr;
       }
     }
   </style>
@@ -233,14 +348,15 @@
         <div class="kv"><span class="k">Defender</span><span class="v" id="defenderLabel"></span></div>
         <div class="kv"><span class="k">Current Turn</span><span class="v" id="turnLabel"></span></div>
         <div class="kv"><span class="k">Zone</span><span class="v" id="zoneLabel"></span></div>
-        <div class="kv"><span class="k">Active Card</span><span class="v" id="activeCardLabel"></span></div>
         <div class="kv"><span class="k">Deck Count</span><span class="v" id="deckCountLabel"></span></div>
         <div class="kv"><span class="k">Score</span><span class="v" id="scoreLabel"></span></div>
+        <div class="kv"><span class="k">Combo State</span><span class="v" id="comboLabel"></span></div>
       </div>
       <div class="zone-track" id="zoneTrack"></div>
       <div class="controls">
         <button id="newGameBtn">New Game</button>
         <button id="cannotPlayBtn">Draw / Cannot Play</button>
+        <button id="doneComboBtn">Done Combo</button>
         <button id="cpuStepBtn">CPU Step / Auto Continue</button>
       </div>
       <div class="legend">
@@ -252,11 +368,17 @@
     </section>
 
     <section class="panel hands">
-      <div>
+      <div class="panel hand-panel" id="humanPanel">
         <h3>Human Hand</h3>
         <div id="humanHand" class="cards"></div>
       </div>
-      <div>
+      <div class="active-middle" id="activeMiddle">
+        <div class="label">Active Card</div>
+        <div id="activeCardMiddle" class="active-card-pill">None</div>
+        <div id="comboHint" class="hint"></div>
+        <div id="eventBanner" class="event-banner contain"></div>
+      </div>
+      <div class="panel hand-panel" id="cpuPanel">
         <h3>CPU Hand (debug visible)</h3>
         <div id="cpuHand" class="cards"></div>
       </div>
@@ -274,7 +396,7 @@
     // ---------------------------
 
     const SUITS = ["Pace", "Finesse", "Grit"];
-    const ZONES = ["Defensive Zone", "Neutral Zone", "Offensive Zone"];
+    const ZONES = ["Human Zone", "Neutral Zone", "CPU Zone"];
 
     const state = {
       deck: [],
@@ -286,6 +408,15 @@
       currentTurn: "human",
       roleOfCurrentTurn: "attacker",
       activeCard: null,
+      comboWindow: false,
+      comboPlayer: null,
+      turnPlayCount: 0,
+      activeBattleState: "none",
+      comboImmunityActive: false,
+      cpuPreviewIndex: null,
+      cpuBusy: false,
+      eventText: "",
+      eventType: "contain",
       zoneIndex: 0,
       humanScore: 0,
       cpuScore: 0,
@@ -324,6 +455,11 @@
       }
     }
 
+    function setEvent(text, type = "contain") {
+      state.eventText = text;
+      state.eventType = type;
+    }
+
     function cardToText(card) {
       if (!card) {
         return "None";
@@ -337,6 +473,40 @@
 
     function syncDefender() {
       state.defender = state.attacker === "human" ? "cpu" : "human";
+    }
+
+    function getDefensiveZoneIndex(player) {
+      return player === "human" ? 0 : 2;
+    }
+
+    function getOffensiveZoneIndex(player) {
+      return player === "human" ? 2 : 0;
+    }
+
+    function getRelativeZoneIndexForAttacker() {
+      // Relative zone: 0 defensive, 1 neutral, 2 offensive from current attacker's perspective.
+      return state.attacker === "human" ? state.zoneIndex : 2 - state.zoneIndex;
+    }
+
+    function relativeZoneName() {
+      const rel = getRelativeZoneIndexForAttacker();
+      if (rel === 0) {
+        return "Defensive";
+      }
+      if (rel === 1) {
+        return "Neutral";
+      }
+      return "Offensive";
+    }
+
+    function relativeZoneNameFromIndex(relativeIndex) {
+      if (relativeIndex === 0) {
+        return "Defensive Zone";
+      }
+      if (relativeIndex === 1) {
+        return "Neutral Zone";
+      }
+      return "Offensive Zone";
     }
 
     function ensureDeckHasCards() {
@@ -393,17 +563,41 @@
 
       const isSuitMatch = card.suit === activeCard.suit;
       const isNumberMatch = card.value === activeCard.value;
+      const isHigher = card.value > activeCard.value;
+      const isLower = card.value < activeCard.value;
 
-      if (isSuitMatch && isNumberMatch) {
-        return "number_and_suit";
+      if (state.roleOfCurrentTurn === "defender") {
+        if (isSuitMatch && isHigher) {
+          return "intercept";
+        }
+        if (isNumberMatch) {
+          return "overpower";
+        }
+        if (isSuitMatch && isLower) {
+          return "contain";
+        }
+        return "illegal";
       }
-      if (isNumberMatch) {
-        return "number";
+
+      if (state.activeBattleState === "overpower") {
+        return isSuitMatch || isNumberMatch ? "win_overpower" : "illegal";
       }
-      if (isSuitMatch) {
-        return "suit";
+
+      if (state.activeBattleState === "containment") {
+        if (isSuitMatch && isHigher) {
+          return "break_containment";
+        }
+        if (isSuitMatch || isNumberMatch) {
+          return "stall_containment";
+        }
+        return "illegal";
       }
-      return "illegal";
+
+      if (state.turnPlayCount > 0) {
+        return isNumberMatch ? "combo" : "illegal";
+      }
+
+      return "attack";
     }
 
     function getLegalCards(hand, activeCard) {
@@ -416,17 +610,129 @@
       return legalIndexes;
     }
 
-    function advanceZone() {
-      if (state.zoneIndex < 2) {
-        state.zoneIndex += 1;
+    function getComboLegalCards(hand, activeCard) {
+      const legalIndexes = [];
+      if (!activeCard) {
+        return legalIndexes;
       }
+      for (let i = 0; i < hand.length; i += 1) {
+        if (hand[i].value === activeCard.value) {
+          legalIndexes.push(i);
+        }
+      }
+      return legalIndexes;
+    }
+
+    function getLegalCardsForTurn(player) {
+      if (player !== state.currentTurn) {
+        return [];
+      }
+
+      const hand = playerHand(player);
+
+      if (!state.activeCard) {
+        return hand.map((_, index) => index);
+      }
+
+      if (state.roleOfCurrentTurn === "defender") {
+        if (state.comboImmunityActive) {
+          return [];
+        }
+
+        return hand
+          .map((card, index) => ({ card, index }))
+          .filter(({ card }) => getMatchType(card, state.activeCard) !== "illegal")
+          .map(({ index }) => index);
+      }
+
+      if (state.activeBattleState === "overpower" || state.activeBattleState === "containment") {
+        return hand
+          .map((card, index) => ({ card, index }))
+          .filter(({ card }) => getMatchType(card, state.activeCard) !== "illegal")
+          .map(({ index }) => index);
+      }
+
+      if (state.turnPlayCount > 0) {
+        return getComboLegalCards(hand, state.activeCard);
+      }
+
+      return hand
+        .map((card, index) => ({ card, index }))
+        .filter(({ card }) => getMatchType(card, state.activeCard) !== "illegal")
+        .map(({ index }) => index);
+    }
+
+    function clearComboWindow() {
+      state.comboWindow = false;
+      state.comboPlayer = null;
+    }
+
+    function refreshComboWindow() {
+      if (
+        state.roleOfCurrentTurn === "attacker"
+        && state.activeBattleState === "none"
+        && state.turnPlayCount > 0
+        && state.activeCard
+      ) {
+        const comboIndexes = getComboLegalCards(playerHand(state.currentTurn), state.activeCard);
+        if (comboIndexes.length > 0) {
+          state.comboWindow = true;
+          state.comboPlayer = state.currentTurn;
+          return;
+        }
+      }
+
+      clearComboWindow();
+    }
+
+    function currentTurnCanPass() {
+      return state.roleOfCurrentTurn === "attacker" && state.activeBattleState === "none" && state.turnPlayCount > 0;
+    }
+
+    function canStartOrContinueCombo(player, activeCard) {
+      if (!activeCard || player !== state.currentTurn) {
+        return false;
+      }
+      return getComboLegalCards(playerHand(player), activeCard).length > 0;
+    }
+
+    function setCurrentTurn(player, role) {
+      const playerChanged = state.currentTurn !== player;
+      state.currentTurn = player;
+      state.roleOfCurrentTurn = role;
+      if (playerChanged) {
+        state.turnPlayCount = 0;
+      }
+      refreshComboWindow();
+    }
+
+    function passAttackTurn() {
+      state.comboImmunityActive = state.turnPlayCount >= 2;
+      const defenderName = lowerPlayerName(state.defender);
+      clearComboWindow();
+      setCurrentTurn(state.defender, "defender");
+      addLog(`Turn passes to ${defenderName}.`);
+      if (state.comboImmunityActive) {
+        addLog(`${lowerPlayerName(state.attacker)} has combo immunity on this response.`);
+      }
+    }
+
+    function endComboByChoice(player) {
+      if (player !== state.currentTurn || !currentTurnCanPass()) {
+        return;
+      }
+      addLog(`${lowerPlayerName(player)} ends the attack turn.`);
+      passAttackTurn();
     }
 
     function flipPossession() {
       state.attacker = state.attacker === "human" ? "cpu" : "human";
       syncDefender();
-      state.currentTurn = state.attacker;
-      state.roleOfCurrentTurn = "attacker";
+      setCurrentTurn(state.attacker, "attacker");
+      state.turnPlayCount = 0;
+      state.activeBattleState = "none";
+      state.comboImmunityActive = false;
+      state.cpuPreviewIndex = null;
     }
 
     function resetShift(reason) {
@@ -435,9 +741,14 @@
       }
       refillHands();
       flipPossession();
-      state.zoneIndex = 0;
+      state.zoneIndex = getDefensiveZoneIndex(state.attacker);
       state.activeCard = null;
+      clearComboWindow();
+      state.turnPlayCount = 0;
+      state.activeBattleState = "none";
+      state.comboImmunityActive = false;
       addLog(`Shift reset. ${lowerPlayerName(state.attacker)} starts in Defensive Zone.`);
+      setEvent("Shift reset", "turnover");
     }
 
     function playerHand(player) {
@@ -502,6 +813,7 @@
       const chainIndexes = findSaveChain(defenderHand, requiredLength, shotCard);
 
       addLog(`${lowerPlayerName(attackerPlayer)} empties hand in Offensive Zone. Shot quality ${shotCard.value}.`);
+      setEvent(`Shot quality ${shotCard.value}`, "shot");
 
       if (chainIndexes && chainIndexes.length === requiredLength) {
         const selectedCards = chainIndexes.map((idx) => defenderHand[idx]);
@@ -514,6 +826,7 @@
         }
 
         addLog(`${lowerPlayerName(defenderPlayer)} makes ${requiredLength}-card save: ${selectedCards.map(cardToText).join(" -> ")}. Frozen puck.`);
+        setEvent("Save / Frozen puck", "contain");
         state.activeCard = null;
         resetShift("Save/frozen puck.");
         return;
@@ -526,6 +839,7 @@
       }
 
       addLog(`${lowerPlayerName(defenderPlayer)} cannot complete ${requiredLength}-card save chain. GOAL ${lowerPlayerName(attackerPlayer)}.`);
+      setEvent(`GOAL ${lowerPlayerName(attackerPlayer)}`, "goal");
       state.activeCard = null;
       resetShift("Goal scored. New shift.");
     }
@@ -541,25 +855,46 @@
 
       if (role === "defender") {
         const drew = drawCard(player, 1);
-        const oldZone = ZONES[state.zoneIndex];
+        const oldRelativeZone = getRelativeZoneIndexForAttacker();
         advanceZone();
-        const newZone = ZONES[state.zoneIndex];
+        const newRelativeZone = getRelativeZoneIndexForAttacker();
 
-        addLog(`${lowerPlayerName(player)} cannot respond and draws ${drew}. ${lowerPlayerName(attackerPlayer)} advances to ${newZone}.`);
+        if (state.comboImmunityActive) {
+          addLog(`${lowerPlayerName(player)} cannot break the combo immunity and draws ${drew}. ${lowerPlayerName(attackerPlayer)} advances to ${relativeZoneNameFromIndex(newRelativeZone)}.`);
+        } else {
+          addLog(`${lowerPlayerName(player)} whiffs and draws ${drew}. ${lowerPlayerName(attackerPlayer)} advances to ${relativeZoneNameFromIndex(newRelativeZone)}.`);
+        }
+        setEvent("Whiff (+1 Zone)", "turnover");
 
-        if (oldZone === "Offensive Zone" && newZone === "Offensive Zone") {
+        if (oldRelativeZone === 2 && newRelativeZone === 2) {
           addLog("Puck stays in Offensive Zone.");
         }
 
         state.activeCard = null;
-        state.currentTurn = attackerPlayer;
-        state.roleOfCurrentTurn = "attacker";
+        state.activeBattleState = "none";
+        state.comboImmunityActive = false;
+        clearComboWindow();
+        state.cpuPreviewIndex = null;
+        setCurrentTurn(attackerPlayer, "attacker");
         return;
       }
 
       const drew = drawCard(player, 1);
-      addLog(`${lowerPlayerName(player)} cannot continue and draws ${drew}. Possession flips.`);
+      if (state.activeBattleState === "overpower") {
+        addLog(`${lowerPlayerName(player)} cannot answer the overpower and draws ${drew}. ${lowerPlayerName(defenderPlayer)} steals possession.`);
+        setEvent("Overpowered!", "turnover");
+      } else if (state.activeBattleState === "containment") {
+        addLog(`${lowerPlayerName(player)} cannot break containment and draws ${drew}. ${lowerPlayerName(defenderPlayer)} steals possession.`);
+        setEvent("Containment wins turnover", "turnover");
+      } else {
+        addLog(`${lowerPlayerName(player)} cannot continue and draws ${drew}. Possession flips.`);
+        setEvent("Turnover - possession flips", "turnover");
+      }
       state.activeCard = null;
+      state.activeBattleState = "none";
+      state.comboImmunityActive = false;
+      clearComboWindow();
+      state.cpuPreviewIndex = null;
       flipPossession();
 
       if (state.attacker !== defenderPlayer) {
@@ -575,20 +910,24 @@
       }
 
       const isAttacker = player === state.attacker;
+      const relativeZone = getRelativeZoneIndexForAttacker();
 
       if (isAttacker) {
-        if (state.zoneIndex === 0) {
+        if (relativeZone === 0) {
           state.activeCard = null;
           resetShift(`${lowerPlayerName(player)} emptied hand in Defensive Zone. Clear and line change.`);
           return true;
         }
 
-        if (state.zoneIndex === 1) {
+        if (relativeZone === 1) {
           addLog(`${lowerPlayerName(player)} emptied hand in Neutral Zone. Dump and chase to Offensive Zone.`);
-          state.zoneIndex = 2;
+          state.zoneIndex = getOffensiveZoneIndex(state.attacker);
           const drew = drawCard(player, 3);
           addLog(`${lowerPlayerName(player)} draws ${drew} for dump and chase continuation.`);
+          setEvent("Dump and chase", "turnover");
           state.activeCard = null;
+          clearComboWindow();
+          state.cpuPreviewIndex = null;
           state.currentTurn = state.attacker;
           state.roleOfCurrentTurn = "attacker";
           return true;
@@ -600,12 +939,34 @@
 
       // Defender empty rule: defensive collapse.
       addLog("Defender ran out of cards. Defensive collapse - puck advances.");
+      setEvent("Defensive collapse", "turnover");
       advanceZone();
       refillToFive(player);
       state.activeCard = null;
-      state.currentTurn = state.attacker;
-      state.roleOfCurrentTurn = "attacker";
+      state.activeBattleState = "none";
+      state.comboImmunityActive = false;
+      clearComboWindow();
+      state.cpuPreviewIndex = null;
+      setCurrentTurn(state.attacker, "attacker");
       return true;
+    }
+
+    function applyBreakawayIfNeeded(player) {
+      if (player !== state.attacker || state.turnPlayCount !== 3) {
+        return;
+      }
+
+      const beforeZone = getRelativeZoneIndexForAttacker();
+      advanceZone();
+      advanceZone();
+      const afterZone = getRelativeZoneIndexForAttacker();
+
+      addLog(`${lowerPlayerName(player)} hits a Breakaway (+2 Zones).`);
+      setEvent("Breakaway (+2 Zones)", "shot");
+
+      if (beforeZone === afterZone && afterZone === 2) {
+        addLog("Breakaway pressure stays in Offensive Zone.");
+      }
     }
 
     function refillToFive(player) {
@@ -632,47 +993,108 @@
       const card = hand[cardIndex];
       const previousActiveCard = state.activeCard;
       const matchType = getMatchType(card, previousActiveCard);
+      const legalForTurn = getLegalCardsForTurn(player);
 
-      if (matchType === "illegal") {
+      if (!legalForTurn.includes(cardIndex) || matchType === "illegal") {
         addLog(`Illegal play: ${lowerPlayerName(player)} tried ${cardToText(card)}.`);
         return;
       }
 
       hand.splice(cardIndex, 1);
       state.discardPile.push(card);
+      state.turnPlayCount += 1;
 
-      const isAttackerTurn = state.roleOfCurrentTurn === "attacker";
       const startsSequence = !previousActiveCard;
 
-      if (isAttackerTurn && startsSequence) {
+      if (startsSequence) {
         addLog(`${lowerPlayerName(player)} attacks with ${cardToText(card)}.`);
-      } else if (isAttackerTurn) {
-        addLog(`${lowerPlayerName(player)} continues with ${cardToText(card)}${matchType === "number" || matchType === "number_and_suit" ? " (number match combo)." : "."}`);
+        state.activeBattleState = "none";
+        state.comboImmunityActive = false;
+        setEvent(`${lowerPlayerName(player)} attack`, "shot");
+        state.activeCard = card;
+      } else if (state.roleOfCurrentTurn === "defender") {
+        state.activeCard = card;
+
+        if (matchType === "intercept") {
+          addLog(`${lowerPlayerName(player)} intercepts with ${cardToText(card)}. Intercept! Possession flips immediately.`);
+          state.attacker = player;
+          syncDefender();
+          state.activeBattleState = "none";
+          state.comboImmunityActive = false;
+          state.roleOfCurrentTurn = "attacker";
+          setEvent("Intercept!", "turnover");
+        } else if (matchType === "overpower") {
+          addLog(`${lowerPlayerName(player)} overpowers with ${cardToText(card)}. Overpowered!`);
+          state.activeBattleState = "overpower";
+          state.comboImmunityActive = false;
+          setEvent("Overpowered!", "contain");
+          setCurrentTurn(state.attacker, "attacker");
+        } else if (matchType === "contain") {
+          addLog(`${lowerPlayerName(player)} contains with ${cardToText(card)}. Containment established.`);
+          state.activeBattleState = "containment";
+          state.comboImmunityActive = false;
+          setEvent("Containment", "contain");
+          setCurrentTurn(state.attacker, "attacker");
+        }
       } else {
-        addLog(`${lowerPlayerName(player)} contains with ${cardToText(card)}${matchType === "number" || matchType === "number_and_suit" ? " (number match combo)." : "."}`);
+        state.activeCard = card;
+
+        if (state.activeBattleState === "overpower") {
+          addLog(`${lowerPlayerName(player)} answers the overpower with ${cardToText(card)} and pushes the battle ahead (+1 Zone).`);
+          advanceZone();
+          state.activeBattleState = "none";
+          state.comboImmunityActive = false;
+          setEvent("Overpower answered (+1 Zone)", "shot");
+        } else if (state.activeBattleState === "containment") {
+          if (matchType === "break_containment") {
+            addLog(`${lowerPlayerName(player)} breaks containment with ${cardToText(card)}. Containment Broken (+1 Zone).`);
+            advanceZone();
+            state.activeBattleState = "none";
+            state.comboImmunityActive = false;
+            setEvent("Containment Broken (+1 Zone)", "shot");
+          } else {
+            addLog(`${lowerPlayerName(player)} grinds with ${cardToText(card)}. Containment continues.`);
+            state.activeBattleState = "containment";
+            state.comboImmunityActive = false;
+            setEvent("Containment grind", "contain");
+          }
+        } else {
+          addLog(`${lowerPlayerName(player)} chains ${cardToText(card)} on the rush.`);
+          setEvent(`${lowerPlayerName(player)} combo`, "shot");
+        }
       }
 
-      state.activeCard = card;
+      applyBreakawayIfNeeded(player);
 
       if (checkHandEmpty(player, card)) {
         return;
       }
 
-      // Number matches create a combo window: same player immediately plays again.
-      if (!startsSequence && (matchType === "number" || matchType === "number_and_suit")) {
-        state.currentTurn = player;
-        state.roleOfCurrentTurn = isAttackerTurn ? "attacker" : "defender";
-        addLog(`${lowerPlayerName(player)} keeps the turn on a number match.`);
+      if (state.roleOfCurrentTurn === "defender") {
+        if (canStartOrContinueCombo(player, card)) {
+          refreshComboWindow();
+        } else {
+          passAttackTurn();
+        }
         return;
       }
 
-      if (isAttackerTurn) {
-        state.currentTurn = state.defender;
-        state.roleOfCurrentTurn = "defender";
-      } else {
-        state.currentTurn = state.attacker;
-        state.roleOfCurrentTurn = "attacker";
+      if (state.activeBattleState === "overpower" || state.activeBattleState === "containment") {
+        if (canStartOrContinueCombo(player, card)) {
+          refreshComboWindow();
+          return;
+        }
+        passAttackTurn();
+        return;
       }
+
+      if (canStartOrContinueCombo(player, card)) {
+        refreshComboWindow();
+        addLog(`${lowerPlayerName(player)} can continue the rush with another ${card.value} or press Done Combo.`);
+        return;
+      }
+
+      passAttackTurn();
     }
 
     // ---------------------------
@@ -703,6 +1125,12 @@
       return best;
     }
 
+    function sleep(ms) {
+      return new Promise((resolve) => {
+        setTimeout(resolve, ms);
+      });
+    }
+
     function cpuChooseCardIndex() {
       const hand = state.cpuHand;
 
@@ -718,40 +1146,63 @@
         return chooseLowestValueIndex(hand, allIndexes);
       }
 
-      const legal = getLegalCards(hand, state.activeCard);
+      const legal = getLegalCardsForTurn("cpu");
       if (legal.length === 0) {
         return null;
       }
 
       if (state.roleOfCurrentTurn === "defender") {
-        const sameSuit = legal.filter((idx) => hand[idx].suit === state.activeCard.suit);
-        if (sameSuit.length > 0) {
-          return chooseLowestValueIndex(hand, sameSuit);
+        const intercepts = legal.filter((idx) => getMatchType(hand[idx], state.activeCard) === "intercept");
+        if (intercepts.length > 0) {
+          return chooseLowestValueIndex(hand, intercepts);
         }
 
-        const sameValue = legal.filter((idx) => hand[idx].value === state.activeCard.value);
-        if (sameValue.length > 0) {
-          return chooseLowestValueIndex(hand, sameValue);
+        const overpowers = legal.filter((idx) => getMatchType(hand[idx], state.activeCard) === "overpower");
+        if (overpowers.length > 0) {
+          return chooseLowestValueIndex(hand, overpowers);
         }
 
-        return chooseRandomFrom(legal);
+        return chooseLowestValueIndex(hand, legal);
       }
 
-      // CPU as attacker continuing a chain: usually low card, but higher in Offensive Zone.
-      if (state.zoneIndex === 2) {
+      if (state.activeBattleState === "containment") {
+        const breakCards = legal.filter((idx) => getMatchType(hand[idx], state.activeCard) === "break_containment");
+        if (breakCards.length > 0) {
+          return chooseLowestValueIndex(hand, breakCards);
+        }
+      }
+
+      if (state.activeBattleState === "overpower") {
+        return chooseLowestValueIndex(hand, legal);
+      }
+
+      if (state.turnPlayCount > 0) {
+        if (state.turnPlayCount >= 3) {
+          return null;
+        }
+        return chooseLowestValueIndex(hand, legal);
+      }
+
+      // CPU as attacker opening pressure: usually low card, but higher in Offensive Zone.
+      if (getRelativeZoneIndexForAttacker() === 2) {
         return chooseHighestValueIndex(hand, legal);
       }
 
       return chooseLowestValueIndex(hand, legal);
     }
 
-    function cpuTakeTurn() {
+    async function cpuTakeTurn() {
       if (state.currentTurn !== "cpu") {
         return false;
       }
 
       const hand = state.cpuHand;
-      const legal = getLegalCards(hand, state.activeCard);
+      const legal = getLegalCardsForTurn("cpu");
+
+      if (currentTurnCanPass() && (legal.length === 0 || state.turnPlayCount >= 3)) {
+        endComboByChoice("cpu");
+        return true;
+      }
 
       if (state.activeCard && legal.length === 0) {
         handleCannotPlay("cpu");
@@ -769,23 +1220,52 @@
         return true;
       }
 
+      state.cpuPreviewIndex = idx;
+      render();
+      await sleep(1000);
+
+      if (state.currentTurn !== "cpu") {
+        state.cpuPreviewIndex = null;
+        return false;
+      }
+
+      if (idx < 0 || idx >= state.cpuHand.length) {
+        state.cpuPreviewIndex = null;
+        return false;
+      }
+
       playCard("cpu", idx);
+      state.cpuPreviewIndex = null;
       return true;
     }
 
-    function autoContinueCpuTurns(maxSteps = 80) {
+    async function autoContinueCpuTurns(maxSteps = 80) {
+      if (state.cpuBusy) {
+        return;
+      }
+
+      state.cpuBusy = true;
       let steps = 0;
       while (state.currentTurn === "cpu" && steps < maxSteps) {
-        const progressed = cpuTakeTurn();
+        const progressed = await cpuTakeTurn();
         if (!progressed) {
           break;
         }
         steps += 1;
+        render();
       }
 
       if (steps >= maxSteps) {
         addLog("Auto-continue safety stop reached.");
       }
+
+      state.cpuBusy = false;
+      state.cpuPreviewIndex = null;
+      render();
+    }
+
+    function runCpuAuto() {
+      void autoContinueCpuTurns();
     }
 
     // ---------------------------
@@ -818,7 +1298,8 @@
       container.innerHTML = "";
 
       const isHumanTurn = state.currentTurn === "human";
-      const legal = owner === "human" ? new Set(getLegalCards(hand, state.activeCard)) : null;
+      const legal = owner === "human" ? new Set(getLegalCardsForTurn("human")) : null;
+      const isComboTurn = state.comboWindow && state.comboPlayer === owner;
 
       hand.forEach((card, i) => {
         const btn = document.createElement("button");
@@ -828,17 +1309,25 @@
         if (owner === "human") {
           const isLegal = legal.has(i);
           btn.classList.add(isLegal ? "legal" : "illegal");
+          if (isComboTurn && isLegal) {
+            btn.classList.add("combo-legal");
+          }
           btn.disabled = !isHumanTurn || !isLegal;
-          btn.title = isHumanTurn ? (isLegal ? "Play this card" : "Not legal on active card") : "Wait for your turn";
+          btn.title = isHumanTurn
+            ? (isLegal ? (isComboTurn ? "Combo play (same value)" : "Play this card") : (isComboTurn ? "Combo only allows same-value cards" : "Not legal on active card"))
+            : "Wait for your turn";
           btn.addEventListener("click", () => {
             playCard("human", i);
             render();
-            autoContinueCpuTurns();
+            runCpuAuto();
             render();
           });
         } else {
           btn.disabled = true;
           btn.title = "CPU hand visible for debugging";
+          if (state.cpuPreviewIndex === i && state.currentTurn === "cpu") {
+            btn.classList.add("cpu-preview");
+          }
         }
 
         container.appendChild(btn);
@@ -871,10 +1360,43 @@
       document.getElementById("attackerLabel").textContent = lowerPlayerName(state.attacker);
       document.getElementById("defenderLabel").textContent = lowerPlayerName(state.defender);
       document.getElementById("turnLabel").textContent = `${lowerPlayerName(state.currentTurn)} (${state.roleOfCurrentTurn})`;
-      document.getElementById("zoneLabel").textContent = ZONES[state.zoneIndex];
-      document.getElementById("activeCardLabel").textContent = state.activeCard ? cardToText(state.activeCard) : "None";
+      document.getElementById("zoneLabel").textContent = `${ZONES[state.zoneIndex]} (${relativeZoneName()} for attacker)`;
       document.getElementById("deckCountLabel").textContent = String(state.deck.length);
       document.getElementById("scoreLabel").textContent = `Human ${state.humanScore} - ${state.cpuScore} CPU`;
+      document.getElementById("comboLabel").textContent = `Battle: ${state.activeBattleState} | Turn cards: ${state.turnPlayCount}`;
+
+      const activeCardMiddle = document.getElementById("activeCardMiddle");
+      activeCardMiddle.className = "active-card-pill";
+      if (state.activeCard) {
+        activeCardMiddle.textContent = cardToText(state.activeCard);
+        activeCardMiddle.classList.add(suitClass(state.activeCard.suit));
+      } else {
+        activeCardMiddle.textContent = "None";
+      }
+
+      const comboHint = document.getElementById("comboHint");
+      if (state.comboImmunityActive && state.roleOfCurrentTurn === "defender") {
+        comboHint.textContent = `${lowerPlayerName(state.attacker)} has combo immunity. Defender must whiff.`;
+      } else if (currentTurnCanPass() && canStartOrContinueCombo(state.currentTurn, state.activeCard)) {
+        comboHint.textContent = `${lowerPlayerName(state.currentTurn)} may continue chaining value ${state.activeCard ? state.activeCard.value : "-"} or press Done Combo.`;
+      } else if (currentTurnCanPass()) {
+        comboHint.textContent = `${lowerPlayerName(state.currentTurn)} may press Done Combo to pass the turn.`;
+      } else if (state.activeBattleState !== "none") {
+        comboHint.textContent = `${lowerPlayerName(state.currentTurn)} is responding to ${state.activeBattleState}.`;
+      } else {
+        comboHint.textContent = "";
+      }
+
+      const eventBanner = document.getElementById("eventBanner");
+      eventBanner.className = `event-banner ${state.eventType || "contain"}`;
+      eventBanner.textContent = state.eventText || "";
+
+      const humanPanel = document.getElementById("humanPanel");
+      const cpuPanel = document.getElementById("cpuPanel");
+      const activeMiddle = document.getElementById("activeMiddle");
+      humanPanel.classList.toggle("possession", state.attacker === "human");
+      cpuPanel.classList.toggle("possession", state.attacker === "cpu");
+      activeMiddle.classList.toggle("possession", true);
 
       renderZoneTrack();
       renderHand("humanHand", state.humanHand, "human");
@@ -882,15 +1404,22 @@
       renderLog();
 
       const cannotPlayBtn = document.getElementById("cannotPlayBtn");
-      const canHumanAct = state.currentTurn === "human";
-      const legal = canHumanAct ? getLegalCards(state.humanHand, state.activeCard) : [];
+      const doneComboBtn = document.getElementById("doneComboBtn");
+      const canHumanAct = state.currentTurn === "human" && !state.cpuBusy;
+      const legal = canHumanAct ? getLegalCardsForTurn("human") : [];
+      const humanCanPass = canHumanAct && currentTurnCanPass();
 
-      cannotPlayBtn.disabled = !canHumanAct || legal.length > 0;
+      cannotPlayBtn.disabled = !canHumanAct || humanCanPass || legal.length > 0;
       cannotPlayBtn.title = !canHumanAct
         ? "CPU turn"
+        : humanCanPass
+          ? "Use Done Combo to pass the turn"
         : legal.length > 0
           ? "You have legal cards"
           : "Draw and trigger cannot-play rule";
+
+      doneComboBtn.disabled = !humanCanPass;
+      doneComboBtn.title = doneComboBtn.disabled ? "No active attack turn to pass" : "End attack turn and pass to defender";
     }
 
     function onHumanCannotPlay() {
@@ -900,7 +1429,13 @@
         return;
       }
 
-      const legal = getLegalCards(state.humanHand, state.activeCard);
+      if (currentTurnCanPass()) {
+        addLog("Human can still pass the attack turn. Press Done Combo instead of drawing.");
+        render();
+        return;
+      }
+
+      const legal = getLegalCardsForTurn("human");
       if (legal.length > 0) {
         addLog("Human still has legal cards. Play one of the highlighted cards.");
         render();
@@ -909,7 +1444,7 @@
 
       handleCannotPlay("human");
       render();
-      autoContinueCpuTurns();
+      runCpuAuto();
       render();
     }
 
@@ -918,14 +1453,23 @@
       state.discardPile = [];
       state.humanHand = [];
       state.cpuHand = [];
-      state.zoneIndex = 0;
+      state.zoneIndex = getDefensiveZoneIndex(state.attacker);
       state.activeCard = null;
+      clearComboWindow();
+      state.turnPlayCount = 0;
+      state.activeBattleState = "none";
+      state.comboImmunityActive = false;
+      state.cpuPreviewIndex = null;
+      state.cpuBusy = false;
+      state.eventText = "";
+      state.eventType = "contain";
       state.logMessages = [];
       state.humanScore = 0;
       state.cpuScore = 0;
 
       state.attacker = Math.random() < 0.5 ? "human" : "cpu";
       syncDefender();
+      state.zoneIndex = getDefensiveZoneIndex(state.attacker);
       state.currentTurn = state.attacker;
       state.roleOfCurrentTurn = "attacker";
 
@@ -934,9 +1478,10 @@
 
       addLog("New game started.");
       addLog(`${lowerPlayerName(state.attacker)} starts as attacker.`);
+      setEvent(`${lowerPlayerName(state.attacker)} has possession`, "turnover");
 
       render();
-      autoContinueCpuTurns();
+      runCpuAuto();
       render();
     }
 
@@ -949,6 +1494,13 @@
         onHumanCannotPlay();
       });
 
+      document.getElementById("doneComboBtn").addEventListener("click", () => {
+        endComboByChoice("human");
+        render();
+        runCpuAuto();
+        render();
+      });
+
       document.getElementById("cpuStepBtn").addEventListener("click", () => {
         if (state.currentTurn !== "cpu") {
           addLog("CPU Step pressed, but it is not CPU turn.");
@@ -956,7 +1508,7 @@
           return;
         }
 
-        autoContinueCpuTurns();
+        runCpuAuto();
         render();
       });
     }
