@@ -1,0 +1,968 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hockey Card Prototype</title>
+  <style>
+    :root {
+      --bg: #f5f7fb;
+      --panel: #ffffff;
+      --ink: #1c2430;
+      --muted: #5f6b7a;
+      --border: #d7deea;
+      --pace: #2f6fe4;
+      --finesse: #2e9b4f;
+      --grit: #d26b1b;
+      --ok: #167a45;
+      --warn: #a66a00;
+      --danger: #a62a2a;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      background: radial-gradient(circle at top right, #eef3ff 0%, var(--bg) 45%, #eef6f1 100%);
+      color: var(--ink);
+      line-height: 1.35;
+      padding: 16px;
+    }
+
+    .app {
+      max-width: 1100px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+    }
+
+    .panel h2,
+    .panel h3 {
+      margin: 0 0 8px;
+      font-size: 1rem;
+    }
+
+    .status-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 8px;
+    }
+
+    .kv {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px;
+      background: #fafcff;
+    }
+
+    .k {
+      display: block;
+      font-size: 0.74rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .v {
+      font-size: 1rem;
+      font-weight: 600;
+    }
+
+    .zone-track {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .zone {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px;
+      text-align: center;
+      font-weight: 600;
+      color: var(--muted);
+      background: #fbfcff;
+    }
+
+    .zone.active {
+      color: var(--ink);
+      border-color: #9ab3e6;
+      background: #edf3ff;
+    }
+
+    .zone.active.offensive {
+      border-color: #c4a364;
+      background: #fff7ea;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    button {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #fff;
+      padding: 7px 11px;
+      font-size: 0.92rem;
+      cursor: pointer;
+      color: var(--ink);
+    }
+
+    button:hover:not(:disabled) {
+      background: #f4f7ff;
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .hands {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+    }
+
+    .cards {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .card-btn {
+      border-width: 2px;
+      min-width: 92px;
+      text-align: left;
+      font-weight: 600;
+      background: #fff;
+    }
+
+    .card-btn.legal {
+      box-shadow: 0 0 0 2px #dce8ff inset;
+      background: #f5f9ff;
+    }
+
+    .card-btn.illegal {
+      opacity: 0.45;
+    }
+
+    .card-btn.pace {
+      border-color: var(--pace);
+      color: var(--pace);
+    }
+
+    .card-btn.finesse {
+      border-color: var(--finesse);
+      color: var(--finesse);
+    }
+
+    .card-btn.grit {
+      border-color: var(--grit);
+      color: var(--grit);
+    }
+
+    .legend {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      font-size: 0.87rem;
+      color: var(--muted);
+      margin-top: 8px;
+    }
+
+    .swatch {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      margin-right: 5px;
+      vertical-align: middle;
+    }
+
+    .log {
+      max-height: 280px;
+      overflow-y: auto;
+      background: #0f1724;
+      color: #e7f0ff;
+      border-radius: 8px;
+      padding: 10px;
+      font-family: Consolas, Monaco, "Courier New", monospace;
+      font-size: 0.84rem;
+      border: 1px solid #1d2a3d;
+    }
+
+    .log-line {
+      margin: 0 0 6px;
+    }
+
+    .hint {
+      color: var(--muted);
+      font-size: 0.88rem;
+      margin-top: 6px;
+    }
+
+    @media (min-width: 900px) {
+      .hands {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <section class="panel">
+      <h2>Hockey Card Prototype</h2>
+      <div class="status-grid">
+        <div class="kv"><span class="k">Attacker</span><span class="v" id="attackerLabel"></span></div>
+        <div class="kv"><span class="k">Defender</span><span class="v" id="defenderLabel"></span></div>
+        <div class="kv"><span class="k">Current Turn</span><span class="v" id="turnLabel"></span></div>
+        <div class="kv"><span class="k">Zone</span><span class="v" id="zoneLabel"></span></div>
+        <div class="kv"><span class="k">Active Card</span><span class="v" id="activeCardLabel"></span></div>
+        <div class="kv"><span class="k">Deck Count</span><span class="v" id="deckCountLabel"></span></div>
+        <div class="kv"><span class="k">Score</span><span class="v" id="scoreLabel"></span></div>
+      </div>
+      <div class="zone-track" id="zoneTrack"></div>
+      <div class="controls">
+        <button id="newGameBtn">New Game</button>
+        <button id="cannotPlayBtn">Draw / Cannot Play</button>
+        <button id="cpuStepBtn">CPU Step / Auto Continue</button>
+      </div>
+      <div class="legend">
+        <span><span class="swatch" style="background: var(--pace);"></span>Pace (blue)</span>
+        <span><span class="swatch" style="background: var(--finesse);"></span>Finesse (green)</span>
+        <span><span class="swatch" style="background: var(--grit);"></span>Grit (orange)</span>
+      </div>
+      <p class="hint">Debug mode: both hands are visible. CPU still plays automatically on its turn.</p>
+    </section>
+
+    <section class="panel hands">
+      <div>
+        <h3>Human Hand</h3>
+        <div id="humanHand" class="cards"></div>
+      </div>
+      <div>
+        <h3>CPU Hand (debug visible)</h3>
+        <div id="cpuHand" class="cards"></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h3>Action Log</h3>
+      <div id="logFeed" class="log"></div>
+    </section>
+  </div>
+
+  <script>
+    // ---------------------------
+    // Core state and constants
+    // ---------------------------
+
+    const SUITS = ["Pace", "Finesse", "Grit"];
+    const ZONES = ["Defensive Zone", "Neutral Zone", "Offensive Zone"];
+
+    const state = {
+      deck: [],
+      discardPile: [],
+      humanHand: [],
+      cpuHand: [],
+      attacker: "human",
+      defender: "cpu",
+      currentTurn: "human",
+      roleOfCurrentTurn: "attacker",
+      activeCard: null,
+      zoneIndex: 0,
+      humanScore: 0,
+      cpuScore: 0,
+      logMessages: []
+    };
+
+    // ---------------------------
+    // Utility and setup functions
+    // ---------------------------
+
+    function createDeck() {
+      const deck = [];
+      for (const suit of SUITS) {
+        for (let value = 1; value <= 6; value += 1) {
+          deck.push({ suit, value });
+          deck.push({ suit, value });
+        }
+      }
+      return deck;
+    }
+
+    function shuffle(deck) {
+      for (let i = deck.length - 1; i > 0; i -= 1) {
+        const j = Math.floor(Math.random() * (i + 1));
+        const temp = deck[i];
+        deck[i] = deck[j];
+        deck[j] = temp;
+      }
+      return deck;
+    }
+
+    function addLog(message) {
+      state.logMessages.push(message);
+      if (state.logMessages.length > 300) {
+        state.logMessages.shift();
+      }
+    }
+
+    function cardToText(card) {
+      if (!card) {
+        return "None";
+      }
+      return `${card.suit} ${card.value}`;
+    }
+
+    function lowerPlayerName(player) {
+      return player === "human" ? "Human" : "CPU";
+    }
+
+    function syncDefender() {
+      state.defender = state.attacker === "human" ? "cpu" : "human";
+    }
+
+    function ensureDeckHasCards() {
+      if (state.deck.length > 0) {
+        return;
+      }
+
+      if (state.discardPile.length > 0) {
+        const recovered = state.discardPile.splice(0, state.discardPile.length);
+        shuffle(recovered);
+        state.deck.push(...recovered);
+        addLog(`Deck rebuilt from discard pile (${recovered.length} cards).`);
+      }
+    }
+
+    function drawCard(player, count = 1) {
+      const hand = player === "human" ? state.humanHand : state.cpuHand;
+      let drew = 0;
+      for (let i = 0; i < count; i += 1) {
+        ensureDeckHasCards();
+        if (state.deck.length === 0) {
+          break;
+        }
+        hand.push(state.deck.pop());
+        drew += 1;
+      }
+      return drew;
+    }
+
+    function refillHands() {
+      while (state.humanHand.length < 5) {
+        if (drawCard("human", 1) === 0) {
+          break;
+        }
+      }
+      while (state.cpuHand.length < 5) {
+        if (drawCard("cpu", 1) === 0) {
+          break;
+        }
+      }
+    }
+
+    function isLegalPlay(card, activeCard) {
+      if (!activeCard) {
+        return true;
+      }
+      return card.suit === activeCard.suit || card.value === activeCard.value;
+    }
+
+    function getMatchType(card, activeCard) {
+      if (!activeCard) {
+        return "start";
+      }
+
+      const isSuitMatch = card.suit === activeCard.suit;
+      const isNumberMatch = card.value === activeCard.value;
+
+      if (isSuitMatch && isNumberMatch) {
+        return "number_and_suit";
+      }
+      if (isNumberMatch) {
+        return "number";
+      }
+      if (isSuitMatch) {
+        return "suit";
+      }
+      return "illegal";
+    }
+
+    function getLegalCards(hand, activeCard) {
+      const legalIndexes = [];
+      for (let i = 0; i < hand.length; i += 1) {
+        if (isLegalPlay(hand[i], activeCard)) {
+          legalIndexes.push(i);
+        }
+      }
+      return legalIndexes;
+    }
+
+    function advanceZone() {
+      if (state.zoneIndex < 2) {
+        state.zoneIndex += 1;
+      }
+    }
+
+    function flipPossession() {
+      state.attacker = state.attacker === "human" ? "cpu" : "human";
+      syncDefender();
+      state.currentTurn = state.attacker;
+      state.roleOfCurrentTurn = "attacker";
+    }
+
+    function resetShift(reason) {
+      if (reason) {
+        addLog(reason);
+      }
+      refillHands();
+      flipPossession();
+      state.zoneIndex = 0;
+      state.activeCard = null;
+      addLog(`Shift reset. ${lowerPlayerName(state.attacker)} starts in Defensive Zone.`);
+    }
+
+    function playerHand(player) {
+      return player === "human" ? state.humanHand : state.cpuHand;
+    }
+
+    // ----------------------------------------
+    // Shot and goalie save sequence resolution
+    // ----------------------------------------
+
+    function requiredSaveLengthFromShotValue(value) {
+      if (value <= 2) {
+        return 1;
+      }
+      if (value <= 4) {
+        return 2;
+      }
+      return 3;
+    }
+
+    function findSaveChain(hand, requiredLength, startingCard) {
+      const used = new Set();
+      const chainIndexes = [];
+
+      function search(prevCard, depth) {
+        if (depth === requiredLength) {
+          return true;
+        }
+
+        for (let i = 0; i < hand.length; i += 1) {
+          if (used.has(i)) {
+            continue;
+          }
+
+          const candidate = hand[i];
+          const legal = isLegalPlay(candidate, prevCard);
+          if (!legal) {
+            continue;
+          }
+
+          used.add(i);
+          chainIndexes.push(i);
+
+          if (search(candidate, depth + 1)) {
+            return true;
+          }
+
+          chainIndexes.pop();
+          used.delete(i);
+        }
+
+        return false;
+      }
+
+      const success = search(startingCard, 0);
+      return success ? [...chainIndexes] : null;
+    }
+
+    function resolveShot(attackerPlayer, defenderPlayer, shotCard) {
+      const requiredLength = requiredSaveLengthFromShotValue(shotCard.value);
+      const defenderHand = playerHand(defenderPlayer);
+      const chainIndexes = findSaveChain(defenderHand, requiredLength, shotCard);
+
+      addLog(`${lowerPlayerName(attackerPlayer)} empties hand in Offensive Zone. Shot quality ${shotCard.value}.`);
+
+      if (chainIndexes && chainIndexes.length === requiredLength) {
+        const selectedCards = chainIndexes.map((idx) => defenderHand[idx]);
+
+        // Remove in descending index order to keep remaining index positions stable.
+        const descending = [...chainIndexes].sort((a, b) => b - a);
+        for (const idx of descending) {
+          const removed = defenderHand.splice(idx, 1)[0];
+          state.discardPile.push(removed);
+        }
+
+        addLog(`${lowerPlayerName(defenderPlayer)} makes ${requiredLength}-card save: ${selectedCards.map(cardToText).join(" -> ")}. Frozen puck.`);
+        state.activeCard = null;
+        resetShift("Save/frozen puck.");
+        return;
+      }
+
+      if (attackerPlayer === "human") {
+        state.humanScore += 1;
+      } else {
+        state.cpuScore += 1;
+      }
+
+      addLog(`${lowerPlayerName(defenderPlayer)} cannot complete ${requiredLength}-card save chain. GOAL ${lowerPlayerName(attackerPlayer)}.`);
+      state.activeCard = null;
+      resetShift("Goal scored. New shift.");
+    }
+
+    // ---------------------------
+    // Turn and rule handling
+    // ---------------------------
+
+    function handleCannotPlay(player) {
+      const role = state.roleOfCurrentTurn;
+      const attackerPlayer = state.attacker;
+      const defenderPlayer = state.defender;
+
+      if (role === "defender") {
+        const drew = drawCard(player, 1);
+        const oldZone = ZONES[state.zoneIndex];
+        advanceZone();
+        const newZone = ZONES[state.zoneIndex];
+
+        addLog(`${lowerPlayerName(player)} cannot respond and draws ${drew}. ${lowerPlayerName(attackerPlayer)} advances to ${newZone}.`);
+
+        if (oldZone === "Offensive Zone" && newZone === "Offensive Zone") {
+          addLog("Puck stays in Offensive Zone.");
+        }
+
+        state.activeCard = null;
+        state.currentTurn = attackerPlayer;
+        state.roleOfCurrentTurn = "attacker";
+        return;
+      }
+
+      const drew = drawCard(player, 1);
+      addLog(`${lowerPlayerName(player)} cannot continue and draws ${drew}. Possession flips.`);
+      state.activeCard = null;
+      flipPossession();
+
+      if (state.attacker !== defenderPlayer) {
+        // Safety check should not happen with valid rules flow.
+        syncDefender();
+      }
+    }
+
+    function checkHandEmpty(player, lastPlayedCard) {
+      const hand = playerHand(player);
+      if (hand.length > 0) {
+        return false;
+      }
+
+      const isAttacker = player === state.attacker;
+
+      if (isAttacker) {
+        if (state.zoneIndex === 0) {
+          state.activeCard = null;
+          resetShift(`${lowerPlayerName(player)} emptied hand in Defensive Zone. Clear and line change.`);
+          return true;
+        }
+
+        if (state.zoneIndex === 1) {
+          addLog(`${lowerPlayerName(player)} emptied hand in Neutral Zone. Dump and chase to Offensive Zone.`);
+          state.zoneIndex = 2;
+          const drew = drawCard(player, 3);
+          addLog(`${lowerPlayerName(player)} draws ${drew} for dump and chase continuation.`);
+          state.activeCard = null;
+          state.currentTurn = state.attacker;
+          state.roleOfCurrentTurn = "attacker";
+          return true;
+        }
+
+        resolveShot(state.attacker, state.defender, lastPlayedCard);
+        return true;
+      }
+
+      // Defender empty rule: defensive collapse.
+      addLog("Defender ran out of cards. Defensive collapse - puck advances.");
+      advanceZone();
+      refillToFive(player);
+      state.activeCard = null;
+      state.currentTurn = state.attacker;
+      state.roleOfCurrentTurn = "attacker";
+      return true;
+    }
+
+    function refillToFive(player) {
+      const hand = playerHand(player);
+      while (hand.length < 5) {
+        if (drawCard(player, 1) === 0) {
+          break;
+        }
+      }
+    }
+
+    function playCard(player, cardIndex) {
+      if (state.currentTurn !== player) {
+        addLog(`Ignored: not ${lowerPlayerName(player)} turn.`);
+        return;
+      }
+
+      const hand = playerHand(player);
+      if (cardIndex < 0 || cardIndex >= hand.length) {
+        addLog(`Ignored: invalid card index for ${lowerPlayerName(player)}.`);
+        return;
+      }
+
+      const card = hand[cardIndex];
+      const previousActiveCard = state.activeCard;
+      const matchType = getMatchType(card, previousActiveCard);
+
+      if (matchType === "illegal") {
+        addLog(`Illegal play: ${lowerPlayerName(player)} tried ${cardToText(card)}.`);
+        return;
+      }
+
+      hand.splice(cardIndex, 1);
+      state.discardPile.push(card);
+
+      const isAttackerTurn = state.roleOfCurrentTurn === "attacker";
+      const startsSequence = !previousActiveCard;
+
+      if (isAttackerTurn && startsSequence) {
+        addLog(`${lowerPlayerName(player)} attacks with ${cardToText(card)}.`);
+      } else if (isAttackerTurn) {
+        addLog(`${lowerPlayerName(player)} continues with ${cardToText(card)}${matchType === "number" || matchType === "number_and_suit" ? " (number match combo)." : "."}`);
+      } else {
+        addLog(`${lowerPlayerName(player)} contains with ${cardToText(card)}${matchType === "number" || matchType === "number_and_suit" ? " (number match combo)." : "."}`);
+      }
+
+      state.activeCard = card;
+
+      if (checkHandEmpty(player, card)) {
+        return;
+      }
+
+      // Number matches create a combo window: same player immediately plays again.
+      if (!startsSequence && (matchType === "number" || matchType === "number_and_suit")) {
+        state.currentTurn = player;
+        state.roleOfCurrentTurn = isAttackerTurn ? "attacker" : "defender";
+        addLog(`${lowerPlayerName(player)} keeps the turn on a number match.`);
+        return;
+      }
+
+      if (isAttackerTurn) {
+        state.currentTurn = state.defender;
+        state.roleOfCurrentTurn = "defender";
+      } else {
+        state.currentTurn = state.attacker;
+        state.roleOfCurrentTurn = "attacker";
+      }
+    }
+
+    // ---------------------------
+    // CPU decision making
+    // ---------------------------
+
+    function chooseRandomFrom(indexes) {
+      return indexes[Math.floor(Math.random() * indexes.length)];
+    }
+
+    function chooseLowestValueIndex(hand, indexes) {
+      let best = indexes[0];
+      for (const idx of indexes) {
+        if (hand[idx].value < hand[best].value) {
+          best = idx;
+        }
+      }
+      return best;
+    }
+
+    function chooseHighestValueIndex(hand, indexes) {
+      let best = indexes[0];
+      for (const idx of indexes) {
+        if (hand[idx].value > hand[best].value) {
+          best = idx;
+        }
+      }
+      return best;
+    }
+
+    function cpuChooseCardIndex() {
+      const hand = state.cpuHand;
+
+      if (state.currentTurn !== "cpu") {
+        return null;
+      }
+
+      if (!state.activeCard && state.roleOfCurrentTurn === "attacker") {
+        const allIndexes = hand.map((_, i) => i);
+        if (allIndexes.length === 0) {
+          return null;
+        }
+        return chooseLowestValueIndex(hand, allIndexes);
+      }
+
+      const legal = getLegalCards(hand, state.activeCard);
+      if (legal.length === 0) {
+        return null;
+      }
+
+      if (state.roleOfCurrentTurn === "defender") {
+        const sameSuit = legal.filter((idx) => hand[idx].suit === state.activeCard.suit);
+        if (sameSuit.length > 0) {
+          return chooseLowestValueIndex(hand, sameSuit);
+        }
+
+        const sameValue = legal.filter((idx) => hand[idx].value === state.activeCard.value);
+        if (sameValue.length > 0) {
+          return chooseLowestValueIndex(hand, sameValue);
+        }
+
+        return chooseRandomFrom(legal);
+      }
+
+      // CPU as attacker continuing a chain: usually low card, but higher in Offensive Zone.
+      if (state.zoneIndex === 2) {
+        return chooseHighestValueIndex(hand, legal);
+      }
+
+      return chooseLowestValueIndex(hand, legal);
+    }
+
+    function cpuTakeTurn() {
+      if (state.currentTurn !== "cpu") {
+        return false;
+      }
+
+      const hand = state.cpuHand;
+      const legal = getLegalCards(hand, state.activeCard);
+
+      if (state.activeCard && legal.length === 0) {
+        handleCannotPlay("cpu");
+        return true;
+      }
+
+      if (!state.activeCard && state.roleOfCurrentTurn === "attacker" && hand.length === 0) {
+        handleCannotPlay("cpu");
+        return true;
+      }
+
+      const idx = cpuChooseCardIndex();
+      if (idx === null || idx === undefined) {
+        handleCannotPlay("cpu");
+        return true;
+      }
+
+      playCard("cpu", idx);
+      return true;
+    }
+
+    function autoContinueCpuTurns(maxSteps = 80) {
+      let steps = 0;
+      while (state.currentTurn === "cpu" && steps < maxSteps) {
+        const progressed = cpuTakeTurn();
+        if (!progressed) {
+          break;
+        }
+        steps += 1;
+      }
+
+      if (steps >= maxSteps) {
+        addLog("Auto-continue safety stop reached.");
+      }
+    }
+
+    // ---------------------------
+    // UI rendering and events
+    // ---------------------------
+
+    function suitClass(suit) {
+      if (suit === "Pace") {
+        return "pace";
+      }
+      if (suit === "Finesse") {
+        return "finesse";
+      }
+      return "grit";
+    }
+
+    function renderZoneTrack() {
+      const zoneTrack = document.getElementById("zoneTrack");
+      zoneTrack.innerHTML = "";
+      ZONES.forEach((zoneName, idx) => {
+        const div = document.createElement("div");
+        div.className = `zone${idx === state.zoneIndex ? " active" : ""}${idx === 2 && idx === state.zoneIndex ? " offensive" : ""}`;
+        div.textContent = zoneName;
+        zoneTrack.appendChild(div);
+      });
+    }
+
+    function renderHand(containerId, hand, owner) {
+      const container = document.getElementById(containerId);
+      container.innerHTML = "";
+
+      const isHumanTurn = state.currentTurn === "human";
+      const legal = owner === "human" ? new Set(getLegalCards(hand, state.activeCard)) : null;
+
+      hand.forEach((card, i) => {
+        const btn = document.createElement("button");
+        btn.className = `card-btn ${suitClass(card.suit)}`;
+        btn.textContent = `${card.suit} ${card.value}`;
+
+        if (owner === "human") {
+          const isLegal = legal.has(i);
+          btn.classList.add(isLegal ? "legal" : "illegal");
+          btn.disabled = !isHumanTurn || !isLegal;
+          btn.title = isHumanTurn ? (isLegal ? "Play this card" : "Not legal on active card") : "Wait for your turn";
+          btn.addEventListener("click", () => {
+            playCard("human", i);
+            render();
+            autoContinueCpuTurns();
+            render();
+          });
+        } else {
+          btn.disabled = true;
+          btn.title = "CPU hand visible for debugging";
+        }
+
+        container.appendChild(btn);
+      });
+
+      if (hand.length === 0) {
+        const empty = document.createElement("span");
+        empty.className = "hint";
+        empty.textContent = "(empty hand)";
+        container.appendChild(empty);
+      }
+    }
+
+    function renderLog() {
+      const logFeed = document.getElementById("logFeed");
+      logFeed.innerHTML = "";
+
+      const recent = state.logMessages.slice(-120);
+      for (const msg of recent) {
+        const p = document.createElement("p");
+        p.className = "log-line";
+        p.textContent = msg;
+        logFeed.appendChild(p);
+      }
+
+      logFeed.scrollTop = logFeed.scrollHeight;
+    }
+
+    function render() {
+      document.getElementById("attackerLabel").textContent = lowerPlayerName(state.attacker);
+      document.getElementById("defenderLabel").textContent = lowerPlayerName(state.defender);
+      document.getElementById("turnLabel").textContent = `${lowerPlayerName(state.currentTurn)} (${state.roleOfCurrentTurn})`;
+      document.getElementById("zoneLabel").textContent = ZONES[state.zoneIndex];
+      document.getElementById("activeCardLabel").textContent = state.activeCard ? cardToText(state.activeCard) : "None";
+      document.getElementById("deckCountLabel").textContent = String(state.deck.length);
+      document.getElementById("scoreLabel").textContent = `Human ${state.humanScore} - ${state.cpuScore} CPU`;
+
+      renderZoneTrack();
+      renderHand("humanHand", state.humanHand, "human");
+      renderHand("cpuHand", state.cpuHand, "cpu");
+      renderLog();
+
+      const cannotPlayBtn = document.getElementById("cannotPlayBtn");
+      const canHumanAct = state.currentTurn === "human";
+      const legal = canHumanAct ? getLegalCards(state.humanHand, state.activeCard) : [];
+
+      cannotPlayBtn.disabled = !canHumanAct || legal.length > 0;
+      cannotPlayBtn.title = !canHumanAct
+        ? "CPU turn"
+        : legal.length > 0
+          ? "You have legal cards"
+          : "Draw and trigger cannot-play rule";
+    }
+
+    function onHumanCannotPlay() {
+      if (state.currentTurn !== "human") {
+        addLog("Cannot use Draw/Cannot Play on CPU turn.");
+        render();
+        return;
+      }
+
+      const legal = getLegalCards(state.humanHand, state.activeCard);
+      if (legal.length > 0) {
+        addLog("Human still has legal cards. Play one of the highlighted cards.");
+        render();
+        return;
+      }
+
+      handleCannotPlay("human");
+      render();
+      autoContinueCpuTurns();
+      render();
+    }
+
+    function newGame() {
+      state.deck = shuffle(createDeck());
+      state.discardPile = [];
+      state.humanHand = [];
+      state.cpuHand = [];
+      state.zoneIndex = 0;
+      state.activeCard = null;
+      state.logMessages = [];
+      state.humanScore = 0;
+      state.cpuScore = 0;
+
+      state.attacker = Math.random() < 0.5 ? "human" : "cpu";
+      syncDefender();
+      state.currentTurn = state.attacker;
+      state.roleOfCurrentTurn = "attacker";
+
+      drawCard("human", 5);
+      drawCard("cpu", 5);
+
+      addLog("New game started.");
+      addLog(`${lowerPlayerName(state.attacker)} starts as attacker.`);
+
+      render();
+      autoContinueCpuTurns();
+      render();
+    }
+
+    function setupEvents() {
+      document.getElementById("newGameBtn").addEventListener("click", () => {
+        newGame();
+      });
+
+      document.getElementById("cannotPlayBtn").addEventListener("click", () => {
+        onHumanCannotPlay();
+      });
+
+      document.getElementById("cpuStepBtn").addEventListener("click", () => {
+        if (state.currentTurn !== "cpu") {
+          addLog("CPU Step pressed, but it is not CPU turn.");
+          render();
+          return;
+        }
+
+        autoContinueCpuTurns();
+        render();
+      });
+    }
+
+    setupEvents();
+    newGame();
+  </script>
+</body>
+</html>
