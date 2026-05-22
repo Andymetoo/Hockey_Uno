@@ -16,6 +16,7 @@
       --grit: #d26b1b;
       --power: #d63f3f;
       --vision: #8a52d8;
+      --wild: #16181d;
       --ok: #167a45;
       --warn: #a66a00;
       --danger: #a62a2a;
@@ -263,6 +264,11 @@
       border-color: var(--vision);
     }
 
+    .active-card-pill.wild {
+      color: var(--wild);
+      border-color: var(--wild);
+    }
+
     .recent-plays {
       display: flex;
       flex-direction: column;
@@ -313,6 +319,11 @@
     .recent-card.vision {
       color: var(--vision);
       border-color: var(--vision);
+    }
+
+    .recent-card.wild {
+      color: var(--wild);
+      border-color: var(--wild);
     }
 
     .recent-player {
@@ -496,6 +507,11 @@
     .card-btn.vision {
       border-color: var(--vision);
       color: var(--vision);
+    }
+
+    .card-btn.wild {
+      border-color: var(--wild);
+      color: var(--wild);
     }
 
     .card-btn.hidden-card {
@@ -689,6 +705,11 @@
       border-color: var(--vision);
     }
 
+    .floating-play-card.wild {
+      color: var(--wild);
+      border-color: var(--wild);
+    }
+
     .floating-play-card.hidden {
       color: #778292;
       border-color: #b6bfcb;
@@ -782,10 +803,18 @@
               <span>Hand Size</span>
               <input id="debugHandSize" type="number" min="3" max="10" step="1" value="5" />
             </label>
+            <label class="debug-field">
+              <span>Wild Cards</span>
+              <input id="debugWildCount" type="number" min="0" max="20" step="1" value="0" />
+            </label>
+            <label class="debug-field">
+              <span>CPU Speed %</span>
+              <input id="debugCpuSpeed" type="number" min="10" max="200" step="10" value="50" />
+            </label>
           </div>
           <p class="debug-preview" id="debugPreview"></p>
           <p class="debug-preview" id="debugRulesPreview"></p>
-          <p class="hint">These settings are draft-only and apply when New Game is clicked.</p>
+          <p class="hint">Suit, value, hand size, and wild-card settings apply on New Game. CPU speed applies immediately.</p>
         </div>
       </details>
       <div class="legend" id="legendList"></div>
@@ -843,11 +872,15 @@
       { name: "Power", className: "power", cssVar: "--power", label: "red" },
       { name: "Vision", className: "vision", cssVar: "--vision", label: "purple" }
     ];
+    const WILD_SUIT = "Wild";
+    const WILD_SUIT_INFO = { name: WILD_SUIT, className: "wild", cssVar: "--wild", label: "black" };
     const FACEOFF_PRIORITY = ["Grit", "Finesse", "Pace", "Power", "Vision"];
     const DEFAULT_CONFIG = {
       suitCount: 3,
       maxValue: 6,
-      handSize: 5
+      handSize: 5,
+      wildCardCount: 0,
+      cpuSpeedPercent: 50
     };
     const ZONES = [
       "Human Goal Zone",
@@ -908,6 +941,9 @@
           deck.push({ suit, value });
         }
       }
+      for (let count = 0; count < state.config.wildCardCount; count += 1) {
+        deck.push({ suit: WILD_SUIT, value: state.config.maxValue });
+      }
       return deck;
     }
 
@@ -936,6 +972,9 @@
     function cardToText(card) {
       if (!card) {
         return "None";
+      }
+      if (card.suit === WILD_SUIT) {
+        return "W";
       }
       return `${card.suit} ${card.value}`;
     }
@@ -985,7 +1024,14 @@
     }
 
     function getSuitInfo(suit) {
+      if (suit === WILD_SUIT) {
+        return WILD_SUIT_INFO;
+      }
       return ALL_SUITS.find((entry) => entry.name === suit) || null;
+    }
+
+    function isWildCard(card) {
+      return Boolean(card) && card.suit === WILD_SUIT;
     }
 
     function getActiveSuitInfos(config = state.config) {
@@ -996,40 +1042,53 @@
       return getActiveSuitInfos(config).map((entry) => entry.name);
     }
 
-    function getFaceoffBeats(config = state.config) {
+    function getOrderedActiveFaceoffSuits(config = state.config) {
       const activeSuitNames = new Set(getActiveSuitNames(config));
-      const ordered = FACEOFF_PRIORITY.filter((name) => activeSuitNames.has(name));
-      const beats = {};
-
-      for (let i = 0; i < ordered.length; i += 1) {
-        beats[ordered[i]] = ordered[(i + 1) % ordered.length];
-      }
-
-      return beats;
+      return FACEOFF_PRIORITY.filter((name) => activeSuitNames.has(name));
     }
 
     function getFaceoffCycleText(config = state.config) {
-      const activeSuitNames = new Set(getActiveSuitNames(config));
-      const ordered = FACEOFF_PRIORITY.filter((name) => activeSuitNames.has(name));
+      const ordered = getOrderedActiveFaceoffSuits(config);
       if (ordered.length === 0) {
         return "";
       }
       return `${ordered.join(" > ")} > ${ordered[0]}`;
     }
 
+    function getFaceoffRuleSummary(config = state.config) {
+      const ordered = getOrderedActiveFaceoffSuits(config);
+      if (ordered.length === 0) {
+        return "No active faceoff suits.";
+      }
+
+      if (ordered.length % 2 === 1) {
+        return `Odd loop: each suit beats the next ${(ordered.length - 1) / 2} clockwise suit${ordered.length === 3 ? "" : "s"}. Same-suit ties resolve randomly.`;
+      }
+
+      if (ordered.length === 2) {
+        return "Even loop: different suits fall back to value only, and exact value ties resolve randomly.";
+      }
+
+      return "Even loop: each suit beats its immediate clockwise neighbor; opposite suits fall back to value, and exact value ties resolve randomly.";
+    }
+
     function getDeckSizeForConfig(config) {
-      return config.suitCount * config.maxValue * 2;
+      return (config.suitCount * config.maxValue * 2) + config.wildCardCount;
     }
 
     function getDraftConfigFromControls() {
       const suitCountInput = document.getElementById("debugSuitCount");
       const maxValueInput = document.getElementById("debugMaxValue");
       const handSizeInput = document.getElementById("debugHandSize");
+      const wildCountInput = document.getElementById("debugWildCount");
+      const cpuSpeedInput = document.getElementById("debugCpuSpeed");
 
       return {
         suitCount: clamp(Number.parseInt(suitCountInput?.value || String(DEFAULT_CONFIG.suitCount), 10), 2, 5),
         maxValue: clamp(Number.parseInt(maxValueInput?.value || String(DEFAULT_CONFIG.maxValue), 10), 5, 10),
-        handSize: clamp(Number.parseInt(handSizeInput?.value || String(DEFAULT_CONFIG.handSize), 10), 3, 10)
+        handSize: clamp(Number.parseInt(handSizeInput?.value || String(DEFAULT_CONFIG.handSize), 10), 3, 10),
+        wildCardCount: clamp(Number.parseInt(wildCountInput?.value || String(DEFAULT_CONFIG.wildCardCount), 10), 0, 20),
+        cpuSpeedPercent: clamp(Number.parseInt(cpuSpeedInput?.value || String(DEFAULT_CONFIG.cpuSpeedPercent), 10), 10, 200)
       };
     }
 
@@ -1037,6 +1096,8 @@
       const suitCountInput = document.getElementById("debugSuitCount");
       const maxValueInput = document.getElementById("debugMaxValue");
       const handSizeInput = document.getElementById("debugHandSize");
+      const wildCountInput = document.getElementById("debugWildCount");
+      const cpuSpeedInput = document.getElementById("debugCpuSpeed");
 
       if (suitCountInput) {
         suitCountInput.value = String(config.suitCount);
@@ -1047,17 +1108,24 @@
       if (handSizeInput) {
         handSizeInput.value = String(config.handSize);
       }
+      if (wildCountInput) {
+        wildCountInput.value = String(config.wildCardCount);
+      }
+      if (cpuSpeedInput) {
+        cpuSpeedInput.value = String(config.cpuSpeedPercent);
+      }
     }
 
     function refreshDebugPreview() {
       const config = getDraftConfigFromControls();
       const preview = document.getElementById("debugPreview");
       const rulesPreview = document.getElementById("debugRulesPreview");
+      const wildText = `${config.wildCardCount} wild card${config.wildCardCount === 1 ? "" : "s"}`;
       if (preview) {
-        preview.textContent = `Next game: ${config.suitCount} suits, values 1-${config.maxValue}, hand size ${config.handSize}, deck ${getDeckSizeForConfig(config)} cards.`;
+        preview.textContent = `Next game: ${config.suitCount} suits, values 1-${config.maxValue}, hand size ${config.handSize}, ${wildText}, deck ${getDeckSizeForConfig(config)} cards. CPU speed ${config.cpuSpeedPercent}% applies immediately.`;
       }
       if (rulesPreview) {
-        rulesPreview.textContent = `Next-game faceoff cycle: ${getFaceoffCycleText(config)}.`;
+        rulesPreview.textContent = `Next-game faceoff cycle: ${getFaceoffCycleText(config)}. ${getFaceoffRuleSummary(config)}`;
       }
     }
 
@@ -1077,6 +1145,16 @@
         item.appendChild(document.createTextNode(`${suitInfo.name} (${suitInfo.label})`));
         legend.appendChild(item);
       });
+
+      if (state.config.wildCardCount > 0) {
+        const item = document.createElement("span");
+        const swatch = document.createElement("span");
+        swatch.className = "swatch";
+        swatch.style.background = `var(${WILD_SUIT_INFO.cssVar})`;
+        item.appendChild(swatch);
+        item.appendChild(document.createTextNode(`Wild (${WILD_SUIT_INFO.label}, x${state.config.wildCardCount})`));
+        legend.appendChild(item);
+      }
     }
 
     function renderFaceoffRulesHint() {
@@ -1085,7 +1163,8 @@
         return;
       }
 
-      const text = `Faceoff cycle: ${getFaceoffCycleText()}. Same suit: higher number wins. Exact match: draw again.`;
+      const wildText = state.config.wildCardCount > 0 ? " Wild cards fall back to value in faceoffs." : "";
+      const text = `Faceoff cycle: ${getFaceoffCycleText()}. ${getFaceoffRuleSummary()} Same suit: higher number wins, and exact ties resolve randomly.${wildText}`;
       hint.textContent = text;
       hint.title = text;
     }
@@ -1311,6 +1390,9 @@
       if (!activeCard) {
         return true;
       }
+      if (isWildCard(card) || isWildCard(activeCard)) {
+        return true;
+      }
       return card.suit === activeCard.suit || card.value === activeCard.value;
     }
 
@@ -1509,21 +1591,14 @@
     }
 
     function compareFaceoffCards(humanCard, cpuCard) {
-      if (humanCard.suit === cpuCard.suit) {
-        if (humanCard.value > cpuCard.value) {
-          return "human";
-        }
-        if (cpuCard.value > humanCard.value) {
-          return "cpu";
-        }
-        return "tie";
-      }
-
-      const faceoffBeats = getFaceoffBeats();
-      return faceoffBeats[humanCard.suit] === cpuCard.suit ? "human" : "cpu";
+      return getFaceoffComparisonDetails(humanCard, cpuCard).winner;
     }
 
-    function describeFaceoffWin(winningCard, losingCard) {
+    function describeFaceoffWin(winningCard, losingCard, summaryOverride = "") {
+      if (summaryOverride) {
+        return summaryOverride;
+      }
+
       if (!winningCard || !losingCard) {
         return "deck exhausted";
       }
@@ -1535,16 +1610,56 @@
       return `${winningCard.suit} beats ${losingCard.suit}`;
     }
 
-    function drawFaceoffTiebreakCard(player) {
-      ensureDeckHasCards();
-      if (state.deck.length === 0) {
-        return null;
+    function resolveFaceoffByValue(humanCard, cpuCard, label = "") {
+      const prefix = label ? `${label}: ` : "";
+      if (humanCard.value > cpuCard.value) {
+        return { winner: "human", summary: `${prefix}${humanCard.value} beats ${cpuCard.value}` };
+      }
+      if (cpuCard.value > humanCard.value) {
+        return { winner: "cpu", summary: `${prefix}${cpuCard.value} beats ${humanCard.value}` };
+      }
+      return {
+        winner: Math.random() < 0.5 ? "human" : "cpu",
+        summary: `${prefix}${humanCard.value} ties ${cpuCard.value}; random edge`
+      };
+    }
+
+    function getFaceoffComparisonDetails(humanCard, cpuCard, config = state.config) {
+      if (humanCard.suit === cpuCard.suit) {
+        return resolveFaceoffByValue(humanCard, cpuCard);
       }
 
-      const card = state.deck.pop();
-      state.discardPile.push(card);
-      recordPlayedCard(player, card);
-      return card;
+      if (isWildCard(humanCard) || isWildCard(cpuCard)) {
+        return resolveFaceoffByValue(humanCard, cpuCard, "wild card");
+      }
+
+      const ordered = getOrderedActiveFaceoffSuits(config);
+      const suitCount = ordered.length;
+      const humanIndex = ordered.indexOf(humanCard.suit);
+      const cpuIndex = ordered.indexOf(cpuCard.suit);
+
+      if (humanIndex === -1 || cpuIndex === -1 || suitCount === 0) {
+        return resolveFaceoffByValue(humanCard, cpuCard, "value fallback");
+      }
+
+      const clockwiseDistance = (cpuIndex - humanIndex + suitCount) % suitCount;
+      if (suitCount % 2 === 1) {
+        const humanWinReach = (suitCount - 1) / 2;
+        if (clockwiseDistance >= 1 && clockwiseDistance <= humanWinReach) {
+          return { winner: "human", summary: `${humanCard.suit} beats ${cpuCard.suit}` };
+        }
+        return { winner: "cpu", summary: `${cpuCard.suit} beats ${humanCard.suit}` };
+      }
+
+      if (clockwiseDistance === suitCount / 2) {
+        return resolveFaceoffByValue(humanCard, cpuCard, "opposite suits");
+      }
+
+      if (clockwiseDistance === 1) {
+        return { winner: "human", summary: `${humanCard.suit} beats ${cpuCard.suit}` };
+      }
+
+      return { winner: "cpu", summary: `${cpuCard.suit} beats ${humanCard.suit}` };
     }
 
     function zoneMarkerForIndex(index) {
@@ -1795,28 +1910,10 @@
 
       addLog(`Faceoff: Human ${cardToText(humanCard)} vs CPU ${cardToText(cpuCard)}.`);
 
-      let winner = compareFaceoffCards(humanCard, cpuCard);
+      const faceoffResult = getFaceoffComparisonDetails(humanCard, cpuCard);
+      const winner = faceoffResult.winner;
       let winningCard = winner === "human" ? humanCard : cpuCard;
       let losingCard = winner === "human" ? cpuCard : humanCard;
-
-      while (winner === "tie") {
-        addLog("Faceoff tie. Draw again.");
-        const humanTiebreak = drawFaceoffTiebreakCard("human");
-        const cpuTiebreak = drawFaceoffTiebreakCard("cpu");
-
-        if (!humanTiebreak || !cpuTiebreak) {
-          winner = "human";
-          winningCard = humanTiebreak || humanCard;
-          losingCard = cpuTiebreak || cpuCard;
-          addLog("Faceoff tiebreak deck exhausted. Human gets the edge.");
-          break;
-        }
-
-        addLog(`Faceoff tiebreak: Human ${cardToText(humanTiebreak)} vs CPU ${cardToText(cpuTiebreak)}.`);
-        winner = compareFaceoffCards(humanTiebreak, cpuTiebreak);
-        winningCard = winner === "human" ? humanTiebreak : cpuTiebreak;
-        losingCard = winner === "human" ? cpuTiebreak : humanTiebreak;
-      }
 
       const resolvedZoneIndex = resolveFaceoffWinningZone(state.zoneIndex, winner);
       state.faceoffPending = false;
@@ -1826,7 +1923,7 @@
       refillHands();
       startAttackerTurn();
 
-      addLog(`${lowerPlayerName(winner)} wins the faceoff at ${zoneLabel(state.zoneIndex)} (${describeFaceoffWin(winningCard, losingCard)}).`);
+      addLog(`${lowerPlayerName(winner)} wins the faceoff at ${zoneLabel(state.zoneIndex)} (${describeFaceoffWin(winningCard, losingCard, faceoffResult.summary)}).`);
       setEvent(`${lowerPlayerName(winner)} wins the faceoff`, "turnover");
     }
 
@@ -2117,6 +2214,12 @@
       });
     }
 
+    function getCpuSimDuration(baseMs, minimumMs = 0) {
+      const speedPercent = clamp(state.config.cpuSpeedPercent || DEFAULT_CONFIG.cpuSpeedPercent, 10, 200);
+      const scaledMs = Math.round(baseMs * (DEFAULT_CONFIG.cpuSpeedPercent / speedPercent));
+      return Math.max(minimumMs, scaledMs);
+    }
+
     function cpuChooseCardIndex() {
       const hand = state.cpuHand;
 
@@ -2185,7 +2288,7 @@
 
       state.cpuPreviewIndex = idx;
       render();
-      await sleep(1000);
+      await sleep(getCpuSimDuration(1000));
 
       if (state.currentTurn !== "cpu") {
         state.cpuPreviewIndex = null;
@@ -2200,7 +2303,7 @@
       const cpuCard = state.cpuHand[idx];
       const cpuButtons = document.querySelectorAll("#cpuHand .card-btn");
       const sourceButton = cpuButtons[idx];
-      await animatePlayToPileFromElement(sourceButton, cpuCard, !state.showCpuCards, 420);
+      await animatePlayToPileFromElement(sourceButton, cpuCard, !state.showCpuCards, getCpuSimDuration(420, 120));
 
       playCard("cpu", idx);
       state.cpuPreviewIndex = null;
@@ -2292,7 +2395,7 @@
       hand.forEach((card, i) => {
         const btn = document.createElement("button");
         btn.className = `card-btn ${shouldShowCpuCards ? suitClass(card.suit) : "hidden-card"}`;
-        btn.textContent = shouldShowCpuCards ? `${card.suit} ${card.value}` : "Hidden";
+        btn.textContent = shouldShowCpuCards ? cardToText(card) : "Hidden";
 
         if (owner === "human") {
           const isLegal = legal.has(i);
@@ -2645,9 +2748,12 @@
         render();
       });
 
-      ["debugSuitCount", "debugMaxValue", "debugHandSize"].forEach((id) => {
+      ["debugSuitCount", "debugMaxValue", "debugHandSize", "debugWildCount", "debugCpuSpeed"].forEach((id) => {
         const element = document.getElementById(id);
         element?.addEventListener("input", () => {
+          if (id === "debugCpuSpeed") {
+            state.config.cpuSpeedPercent = getDraftConfigFromControls().cpuSpeedPercent;
+          }
           refreshDebugPreview();
         });
       });
