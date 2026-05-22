@@ -836,7 +836,7 @@
           <div class="active-status-chip"><span class="k">Score</span><span class="v" id="scoreLabel"></span></div>
           <div class="active-status-chip"><span class="k">Exchange</span><span class="v" id="comboLabel"></span></div>
         </div>
-        <div class="label">Active Card</div>
+            <div id="activeCardLabel" class="label">Active Card</div>
         <div id="activeCardMiddle" class="active-card-pill">Any Card</div>
         <div id="recentPlays" class="recent-plays"></div>
         <div id="comboHint" class="hint"></div>
@@ -856,6 +856,9 @@
     <section class="panel">
       <h3>Action Log</h3>
       <div id="logFeed" class="log"></div>
+      <div class="controls">
+        <button id="downloadDebugDumpBtn">Download Debug Dump</button>
+      </div>
     </section>
   </div>
   <p class="micro-tooltip" id="faceoffRulesHint"></p>
@@ -959,14 +962,76 @@
 
     function addLog(message) {
       state.logMessages.push(message);
-      if (state.logMessages.length > 300) {
-        state.logMessages.shift();
-      }
     }
 
     function setEvent(text, type = "contain") {
       state.eventText = text;
       state.eventType = type;
+    }
+
+    function buildDebugDumpText() {
+      const configLines = [
+        `Suit Count: ${state.config.suitCount}`,
+        `Max Card Value: ${state.config.maxValue}`,
+        `Hand Size: ${state.config.handSize}`,
+        `Wild Cards: ${state.config.wildCardCount}`,
+        `CPU Speed %: ${state.config.cpuSpeedPercent}`,
+        `Show CPU Cards: ${state.showCpuCards}`
+      ];
+
+      const stateLines = [
+        `Score: Human ${state.humanScore} - ${state.cpuScore} CPU`,
+        `Zone: ${zoneLabel(state.zoneIndex)}`,
+        `Attacker: ${lowerPlayerName(state.attacker)}`,
+        `Defender: ${lowerPlayerName(state.defender)}`,
+        `Current Turn: ${lowerPlayerName(state.currentTurn)}`,
+        `Current Role: ${state.roleOfCurrentTurn}`,
+        `Active Card: ${cardToText(state.activeCard)}`,
+        `Deck Count: ${state.deck.length}`,
+        `Discard Count: ${state.discardPile.length}`
+      ];
+
+      const lastShotLines = state.lastShot
+        ? [
+            `Shooter: ${lowerPlayerName(state.lastShot.attackerPlayer)} ${cardToText(state.lastShot.shotCard)}`,
+            `Defender: ${lowerPlayerName(state.lastShot.defenderPlayer)}`,
+            `Outcome: ${state.lastShot.outcome}`,
+            `Responses: ${state.lastShot.saveCards.length > 0 ? state.lastShot.saveCards.map(cardToText).join(" -> ") : "None"}`
+          ]
+        : ["No recorded shot."];
+
+      const logLines = state.logMessages.length > 0 ? state.logMessages : ["(empty log)"];
+
+      return [
+        "Hockey Card Prototype Debug Dump",
+        `Exported: ${new Date().toISOString()}`,
+        "",
+        "Settings",
+        ...configLines,
+        "",
+        "Game State",
+        ...stateLines,
+        "",
+        "Last Shot",
+        ...lastShotLines,
+        "",
+        "Action Log",
+        ...logLines
+      ].join("\n");
+    }
+
+    function downloadDebugDump() {
+      const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+      const blob = new Blob([buildDebugDumpText()], { type: "text/plain;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `hockey-card-debug-${stamp}.txt`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 0);
+      addLog("Debug dump downloaded.");
     }
 
     function cardToText(card) {
@@ -1431,10 +1496,6 @@
       }
 
       const hand = playerHand(player);
-
-      if (state.roleOfCurrentTurn === "attacker" && state.attackerChainCount === 0) {
-        return hand.map((_, index) => index);
-      }
 
       if (!state.activeCard) {
         return hand.map((_, index) => index);
@@ -2123,7 +2184,7 @@
       const matchType = getMatchType(card, previousActiveCard);
       const legalForTurn = getLegalCardsForTurn(player);
 
-      if (!legalForTurn.includes(cardIndex) || (!isOpeningAttackPlay && matchType === "illegal")) {
+      if (!legalForTurn.includes(cardIndex) || matchType === "illegal") {
         addLog(`Illegal play: ${lowerPlayerName(player)} tried ${cardToText(card)}.`);
         return;
       }
@@ -2227,7 +2288,7 @@
         return null;
       }
 
-      if (state.roleOfCurrentTurn === "attacker" && state.attackerChainCount === 0) {
+      if (!state.activeCard && state.roleOfCurrentTurn === "attacker" && state.attackerChainCount === 0) {
         const allIndexes = hand.map((_, i) => i);
         if (allIndexes.length === 0) {
           return null;
@@ -2544,7 +2605,16 @@
       renderFaceoffRulesHint();
       refreshDebugPreview();
 
+      const activeCardLabel = document.getElementById("activeCardLabel");
       const activeCardMiddle = document.getElementById("activeCardMiddle");
+      if (state.faceoffPending) {
+        activeCardLabel.textContent = "Faceoff";
+      } else if (state.shotPending) {
+        activeCardLabel.textContent = "Save Must Match";
+      } else {
+        activeCardLabel.textContent = "Active Card";
+      }
+
       activeCardMiddle.className = "active-card-pill";
       if (state.activeCard) {
         activeCardMiddle.textContent = cardToText(state.activeCard);
@@ -2575,7 +2645,9 @@
           ? `${lowerPlayerName(state.currentTurn)} may end the attack chain.`
           : `${lowerPlayerName(state.currentTurn)} may end the defense chain to resolve the exchange.`;
       } else if (state.roleOfCurrentTurn === "attacker" && state.attackerChainCount === 0) {
-        comboHint.textContent = `${lowerPlayerName(state.currentTurn)} starts a new attack with any card.`;
+        comboHint.textContent = state.activeCard
+          ? `${lowerPlayerName(state.currentTurn)} starts a new attack by matching the active card or drawing.`
+          : `${lowerPlayerName(state.currentTurn)} starts a new attack with any card.`;
       } else if (state.roleOfCurrentTurn === "defender") {
         comboHint.textContent = `${lowerPlayerName(state.currentTurn)} must match the active card or draw.`;
       } else {
@@ -2745,6 +2817,11 @@
 
       document.getElementById("showCpuCardsCheckbox").addEventListener("change", (event) => {
         state.showCpuCards = event.target.checked;
+        render();
+      });
+
+      document.getElementById("downloadDebugDumpBtn").addEventListener("click", () => {
+        downloadDebugDump();
         render();
       });
 
