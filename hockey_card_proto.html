@@ -221,6 +221,82 @@
       box-shadow: 0 0 0 3px #8db5ff inset;
     }
 
+    .turn-transition-overlay[hidden] {
+      display: none;
+    }
+
+    .turn-transition-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 8;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      background: rgba(248, 251, 255, 0.9);
+      backdrop-filter: blur(3px);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 180ms ease;
+    }
+
+    .turn-transition-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .turn-transition-card {
+      width: min(100%, 280px);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: #ffffff;
+      padding: 14px 16px;
+      box-shadow: 0 18px 38px rgba(28, 36, 48, 0.16);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      text-align: center;
+    }
+
+    .turn-transition-card.human {
+      border-color: #e19d9d;
+      background: #fff7f7;
+    }
+
+    .turn-transition-card.cpu {
+      border-color: #9fb9ec;
+      background: #f5f9ff;
+    }
+
+    .turn-transition-card.neutral {
+      border-color: #c4cfdd;
+      background: #fbfcff;
+    }
+
+    .turn-transition-kicker {
+      font-size: 0.7rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .turn-transition-title {
+      font-size: 1.18rem;
+      font-weight: 700;
+      color: var(--ink);
+    }
+
+    .turn-transition-subtitle {
+      font-size: 0.84rem;
+      color: var(--muted);
+    }
+
+    .turn-transition-btn {
+      min-width: 150px;
+      font-weight: 700;
+    }
+
     .active-middle .label {
       font-size: 0.72rem;
       letter-spacing: 0.06em;
@@ -228,15 +304,38 @@
       text-transform: uppercase;
     }
 
+    .active-card-row {
+      display: flex;
+      align-items: stretch;
+      justify-content: center;
+      gap: 10px;
+      width: 100%;
+      max-width: 240px;
+      margin: 0 auto;
+    }
+
+    .active-card-stack {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+      flex: 1;
+    }
+
     .active-card-pill {
-      display: inline-block;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       border: 2px solid var(--border);
       border-radius: 10px;
       padding: 10px 12px;
       min-width: 110px;
+      min-height: 72px;
       font-weight: 700;
       background: #fff;
       margin: 0 auto;
+      width: 100%;
     }
 
     .active-card-pill.pace {
@@ -352,15 +451,6 @@
       margin: 0;
     }
 
-    .draw-float-btn {
-      position: absolute;
-      top: 8px;
-      right: 8px;
-      padding: 4px 8px;
-      font-size: 0.78rem;
-      z-index: 2;
-    }
-
     .chain-float-btn {
       position: absolute;
       top: 8px;
@@ -368,6 +458,57 @@
       padding: 4px 8px;
       font-size: 0.78rem;
       z-index: 2;
+    }
+
+    .deck-draw-btn {
+      width: 78px;
+      min-width: 78px;
+      min-height: 106px;
+      padding: 8px 6px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      border: 2px solid #60708a;
+      border-radius: 12px;
+      background:
+        linear-gradient(135deg, rgba(255, 255, 255, 0.14) 0%, rgba(255, 255, 255, 0) 45%),
+        repeating-linear-gradient(135deg, #425168 0 8px, #54647d 8px 16px);
+      color: #f7fbff;
+      box-shadow: 0 10px 22px rgba(28, 36, 48, 0.14);
+      align-self: flex-end;
+    }
+
+    .deck-draw-btn:hover:not(:disabled) {
+      background:
+        linear-gradient(135deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0) 45%),
+        repeating-linear-gradient(135deg, #3d4b61 0 8px, #4d5d75 8px 16px);
+    }
+
+    .deck-draw-btn.no-save {
+      border-color: #d57a60;
+      background: linear-gradient(180deg, #fff3ec 0%, #ffd4c3 100%);
+      color: #8c331a;
+    }
+
+    .deck-draw-title {
+      font-size: 0.63rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      opacity: 0.88;
+    }
+
+    .deck-draw-count {
+      font-size: 1.18rem;
+      line-height: 1;
+      font-weight: 800;
+    }
+
+    .deck-draw-action {
+      font-size: 0.76rem;
+      line-height: 1.1;
+      font-weight: 700;
     }
 
     .active-status-row {
@@ -811,6 +952,13 @@
               <span>CPU Speed %</span>
               <input id="debugCpuSpeed" type="number" min="10" max="200" step="10" value="50" />
             </label>
+            <label class="debug-field">
+              <span>Cross River Once</span>
+              <select id="debugRiverMode">
+                <option value="off" selected>Off</option>
+                <option value="on">On</option>
+              </select>
+            </label>
           </div>
           <p class="debug-preview" id="debugPreview"></p>
           <p class="debug-preview" id="debugRulesPreview"></p>
@@ -831,16 +979,32 @@
       </div>
       <div class="active-middle" id="activeMiddle">
         <button id="doneComboBtn" class="chain-float-btn">End Chain</button>
-        <button id="cannotPlayBtn" class="draw-float-btn">Draw</button>
         <div class="active-status-row">
           <div class="active-status-chip"><span class="k">Score</span><span class="v" id="scoreLabel"></span></div>
           <div class="active-status-chip"><span class="k">Exchange</span><span class="v" id="comboLabel"></span></div>
         </div>
+        <div class="active-card-row">
+          <div class="active-card-stack">
             <div id="activeCardLabel" class="label">Active Card</div>
-        <div id="activeCardMiddle" class="active-card-pill">Any Card</div>
+            <div id="activeCardMiddle" class="active-card-pill">Any Card</div>
+          </div>
+          <button id="cannotPlayBtn" class="deck-draw-btn" type="button">
+            <span id="deckDrawTitle" class="deck-draw-title">Deck</span>
+            <span id="deckDrawCount" class="deck-draw-count">0</span>
+            <span id="deckDrawAction" class="deck-draw-action">Draw</span>
+          </button>
+        </div>
         <div id="recentPlays" class="recent-plays"></div>
         <div id="comboHint" class="hint"></div>
         <div id="eventBanner" class="event-banner contain"></div>
+        <div id="turnTransitionOverlay" class="turn-transition-overlay" hidden>
+          <div id="turnTransitionCard" class="turn-transition-card neutral">
+            <div class="turn-transition-kicker">Turn Change</div>
+            <div id="turnTransitionTitle" class="turn-transition-title">Next Turn</div>
+            <div id="turnTransitionSubtitle" class="turn-transition-subtitle">Auto-advance in 3s.</div>
+            <button id="turnTransitionBtn" class="turn-transition-btn" type="button">Next Turn</button>
+          </div>
+        </div>
       </div>
       <div class="panel hand-panel" id="cpuPanel">
         <h3>CPU Hand (debug visible)</h3>
@@ -883,7 +1047,8 @@
       maxValue: 6,
       handSize: 5,
       wildCardCount: 0,
-      cpuSpeedPercent: 50
+      cpuSpeedPercent: 50,
+      singleRiverCrossMode: false
     };
     const ZONES = [
       "Human Goal Zone",
@@ -894,6 +1059,7 @@
       "CPU Goal Zone"
     ];
     const CENTER_ICE = 2.5;
+    const TURN_TRANSITION_MS = 3000;
 
     const state = {
       deck: [],
@@ -905,6 +1071,8 @@
       currentTurn: "human",
       roleOfCurrentTurn: "attacker",
       activeCard: null,
+      runMatchMode: null,
+      runHasCrossedRiver: false,
       comboWindow: false,
       comboPlayer: null,
       turnPlayCount: 0,
@@ -922,6 +1090,7 @@
       eventType: "contain",
       lastShot: null,
       recentPlayedCards: [],
+      turnTransition: null,
       zoneIndex: 0,
       humanScore: 0,
       cpuScore: 0,
@@ -931,6 +1100,8 @@
     let activeDrag = null;
     let suppressHumanCardClickUntil = 0;
     let goalFlashTimeoutId = null;
+    let turnTransitionTimeoutId = null;
+    let turnTransitionIntervalId = null;
 
     // ---------------------------
     // Utility and setup functions
@@ -976,6 +1147,7 @@
         `Hand Size: ${state.config.handSize}`,
         `Wild Cards: ${state.config.wildCardCount}`,
         `CPU Speed %: ${state.config.cpuSpeedPercent}`,
+        `Cross River Once: ${state.config.singleRiverCrossMode}`,
         `Show CPU Cards: ${state.showCpuCards}`
       ];
 
@@ -987,6 +1159,8 @@
         `Current Turn: ${lowerPlayerName(state.currentTurn)}`,
         `Current Role: ${state.roleOfCurrentTurn}`,
         `Active Card: ${cardToText(state.activeCard)}`,
+        `Run Match Mode: ${state.runMatchMode || "uncommitted"}`,
+        `River Crossed: ${state.runHasCrossedRiver}`,
         `Deck Count: ${state.deck.length}`,
         `Discard Count: ${state.discardPile.length}`
       ];
@@ -1044,6 +1218,14 @@
       return `${card.suit} ${card.value}`;
     }
 
+    function cardsToText(cards) {
+      return cards.length > 0 ? cards.map(cardToText).join(", ") : "none";
+    }
+
+    function cardsAtIndexesToText(hand, indexes) {
+      return indexes.length > 0 ? indexes.map((index) => cardToText(hand[index])).join(", ") : "none";
+    }
+
     function playerEmoji(player) {
       return player === "human" ? "🧑" : "🤖";
     }
@@ -1082,6 +1264,85 @@
         return "CPU";
       }
       return "None";
+    }
+
+    function clearTurnTransitionTimers() {
+      if (turnTransitionTimeoutId) {
+        clearTimeout(turnTransitionTimeoutId);
+        turnTransitionTimeoutId = null;
+      }
+      if (turnTransitionIntervalId) {
+        clearInterval(turnTransitionIntervalId);
+        turnTransitionIntervalId = null;
+      }
+    }
+
+    function getTurnTransitionTone(player, role) {
+      if (role === "faceoff") {
+        return "neutral";
+      }
+      if (player === "human") {
+        return "human";
+      }
+      if (player === "cpu") {
+        return "cpu";
+      }
+      return "neutral";
+    }
+
+    function getTurnTransitionTitle(player, role) {
+      if (role === "faceoff") {
+        return "Faceoff";
+      }
+      if (role === "save") {
+        return `${lowerPlayerName(player)} Save Turn`;
+      }
+      if (role === "attacker") {
+        return `${lowerPlayerName(player)} Attack Turn`;
+      }
+      if (role === "defender") {
+        return `${lowerPlayerName(player)} Defense Turn`;
+      }
+      return "Next Turn";
+    }
+
+    function dismissTurnTransition(runFollowUp = true) {
+      if (!state.turnTransition) {
+        return;
+      }
+
+      clearTurnTransitionTimers();
+      state.turnTransition = null;
+      render();
+
+      if (runFollowUp) {
+        runCpuAuto();
+        render();
+      }
+    }
+
+    function startTurnTransition(player, role, durationMs = TURN_TRANSITION_MS) {
+      clearTurnTransitionTimers();
+      state.turnTransition = {
+        player,
+        role,
+        tone: getTurnTransitionTone(player, role),
+        title: getTurnTransitionTitle(player, role),
+        deadline: Date.now() + durationMs
+      };
+
+      turnTransitionIntervalId = setInterval(() => {
+        if (!state.turnTransition) {
+          return;
+        }
+        render();
+      }, 200);
+
+      turnTransitionTimeoutId = setTimeout(() => {
+        dismissTurnTransition();
+      }, durationMs);
+
+      render();
     }
 
     function clamp(value, min, max) {
@@ -1147,13 +1408,15 @@
       const handSizeInput = document.getElementById("debugHandSize");
       const wildCountInput = document.getElementById("debugWildCount");
       const cpuSpeedInput = document.getElementById("debugCpuSpeed");
+      const riverModeInput = document.getElementById("debugRiverMode");
 
       return {
         suitCount: clamp(Number.parseInt(suitCountInput?.value || String(DEFAULT_CONFIG.suitCount), 10), 2, 5),
         maxValue: clamp(Number.parseInt(maxValueInput?.value || String(DEFAULT_CONFIG.maxValue), 10), 5, 10),
         handSize: clamp(Number.parseInt(handSizeInput?.value || String(DEFAULT_CONFIG.handSize), 10), 3, 10),
         wildCardCount: clamp(Number.parseInt(wildCountInput?.value || String(DEFAULT_CONFIG.wildCardCount), 10), 0, 20),
-        cpuSpeedPercent: clamp(Number.parseInt(cpuSpeedInput?.value || String(DEFAULT_CONFIG.cpuSpeedPercent), 10), 10, 200)
+        cpuSpeedPercent: clamp(Number.parseInt(cpuSpeedInput?.value || String(DEFAULT_CONFIG.cpuSpeedPercent), 10), 10, 200),
+        singleRiverCrossMode: (riverModeInput?.value || "off") === "on"
       };
     }
 
@@ -1163,6 +1426,7 @@
       const handSizeInput = document.getElementById("debugHandSize");
       const wildCountInput = document.getElementById("debugWildCount");
       const cpuSpeedInput = document.getElementById("debugCpuSpeed");
+      const riverModeInput = document.getElementById("debugRiverMode");
 
       if (suitCountInput) {
         suitCountInput.value = String(config.suitCount);
@@ -1179,6 +1443,9 @@
       if (cpuSpeedInput) {
         cpuSpeedInput.value = String(config.cpuSpeedPercent);
       }
+      if (riverModeInput) {
+        riverModeInput.value = config.singleRiverCrossMode ? "on" : "off";
+      }
     }
 
     function refreshDebugPreview() {
@@ -1186,11 +1453,12 @@
       const preview = document.getElementById("debugPreview");
       const rulesPreview = document.getElementById("debugRulesPreview");
       const wildText = `${config.wildCardCount} wild card${config.wildCardCount === 1 ? "" : "s"}`;
+      const riverText = config.singleRiverCrossMode ? "cross river once ON" : "cross river once OFF";
       if (preview) {
-        preview.textContent = `Next game: ${config.suitCount} suits, values 1-${config.maxValue}, hand size ${config.handSize}, ${wildText}, deck ${getDeckSizeForConfig(config)} cards. CPU speed ${config.cpuSpeedPercent}% applies immediately.`;
+        preview.textContent = `Next game: ${config.suitCount} suits, values 1-${config.maxValue}, hand size ${config.handSize}, ${wildText}, deck ${getDeckSizeForConfig(config)} cards, ${riverText}. CPU speed ${config.cpuSpeedPercent}% applies immediately.`;
       }
       if (rulesPreview) {
-        rulesPreview.textContent = `Next-game faceoff cycle: ${getFaceoffCycleText(config)}. ${getFaceoffRuleSummary(config)}`;
+        rulesPreview.textContent = `Next-game faceoff cycle: ${getFaceoffCycleText(config)}. ${getFaceoffRuleSummary(config)} Chain mode: ${config.singleRiverCrossMode ? "you may switch between value and suit matching once per pile run." : "value and suit matching may alternate freely."}`;
       }
     }
 
@@ -1363,8 +1631,9 @@
       }
 
       const legal = getLegalCardsForTurn(player);
-      if (!legal.includes(cardIndex)) {
-        addLog(`Illegal save attempt: ${lowerPlayerName(player)} tried ${cardToText(hand[cardIndex])}.`);
+      const matchDecision = getMatchDecision(hand[cardIndex], state.activeCard);
+      if (!legal.includes(cardIndex) || !matchDecision.legal) {
+        addLog(`Illegal save attempt: ${lowerPlayerName(player)} tried ${cardToText(hand[cardIndex])} (${matchDecision.reason}).`);
         return;
       }
 
@@ -1372,15 +1641,21 @@
       state.discardPile.push(card);
       recordPlayedCard(player, card);
       state.activeCard = card;
+      state.runMatchMode = matchDecision.nextMode;
+      state.runHasCrossedRiver = matchDecision.nextHasCrossed;
       shot.savedCards.push(card);
       shot.savedCount += 1;
       state.turnPlayCount = shot.savedCount;
 
       addLog(`${lowerPlayerName(player)} plays save card ${shot.savedCount}/${shot.requiredLength}: ${cardToText(card)}.`);
+      addLog(`Pile top is now ${cardToText(state.activeCard)}.`);
+      addLog(`Match debug: ${describeMatchDecision(matchDecision)}.`);
       setEvent(`Save chain ${shot.savedCount}/${shot.requiredLength}`, "contain");
 
       if (shot.savedCount >= shot.requiredLength) {
         finishShotWithSave(shot.savedCards);
+      } else {
+        logTurnDiagnostics(player, "Save continues.");
       }
     }
 
@@ -1420,6 +1695,38 @@
       return card;
     }
 
+    function getDeckGhostRect(sourceElement) {
+      const rect = sourceElement.getBoundingClientRect();
+      const width = Math.min(112, Math.max(72, rect.width - 20));
+      const height = Math.min(132, Math.max(92, rect.height - 20));
+      return {
+        left: rect.left + ((rect.width - width) / 2),
+        top: rect.top + ((rect.height - height) / 2),
+        width,
+        height
+      };
+    }
+
+    function getDrawAnimationTarget(player) {
+      const buttonSelector = player === "human" ? "#humanHand .card-btn:last-child" : "#cpuHand .card-btn:last-child";
+      const containerId = player === "human" ? "humanHand" : "cpuHand";
+      return document.querySelector(buttonSelector) || document.getElementById(containerId);
+    }
+
+    async function animateDrawToHand(player, drawnCard, duration = 320) {
+      const deckButton = document.getElementById("cannotPlayBtn");
+      const target = getDrawAnimationTarget(player);
+      if (!deckButton || !target || !drawnCard) {
+        return;
+      }
+
+      const hidden = player === "cpu" && !state.showCpuCards;
+      const ghost = createFloatingPlayCard(cardToText(drawnCard), drawnCard.suit, getDeckGhostRect(deckButton), hidden);
+      ghost.style.opacity = "0.96";
+      ghost.style.transform = "scale(0.92)";
+      await animateGhostToTarget(ghost, target, duration);
+    }
+
     function refillHands() {
       while (state.humanHand.length < state.config.handSize) {
         if (drawCard("human", 1) === 0) {
@@ -1433,7 +1740,7 @@
       }
     }
 
-    function tryPlayDrawnCard(player, drawnCard) {
+    async function tryPlayDrawnCard(player, drawnCard) {
       if (!drawnCard) {
         return false;
       }
@@ -1446,41 +1753,126 @@
         return false;
       }
 
-      addLog(`${lowerPlayerName(player)} draws ${cardToText(drawnCard)} and plays it immediately.`);
+      const drawnButton = getDrawAnimationTarget(player);
+      await animatePlayToPileFromElement(drawnButton, drawnCard, player === "cpu" && !state.showCpuCards, player === "cpu" ? getCpuSimDuration(420, 120) : 280);
+      addLog(`${lowerPlayerName(player)} plays the drawn ${cardToText(drawnCard)} immediately.`);
       playCard(player, drawnIndex);
       return true;
     }
 
-    function isLegalPlay(card, activeCard) {
+    function isNewestDrawnCardPlayable(player) {
+      const hand = playerHand(player);
+      const drawnIndex = hand.length - 1;
+      if (drawnIndex < 0) {
+        return false;
+      }
+      return getLegalCardsForTurn(player).includes(drawnIndex);
+    }
+
+    function resetRunMatchState() {
+      state.runMatchMode = null;
+      state.runHasCrossedRiver = false;
+    }
+
+    function getAvailableMatchTypes(card, activeCard) {
       if (!activeCard) {
-        return true;
+        return ["start"];
       }
       if (isWildCard(card) || isWildCard(activeCard)) {
-        return true;
-      }
-      return card.suit === activeCard.suit || card.value === activeCard.value;
-    }
-
-    function getMatchType(card, activeCard) {
-      if (!activeCard) {
-        return "start";
+        return ["wild"];
       }
 
-      return isLegalPlay(card, activeCard) ? "chain" : "illegal";
+      const matchTypes = [];
+      if (card.suit === activeCard.suit) {
+        matchTypes.push("suit");
+      }
+      if (card.value === activeCard.value) {
+        matchTypes.push("value");
+      }
+      return matchTypes;
     }
 
-    function getLegalCards(hand, activeCard) {
+    function getMatchDecision(card, activeCard, currentMode = state.runMatchMode, hasCrossed = state.runHasCrossedRiver, config = state.config) {
+      const matchTypes = getAvailableMatchTypes(card, activeCard);
+
+      if (matchTypes.includes("start")) {
+        return { legal: true, appliedType: "start", nextMode: currentMode, nextHasCrossed: hasCrossed, crossedRiver: false, reason: "starts the pile" };
+      }
+
+      if (matchTypes.includes("wild")) {
+        return { legal: true, appliedType: "wild", nextMode: currentMode, nextHasCrossed: hasCrossed, crossedRiver: false, reason: "uses a wild bridge" };
+      }
+
+      if (matchTypes.length === 0) {
+        return { legal: false, appliedType: null, nextMode: currentMode, nextHasCrossed: hasCrossed, crossedRiver: false, reason: "does not match suit or value" };
+      }
+
+      if (!config.singleRiverCrossMode) {
+        const appliedType = currentMode && matchTypes.includes(currentMode) ? currentMode : (matchTypes.length === 2 ? "both" : matchTypes[0]);
+        return { legal: true, appliedType, nextMode: currentMode, nextHasCrossed: hasCrossed, crossedRiver: false, reason: "standard matching", matchTypes };
+      }
+
+      if (currentMode === null) {
+        if (matchTypes.length === 2) {
+          return { legal: true, appliedType: "both", nextMode: null, nextHasCrossed: hasCrossed, crossedRiver: false, reason: "matches by suit and value without locking the run", matchTypes };
+        }
+
+        return { legal: true, appliedType: matchTypes[0], nextMode: matchTypes[0], nextHasCrossed: hasCrossed, crossedRiver: false, reason: `locks the run to ${matchTypes[0]} matching`, matchTypes };
+      }
+
+      if (matchTypes.includes(currentMode)) {
+        return { legal: true, appliedType: currentMode, nextMode: currentMode, nextHasCrossed: hasCrossed, crossedRiver: false, reason: `continues matching by ${currentMode}`, matchTypes };
+      }
+
+      if (!hasCrossed) {
+        const nextMode = matchTypes[0];
+        return { legal: true, appliedType: nextMode, nextMode, nextHasCrossed: true, crossedRiver: true, previousMode: currentMode, reason: `crosses the river from ${currentMode} to ${nextMode}`, matchTypes };
+      }
+
+      return { legal: false, appliedType: null, nextMode: currentMode, nextHasCrossed: hasCrossed, crossedRiver: false, reason: `river already crossed; run is locked to ${currentMode} matching`, matchTypes };
+    }
+
+    function describeMatchDecision(decision) {
+      if (!decision || !decision.legal) {
+        return decision?.reason || "illegal match";
+      }
+
+      if (decision.appliedType === "start") {
+        return "starts a new pile";
+      }
+      if (decision.appliedType === "wild") {
+        return "uses a wild bridge";
+      }
+      if (decision.appliedType === "both") {
+        return "matches by suit and value";
+      }
+      if (decision.crossedRiver) {
+        return `matches by ${decision.appliedType} and crosses the river from ${decision.previousMode} to ${decision.appliedType}`;
+      }
+      return `matches by ${decision.appliedType}`;
+    }
+
+    function isLegalPlay(card, activeCard, currentMode = state.runMatchMode, hasCrossed = state.runHasCrossedRiver, config = state.config) {
+      return getMatchDecision(card, activeCard, currentMode, hasCrossed, config).legal;
+    }
+
+    function getMatchType(card, activeCard, currentMode = state.runMatchMode, hasCrossed = state.runHasCrossedRiver, config = state.config) {
+      const decision = getMatchDecision(card, activeCard, currentMode, hasCrossed, config);
+      return decision.legal ? decision.appliedType : "illegal";
+    }
+
+    function getLegalCards(hand, activeCard, currentMode = state.runMatchMode, hasCrossed = state.runHasCrossedRiver, config = state.config) {
       const legalIndexes = [];
       for (let i = 0; i < hand.length; i += 1) {
-        if (isLegalPlay(hand[i], activeCard)) {
+        if (isLegalPlay(hand[i], activeCard, currentMode, hasCrossed, config)) {
           legalIndexes.push(i);
         }
       }
       return legalIndexes;
     }
 
-    function getComboLegalCards(hand, activeCard) {
-      return getLegalCards(hand, activeCard);
+    function getComboLegalCards(hand, activeCard, currentMode = state.runMatchMode, hasCrossed = state.runHasCrossedRiver, config = state.config) {
+      return getLegalCards(hand, activeCard, currentMode, hasCrossed, config);
     }
 
     function getLegalCardsForTurn(player) {
@@ -1502,6 +1894,25 @@
       }
 
       return getLegalCards(hand, state.activeCard);
+    }
+
+    function logTurnDiagnostics(player, label = "Turn setup.") {
+      if (!player || player !== state.currentTurn || state.faceoffPending) {
+        return;
+      }
+
+      const hand = playerHand(player);
+      if (state.shotPending) {
+        addLog(`${label} ${lowerPlayerName(player)} save turn. Must answer ${cardToText(state.activeCard)} with ${state.shotPending.requiredLength} linked save card(s). Hand: ${cardsToText(hand)}.`);
+        return;
+      }
+
+      const legal = getLegalCardsForTurn(player);
+      const activeText = state.activeCard ? cardToText(state.activeCard) : "Any Card";
+      const riverText = state.config.singleRiverCrossMode
+        ? ` Run mode: ${state.runMatchMode || "uncommitted"}. River crossed: ${state.runHasCrossedRiver ? "yes" : "no"}.`
+        : "";
+      addLog(`${label} ${lowerPlayerName(player)} ${state.roleOfCurrentTurn} turn. Active card: ${activeText}. Legal plays: ${cardsAtIndexesToText(hand, legal)}. Full hand: ${cardsToText(hand)}.${riverText}`);
     }
 
     function clearComboWindow() {
@@ -1540,11 +1951,17 @@
       }
     }
 
-    function setCurrentTurn(player, role) {
+    function setCurrentTurn(player, role, forceTransition = false) {
+      const previousTurn = state.currentTurn;
+      const previousRole = state.roleOfCurrentTurn;
       state.currentTurn = player;
       state.roleOfCurrentTurn = role;
       syncTurnPlayCount();
       refreshComboWindow();
+
+      if (forceTransition || previousTurn !== player || previousRole !== role) {
+        startTurnTransition(player, role);
+      }
     }
 
     function resetExchangeCounts() {
@@ -1556,10 +1973,11 @@
     function startAttackerTurn() {
       clearComboWindow();
       resetExchangeCounts();
+      resetRunMatchState();
       clearShotPending();
       state.activeBattleState = "attack";
       state.comboImmunityActive = false;
-      setCurrentTurn(state.attacker, "attacker");
+      setCurrentTurn(state.attacker, "attacker", true);
     }
 
     function passAttackTurn() {
@@ -1567,9 +1985,10 @@
       state.defenderChainCount = 0;
       state.activeBattleState = "defense";
       state.comboImmunityActive = false;
-      setCurrentTurn(state.defender, "defender");
+      setCurrentTurn(state.defender, "defender", true);
       addLog(`Turn passes to ${lowerPlayerName(state.defender)} to defend the exchange.`);
       setEvent(`${lowerPlayerName(state.defender)} defending`, "contain");
+      logTurnDiagnostics(state.currentTurn);
     }
 
     function resolveExchange(winner, reason) {
@@ -1588,6 +2007,7 @@
         }
         setEvent("Exchange Win (+1 Zone)", "shot");
         startAttackerTurn();
+        logTurnDiagnostics(state.currentTurn);
         return;
       }
 
@@ -1596,6 +2016,7 @@
       addLog(reason || `${lowerPlayerName(state.attacker)} wins the exchange ${state.defenderChainCount}-${state.attackerChainCount}. Turnover.`);
       setEvent("Turnover", "turnover");
       startAttackerTurn();
+      logTurnDiagnostics(state.currentTurn);
     }
 
     function endComboByChoice(player) {
@@ -1926,6 +2347,7 @@
       state.currentTurn = "human";
       state.roleOfCurrentTurn = "faceoff";
       state.activeCard = null;
+      resetRunMatchState();
       clearShotPending();
       clearComboWindow();
       state.turnPlayCount = 0;
@@ -1939,6 +2361,7 @@
 
       addLog(`Faceoff at ${zoneLabel(state.zoneIndex)}. Human choose a card.`);
       setEvent(`Faceoff at ${zoneLabel(state.zoneIndex)}`, "contain");
+      startTurnTransition("human", "faceoff");
     }
 
     function resolveFaceoff(humanIndex) {
@@ -1981,11 +2404,15 @@
       state.zoneIndex = resolvedZoneIndex;
       state.attacker = winner;
       syncDefender();
+      state.activeCard = winningCard;
+      resetRunMatchState();
       refillHands();
       startAttackerTurn();
 
       addLog(`${lowerPlayerName(winner)} wins the faceoff at ${zoneLabel(state.zoneIndex)} (${describeFaceoffWin(winningCard, losingCard, faceoffResult.summary)}).`);
+      addLog(`Pile top is now ${cardToText(state.activeCard)} from the faceoff win.`);
       setEvent(`${lowerPlayerName(winner)} wins the faceoff`, "turnover");
+      logTurnDiagnostics(state.currentTurn);
     }
 
     // ----------------------------------------
@@ -2006,7 +2433,7 @@
       const used = new Set();
       const chainIndexes = [];
 
-      function search(prevCard, depth) {
+      function search(prevCard, depth, currentMode, hasCrossed) {
         if (depth === requiredLength) {
           return true;
         }
@@ -2017,15 +2444,15 @@
           }
 
           const candidate = hand[i];
-          const legal = isLegalPlay(candidate, prevCard);
-          if (!legal) {
+          const decision = getMatchDecision(candidate, prevCard, currentMode, hasCrossed);
+          if (!decision.legal) {
             continue;
           }
 
           used.add(i);
           chainIndexes.push(i);
 
-          if (search(candidate, depth + 1)) {
+          if (search(candidate, depth + 1, decision.nextMode, decision.nextHasCrossed)) {
             return true;
           }
 
@@ -2036,7 +2463,7 @@
         return false;
       }
 
-      const success = search(startingCard, 0);
+      const success = search(startingCard, 0, state.runMatchMode, state.runHasCrossedRiver);
       return success ? [...chainIndexes] : null;
     }
 
@@ -2070,6 +2497,8 @@
         state.activeCard = shotCard;
         addLog(`Human must manually play a ${requiredLength}-card save chain or concede the goal.`);
         setEvent(`Save chain needed: ${requiredLength}`, "contain");
+        logTurnDiagnostics(defenderPlayer, "Save setup.");
+        startTurnTransition(defenderPlayer, "save");
         return;
       }
 
@@ -2111,23 +2540,42 @@
     // Turn and rule handling
     // ---------------------------
 
-    function handleCannotPlay(player) {
+    async function handleCannotPlay(player) {
       const drawnCard = drawOneCard(player);
-      if (tryPlayDrawnCard(player, drawnCard)) {
+
+      if (drawnCard) {
+        addLog(`${lowerPlayerName(player)} draws ${cardToText(drawnCard)} from the deck (${state.deck.length} left).`);
+        render();
+        await animateDrawToHand(player, drawnCard, player === "cpu" ? getCpuSimDuration(460, 140) : 320);
+      } else {
+        addLog(`${lowerPlayerName(player)} tries to draw, but the deck is empty.`);
+      }
+
+      if (player === "human" && drawnCard && isNewestDrawnCardPlayable(player)) {
+        addLog(`Human drew ${cardToText(drawnCard)}. It is playable; choose it manually if you want to use it.`);
+        logTurnDiagnostics(player, "Draw result.");
         return;
+      }
+
+      if (await tryPlayDrawnCard(player, drawnCard)) {
+        return;
+      }
+
+      if (drawnCard) {
+        addLog(`${lowerPlayerName(player)} still cannot play the drawn ${cardToText(drawnCard)} on ${cardToText(state.activeCard)}.`);
       }
 
       clearComboWindow();
       state.cpuPreviewIndex = null;
 
       if (state.roleOfCurrentTurn === "attacker") {
-        addLog(`${lowerPlayerName(player)} ${drawnCard ? `draws ${cardToText(drawnCard)}` : "cannot draw"} and ends the attack chain at ${state.attackerChainCount}.`);
+        addLog(`${lowerPlayerName(player)} ${drawnCard ? "ends the attack chain after the draw" : "cannot draw and ends the attack chain"} at ${state.attackerChainCount}.`);
         setEvent("Attack chain ends", "contain");
         passAttackTurn();
         return;
       }
 
-      addLog(`${lowerPlayerName(player)} ${drawnCard ? `draws ${cardToText(drawnCard)}` : "cannot draw"} and cannot continue the defense.`);
+      addLog(`${lowerPlayerName(player)} ${drawnCard ? "cannot continue the defense after the draw" : "cannot draw and cannot continue the defense"}.`);
       resolveExchange(state.attacker, `${lowerPlayerName(state.attacker)} wins the exchange ${state.attackerChainCount}-${state.defenderChainCount}.`);
     }
 
@@ -2181,11 +2629,12 @@
       const card = hand[cardIndex];
       const isOpeningAttackPlay = state.roleOfCurrentTurn === "attacker" && state.attackerChainCount === 0;
       const previousActiveCard = state.activeCard;
-      const matchType = getMatchType(card, previousActiveCard);
+      const matchDecision = getMatchDecision(card, previousActiveCard);
+      const matchType = matchDecision.legal ? matchDecision.appliedType : "illegal";
       const legalForTurn = getLegalCardsForTurn(player);
 
-      if (!legalForTurn.includes(cardIndex) || matchType === "illegal") {
-        addLog(`Illegal play: ${lowerPlayerName(player)} tried ${cardToText(card)}.`);
+      if (!legalForTurn.includes(cardIndex) || !matchDecision.legal || matchType === "illegal") {
+        addLog(`Illegal play: ${lowerPlayerName(player)} tried ${cardToText(card)} (${matchDecision.reason}).`);
         return;
       }
 
@@ -2194,8 +2643,12 @@
       recordPlayedCard(player, card);
 
       state.activeCard = card;
+        state.runMatchMode = matchDecision.nextMode;
+        state.runHasCrossedRiver = matchDecision.nextHasCrossed;
       state.activeBattleState = state.roleOfCurrentTurn === "attacker" ? "attack" : "defense";
       state.comboImmunityActive = false;
+      addLog(`Pile top is now ${cardToText(state.activeCard)}.`);
+        addLog(`Match debug: ${describeMatchDecision(matchDecision)}.`);
 
       if (state.roleOfCurrentTurn === "attacker") {
         state.attackerChainCount += 1;
@@ -2226,6 +2679,7 @@
         } else {
           addLog(`${lowerPlayerName(player)} may keep defending or press End Chain.`);
         }
+        logTurnDiagnostics(player, "Chain continues.");
         return;
       }
 
@@ -2319,8 +2773,21 @@
       return chooseLowestValueIndex(hand, legal);
     }
 
+    function getCpuChoiceReason(hand) {
+      if (state.roleOfCurrentTurn === "defender") {
+        return "lowest legal defense";
+      }
+      if (isShotZone("cpu") || hand.length === 1) {
+        return "highest legal attack";
+      }
+      if (isFarOffensiveZone("cpu") || isCloseOffensiveZone("cpu")) {
+        return "highest legal attack in offensive zone";
+      }
+      return "lowest legal attack to conserve stronger cards";
+    }
+
     async function cpuTakeTurn() {
-      if (state.currentTurn !== "cpu") {
+      if (state.currentTurn !== "cpu" || state.turnTransition) {
         return false;
       }
 
@@ -2337,7 +2804,7 @@
       }
 
       if (legal.length === 0) {
-        handleCannotPlay("cpu");
+        await handleCannotPlay("cpu");
         return true;
       }
 
@@ -2346,6 +2813,9 @@
         endComboByChoice("cpu");
         return true;
       }
+
+      addLog(`CPU debug: active card ${state.activeCard ? cardToText(state.activeCard) : "Any Card"}; legal plays ${cardsAtIndexesToText(state.cpuHand, legal)}.`);
+      addLog(`CPU selects ${cardToText(state.cpuHand[idx])} from hand (${getCpuChoiceReason(state.cpuHand)}).`);
 
       state.cpuPreviewIndex = idx;
       render();
@@ -2378,7 +2848,7 @@
 
       state.cpuBusy = true;
       let steps = 0;
-      while (state.currentTurn === "cpu" && steps < maxSteps) {
+      while (state.currentTurn === "cpu" && !state.turnTransition && steps < maxSteps) {
         const progressed = await cpuTakeTurn();
         if (!progressed) {
           break;
@@ -2397,7 +2867,7 @@
     }
 
     function runCpuAuto() {
-      if (state.faceoffPending) {
+      if (state.faceoffPending || state.turnTransition) {
         return;
       }
       void autoContinueCpuTurns();
@@ -2446,7 +2916,8 @@
       const container = document.getElementById(containerId);
       container.innerHTML = "";
 
-      const isHumanTurn = owner === "human" && (state.faceoffPending || state.currentTurn === "human");
+      const humanInteractionBlocked = state.cpuBusy || Boolean(state.turnTransition);
+      const isHumanTurn = owner === "human" && !humanInteractionBlocked && (state.faceoffPending || state.currentTurn === "human");
       const legal = owner === "human"
         ? new Set(state.faceoffPending ? hand.map((_, index) => index) : getLegalCardsForTurn("human"))
         : null;
@@ -2672,10 +3143,22 @@
       renderLog();
 
       const cannotPlayBtn = document.getElementById("cannotPlayBtn");
+      const deckDrawTitle = document.getElementById("deckDrawTitle");
+      const deckDrawCount = document.getElementById("deckDrawCount");
+      const deckDrawAction = document.getElementById("deckDrawAction");
       const doneComboBtn = document.getElementById("doneComboBtn");
-      cannotPlayBtn.textContent = state.shotPending ? "No Save" : "Draw";
+      const turnTransitionOverlay = document.getElementById("turnTransitionOverlay");
+      const turnTransitionCard = document.getElementById("turnTransitionCard");
+      const turnTransitionTitle = document.getElementById("turnTransitionTitle");
+      const turnTransitionSubtitle = document.getElementById("turnTransitionSubtitle");
+      const turnTransitionBtn = document.getElementById("turnTransitionBtn");
+      cannotPlayBtn.className = `deck-draw-btn${state.shotPending ? " no-save" : ""}`;
+      deckDrawTitle.textContent = state.shotPending ? "Goalie" : "Deck";
+      deckDrawCount.textContent = String(state.deck.length);
+      deckDrawCount.hidden = Boolean(state.shotPending);
+      deckDrawAction.textContent = state.shotPending ? "No Save" : "Draw";
       doneComboBtn.textContent = "End Chain";
-      const canHumanAct = state.currentTurn === "human" && !state.cpuBusy;
+      const canHumanAct = state.currentTurn === "human" && !state.cpuBusy && !state.turnTransition;
       const legal = canHumanAct ? getLegalCardsForTurn("human") : [];
       const humanCanPass = canHumanAct && currentTurnCanPass();
 
@@ -2702,9 +3185,26 @@
             : state.defenderChainCount > state.attackerChainCount
               ? "End the defense chain and take the puck"
               : "End the defense chain and resolve the exchange";
+
+      if (state.turnTransition) {
+        const secondsLeft = Math.max(1, Math.ceil((state.turnTransition.deadline - Date.now()) / 1000));
+        turnTransitionOverlay.hidden = false;
+        turnTransitionOverlay.classList.add("active");
+        turnTransitionCard.className = `turn-transition-card ${state.turnTransition.tone}`;
+        turnTransitionTitle.textContent = state.turnTransition.title;
+        turnTransitionSubtitle.textContent = `Auto-advance in ${secondsLeft}s.`;
+        turnTransitionBtn.textContent = `Next Turn (${secondsLeft})`;
+      } else {
+        turnTransitionOverlay.hidden = true;
+        turnTransitionOverlay.classList.remove("active");
+        turnTransitionCard.className = "turn-transition-card neutral";
+        turnTransitionTitle.textContent = "Next Turn";
+        turnTransitionSubtitle.textContent = "Auto-advance in 3s.";
+        turnTransitionBtn.textContent = "Next Turn";
+      }
     }
 
-    function onHumanCannotPlay() {
+    async function onHumanCannotPlay() {
       if (state.faceoffPending) {
         addLog("Faceoff is pending. Choose a faceoff card instead of drawing.");
         render();
@@ -2738,13 +3238,14 @@
         return;
       }
 
-      handleCannotPlay("human");
+      await handleCannotPlay("human");
       render();
       runCpuAuto();
       render();
     }
 
     function newGame() {
+      clearTurnTransitionTimers();
       state.config = getDraftConfigFromControls();
       state.deck = shuffle(createDeck());
       state.discardPile = [];
@@ -2752,6 +3253,7 @@
       state.cpuHand = [];
       state.zoneIndex = CENTER_ICE;
       state.activeCard = null;
+      resetRunMatchState();
       clearComboWindow();
       state.turnPlayCount = 0;
       state.attackerChainCount = 0;
@@ -2765,6 +3267,7 @@
       state.eventType = "contain";
       state.lastShot = null;
       state.recentPlayedCards = [];
+      state.turnTransition = null;
       state.faceoffPending = false;
       state.logMessages = [];
       state.humanScore = 0;
@@ -2777,6 +3280,7 @@
       state.roleOfCurrentTurn = "faceoff";
 
       addLog("New game started.");
+      addLog(`Config: ${state.config.suitCount} suits, values 1-${state.config.maxValue}, hand size ${state.config.handSize}, wild ${state.config.wildCardCount}, CPU speed ${state.config.cpuSpeedPercent}%, cross river once ${state.config.singleRiverCrossMode ? "on" : "off"}.`);
       startFaceoff(CENTER_ICE, "Opening faceoff at center ice.");
 
       render();
@@ -2788,7 +3292,11 @@
       });
 
       document.getElementById("cannotPlayBtn").addEventListener("click", () => {
-        onHumanCannotPlay();
+        void onHumanCannotPlay();
+      });
+
+      document.getElementById("turnTransitionBtn").addEventListener("click", () => {
+        dismissTurnTransition();
       });
 
       document.getElementById("doneComboBtn").addEventListener("click", () => {
@@ -2825,7 +3333,7 @@
         render();
       });
 
-      ["debugSuitCount", "debugMaxValue", "debugHandSize", "debugWildCount", "debugCpuSpeed"].forEach((id) => {
+      ["debugSuitCount", "debugMaxValue", "debugHandSize", "debugWildCount", "debugCpuSpeed", "debugRiverMode"].forEach((id) => {
         const element = document.getElementById(id);
         element?.addEventListener("input", () => {
           if (id === "debugCpuSpeed") {
