@@ -221,80 +221,61 @@
       box-shadow: 0 0 0 3px #8db5ff inset;
     }
 
-    .turn-transition-overlay[hidden] {
-      display: none;
+    .active-middle.phase-flash-human {
+      animation: phaseFlashHuman 560ms ease-out;
     }
 
-    .turn-transition-overlay {
-      position: absolute;
-      inset: 0;
-      z-index: 8;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 16px;
-      background: rgba(248, 251, 255, 0.9);
-      backdrop-filter: blur(3px);
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 180ms ease;
+    .active-middle.phase-flash-cpu {
+      animation: phaseFlashCpu 560ms ease-out;
     }
 
-    .turn-transition-overlay.active {
-      opacity: 1;
-      pointer-events: auto;
+    .active-middle.phase-flash-neutral {
+      animation: phaseFlashNeutral 560ms ease-out;
     }
 
-    .turn-transition-card {
-      width: min(100%, 280px);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      background: #ffffff;
-      padding: 14px 16px;
-      box-shadow: 0 18px 38px rgba(28, 36, 48, 0.16);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 8px;
-      text-align: center;
+    @keyframes phaseFlashHuman {
+      0% {
+        background: #fff2f2;
+        box-shadow: 0 0 0 0 rgba(214, 63, 63, 0.28) inset;
+      }
+      40% {
+        background: #ffdedd;
+        box-shadow: 0 0 0 999px rgba(214, 63, 63, 0.1) inset;
+      }
+      100% {
+        background: #fff2f2;
+        box-shadow: 0 0 0 0 rgba(214, 63, 63, 0) inset;
+      }
     }
 
-    .turn-transition-card.human {
-      border-color: #e19d9d;
-      background: #fff7f7;
+    @keyframes phaseFlashCpu {
+      0% {
+        background: #f3f8ff;
+        box-shadow: 0 0 0 0 rgba(47, 111, 228, 0.24) inset;
+      }
+      40% {
+        background: #deebff;
+        box-shadow: 0 0 0 999px rgba(47, 111, 228, 0.09) inset;
+      }
+      100% {
+        background: #f3f8ff;
+        box-shadow: 0 0 0 0 rgba(47, 111, 228, 0) inset;
+      }
     }
 
-    .turn-transition-card.cpu {
-      border-color: #9fb9ec;
-      background: #f5f9ff;
-    }
-
-    .turn-transition-card.neutral {
-      border-color: #c4cfdd;
-      background: #fbfcff;
-    }
-
-    .turn-transition-kicker {
-      font-size: 0.7rem;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--muted);
-    }
-
-    .turn-transition-title {
-      font-size: 1.18rem;
-      font-weight: 700;
-      color: var(--ink);
-    }
-
-    .turn-transition-subtitle {
-      font-size: 0.84rem;
-      color: var(--muted);
-    }
-
-    .turn-transition-btn {
-      min-width: 150px;
-      font-weight: 700;
+    @keyframes phaseFlashNeutral {
+      0% {
+        background: #f8fbff;
+        box-shadow: 0 0 0 0 rgba(95, 107, 122, 0.18) inset;
+      }
+      40% {
+        background: #eef3f8;
+        box-shadow: 0 0 0 999px rgba(95, 107, 122, 0.08) inset;
+      }
+      100% {
+        background: #f8fbff;
+        box-shadow: 0 0 0 0 rgba(95, 107, 122, 0) inset;
+      }
     }
 
     .active-middle .label {
@@ -921,7 +902,7 @@
       <div class="controls">
         <button id="newGameBtn">New Game</button>
         <button id="cpuStepBtn">CPU Step / Auto Continue</button>
-        <label class="toggle-label"><input id="showCpuCardsCheckbox" type="checkbox" checked />Show CPU cards</label>
+        <label class="toggle-label"><input id="showCpuCardsCheckbox" type="checkbox" />Show CPU cards</label>
       </div>
       <details class="debug-config">
         <summary>Debug Setup</summary>
@@ -997,17 +978,9 @@
         <div id="recentPlays" class="recent-plays"></div>
         <div id="comboHint" class="hint"></div>
         <div id="eventBanner" class="event-banner contain"></div>
-        <div id="turnTransitionOverlay" class="turn-transition-overlay" hidden>
-          <div id="turnTransitionCard" class="turn-transition-card neutral">
-            <div class="turn-transition-kicker">Turn Change</div>
-            <div id="turnTransitionTitle" class="turn-transition-title">Next Turn</div>
-            <div id="turnTransitionSubtitle" class="turn-transition-subtitle">Auto-advance in 3s.</div>
-            <button id="turnTransitionBtn" class="turn-transition-btn" type="button">Next Turn</button>
-          </div>
-        </div>
       </div>
       <div class="panel hand-panel" id="cpuPanel">
-        <h3>CPU Hand (debug visible)</h3>
+        <h3>CPU Hand</h3>
         <div id="cpuHand" class="cards"></div>
       </div>
     </section>
@@ -1043,12 +1016,12 @@
     const WILD_SUIT_INFO = { name: WILD_SUIT, className: "wild", cssVar: "--wild", label: "black" };
     const FACEOFF_PRIORITY = ["Grit", "Finesse", "Pace", "Power", "Vision"];
     const DEFAULT_CONFIG = {
-      suitCount: 3,
-      maxValue: 6,
+      suitCount: 4,
+      maxValue: 8,
       handSize: 5,
       wildCardCount: 0,
-      cpuSpeedPercent: 50,
-      singleRiverCrossMode: false
+      cpuSpeedPercent: 100,
+      singleRiverCrossMode: true
     };
     const ZONES = [
       "Human Goal Zone",
@@ -1059,8 +1032,6 @@
       "CPU Goal Zone"
     ];
     const CENTER_ICE = 2.5;
-    const TURN_TRANSITION_MS = 3000;
-
     const state = {
       deck: [],
       discardPile: [],
@@ -1084,13 +1055,12 @@
       cpuBusy: false,
       shotPending: null,
       config: { ...DEFAULT_CONFIG },
-      showCpuCards: true,
+      showCpuCards: false,
       faceoffPending: false,
       eventText: "",
       eventType: "contain",
       lastShot: null,
       recentPlayedCards: [],
-      turnTransition: null,
       zoneIndex: 0,
       humanScore: 0,
       cpuScore: 0,
@@ -1100,8 +1070,7 @@
     let activeDrag = null;
     let suppressHumanCardClickUntil = 0;
     let goalFlashTimeoutId = null;
-    let turnTransitionTimeoutId = null;
-    let turnTransitionIntervalId = null;
+    let phaseFlashTimeoutId = null;
 
     // ---------------------------
     // Utility and setup functions
@@ -1266,83 +1235,25 @@
       return "None";
     }
 
-    function clearTurnTransitionTimers() {
-      if (turnTransitionTimeoutId) {
-        clearTimeout(turnTransitionTimeoutId);
-        turnTransitionTimeoutId = null;
-      }
-      if (turnTransitionIntervalId) {
-        clearInterval(turnTransitionIntervalId);
-        turnTransitionIntervalId = null;
-      }
-    }
-
-    function getTurnTransitionTone(player, role) {
-      if (role === "faceoff") {
-        return "neutral";
-      }
-      if (player === "human") {
-        return "human";
-      }
-      if (player === "cpu") {
-        return "cpu";
-      }
-      return "neutral";
-    }
-
-    function getTurnTransitionTitle(player, role) {
-      if (role === "faceoff") {
-        return "Faceoff";
-      }
-      if (role === "save") {
-        return `${lowerPlayerName(player)} Save Turn`;
-      }
-      if (role === "attacker") {
-        return `${lowerPlayerName(player)} Attack Turn`;
-      }
-      if (role === "defender") {
-        return `${lowerPlayerName(player)} Defense Turn`;
-      }
-      return "Next Turn";
-    }
-
-    function dismissTurnTransition(runFollowUp = true) {
-      if (!state.turnTransition) {
+    function triggerPhaseFlash(tone = "neutral") {
+      const activeMiddle = document.getElementById("activeMiddle");
+      if (!activeMiddle) {
         return;
       }
 
-      clearTurnTransitionTimers();
-      state.turnTransition = null;
-      render();
-
-      if (runFollowUp) {
-        runCpuAuto();
-        render();
+      if (phaseFlashTimeoutId) {
+        clearTimeout(phaseFlashTimeoutId);
+        phaseFlashTimeoutId = null;
       }
-    }
 
-    function startTurnTransition(player, role, durationMs = TURN_TRANSITION_MS) {
-      clearTurnTransitionTimers();
-      state.turnTransition = {
-        player,
-        role,
-        tone: getTurnTransitionTone(player, role),
-        title: getTurnTransitionTitle(player, role),
-        deadline: Date.now() + durationMs
-      };
+      activeMiddle.classList.remove("phase-flash-human", "phase-flash-cpu", "phase-flash-neutral");
+      void activeMiddle.offsetWidth;
+      activeMiddle.classList.add(`phase-flash-${tone}`);
 
-      turnTransitionIntervalId = setInterval(() => {
-        if (!state.turnTransition) {
-          return;
-        }
-        render();
-      }, 200);
-
-      turnTransitionTimeoutId = setTimeout(() => {
-        dismissTurnTransition();
-      }, durationMs);
-
-      render();
+      phaseFlashTimeoutId = setTimeout(() => {
+        activeMiddle.classList.remove("phase-flash-human", "phase-flash-cpu", "phase-flash-neutral");
+        phaseFlashTimeoutId = null;
+      }, 620);
     }
 
     function clamp(value, min, max) {
@@ -1951,17 +1862,11 @@
       }
     }
 
-    function setCurrentTurn(player, role, forceTransition = false) {
-      const previousTurn = state.currentTurn;
-      const previousRole = state.roleOfCurrentTurn;
+    function setCurrentTurn(player, role) {
       state.currentTurn = player;
       state.roleOfCurrentTurn = role;
       syncTurnPlayCount();
       refreshComboWindow();
-
-      if (forceTransition || previousTurn !== player || previousRole !== role) {
-        startTurnTransition(player, role);
-      }
     }
 
     function resetExchangeCounts() {
@@ -1977,7 +1882,8 @@
       clearShotPending();
       state.activeBattleState = "attack";
       state.comboImmunityActive = false;
-      setCurrentTurn(state.attacker, "attacker", true);
+      setCurrentTurn(state.attacker, "attacker");
+      triggerPhaseFlash(state.attacker === "human" ? "human" : "cpu");
     }
 
     function passAttackTurn() {
@@ -1985,7 +1891,7 @@
       state.defenderChainCount = 0;
       state.activeBattleState = "defense";
       state.comboImmunityActive = false;
-      setCurrentTurn(state.defender, "defender", true);
+      setCurrentTurn(state.defender, "defender");
       addLog(`Turn passes to ${lowerPlayerName(state.defender)} to defend the exchange.`);
       setEvent(`${lowerPlayerName(state.defender)} defending`, "contain");
       logTurnDiagnostics(state.currentTurn);
@@ -2361,7 +2267,7 @@
 
       addLog(`Faceoff at ${zoneLabel(state.zoneIndex)}. Human choose a card.`);
       setEvent(`Faceoff at ${zoneLabel(state.zoneIndex)}`, "contain");
-      startTurnTransition("human", "faceoff");
+      triggerPhaseFlash("neutral");
     }
 
     function resolveFaceoff(humanIndex) {
@@ -2498,7 +2404,7 @@
         addLog(`Human must manually play a ${requiredLength}-card save chain or concede the goal.`);
         setEvent(`Save chain needed: ${requiredLength}`, "contain");
         logTurnDiagnostics(defenderPlayer, "Save setup.");
-        startTurnTransition(defenderPlayer, "save");
+        triggerPhaseFlash(defenderPlayer === "human" ? "human" : "cpu");
         return;
       }
 
@@ -2787,7 +2693,7 @@
     }
 
     async function cpuTakeTurn() {
-      if (state.currentTurn !== "cpu" || state.turnTransition) {
+      if (state.currentTurn !== "cpu") {
         return false;
       }
 
@@ -2848,7 +2754,7 @@
 
       state.cpuBusy = true;
       let steps = 0;
-      while (state.currentTurn === "cpu" && !state.turnTransition && steps < maxSteps) {
+      while (state.currentTurn === "cpu" && steps < maxSteps) {
         const progressed = await cpuTakeTurn();
         if (!progressed) {
           break;
@@ -2867,7 +2773,7 @@
     }
 
     function runCpuAuto() {
-      if (state.faceoffPending || state.turnTransition) {
+      if (state.faceoffPending) {
         return;
       }
       void autoContinueCpuTurns();
@@ -2916,7 +2822,7 @@
       const container = document.getElementById(containerId);
       container.innerHTML = "";
 
-      const humanInteractionBlocked = state.cpuBusy || Boolean(state.turnTransition);
+      const humanInteractionBlocked = state.cpuBusy;
       const isHumanTurn = owner === "human" && !humanInteractionBlocked && (state.faceoffPending || state.currentTurn === "human");
       const legal = owner === "human"
         ? new Set(state.faceoffPending ? hand.map((_, index) => index) : getLegalCardsForTurn("human"))
@@ -3147,18 +3053,13 @@
       const deckDrawCount = document.getElementById("deckDrawCount");
       const deckDrawAction = document.getElementById("deckDrawAction");
       const doneComboBtn = document.getElementById("doneComboBtn");
-      const turnTransitionOverlay = document.getElementById("turnTransitionOverlay");
-      const turnTransitionCard = document.getElementById("turnTransitionCard");
-      const turnTransitionTitle = document.getElementById("turnTransitionTitle");
-      const turnTransitionSubtitle = document.getElementById("turnTransitionSubtitle");
-      const turnTransitionBtn = document.getElementById("turnTransitionBtn");
       cannotPlayBtn.className = `deck-draw-btn${state.shotPending ? " no-save" : ""}`;
       deckDrawTitle.textContent = state.shotPending ? "Goalie" : "Deck";
       deckDrawCount.textContent = String(state.deck.length);
       deckDrawCount.hidden = Boolean(state.shotPending);
       deckDrawAction.textContent = state.shotPending ? "No Save" : "Draw";
       doneComboBtn.textContent = "End Chain";
-      const canHumanAct = state.currentTurn === "human" && !state.cpuBusy && !state.turnTransition;
+      const canHumanAct = state.currentTurn === "human" && !state.cpuBusy;
       const legal = canHumanAct ? getLegalCardsForTurn("human") : [];
       const humanCanPass = canHumanAct && currentTurnCanPass();
 
@@ -3185,23 +3086,6 @@
             : state.defenderChainCount > state.attackerChainCount
               ? "End the defense chain and take the puck"
               : "End the defense chain and resolve the exchange";
-
-      if (state.turnTransition) {
-        const secondsLeft = Math.max(1, Math.ceil((state.turnTransition.deadline - Date.now()) / 1000));
-        turnTransitionOverlay.hidden = false;
-        turnTransitionOverlay.classList.add("active");
-        turnTransitionCard.className = `turn-transition-card ${state.turnTransition.tone}`;
-        turnTransitionTitle.textContent = state.turnTransition.title;
-        turnTransitionSubtitle.textContent = `Auto-advance in ${secondsLeft}s.`;
-        turnTransitionBtn.textContent = `Next Turn (${secondsLeft})`;
-      } else {
-        turnTransitionOverlay.hidden = true;
-        turnTransitionOverlay.classList.remove("active");
-        turnTransitionCard.className = "turn-transition-card neutral";
-        turnTransitionTitle.textContent = "Next Turn";
-        turnTransitionSubtitle.textContent = "Auto-advance in 3s.";
-        turnTransitionBtn.textContent = "Next Turn";
-      }
     }
 
     async function onHumanCannotPlay() {
@@ -3245,7 +3129,6 @@
     }
 
     function newGame() {
-      clearTurnTransitionTimers();
       state.config = getDraftConfigFromControls();
       state.deck = shuffle(createDeck());
       state.discardPile = [];
@@ -3267,7 +3150,6 @@
       state.eventType = "contain";
       state.lastShot = null;
       state.recentPlayedCards = [];
-      state.turnTransition = null;
       state.faceoffPending = false;
       state.logMessages = [];
       state.humanScore = 0;
@@ -3293,10 +3175,6 @@
 
       document.getElementById("cannotPlayBtn").addEventListener("click", () => {
         void onHumanCannotPlay();
-      });
-
-      document.getElementById("turnTransitionBtn").addEventListener("click", () => {
-        dismissTurnTransition();
       });
 
       document.getElementById("doneComboBtn").addEventListener("click", () => {
