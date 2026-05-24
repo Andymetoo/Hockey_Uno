@@ -107,6 +107,81 @@
       background: #ffffff;
     }
 
+    .hands-rink-stack {
+      width: min(100%, 520px);
+      max-width: 520px;
+      display: grid;
+      gap: 8px;
+      justify-items: center;
+    }
+
+    .momentum-track {
+      width: 100%;
+      display: grid;
+      grid-template-columns: minmax(72px, 1fr) auto minmax(72px, 1fr);
+      align-items: center;
+      gap: 12px;
+      min-height: 32px;
+    }
+
+    .momentum-side {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 96px;
+    }
+
+    .momentum-side.human {
+      justify-self: start;
+    }
+
+    .momentum-side.cpu {
+      justify-self: end;
+      justify-content: flex-end;
+    }
+
+    .rink-clock-chip {
+      display: inline-flex;
+      align-items: baseline;
+      justify-content: center;
+      gap: 8px;
+      min-width: 166px;
+      padding: 5px 10px;
+      border: 1px solid #d0dbef;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.96);
+      box-shadow: 0 6px 16px rgba(24, 37, 58, 0.08);
+      white-space: nowrap;
+    }
+
+    .rink-clock-chip .k {
+      margin: 0;
+      font-size: 0.66rem;
+    }
+
+    .rink-clock-chip .v {
+      font-size: 0.88rem;
+      line-height: 1.1;
+    }
+
+    .momentum-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 999px;
+      background: rgba(140, 156, 178, 0.28);
+      box-shadow: inset 0 0 0 1px rgba(96, 112, 138, 0.2);
+    }
+
+    .momentum-dot.filled.human {
+      background: #ef2323;
+      box-shadow: 0 0 0 1px rgba(177, 18, 18, 0.28);
+    }
+
+    .momentum-dot.filled.cpu {
+      background: #4a1fcb;
+      box-shadow: 0 0 0 1px rgba(49, 18, 136, 0.3);
+    }
+
     .hands-rink-row {
       grid-column: 1 / -1;
       display: flex;
@@ -119,6 +194,40 @@
       max-width: 520px;
       height: 22px;
       margin-top: 0;
+    }
+
+    .hand-panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+
+    .hand-panel-header h3 {
+      margin: 0;
+    }
+
+    .hand-panel-actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      align-items: flex-start;
+      gap: 6px;
+    }
+
+    .hand-panel-actions[hidden] {
+      display: none;
+    }
+
+    .hand-panel-btn {
+      padding: 5px 9px;
+      font-size: 0.78rem;
+      white-space: nowrap;
+    }
+
+    .hand-panel-btn .btn-label-short {
+      display: none;
     }
 
     .zone {
@@ -1041,6 +1150,57 @@
         padding: 10px;
       }
 
+      .momentum-track {
+        gap: 8px;
+        grid-template-columns: minmax(52px, 1fr) auto minmax(52px, 1fr);
+      }
+
+      .momentum-side {
+        min-width: 72px;
+        gap: 8px;
+      }
+
+      .momentum-dot {
+        width: 10px;
+        height: 10px;
+      }
+
+      .hand-panel-header {
+        align-items: flex-start;
+        gap: 8px;
+      }
+
+      .hand-panel-actions {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, auto));
+        justify-content: end;
+        gap: 4px;
+        max-width: 132px;
+      }
+
+      .hand-panel-btn {
+        padding: 4px 7px;
+        font-size: 0.72rem;
+      }
+
+      .hand-panel-btn .btn-label-full {
+        display: none;
+      }
+
+      .hand-panel-btn .btn-label-short {
+        display: inline;
+      }
+
+      .rink-clock-chip {
+        min-width: 112px;
+        gap: 6px;
+        padding: 4px 8px;
+      }
+
+      .rink-clock-chip .v {
+        font-size: 0.78rem;
+      }
+
       :root {
         /* Phone card-size overrides. If mobile card size is not changing, edit these values. */
         --play-card-width: 45px;
@@ -1108,7 +1268,7 @@
             </label>
             <label class="debug-field">
               <span>CPU Speed %</span>
-              <input id="debugCpuSpeed" type="number" min="10" max="200" step="10" value="100" />
+              <input id="debugCpuSpeed" type="number" min="10" max="200" step="10" value="200" />
             </label>
             <label class="debug-field">
               <span>Cross River Once</span>
@@ -1117,10 +1277,17 @@
                 <option value="on">On</option>
               </select>
             </label>
+            <label class="debug-field">
+              <span>Momentum System</span>
+              <select id="debugMomentumSystem">
+                <option value="on" selected>On</option>
+                <option value="off">Off</option>
+              </select>
+            </label>
           </div>
           <p class="debug-preview" id="debugPreview"></p>
           <p class="debug-preview" id="debugRulesPreview"></p>
-          <p class="hint">Suit, value, hand size, and wild-card settings apply on New Game. CPU speed applies immediately.</p>
+          <p class="hint">Suit, value, hand size, wild-card settings, and feature flags apply on New Game. CPU speed applies immediately.</p>
         </div>
       </details>
       <div class="legend" id="legendList"></div>
@@ -1129,10 +1296,25 @@
 
     <section class="panel hands">
       <div class="hands-rink-row">
-        <div class="zone-track" id="zoneTrack"></div>
+        <div class="hands-rink-stack">
+          <div id="momentumTracker" class="momentum-track">
+            <div id="humanMomentumDots" class="momentum-side human" aria-label="Human momentum"></div>
+            <div class="rink-clock-chip"><span class="k">Clock</span><span class="v" id="gameClockLabel"></span></div>
+            <div id="cpuMomentumDots" class="momentum-side cpu" aria-label="CPU momentum"></div>
+          </div>
+          <div class="zone-track" id="zoneTrack"></div>
+        </div>
       </div>
       <div class="panel hand-panel" id="humanPanel">
-        <h3>Human Hand</h3>
+        <div class="hand-panel-header">
+          <h3>Human Hand</h3>
+          <div id="humanMomentumActions" class="hand-panel-actions" hidden>
+            <button id="cycleMomentumBtn" class="hand-panel-btn" type="button" disabled><span class="btn-label-full">Cycle (Cost: 1)</span><span class="btn-label-short">Cycle 1</span></button>
+            <button id="burnMomentumBtn" class="hand-panel-btn" type="button" disabled><span class="btn-label-full">Burn (Cost: 2)</span><span class="btn-label-short">Burn 2</span></button>
+            <button id="powerShotBtn" class="hand-panel-btn" type="button" disabled><span class="btn-label-full">Power Shot (Cost: 3)</span><span class="btn-label-short">Shot 3</span></button>
+            <button id="dumpChaseBtn" class="hand-panel-btn" type="button" disabled><span class="btn-label-full">Dump Hand</span><span class="btn-label-short">Dump</span></button>
+          </div>
+        </div>
         <div id="humanHand" class="cards"></div>
       </div>
       <div class="active-middle" id="activeMiddle">
@@ -1197,14 +1379,21 @@
     const WILD_SUIT = "Wild";
     const WILD_SUIT_INFO = { name: WILD_SUIT, className: "wild", cssVar: "--wild", label: "black" };
     const FACEOFF_PRIORITY = ["Grit", "Finesse", "Pace", "Power", "Vision"];
+    const DEFAULT_FEATURES = {
+      momentumSystem: true
+    };
+    const FEATURES = { ...DEFAULT_FEATURES };
     const DEFAULT_CONFIG = {
       suitCount: 4,
       maxValue: 8,
       handSize: 5,
       wildCardCount: 0,
-      cpuSpeedPercent: 100,
+      cpuSpeedPercent: 200,
       singleRiverCrossMode: false
     };
+    const REGULATION_PERIOD_COUNT = 3;
+    const PERIOD_MINUTES = 20;
+    const DECK_CYCLE_MINUTES = 5;
     const ZONES = [
       "Human Goal Zone",
       "Human Defensive Zone",
@@ -1239,15 +1428,27 @@
       config: { ...DEFAULT_CONFIG },
       showCpuCards: false,
       faceoffPending: false,
+      faceoffMode: "standard",
+      faceoffReturnZone: null,
+      loosePuckOriginAttacker: null,
       eventText: "",
       eventType: "contain",
       lastShot: null,
       recentPlayedCards: [],
       cpuNotice: null,
       humanPendingTurn: null,
+      pendingBurnSelection: false,
+      pendingCycleSelection: false,
+      humanMomentum: 0,
+      cpuMomentum: 0,
       zoneIndex: 0,
       humanScore: 0,
       cpuScore: 0,
+      periodNumber: 1,
+      periodClockMinutes: PERIOD_MINUTES,
+      pendingPeriodBreak: null,
+      gameOver: false,
+      gameWinner: null,
       logMessages: []
     };
 
@@ -1294,6 +1495,138 @@
       state.eventType = type;
     }
 
+    function formatGameClock(minutes = state.periodClockMinutes) {
+      return `${minutes}:00`;
+    }
+
+    function getPeriodLabel(periodNumber = state.periodNumber) {
+      if (periodNumber <= REGULATION_PERIOD_COUNT) {
+        return `Period ${periodNumber}`;
+      }
+      return `OT${periodNumber - REGULATION_PERIOD_COUNT}`;
+    }
+
+    function isSuddenDeathOvertime(periodNumber = state.periodNumber) {
+      return periodNumber > REGULATION_PERIOD_COUNT;
+    }
+
+    function rebuildDeckFromDiscard() {
+      if (state.discardPile.length === 0) {
+        return 0;
+      }
+
+      const recovered = state.discardPile.splice(0, state.discardPile.length);
+      shuffle(recovered);
+      state.deck.push(...recovered);
+      return recovered.length;
+    }
+
+    function endGame(winner, reason = "") {
+      state.gameOver = true;
+      state.gameWinner = winner;
+      clearShotPending();
+      clearComboWindow();
+      clearHumanPendingTurn();
+      clearBurnSelection();
+      resetRunMatchState();
+      state.faceoffPending = false;
+      state.faceoffMode = "standard";
+      state.faceoffReturnZone = null;
+      state.loosePuckOriginAttacker = null;
+      state.attacker = null;
+      state.defender = null;
+      state.currentTurn = null;
+      state.roleOfCurrentTurn = "final";
+      state.turnPlayCount = 0;
+      state.attackerChainCount = 0;
+      state.defenderChainCount = 0;
+      state.activeBattleState = "none";
+      state.comboImmunityActive = false;
+      state.cpuBusy = false;
+      state.cpuPreviewIndex = null;
+      state.pendingPeriodBreak = null;
+      if (reason) {
+        addLog(reason);
+      }
+      setEvent(`Final: ${lowerPlayerName(winner)} wins`, "goal");
+    }
+
+    function resolvePendingPeriodBreak() {
+      const pending = state.pendingPeriodBreak;
+      if (!pending) {
+        return false;
+      }
+
+      state.pendingPeriodBreak = null;
+      clearShotPending();
+      clearComboWindow();
+      clearHumanPendingTurn();
+      clearBurnSelection();
+      resetRunMatchState();
+      state.turnPlayCount = 0;
+      state.attackerChainCount = 0;
+      state.defenderChainCount = 0;
+      state.activeBattleState = "none";
+      state.comboImmunityActive = false;
+      state.cpuPreviewIndex = null;
+      state.faceoffPending = false;
+      state.faceoffMode = "standard";
+      state.faceoffReturnZone = null;
+      state.loosePuckOriginAttacker = null;
+      state.attacker = null;
+      state.defender = null;
+
+      addLog(`${pending.endedLabel} ended.`);
+      setEvent(`${pending.endedLabel} Ended`, "contain");
+      triggerPhaseFlash("neutral");
+
+      if (state.periodNumber >= REGULATION_PERIOD_COUNT && state.humanScore !== state.cpuScore) {
+        const winner = state.humanScore > state.cpuScore ? "human" : "cpu";
+        endGame(winner, `${lowerPlayerName(winner)} wins ${state.humanScore}-${state.cpuScore}.`);
+        return true;
+      }
+
+      state.periodNumber += 1;
+      state.periodClockMinutes = PERIOD_MINUTES;
+      const nextLabel = getPeriodLabel();
+      addLog(isSuddenDeathOvertime() ? `${nextLabel} begins at ${formatGameClock()}. Next goal wins.` : `${nextLabel} begins at ${formatGameClock()}.`);
+      startFaceoff(CENTER_ICE, `${nextLabel} begins. Center-ice faceoff.`);
+      return true;
+    }
+
+    function handleDeckCycleCompletion() {
+      if (state.gameOver) {
+        return;
+      }
+
+      const recoveredCount = rebuildDeckFromDiscard();
+      if (recoveredCount === 0) {
+        addLog("Deck is exhausted and there are no discard cards available to rebuild it.");
+        return;
+      }
+
+      const endedLabel = getPeriodLabel();
+      state.periodClockMinutes = Math.max(0, state.periodClockMinutes - DECK_CYCLE_MINUTES);
+
+      if (state.periodClockMinutes > 0) {
+        addLog(`Deck rebuilt from discard pile (${recoveredCount} cards). ${endedLabel} clock drops to ${formatGameClock()}.`);
+        return;
+      }
+
+      addLog(`Deck rebuilt from discard pile (${recoveredCount} cards). ${endedLabel} clock hits 0:00.`);
+      state.pendingPeriodBreak = { endedLabel };
+    }
+
+    function handleGoalAfterScore(attackerPlayer) {
+      if (isSuddenDeathOvertime()) {
+        addLog(`${getPeriodLabel()} ends on the winning goal.`);
+        endGame(attackerPlayer, `${lowerPlayerName(attackerPlayer)} wins in ${getPeriodLabel()} ${state.humanScore}-${state.cpuScore}.`);
+        return;
+      }
+
+      startFaceoff(CENTER_ICE, "Goal scored. Center-ice faceoff.");
+    }
+
     function buildDebugDumpText() {
       const configLines = [
         `Suit Count: ${state.config.suitCount}`,
@@ -1302,11 +1635,15 @@
         `Wild Cards: ${state.config.wildCardCount}`,
         `CPU Speed %: ${state.config.cpuSpeedPercent}`,
         `Cross River Once: ${state.config.singleRiverCrossMode}`,
+        `Momentum System: ${FEATURES.momentumSystem}`,
         `Show CPU Cards: ${state.showCpuCards}`
       ];
 
       const stateLines = [
         `Score: (${state.humanHand.length}) Human ${state.humanScore} - ${state.cpuScore} CPU (${state.cpuHand.length})`,
+        `Period: ${getPeriodLabel()}`,
+        `Clock: ${formatGameClock()}`,
+        `Game Over: ${state.gameOver}`,
         `Zone: ${zoneLabel(state.zoneIndex)}`,
         `Attacker: ${lowerPlayerName(state.attacker)}`,
         `Defender: ${lowerPlayerName(state.defender)}`,
@@ -1412,6 +1749,327 @@
 
     function clearHumanPendingTurn() {
       state.humanPendingTurn = null;
+    }
+
+    function clearBurnSelection() {
+      state.pendingBurnSelection = false;
+      state.pendingCycleSelection = false;
+    }
+
+    function getPendingMomentumAction() {
+      if (state.pendingBurnSelection) {
+        return "burn";
+      }
+      if (state.pendingCycleSelection) {
+        return "cycle";
+      }
+      return null;
+    }
+
+    function momentumStateKey(player) {
+      if (player === "human") {
+        return "humanMomentum";
+      }
+      if (player === "cpu") {
+        return "cpuMomentum";
+      }
+      return null;
+    }
+
+    function getMomentum(player) {
+      const key = momentumStateKey(player);
+      return key ? state[key] : 0;
+    }
+
+    function setMomentum(player, value) {
+      const key = momentumStateKey(player);
+      if (!FEATURES.momentumSystem || !key) {
+        return;
+      }
+
+      state[key] = clamp(value, 0, 3);
+    }
+
+    function changeMomentum(player, delta, reason = "") {
+      const key = momentumStateKey(player);
+      if (!FEATURES.momentumSystem || !key || delta === 0) {
+        return;
+      }
+
+      const current = state[key];
+      const next = clamp(current + delta, 0, 3);
+      if (next === current) {
+        return;
+      }
+
+      state[key] = next;
+      if (reason) {
+        addLog(`${lowerPlayerName(player)} ${delta > 0 ? "gains" : "loses"} 1 Momentum (${reason}). Now ${next}/3.`);
+      }
+    }
+
+    function resetMomentum(reason = "") {
+      if (!FEATURES.momentumSystem) {
+        return;
+      }
+
+      const hadMomentum = state.humanMomentum > 0 || state.cpuMomentum > 0;
+      state.humanMomentum = 0;
+      state.cpuMomentum = 0;
+      if (hadMomentum && reason) {
+        addLog(reason);
+      }
+    }
+
+    function isLoosePuckFaceoff() {
+      return state.faceoffMode === "loosePuck";
+    }
+
+    function isPlayerOnOpponentSide(player, zoneIndex = state.zoneIndex) {
+      if (player === "human") {
+        return zoneIndex === 3 || zoneIndex === 4 || zoneIndex === 5;
+      }
+      if (player === "cpu") {
+        return zoneIndex === 2 || zoneIndex === 1 || zoneIndex === 0;
+      }
+      return false;
+    }
+
+    function canPlayerSpendMomentum(player, cost) {
+      if (!FEATURES.momentumSystem || state.faceoffPending || state.shotPending || state.currentTurn !== player) {
+        return false;
+      }
+
+      if (state.attacker !== player || state.roleOfCurrentTurn !== "attacker" || state.attackerChainCount !== 0) {
+        return false;
+      }
+
+      return getMomentum(player) >= cost;
+    }
+
+    function canPlayerUseCycle(player) {
+      return canPlayerSpendMomentum(player, 1) && playerHand(player).length > 0;
+    }
+
+    function canPlayerUseBurn(player) {
+      return canPlayerSpendMomentum(player, 2) && playerHand(player).length > 1;
+    }
+
+    function canPlayerUsePowerShot(player) {
+      return canPlayerSpendMomentum(player, 3) && playerHand(player).length > 0 && isShotZone(player);
+    }
+
+    function canPlayerDumpAndChase(player) {
+      if (!FEATURES.momentumSystem || state.faceoffPending || state.shotPending || state.currentTurn !== player) {
+        return false;
+      }
+
+      if (state.attacker !== player || state.roleOfCurrentTurn !== "attacker" || currentTurnCanPass()) {
+        return false;
+      }
+
+      const hand = playerHand(player);
+      if (hand.length === 0 || !isPlayerOnOpponentSide(player)) {
+        return false;
+      }
+
+      return getLegalCardsForTurn(player).length === 0;
+    }
+
+    function getDumpTargetZoneIndex(player) {
+      return getGoalZoneIndex(player);
+    }
+
+    function getPowerShotValue(player) {
+      return playerHand(player).length;
+    }
+
+    function getPowerShotAnchorCard(player) {
+      return cloneCard(state.activeCard) || cloneCard(playerHand(player)[0]) || null;
+    }
+
+    function beginHumanCycleSelection() {
+      if (!canPlayerUseCycle("human") || state.cpuBusy || hasHumanPendingTurn()) {
+        return false;
+      }
+
+      clearBurnSelection();
+      state.pendingCycleSelection = true;
+      addLog("Human is selecting a card to Cycle out of hand.");
+      return true;
+    }
+
+    function beginHumanBurnSelection() {
+      if (!canPlayerUseBurn("human") || state.cpuBusy || hasHumanPendingTurn()) {
+        return false;
+      }
+
+      clearBurnSelection();
+      state.pendingBurnSelection = true;
+      addLog("Human is selecting a card to Burn out of hand.");
+      return true;
+    }
+
+    function cancelHumanCycleSelection() {
+      if (!state.pendingCycleSelection) {
+        return false;
+      }
+
+      clearBurnSelection();
+      addLog("Human cancels the Cycle selection.");
+      return true;
+    }
+
+    function cancelHumanBurnSelection() {
+      if (!state.pendingBurnSelection) {
+        return false;
+      }
+
+      clearBurnSelection();
+      addLog("Human cancels the Burn selection.");
+      return true;
+    }
+
+    function cycleMomentumCard(player, cardIndex) {
+      if (!canPlayerUseCycle(player)) {
+        return false;
+      }
+
+      const hand = playerHand(player);
+      if (cardIndex < 0 || cardIndex >= hand.length) {
+        addLog(`Ignored: invalid Cycle card for ${lowerPlayerName(player)}.`);
+        clearBurnSelection();
+        return false;
+      }
+
+      const momentumBefore = getMomentum(player);
+      if (momentumBefore < 1) {
+        clearBurnSelection();
+        return false;
+      }
+
+      const card = hand.splice(cardIndex, 1)[0];
+      setMomentum(player, momentumBefore - 1);
+      state.deck.unshift(card);
+      clearBurnSelection();
+
+      const drawnCard = drawOneCard(player);
+      if (drawnCard) {
+        addLog(`${lowerPlayerName(player)} spends 1 Momentum to Cycle ${cardToText(card)} away and draw ${cardToText(drawnCard)}.`);
+      } else {
+        addLog(`${lowerPlayerName(player)} spends 1 Momentum to Cycle ${cardToText(card)} away, but the deck is empty.`);
+      }
+
+      if (resolvePendingPeriodBreak()) {
+        return true;
+      }
+
+      setEvent(`${lowerPlayerName(player)} cycles a card`, "contain");
+      refreshComboWindow();
+
+      const legalAfterCycle = getLegalCardsForTurn(player).length;
+      if (legalAfterCycle > 0) {
+        addLog(`${lowerPlayerName(player)} may now start the attack normally.`);
+      } else if (canPlayerDumpAndChase(player)) {
+        addLog(`${lowerPlayerName(player)} is still stuck after the Cycle and may draw or Dump Hand.`);
+      } else {
+        addLog(`${lowerPlayerName(player)} is still stuck after the Cycle.`);
+      }
+
+      return true;
+    }
+
+    function burnMomentumCard(player, cardIndex) {
+      if (!canPlayerUseBurn(player)) {
+        return false;
+      }
+
+      const hand = playerHand(player);
+      if (cardIndex < 0 || cardIndex >= hand.length || hand.length <= 1) {
+        addLog(`Ignored: invalid Burn card for ${lowerPlayerName(player)}.`);
+        clearBurnSelection();
+        return false;
+      }
+
+      const momentumBefore = getMomentum(player);
+      if (momentumBefore < 2) {
+        clearBurnSelection();
+        return false;
+      }
+
+      const card = hand.splice(cardIndex, 1)[0];
+      setMomentum(player, momentumBefore - 2);
+      state.deck.unshift(card);
+      clearBurnSelection();
+
+      addLog(`${lowerPlayerName(player)} spends 2 Momentum to Burn ${cardToText(card)} out of hand and send it to the bottom of the deck.`);
+      setEvent(`${lowerPlayerName(player)} burns a card`, "contain");
+      refreshComboWindow();
+
+      const legalAfterBurn = getLegalCardsForTurn(player).length;
+      if (legalAfterBurn > 0) {
+        addLog(`${lowerPlayerName(player)} may now start the attack normally.`);
+      } else if (canPlayerDumpAndChase(player)) {
+        addLog(`${lowerPlayerName(player)} is still stuck after the Burn and may either draw or Dump Hand.`);
+      } else {
+        addLog(`${lowerPlayerName(player)} is still stuck after the Burn and may need to draw.`);
+      }
+
+      return true;
+    }
+
+    function powerShot(player) {
+      if (!canPlayerUsePowerShot(player)) {
+        return false;
+      }
+
+      const handSize = getPowerShotValue(player);
+      const shotCard = getPowerShotAnchorCard(player);
+      if (!shotCard) {
+        return false;
+      }
+
+      const momentumBefore = getMomentum(player);
+      if (momentumBefore < 3) {
+        return false;
+      }
+
+      setMomentum(player, momentumBefore - 3);
+      clearBurnSelection();
+
+      const rangeLabel = isCloseOffensiveZone(player) ? "close" : "far";
+      addLog(`${lowerPlayerName(player)} spends 3 Momentum for a Power Shot from ${rangeLabel} range.`);
+      resolveShot(player, state.defender, shotCard, {
+        shotValueOverride: handSize,
+        shotKind: "powerShot",
+        powerHandSize: handSize,
+        logLine: `${lowerPlayerName(player)} uses Power Shot from ${rangeLabel} range. Shot quality ${handSize} from ${handSize} card${handSize === 1 ? "" : "s"} in hand.`
+      });
+      return true;
+    }
+
+    function dumpAndChase(player) {
+      if (!canPlayerDumpAndChase(player)) {
+        return false;
+      }
+
+      const hand = playerHand(player);
+      const dumpZone = getDumpTargetZoneIndex(player);
+      const previousZone = state.zoneIndex;
+      const returnedCards = shuffle(hand.splice(0, hand.length));
+      state.deck.unshift(...returnedCards);
+      refillToFive(player);
+      clearBurnSelection();
+      state.zoneIndex = dumpZone;
+
+      addLog(`${lowerPlayerName(player)} uses Dump and Chase: the hand is shuffled to the bottom of the deck, then refreshed.`);
+      if (previousZone !== dumpZone) {
+        addLog(`${lowerPlayerName(player)} dumps the puck deep to ${zoneLabel(dumpZone)}.`);
+      } else {
+        addLog(`${lowerPlayerName(player)} keeps the puck deep in ${zoneLabel(dumpZone)} with the dump.`);
+      }
+      resolveExchange(state.defender, `${lowerPlayerName(state.defender)} wins the exchange after ${lowerPlayerName(player)} dumps the puck deep and chases. Turnover.`);
+      return true;
     }
 
     function captureHumanTurnSnapshot(playedCardIndex, playedCard) {
@@ -1612,6 +2270,14 @@
       };
     }
 
+    function getDraftFeaturesFromControls() {
+      const momentumSystemInput = document.getElementById("debugMomentumSystem");
+
+      return {
+        momentumSystem: (momentumSystemInput?.value || "on") === "on"
+      };
+    }
+
     function syncDebugControlsFromConfig(config = state.config) {
       const suitCountInput = document.getElementById("debugSuitCount");
       const maxValueInput = document.getElementById("debugMaxValue");
@@ -1619,6 +2285,7 @@
       const wildCountInput = document.getElementById("debugWildCount");
       const cpuSpeedInput = document.getElementById("debugCpuSpeed");
       const riverModeInput = document.getElementById("debugRiverMode");
+      const momentumSystemInput = document.getElementById("debugMomentumSystem");
 
       if (suitCountInput) {
         suitCountInput.value = String(config.suitCount);
@@ -1638,19 +2305,24 @@
       if (riverModeInput) {
         riverModeInput.value = config.singleRiverCrossMode ? "on" : "off";
       }
+      if (momentumSystemInput) {
+        momentumSystemInput.value = FEATURES.momentumSystem ? "on" : "off";
+      }
     }
 
     function refreshDebugPreview() {
       const config = getDraftConfigFromControls();
+      const features = getDraftFeaturesFromControls();
       const preview = document.getElementById("debugPreview");
       const rulesPreview = document.getElementById("debugRulesPreview");
       const wildText = `${config.wildCardCount} wild card${config.wildCardCount === 1 ? "" : "s"}`;
       const riverText = config.singleRiverCrossMode ? "cross river once ON" : "cross river once OFF";
+      const momentumText = features.momentumSystem ? "Momentum/Dump ON" : "Momentum/Dump OFF";
       if (preview) {
-        preview.textContent = `Next game: ${config.suitCount} suits, values 1-${config.maxValue}, hand size ${config.handSize}, ${wildText}, deck ${getDeckSizeForConfig(config)} cards, ${riverText}. CPU speed ${config.cpuSpeedPercent}% applies immediately.`;
+        preview.textContent = `Next game: ${config.suitCount} suits, values 1-${config.maxValue}, hand size ${config.handSize}, ${wildText}, deck ${getDeckSizeForConfig(config)} cards, ${riverText}, ${momentumText}. CPU speed ${config.cpuSpeedPercent}% applies immediately.`;
       }
       if (rulesPreview) {
-        rulesPreview.textContent = `Next-game faceoff cycle: ${getFaceoffCycleText(config)}. ${getFaceoffRuleSummary(config)} Chain mode: ${config.singleRiverCrossMode ? "you may switch between value and suit matching once per pile run." : "value and suit matching may alternate freely."}`;
+        rulesPreview.textContent = `Next-game faceoff cycle: ${getFaceoffCycleText(config)}. ${getFaceoffRuleSummary(config)} Chain mode: ${config.singleRiverCrossMode ? "you may switch between value and suit matching once per pile run." : "value and suit matching may alternate freely."} Experimental feature flag: Momentum, Loose Puck, Burn, and Dump are ${features.momentumSystem ? "enabled" : "disabled"}.`;
       }
     }
 
@@ -1771,6 +2443,8 @@
         shotCard: { suit: shot.shotCard.suit, value: shot.shotCard.value },
         shotValue: shot.shotValue,
         shotZoneIndex: shot.shotZoneIndex,
+        shotKind: shot.shotKind || "card",
+        powerHandSize: shot.powerHandSize || null,
         outcome,
         saveCards: saveCards.map((card) => ({ suit: card.suit, value: card.value }))
       };
@@ -1807,7 +2481,7 @@
       setEvent(`GOAL ${lowerPlayerName(shot.attackerPlayer)}`, "goal");
       triggerGoalFlash();
       clearShotPending();
-      startFaceoff(CENTER_ICE, "Goal scored. Center-ice faceoff.");
+      handleGoalAfterScore(shot.attackerPlayer);
     }
 
     function playShotSaveCard(player, cardIndex) {
@@ -1857,10 +2531,8 @@
       }
 
       if (state.discardPile.length > 0) {
-        const recovered = state.discardPile.splice(0, state.discardPile.length);
-        shuffle(recovered);
-        state.deck.push(...recovered);
-        addLog(`Deck rebuilt from discard pile (${recovered.length} cards).`);
+        const recoveredCount = rebuildDeckFromDiscard();
+        addLog(`Deck rebuilt from discard pile (${recoveredCount} cards).`);
       }
     }
 
@@ -1871,6 +2543,9 @@
           break;
         }
         drew += 1;
+        if (state.pendingPeriodBreak) {
+          break;
+        }
       }
       return drew;
     }
@@ -1884,6 +2559,9 @@
 
       const card = state.deck.pop();
       hand.push(card);
+      if (state.deck.length === 0) {
+        handleDeckCycleCompletion();
+      }
       return card;
     }
 
@@ -1921,12 +2599,12 @@
 
     function refillHands() {
       while (state.humanHand.length < state.config.handSize) {
-        if (drawCard("human", 1) === 0) {
+        if (drawCard("human", 1) === 0 || state.pendingPeriodBreak) {
           break;
         }
       }
       while (state.cpuHand.length < state.config.handSize) {
-        if (drawCard("cpu", 1) === 0) {
+        if (drawCard("cpu", 1) === 0 || state.pendingPeriodBreak) {
           break;
         }
       }
@@ -2256,10 +2934,21 @@
       clearComboWindow();
       state.activeBattleState = "none";
       state.comboImmunityActive = false;
+      if (FEATURES.momentumSystem && state.attacker && winner !== state.attacker) {
+        changeMomentum(state.attacker, -1, "turnover");
+      }
       state.attacker = winner;
       syncDefender();
 
       addLog(`${lowerPlayerName(winner)} empties the hand on defense and forces a special turnover.`);
+      addLog(`Possession flips to ${lowerPlayerName(state.attacker)} because the defender ran out of cards.`);
+
+      if (isShotZone(state.attacker, state.zoneIndex)) {
+        addLog(`Special turnover reward: ${lowerPlayerName(state.attacker)} gets an immediate shot from ${zoneLabel(state.zoneIndex)} with ${cardToText(lastPlayedCard)}.`);
+        setEvent("Special turnover shot", "shot");
+        resolveShot(state.attacker, state.defender, lastPlayedCard);
+        return;
+      }
 
       const previousZone = state.zoneIndex;
       advanceZone();
@@ -2270,15 +2959,11 @@
         addLog(`Puck stays in ${zoneLabel(state.zoneIndex)} after the special turnover.`);
       }
 
-      if (isShotZone(state.attacker, state.zoneIndex)) {
-        addLog(`Special turnover reward: ${lowerPlayerName(state.attacker)} gets an immediate shot with ${cardToText(lastPlayedCard)}.`);
-        setEvent("Special turnover shot", "shot");
-        resolveShot(state.attacker, state.defender, lastPlayedCard);
-        return;
-      }
-
       setEvent("Special turnover", "turnover");
       refillHands();
+      if (resolvePendingPeriodBreak()) {
+        return;
+      }
       startAttackerTurn();
       logTurnDiagnostics(state.currentTurn, "Special turnover.");
     }
@@ -2286,6 +2971,7 @@
     function startAttackerTurn() {
       clearComboWindow();
       clearHumanPendingTurn();
+      clearBurnSelection();
       resetExchangeCounts();
       resetRunMatchState();
       clearShotPending();
@@ -2298,6 +2984,7 @@
     function passAttackTurn() {
       clearComboWindow();
       clearHumanPendingTurn();
+      clearBurnSelection();
       state.defenderChainCount = 0;
       resetRunMatchState();
       state.activeBattleState = "defense";
@@ -2313,7 +3000,24 @@
       state.activeBattleState = "none";
       state.comboImmunityActive = false;
 
+      const previousAttacker = state.attacker;
+      const exchangeMargin = Math.abs(state.attackerChainCount - state.defenderChainCount);
+      const loosePuckExchange = FEATURES.momentumSystem && state.attackerChainCount === 0 && state.defenderChainCount === 0;
+
       if (winner === state.attacker) {
+        if (loosePuckExchange) {
+          addLog(reason || `${lowerPlayerName(state.attacker)} holds the puck after a 0-0 exchange.`);
+          addLog(`Loose Puck: 0-0 exchange triggers an immediate faceoff in ${zoneLabel(state.zoneIndex)}.`);
+          setEvent("Loose Puck", "contain");
+          startFaceoff(state.zoneIndex, "Loose Puck: 0-0 Exchange.", {
+            mode: "loosePuck",
+            refillHands: false,
+            preserveZone: true,
+            originAttacker: previousAttacker
+          });
+          return;
+        }
+
         const previousZone = state.zoneIndex;
         const attackerAdvances = attackerAdvancesOnExchangeWin();
         if (attackerAdvances) {
@@ -2336,16 +3040,30 @@
         } else {
           addLog(`Puck stays in ${zoneLabel(state.zoneIndex)}.`);
         }
+
+        if (FEATURES.momentumSystem && exchangeMargin >= 3) {
+          changeMomentum(winner, 1, `exchange win by ${exchangeMargin}`);
+        }
+
         setEvent(attackerAdvances ? "Exchange Win (+1 Zone)" : "Exchange Hold / No Advance", attackerAdvances ? "shot" : "contain");
         startAttackerTurn();
         logTurnDiagnostics(state.currentTurn);
         return;
       }
 
+      if (FEATURES.momentumSystem && previousAttacker) {
+        changeMomentum(previousAttacker, -1, "turnover");
+      }
+
       state.attacker = winner;
       syncDefender();
       addLog(reason || `${lowerPlayerName(state.attacker)} wins the exchange ${state.defenderChainCount}-${state.attackerChainCount}. Turnover.`);
       addLog(`Possession changes because ${lowerPlayerName(state.attacker)} won the exchange on defense.`);
+
+      if (FEATURES.momentumSystem && exchangeMargin >= 3) {
+        changeMomentum(winner, 1, `exchange win by ${exchangeMargin}`);
+      }
+
       setEvent("Turnover", "turnover");
       startAttackerTurn();
       logTurnDiagnostics(state.currentTurn);
@@ -2375,22 +3093,53 @@
       }
     }
 
+    function getMomentumZoneBand(player, zoneIndex = state.zoneIndex) {
+      if (isCenterIce(zoneIndex) || zoneIndex === 2 || zoneIndex === 3) {
+        return "neutral";
+      }
+
+      if (player === "human") {
+        if (zoneIndex === 0 || zoneIndex === 1) {
+          return "defensive";
+        }
+        if (zoneIndex === 4 || zoneIndex === 5) {
+          return "offensive";
+        }
+      }
+
+      if (player === "cpu") {
+        if (zoneIndex === 4 || zoneIndex === 5) {
+          return "defensive";
+        }
+        if (zoneIndex === 0 || zoneIndex === 1) {
+          return "offensive";
+        }
+      }
+
+      return null;
+    }
+
     function advanceZone() {
+      const previousZone = state.zoneIndex;
+
       if (state.attacker === "human") {
         if (isCenterIce()) {
           state.zoneIndex = 3;
         } else if (state.zoneIndex < ZONES.length - 1) {
           state.zoneIndex += 1;
         }
-        return;
-      }
-
-      if (state.attacker === "cpu") {
+      } else if (state.attacker === "cpu") {
         if (isCenterIce()) {
           state.zoneIndex = 2;
         } else if (state.zoneIndex > 0) {
           state.zoneIndex -= 1;
         }
+      }
+
+      const previousBand = getMomentumZoneBand(state.attacker, previousZone);
+      const nextBand = getMomentumZoneBand(state.attacker, state.zoneIndex);
+      if (FEATURES.momentumSystem && state.attacker && previousZone !== state.zoneIndex && previousBand && nextBand && previousBand !== nextBand) {
+        changeMomentum(state.attacker, 1, `crossing into the ${nextBand} zone`);
       }
     }
 
@@ -2581,6 +3330,18 @@
     }
 
     async function commitHumanCardPlay(cardIndex) {
+      if (state.pendingBurnSelection) {
+        burnMomentumCard("human", cardIndex);
+        render();
+        return;
+      }
+
+      if (state.pendingCycleSelection) {
+        cycleMomentumCard("human", cardIndex);
+        render();
+        return;
+      }
+
       if (state.faceoffPending) {
         resolveFaceoff(cardIndex);
         render();
@@ -2682,11 +3443,32 @@
       });
     }
 
-    function startFaceoff(zoneIndex, reason) {
-      refillHands();
+    function startFaceoff(zoneIndex, reason, options = {}) {
+      if (state.gameOver) {
+        return;
+      }
+
+      const faceoffMode = options.mode || "standard";
+      const refillForFaceoff = options.refillHands !== false;
+
+      if (refillForFaceoff) {
+        refillHands();
+        if (resolvePendingPeriodBreak()) {
+          return;
+        }
+      }
+
+      if (FEATURES.momentumSystem && faceoffMode === "standard") {
+        resetMomentum("Momentum resets for the faceoff.");
+      }
+
       clearHumanPendingTurn();
+      clearBurnSelection();
       state.faceoffPending = true;
-      state.zoneIndex = getFaceoffPairCenter(zoneIndex);
+      state.faceoffMode = faceoffMode;
+      state.faceoffReturnZone = options.preserveZone ? zoneIndex : null;
+      state.loosePuckOriginAttacker = options.originAttacker || null;
+      state.zoneIndex = options.preserveZone ? zoneIndex : getFaceoffPairCenter(zoneIndex);
       state.attacker = null;
       state.defender = null;
       state.currentTurn = "human";
@@ -2704,8 +3486,9 @@
         addLog(reason);
       }
 
-      addLog(`Faceoff at ${zoneLabel(state.zoneIndex)}. Human choose a card.`);
-      setEvent(`Faceoff at ${zoneLabel(state.zoneIndex)}`, "contain");
+      const faceoffLabel = faceoffMode === "loosePuck" ? "Loose Puck" : "Faceoff";
+      addLog(`${faceoffLabel} at ${zoneLabel(state.zoneIndex)}. Human choose a card.`);
+      setEvent(`${faceoffLabel} at ${zoneLabel(state.zoneIndex)}`, "contain");
       triggerPhaseFlash("neutral");
     }
 
@@ -2714,17 +3497,47 @@
         return;
       }
 
+      const loosePuckFaceoff = isLoosePuckFaceoff();
+      const originAttacker = state.loosePuckOriginAttacker;
+
       if (humanIndex < 0 || humanIndex >= state.humanHand.length) {
         addLog("Ignored: invalid human faceoff card.");
         return;
       }
 
-      if (state.cpuHand.length === 0) {
+      if (!loosePuckFaceoff && state.cpuHand.length === 0) {
         refillToFive("cpu");
+        if (resolvePendingPeriodBreak()) {
+          return;
+        }
       }
 
       const cpuIndexes = state.cpuHand.map((_, index) => index);
       if (cpuIndexes.length === 0) {
+        if (loosePuckFaceoff) {
+          const fallbackZoneIndex = state.faceoffReturnZone ?? state.zoneIndex;
+          state.faceoffPending = false;
+          state.faceoffMode = "standard";
+          state.faceoffReturnZone = null;
+          state.loosePuckOriginAttacker = null;
+          state.zoneIndex = fallbackZoneIndex;
+          state.attacker = "human";
+          syncDefender();
+          resetRunMatchState();
+          if (FEATURES.momentumSystem && originAttacker && originAttacker !== "human") {
+            changeMomentum(originAttacker, -1, "losing the loose puck");
+          }
+          addLog(`CPU has no card for the Loose Puck faceoff. Human wins possession in ${zoneLabel(state.zoneIndex)}.`);
+          if (state.humanHand.length === 0) {
+            refillToFive("human");
+            addLog("Human draws a fresh hand after winning the Loose Puck with no remaining cards.");
+          }
+          setEvent("Loose Puck won", "turnover");
+          startAttackerTurn();
+          logTurnDiagnostics(state.currentTurn);
+          return;
+        }
+
         addLog("CPU has no card available for the faceoff.");
         return;
       }
@@ -2744,19 +3557,55 @@
       let winningCard = winner === "human" ? humanCard : cpuCard;
       let losingCard = winner === "human" ? cpuCard : humanCard;
 
-      const resolvedZoneIndex = resolveFaceoffWinningZone(state.zoneIndex, winner);
+      const winnerHand = playerHand(winner);
+      const winnerUsedLastCard = winnerHand.length === 0;
+      const resolvedZoneIndex = loosePuckFaceoff
+        ? (state.faceoffReturnZone ?? state.zoneIndex)
+        : resolveFaceoffWinningZone(state.zoneIndex, winner);
       state.faceoffPending = false;
+      state.faceoffMode = "standard";
+      state.faceoffReturnZone = null;
+      state.loosePuckOriginAttacker = null;
       state.zoneIndex = resolvedZoneIndex;
       state.attacker = winner;
       syncDefender();
       state.activeCard = winningCard;
       resetRunMatchState();
-      refillHands();
+
+      if (!loosePuckFaceoff) {
+        if (state.humanHand.length === 0) {
+          refillToFive("human");
+          if (resolvePendingPeriodBreak()) {
+            return;
+          }
+          addLog("Human spent the last available faceoff card and draws a fresh hand.");
+        }
+        if (state.cpuHand.length === 0) {
+          refillToFive("cpu");
+          if (resolvePendingPeriodBreak()) {
+            return;
+          }
+          addLog("CPU spent the last available faceoff card and draws a fresh hand.");
+        }
+      } else if (winnerUsedLastCard) {
+        refillToFive(winner);
+        if (resolvePendingPeriodBreak()) {
+          return;
+        }
+      }
+
+      if (FEATURES.momentumSystem && loosePuckFaceoff && originAttacker && winner !== originAttacker) {
+        changeMomentum(originAttacker, -1, "losing the loose puck");
+      }
+
       startAttackerTurn();
 
-      addLog(`${lowerPlayerName(winner)} wins the faceoff at ${zoneLabel(state.zoneIndex)} (${describeFaceoffWin(winningCard, losingCard, faceoffResult.summary)}).`);
+      addLog(`${lowerPlayerName(winner)} wins the ${loosePuckFaceoff ? "Loose Puck" : "faceoff"} at ${zoneLabel(state.zoneIndex)} (${describeFaceoffWin(winningCard, losingCard, faceoffResult.summary)}).`);
       addLog(`Pile top is now ${cardToText(state.activeCard)} from the faceoff win.`);
-      setEvent(`${lowerPlayerName(winner)} wins the faceoff`, "turnover");
+      if (loosePuckFaceoff && winnerUsedLastCard) {
+        addLog(`${lowerPlayerName(winner)} used the last card to win the Loose Puck and draws a fresh hand.`);
+      }
+      setEvent(`${lowerPlayerName(winner)} wins the ${loosePuckFaceoff ? "Loose Puck" : "faceoff"}`, "turnover");
       logTurnDiagnostics(state.currentTurn);
     }
 
@@ -2812,17 +3661,23 @@
       return success ? [...chainIndexes] : null;
     }
 
-    function resolveShot(attackerPlayer, defenderPlayer, shotCard) {
+    function resolveShot(attackerPlayer, defenderPlayer, shotCard, options = {}) {
       const shotZoneIndex = state.zoneIndex;
       const closeShot = isCloseOffensiveZone(attackerPlayer, shotZoneIndex);
-      const shotValue = closeShot ? Math.min(6, shotCard.value + 1) : shotCard.value;
+      const hasShotValueOverride = Number.isFinite(options.shotValueOverride);
+      const shotValueBase = hasShotValueOverride ? options.shotValueOverride : shotCard.value;
+      const shotValue = hasShotValueOverride ? shotValueBase : closeShot ? Math.min(6, shotCard.value + 1) : shotCard.value;
       const requiredLength = requiredSaveLengthFromShotValue(shotValue);
       const defenderHand = playerHand(defenderPlayer);
 
+      if (FEATURES.momentumSystem) {
+        resetMomentum("Momentum resets after the shot.");
+      }
+
       resetRunMatchState();
 
-      addLog(`${lowerPlayerName(attackerPlayer)} empties hand in ${closeShot ? "close" : "far"} shot range. Shot quality ${shotValue}.`);
-      if (closeShot) {
+      addLog(options.logLine || `${lowerPlayerName(attackerPlayer)} empties hand in ${closeShot ? "close" : "far"} shot range. Shot quality ${shotValue}.`);
+      if (closeShot && !hasShotValueOverride) {
         addLog(`Close-range bonus applies: ${shotCard.value} becomes ${shotValue}.`);
       }
       setEvent(`Shot quality ${shotValue}`, "shot");
@@ -2834,6 +3689,8 @@
           shotCard: { suit: shotCard.suit, value: shotCard.value },
           shotZoneIndex,
           shotValue,
+          shotKind: options.shotKind || "card",
+          powerHandSize: options.powerHandSize || null,
           requiredLength,
           savedCards: [],
           savedCount: 0
@@ -2863,14 +3720,14 @@
           state.discardPile.push(removed);
         }
 
-        setLastShotSummary({ attackerPlayer, defenderPlayer, shotCard, shotValue, shotZoneIndex }, "save", selectedCards);
+        setLastShotSummary({ attackerPlayer, defenderPlayer, shotCard, shotValue, shotZoneIndex, shotKind: options.shotKind || "card", powerHandSize: options.powerHandSize || null }, "save", selectedCards);
         addLog(`${lowerPlayerName(defenderPlayer)} makes ${requiredLength}-card save: ${selectedCards.map(cardToText).join(" -> ")}. Frozen puck.`);
         setEvent("Save / Frozen puck", "contain");
         startFaceoff(shotZoneIndex, "Save/frozen puck.");
         return;
       }
 
-      setLastShotSummary({ attackerPlayer, defenderPlayer, shotCard, shotValue, shotZoneIndex }, "goal", []);
+      setLastShotSummary({ attackerPlayer, defenderPlayer, shotCard, shotValue, shotZoneIndex, shotKind: options.shotKind || "card", powerHandSize: options.powerHandSize || null }, "goal", []);
       if (attackerPlayer === "human") {
         state.humanScore += 1;
       } else {
@@ -2880,7 +3737,7 @@
       addLog(`${lowerPlayerName(defenderPlayer)} cannot complete ${requiredLength}-card save chain. GOAL ${lowerPlayerName(attackerPlayer)}.`);
       setEvent(`GOAL ${lowerPlayerName(attackerPlayer)}`, "goal");
       triggerGoalFlash();
-      startFaceoff(CENTER_ICE, "Goal scored. Center-ice faceoff.");
+      handleGoalAfterScore(attackerPlayer);
     }
 
     // ---------------------------
@@ -2890,6 +3747,10 @@
     async function handleCannotPlay(player) {
       if (player === "cpu") {
         showCpuNotice("CANNOT PLAY");
+      }
+
+      if (FEATURES.momentumSystem) {
+        changeMomentum(player, -1, "standard draw penalty");
       }
 
       const drawnCard = drawOneCard(player);
@@ -2903,6 +3764,10 @@
         if (player === "cpu") {
           showCpuNotice("DECK EMPTY");
         }
+      }
+
+      if (resolvePendingPeriodBreak()) {
+        return;
       }
 
       if (player === "human" && drawnCard && isNewestDrawnCardPlayable(player)) {
@@ -2946,6 +3811,9 @@
           resolveShot(state.attacker, state.defender, lastPlayedCard);
         } else {
           refillHands();
+          if (resolvePendingPeriodBreak()) {
+            return true;
+          }
           resolveExchange(player, `${lowerPlayerName(player)} empties the hand and wins the exchange.`);
         }
         return true;
@@ -2958,7 +3826,7 @@
     function refillToFive(player) {
       const hand = playerHand(player);
       while (hand.length < state.config.handSize) {
-        if (drawCard(player, 1) === 0) {
+        if (drawCard(player, 1) === 0 || state.pendingPeriodBreak) {
           break;
         }
       }
@@ -3152,12 +4020,212 @@
       return "lowest legal attack to conserve stronger cards";
     }
 
+    function getBurnFollowUpCount(hand, burnIndex) {
+      if (!hand || burnIndex < 0 || burnIndex >= hand.length || hand.length <= 1) {
+        return 0;
+      }
+
+      const remainingHand = hand.filter((_, index) => index !== burnIndex);
+      return getLegalCards(remainingHand, state.activeCard, state.runMatchMode, state.runHasCrossedRiver).length;
+    }
+
+    function getCpuBurnIndex() {
+      const allIndexes = state.cpuHand.map((_, index) => index);
+      if (allIndexes.length === 0) {
+        return null;
+      }
+
+      let bestIndex = allIndexes[0];
+      let bestFollowUpCount = getBurnFollowUpCount(state.cpuHand, bestIndex);
+      for (let i = 1; i < allIndexes.length; i += 1) {
+        const idx = allIndexes[i];
+        const candidateValue = state.cpuHand[idx].value;
+        const bestValue = state.cpuHand[bestIndex].value;
+        if (candidateValue < bestValue) {
+          bestIndex = idx;
+          bestFollowUpCount = getBurnFollowUpCount(state.cpuHand, bestIndex);
+          continue;
+        }
+
+        if (candidateValue === bestValue) {
+          const followUpCount = getBurnFollowUpCount(state.cpuHand, idx);
+          if (followUpCount > bestFollowUpCount) {
+            bestIndex = idx;
+            bestFollowUpCount = followUpCount;
+          }
+        }
+      }
+
+      return bestIndex;
+    }
+
+    function getCpuCycleIndex() {
+      const allIndexes = state.cpuHand.map((_, index) => index);
+      if (allIndexes.length === 0) {
+        return null;
+      }
+
+      return chooseLowestValueIndex(state.cpuHand, allIndexes);
+    }
+
+    function cpuShouldCycleMomentum(legalIndexes = getLegalCardsForTurn("cpu")) {
+      if (!FEATURES.momentumSystem || !canPlayerUseCycle("cpu")) {
+        return false;
+      }
+
+      return legalIndexes.length === 0;
+    }
+
+    function cpuShouldPowerShotMomentum(legalIndexes = getLegalCardsForTurn("cpu")) {
+      if (!FEATURES.momentumSystem || !canPlayerUsePowerShot("cpu")) {
+        return false;
+      }
+
+      const handSize = getPowerShotValue("cpu");
+      if (handSize < 2) {
+        return false;
+      }
+
+      const shotPressure = requiredSaveLengthFromShotValue(handSize);
+      if (legalIndexes.length === 0) {
+        return shotPressure >= 2;
+      }
+
+      if (isCloseOffensiveZone("cpu")) {
+        return handSize >= Math.max(4, state.config.handSize - 1) || (shotPressure >= 3 && legalIndexes.length <= 1);
+      }
+
+      return handSize >= state.config.handSize && legalIndexes.length <= 1 && shotPressure >= 3;
+    }
+
+    function cpuShouldDumpAndChase() {
+      if (!FEATURES.momentumSystem || !canPlayerDumpAndChase("cpu")) {
+        return false;
+      }
+
+      if (state.deck.length === 0) {
+        return true;
+      }
+
+      const hand = state.cpuHand;
+      const lowValueThreshold = Math.max(2, Math.ceil(state.config.maxValue / 2));
+      const lowValueCount = hand.filter((card) => card.value <= lowValueThreshold).length;
+      const mostlyLowValue = lowValueCount >= Math.ceil(hand.length / 2);
+      const shortHand = hand.length <= Math.max(2, Math.ceil(state.config.handSize / 2));
+      const conservingMomentum = getMomentum("cpu") > 0;
+      const deckLow = state.deck.length <= Math.max(6, state.config.handSize * 2);
+
+      if (isCloseOffensiveZone("cpu")) {
+        return mostlyLowValue || conservingMomentum || shortHand;
+      }
+
+      if (isFarOffensiveZone("cpu")) {
+        return mostlyLowValue && (conservingMomentum || shortHand || deckLow);
+      }
+
+      return mostlyLowValue && deckLow && conservingMomentum;
+    }
+
+    function cpuShouldBurnMomentum(legalIndexes = getLegalCardsForTurn("cpu")) {
+      if (!FEATURES.momentumSystem || !canPlayerUseBurn("cpu")) {
+        return false;
+      }
+
+      const burnIndex = getCpuBurnIndex();
+      if (burnIndex === null || burnIndex === undefined) {
+        return false;
+      }
+
+      const burnFollowUpCount = getBurnFollowUpCount(state.cpuHand, burnIndex);
+      const canDump = canPlayerDumpAndChase("cpu");
+
+      if (legalIndexes.length === 0) {
+        if (canDump && burnFollowUpCount === 0) {
+          return false;
+        }
+        return burnFollowUpCount > 0 || !canDump;
+      }
+
+      const hand = state.cpuHand;
+      const lowValueThreshold = Math.max(2, Math.ceil(state.config.maxValue / 2));
+      const lowValueCount = hand.filter((card) => card.value <= lowValueThreshold).length;
+      const mostlyLowValue = lowValueCount >= Math.ceil(hand.length / 2);
+      const activeValue = state.activeCard?.value ?? lowValueThreshold;
+      const bestCurrentLegalValue = legalIndexes.reduce((best, idx) => Math.max(best, hand[idx].value), 0);
+      const legalLooksWeak = legalIndexes.length <= 1 || bestCurrentLegalValue <= activeValue;
+      const burnImprovesOptions = burnFollowUpCount > legalIndexes.length;
+      return mostlyLowValue && burnFollowUpCount > 0 && (legalLooksWeak || burnImprovesOptions);
+    }
+
     async function cpuTakeTurn() {
       if (state.currentTurn !== "cpu") {
         return false;
       }
 
       const legal = getLegalCardsForTurn("cpu");
+
+      if (FEATURES.momentumSystem && cpuShouldPowerShotMomentum(legal)) {
+        showCpuNotice("POWER SHOT", "info");
+        render();
+        await sleep(getCpuSimDuration(900, 180));
+
+        if (state.currentTurn !== "cpu") {
+          return false;
+        }
+
+        powerShot("cpu");
+        return true;
+      }
+
+      if (FEATURES.momentumSystem && cpuShouldBurnMomentum(legal)) {
+        const burnIndex = getCpuBurnIndex();
+        if (burnIndex !== null && burnIndex !== undefined) {
+          showCpuNotice("BURN", "info");
+
+          state.cpuPreviewIndex = burnIndex;
+          render();
+          await sleep(getCpuSimDuration(850, 180));
+
+          if (state.currentTurn !== "cpu" || burnIndex < 0 || burnIndex >= state.cpuHand.length) {
+            state.cpuPreviewIndex = null;
+            return false;
+          }
+
+          const cpuButtons = document.querySelectorAll("#cpuHand .card-btn");
+          const sourceButton = cpuButtons[burnIndex];
+          const burnCard = state.cpuHand[burnIndex];
+          await animatePlayToPileFromElement(sourceButton, burnCard, !state.showCpuCards, getCpuSimDuration(420, 120));
+
+          burnMomentumCard("cpu", burnIndex);
+          state.cpuPreviewIndex = null;
+          return true;
+        }
+      }
+
+      if (FEATURES.momentumSystem && cpuShouldCycleMomentum(legal)) {
+        const cycleIndex = getCpuCycleIndex();
+        if (cycleIndex !== null && cycleIndex !== undefined) {
+          showCpuNotice("CYCLE", "info");
+
+          state.cpuPreviewIndex = cycleIndex;
+          render();
+          await sleep(getCpuSimDuration(760, 160));
+
+          if (state.currentTurn !== "cpu" || cycleIndex < 0 || cycleIndex >= state.cpuHand.length) {
+            state.cpuPreviewIndex = null;
+            return false;
+          }
+
+          const cpuButtons = document.querySelectorAll("#cpuHand .card-btn");
+          const sourceButton = cpuButtons[cycleIndex];
+          const cycleCard = state.cpuHand[cycleIndex];
+          await animatePlayToPileFromElement(sourceButton, cycleCard, !state.showCpuCards, getCpuSimDuration(420, 120));
+
+          cycleMomentumCard("cpu", cycleIndex);
+          state.cpuPreviewIndex = null;
+          return true;
+        }
+      }
 
       if (state.roleOfCurrentTurn === "defender" && currentTurnCanPass() && state.defenderChainCount > state.attackerChainCount) {
         showCpuNotice("TAKES PUCK", "info");
@@ -3173,7 +4241,16 @@
         return true;
       }
 
+      if (FEATURES.momentumSystem && cpuShouldDumpAndChase()) {
+        showCpuNotice("DUMP", "info");
+        dumpAndChase("cpu");
+        return true;
+      }
+
       if (legal.length === 0) {
+        if (FEATURES.momentumSystem && canPlayerDumpAndChase("cpu")) {
+          addLog("CPU declines Dump Hand and risks the draw instead.");
+        }
         await handleCannotPlay("cpu");
         return true;
       }
@@ -3323,14 +4400,31 @@
       }
     }
 
+    function renderMomentumDots(containerId, momentumValue, side) {
+      const container = document.getElementById(containerId);
+      if (!container) {
+        return;
+      }
+
+      container.innerHTML = "";
+      for (let i = 0; i < 3; i += 1) {
+        const dot = document.createElement("span");
+        dot.className = `momentum-dot${i < momentumValue ? ` filled ${side}` : ""}`;
+        container.appendChild(dot);
+      }
+    }
+
     function renderHand(containerId, hand, owner) {
       const container = document.getElementById(containerId);
       container.innerHTML = "";
 
       const humanInteractionBlocked = state.cpuBusy;
       const isHumanTurn = owner === "human" && !humanInteractionBlocked && (state.faceoffPending || state.currentTurn === "human");
+      const pendingMomentumAction = owner === "human" && state.currentTurn === "human" && !state.faceoffPending && !state.shotPending
+        ? getPendingMomentumAction()
+        : null;
       const legal = owner === "human"
-        ? new Set(state.faceoffPending ? hand.map((_, index) => index) : getLegalCardsForTurn("human"))
+        ? new Set(pendingMomentumAction ? hand.map((_, index) => index) : state.faceoffPending ? hand.map((_, index) => index) : getLegalCardsForTurn("human"))
         : null;
       const isComboTurn = state.comboWindow && state.comboPlayer === owner;
       const shouldShowCpuCards = owner !== "cpu" || state.showCpuCards;
@@ -3358,6 +4452,10 @@
           btn.disabled = !isHumanTurn || !isLegal;
           if (state.faceoffPending) {
             btn.title = isLegal ? "Choose this card for the faceoff" : "Choose a faceoff card";
+          } else if (pendingMomentumAction === "burn") {
+            btn.title = isLegal ? "Burn this card out of hand" : "Choose a Burn card";
+          } else if (pendingMomentumAction === "cycle") {
+            btn.title = isLegal ? "Cycle out this card and draw 1" : "Choose a Cycle card";
           } else if (state.shotPending) {
             btn.title = isLegal ? "Play this save card" : "Not legal in the current save chain";
           } else {
@@ -3466,25 +4564,32 @@
       panel.className = "last-shot-panel";
       const shot = state.lastShot;
       const responseText = shot.saveCards.length > 0 ? shot.saveCards.map(cardToText).join(" -> ") : "No completed save response";
+      const shooterText = shot.shotKind === "powerShot"
+        ? `${lowerPlayerName(shot.attackerPlayer)} used Power Shot from ${zoneLabel(shot.shotZoneIndex)} (quality ${shot.shotValue}${shot.powerHandSize ? `, hand ${shot.powerHandSize}` : ""}).`
+        : `${lowerPlayerName(shot.attackerPlayer)} played ${cardToText(shot.shotCard)} from ${zoneLabel(shot.shotZoneIndex)} (quality ${shot.shotValue}).`;
       panel.innerHTML = [
-        `<div class="last-shot-row"><strong>Shooter</strong>${lowerPlayerName(shot.attackerPlayer)} played ${cardToText(shot.shotCard)} from ${zoneLabel(shot.shotZoneIndex)} (quality ${shot.shotValue}).</div>`,
+        `<div class="last-shot-row"><strong>Shooter</strong>${shooterText}</div>`,
         `<div class="last-shot-row"><strong>Defender</strong>${lowerPlayerName(shot.defenderPlayer)} responded with ${responseText}.</div>`,
         `<div class="last-shot-row"><strong>Outcome</strong>${shot.outcome === "save" ? "Save / frozen puck" : `Goal for ${lowerPlayerName(shot.attackerPlayer)}`}</div>`
       ].join("");
     }
 
     function render() {
+      const faceoffUiLabel = state.faceoffPending && isLoosePuckFaceoff() ? "Puck Battle" : "Faceoff";
       document.getElementById("attackerLabel").textContent = lowerPlayerName(state.attacker);
       document.getElementById("defenderLabel").textContent = lowerPlayerName(state.defender);
-      document.getElementById("turnLabel").textContent = state.faceoffPending
-        ? "Faceoff"
+      document.getElementById("turnLabel").textContent = state.gameOver
+        ? "Final"
+        : state.faceoffPending
+        ? faceoffUiLabel
         : state.shotPending
           ? `${lowerPlayerName(state.currentTurn)} (save chain)`
           : `${lowerPlayerName(state.currentTurn)} (${state.roleOfCurrentTurn === "attacker" ? "attacking" : "defending"})`;
       document.getElementById("deckCountLabel").textContent = String(state.deck.length);
       document.getElementById("scoreLabel").textContent = `(${state.humanHand.length}) Human ${state.humanScore} - ${state.cpuScore} CPU (${state.cpuHand.length})`;
+      document.getElementById("gameClockLabel").textContent = state.gameOver ? `${getPeriodLabel()} Final` : `${getPeriodLabel()} | ${formatGameClock()}`;
       document.getElementById("comboLabel").textContent = state.faceoffPending
-        ? "Faceoff pending"
+        ? `${faceoffUiLabel} pending`
         : state.shotPending
           ? `Save ${state.shotPending.savedCount}/${state.shotPending.requiredLength}`
           : `Attack ${state.attackerChainCount} | Defense ${state.defenderChainCount}`;
@@ -3496,7 +4601,7 @@
       const activeCardLabel = document.getElementById("activeCardLabel");
       const activeCardMiddle = document.getElementById("activeCardMiddle");
       if (state.faceoffPending) {
-        activeCardLabel.textContent = "Faceoff";
+        activeCardLabel.textContent = faceoffUiLabel;
       } else if (state.shotPending) {
         activeCardLabel.textContent = "Save Must Match";
       } else {
@@ -3508,7 +4613,7 @@
         activeCardMiddle.classList.add(suitClass(state.activeCard.suit));
         fillCardVisual(activeCardMiddle, state.activeCard);
       } else if (state.faceoffPending) {
-        fillCardVisual(activeCardMiddle, null, { placeholderText: "Faceoff" });
+        fillCardVisual(activeCardMiddle, null, { placeholderText: faceoffUiLabel });
       } else {
         fillCardVisual(activeCardMiddle, null, { placeholderText: "Any Card" });
       }
@@ -3517,7 +4622,11 @@
 
       const comboHint = document.getElementById("comboHint");
       const humanPendingCount = getHumanPendingPlayCount();
-      if (state.currentTurn === "human" && humanPendingCount > 0 && !state.faceoffPending && !state.shotPending) {
+      if (state.pendingBurnSelection) {
+        comboHint.textContent = "Burn is active. Choose exactly 1 Human card to discard out of hand.";
+      } else if (state.pendingCycleSelection) {
+        comboHint.textContent = "Cycle is active. Choose exactly 1 Human card to discard and redraw.";
+      } else if (state.currentTurn === "human" && humanPendingCount > 0 && !state.faceoffPending && !state.shotPending) {
         const suffix = humanPendingCount === 1 ? "card" : "cards";
         comboHint.textContent = canStartOrContinueCombo("human", state.activeCard)
           ? `Human has ${humanPendingCount} unsubmitted ${suffix}. Play more, Undo, or Submit.`
@@ -3526,6 +4635,8 @@
         comboHint.textContent = "Choose one card for the faceoff. RPS suit rules decide first.";
       } else if (state.shotPending) {
         comboHint.textContent = `Human must complete a ${state.shotPending.requiredLength}-card save chain or press No Save.`;
+      } else if (state.currentTurn === "human" && canPlayerDumpAndChase("human")) {
+        comboHint.textContent = "Human is stuck on the opponent's side. Draw normally, or use Dump Hand to send the puck deep.";
       } else if (currentTurnCanPass() && canStartOrContinueCombo(state.currentTurn, state.activeCard)) {
         if (state.roleOfCurrentTurn === "attacker") {
           comboHint.textContent = `${lowerPlayerName(state.currentTurn)} may keep attacking or press End Chain.`;
@@ -3555,9 +4666,28 @@
       const humanPanel = document.getElementById("humanPanel");
       const cpuPanel = document.getElementById("cpuPanel");
       const activeMiddle = document.getElementById("activeMiddle");
+      const momentumTracker = document.getElementById("momentumTracker");
+      const humanMomentumDots = document.getElementById("humanMomentumDots");
+      const cpuMomentumDots = document.getElementById("cpuMomentumDots");
+      const humanMomentumActions = document.getElementById("humanMomentumActions");
       humanPanel.classList.toggle("possession", state.attacker === "human");
       cpuPanel.classList.toggle("possession", state.attacker === "cpu");
       activeMiddle.classList.toggle("possession", true);
+
+      if (momentumTracker) {
+        momentumTracker.hidden = false;
+      }
+      if (humanMomentumDots) {
+        humanMomentumDots.hidden = !FEATURES.momentumSystem;
+      }
+      if (cpuMomentumDots) {
+        cpuMomentumDots.hidden = !FEATURES.momentumSystem;
+      }
+
+      if (FEATURES.momentumSystem) {
+        renderMomentumDots("humanMomentumDots", state.humanMomentum, "human");
+        renderMomentumDots("cpuMomentumDots", state.cpuMomentum, "cpu");
+      }
 
       renderZoneTrack();
       renderHand("humanHand", state.humanHand, "human");
@@ -3573,6 +4703,10 @@
       const doneComboBtn = document.getElementById("doneComboBtn");
       const undoTurnBtn = document.getElementById("undoTurnBtn");
       const submitTurnBtn = document.getElementById("submitTurnBtn");
+      const cycleMomentumBtn = document.getElementById("cycleMomentumBtn");
+      const burnMomentumBtn = document.getElementById("burnMomentumBtn");
+      const powerShotBtn = document.getElementById("powerShotBtn");
+      const dumpChaseBtn = document.getElementById("dumpChaseBtn");
       cannotPlayBtn.className = `deck-draw-btn${state.shotPending ? " no-save" : ""}`;
       deckDrawTitle.textContent = state.shotPending ? "Goalie" : "Deck";
       deckDrawCount.textContent = String(state.deck.length);
@@ -3582,19 +4716,41 @@
       const canHumanAct = state.currentTurn === "human" && !state.cpuBusy;
       const legal = canHumanAct ? getLegalCardsForTurn("human") : [];
       const humanCanPass = canHumanAct && currentTurnCanPass();
+      const pendingMomentumAction = canHumanAct ? getPendingMomentumAction() : null;
+      const momentumSelectionActive = Boolean(pendingMomentumAction);
+      const cycleSelectionActive = pendingMomentumAction === "cycle";
+      const burnSelectionActive = pendingMomentumAction === "burn";
+      const humanCanCycle = canHumanAct && !hasHumanPendingTurn() && canPlayerUseCycle("human");
+      const humanCanBurn = canHumanAct && !hasHumanPendingTurn() && canPlayerUseBurn("human");
+      const humanCanPowerShot = canHumanAct && !hasHumanPendingTurn() && canPlayerUsePowerShot("human");
+      const humanCanDump = canHumanAct && !hasHumanPendingTurn() && canPlayerDumpAndChase("human");
+      const showCycleMomentumBtn = FEATURES.momentumSystem && (cycleSelectionActive || humanCanCycle);
+      const showBurnMomentumBtn = FEATURES.momentumSystem && (burnSelectionActive || humanCanBurn);
+      const showPowerShotBtn = FEATURES.momentumSystem && humanCanPowerShot;
+      const showDumpChaseBtn = FEATURES.momentumSystem && humanCanDump;
 
-      cannotPlayBtn.disabled = state.faceoffPending || !canHumanAct || (!state.shotPending && (humanCanPass || legal.length > 0));
+      if (humanMomentumActions) {
+        humanMomentumActions.hidden = !showCycleMomentumBtn && !showBurnMomentumBtn && !showPowerShotBtn && !showDumpChaseBtn;
+      }
+
+      cannotPlayBtn.disabled = state.faceoffPending || !canHumanAct || momentumSelectionActive || (!state.shotPending && (humanCanPass || legal.length > 0));
       cannotPlayBtn.title = state.faceoffPending
         ? "Choose a faceoff card"
         : !canHumanAct
         ? "CPU turn"
+        : burnSelectionActive
+          ? "Choose a Burn card or cancel Burn"
+        : cycleSelectionActive
+          ? "Choose a Cycle card or cancel Cycle"
         : state.shotPending
           ? "Concede the goal"
         : humanCanPass
           ? "Use End Chain to resolve the current exchange"
         : legal.length > 0
           ? "You have legal cards"
-          : "Draw and trigger cannot-play rule";
+          : humanCanDump
+            ? "Draw and trigger cannot-play rule, or use Dump Hand to send the puck deep"
+            : "Draw and trigger cannot-play rule";
 
       doneComboBtn.disabled = state.faceoffPending || state.shotPending || !humanCanPass || humanPendingCount > 0;
       doneComboBtn.title = state.faceoffPending
@@ -3617,6 +4773,42 @@
       if (submitTurnBtn) {
         submitTurnBtn.disabled = state.faceoffPending || state.shotPending || !canHumanAct || humanPendingCount === 0;
         submitTurnBtn.title = humanPendingCount > 0 ? "Commit the pending human plays and continue the game" : "Play at least one card before submitting";
+      }
+
+      if (cycleMomentumBtn) {
+        cycleMomentumBtn.disabled = !FEATURES.momentumSystem || state.faceoffPending || state.shotPending || hasHumanPendingTurn() || burnSelectionActive || (!cycleSelectionActive && !humanCanCycle);
+        cycleMomentumBtn.hidden = !showCycleMomentumBtn;
+        cycleMomentumBtn.title = cycleSelectionActive
+          ? "Click again to cancel Cycle selection"
+          : humanCanCycle
+            ? "Spend 1 Momentum, then choose 1 card to discard and draw 1"
+            : "Cycle is only available to the Human attacker at the start of the turn with 1+ Momentum and at least 1 card";
+      }
+
+      if (burnMomentumBtn) {
+        burnMomentumBtn.disabled = !FEATURES.momentumSystem || state.faceoffPending || state.shotPending || hasHumanPendingTurn() || cycleSelectionActive || (!burnSelectionActive && !humanCanBurn);
+        burnMomentumBtn.hidden = !showBurnMomentumBtn;
+        burnMomentumBtn.title = burnSelectionActive
+          ? "Click again to cancel Burn selection"
+          : humanCanBurn
+            ? "Spend 2 Momentum, then choose 1 card to Burn out of hand"
+            : "Burn is only available to the Human attacker at the start of the turn with 2+ Momentum and more than 1 card";
+      }
+
+      if (powerShotBtn) {
+        powerShotBtn.disabled = !FEATURES.momentumSystem || state.faceoffPending || state.shotPending || hasHumanPendingTurn() || momentumSelectionActive || !humanCanPowerShot;
+        powerShotBtn.hidden = !showPowerShotBtn;
+        powerShotBtn.title = humanCanPowerShot
+          ? "Spend 3 Momentum to take an immediate Power Shot. Shot quality equals cards in hand"
+          : "Power Shot is only available to the Human attacker at the start of the turn in a shot zone with 3 Momentum";
+      }
+
+      if (dumpChaseBtn) {
+        dumpChaseBtn.disabled = !FEATURES.momentumSystem || momentumSelectionActive || !humanCanDump;
+        dumpChaseBtn.hidden = !showDumpChaseBtn;
+        dumpChaseBtn.title = humanCanDump
+          ? "Dump the puck deep to the far zone and concede the current exchange"
+          : "Dump Hand is only available to a stuck Human attacker on the opponent's side of the ice";
       }
 
       if (cpuNotice) {
@@ -3653,6 +4845,18 @@
         return;
       }
 
+      if (state.pendingBurnSelection) {
+        addLog("Human is selecting a Burn card. Choose a card or cancel Burn first.");
+        render();
+        return;
+      }
+
+      if (state.pendingCycleSelection) {
+        addLog("Human is selecting a Cycle card. Choose a card or cancel Cycle first.");
+        render();
+        return;
+      }
+
       if (hasHumanPendingTurn()) {
         addLog("Human has unsubmitted cards. Use Undo or Submit instead of drawing.");
         render();
@@ -3681,6 +4885,7 @@
     function newGame() {
       clearCpuNotice();
       clearHumanPendingTurn();
+      Object.assign(FEATURES, getDraftFeaturesFromControls());
       state.config = getDraftConfigFromControls();
       state.deck = shuffle(createDeck());
       state.discardPile = [];
@@ -3704,9 +4909,21 @@
       state.recentPlayedCards = [];
       state.cpuNotice = null;
       state.faceoffPending = false;
+      state.faceoffMode = "standard";
+      state.faceoffReturnZone = null;
+      state.loosePuckOriginAttacker = null;
+      state.pendingBurnSelection = false;
+      state.pendingCycleSelection = false;
       state.logMessages = [];
+      state.humanMomentum = 0;
+      state.cpuMomentum = 0;
       state.humanScore = 0;
       state.cpuScore = 0;
+      state.periodNumber = 1;
+      state.periodClockMinutes = PERIOD_MINUTES;
+      state.pendingPeriodBreak = null;
+      state.gameOver = false;
+      state.gameWinner = null;
 
       state.attacker = null;
       state.defender = null;
@@ -3745,6 +4962,44 @@
         void submitHumanTurn();
       });
 
+      document.getElementById("cycleMomentumBtn").addEventListener("click", () => {
+        if (state.pendingCycleSelection) {
+          cancelHumanCycleSelection();
+        } else {
+          beginHumanCycleSelection();
+        }
+        render();
+      });
+
+      document.getElementById("burnMomentumBtn").addEventListener("click", () => {
+        if (state.pendingBurnSelection) {
+          cancelHumanBurnSelection();
+        } else {
+          beginHumanBurnSelection();
+        }
+        render();
+      });
+
+      document.getElementById("powerShotBtn").addEventListener("click", () => {
+        if (!powerShot("human")) {
+          render();
+          return;
+        }
+        render();
+        runCpuAuto();
+        render();
+      });
+
+      document.getElementById("dumpChaseBtn").addEventListener("click", () => {
+        if (!dumpAndChase("human")) {
+          render();
+          return;
+        }
+        render();
+        runCpuAuto();
+        render();
+      });
+
       document.getElementById("cpuStepBtn").addEventListener("click", () => {
         if (state.faceoffPending) {
           addLog("CPU Step is unavailable during a faceoff. Choose a faceoff card.");
@@ -3772,7 +5027,7 @@
         render();
       });
 
-      ["debugSuitCount", "debugMaxValue", "debugHandSize", "debugWildCount", "debugCpuSpeed", "debugRiverMode"].forEach((id) => {
+      ["debugSuitCount", "debugMaxValue", "debugHandSize", "debugWildCount", "debugCpuSpeed", "debugRiverMode", "debugMomentumSystem"].forEach((id) => {
         const element = document.getElementById(id);
         element?.addEventListener("input", () => {
           if (id === "debugCpuSpeed") {

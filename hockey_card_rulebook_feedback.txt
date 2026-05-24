@@ -19,7 +19,12 @@ The main loop is:
 6. If an attacker empties their hand in a shot zone, a shot occurs.
 7. A goal leads to a center-ice faceoff. A save leads to a faceoff in the shot area.
 
-At the moment, the prototype tracks score but does not implement a final game-ending win condition. Play can continue indefinitely.
+The prototype now tracks score across regulation and overtime.
+
+- The game is played over 3 regulation periods.
+- If one side leads after Period 3 ends, that side wins the game.
+- If the score is tied after Period 3, the game goes to OT1, then OT2, and so on.
+- Overtime is sudden death: the next goal wins.
 
 2. COMPONENTS
 
@@ -58,6 +63,18 @@ Center ice is treated as the space between the two neutral zones. End-zone faceo
 Your short-term goal is to win exchanges and move the puck toward the opponent's end.
 
 Your scoring goal is to empty your hand in a shot zone, force a save challenge, and beat that challenge to score.
+
+3.1 PERIODS AND CLOCK
+
+The prototype uses a deck-based game clock instead of tracking real-time seconds.
+
+- Each period starts at 20:00.
+- Each time the deck is exhausted and rebuilt from the discard pile, the clock loses 5:00.
+- This means each period contains 4 full deck cycles.
+- The clock only changes when the last card of a deck is drawn.
+- If that draw drops the clock from 5:00 to 0:00, the period ends immediately, even if it happens in the middle of a play sequence.
+- When a period ends, play stops and the next period begins with a center-ice faceoff.
+- There is no side switch between periods in the current prototype.
 
 4. TURN STRUCTURE
 
@@ -116,7 +133,7 @@ Important prototype note
 
 7. FACEOFFS
 
-The game begins with a faceoff at center ice. Other faceoffs happen after goals and saves.
+The game begins with a faceoff at center ice. Other standard faceoffs happen after goals, saves, and period starts.
 
 During a faceoff:
 
@@ -144,7 +161,13 @@ Faceoff resolution rules
 - In even loops larger than 2 suits, a suit beats its immediate clockwise neighbor, while opposite suits fall back to value.
 - Exact fallback ties are resolved randomly.
 
-After the faceoff resolves, hands are refilled and normal attack play begins.
+After the faceoff resolves, normal attack play begins.
+
+Current prototype note
+
+- Standard faceoffs refill hands before the faceoff begins.
+- The faceoff cards themselves are spent cards and do not automatically refill after the faceoff resolves.
+- Only a player who somehow reaches an empty hand after the faceoff draws a fresh hand.
 
 8. EXCHANGES
 
@@ -297,9 +320,8 @@ If the defender empties the hand while defending, a special turnover occurs.
 The special turnover reward is:
 
 - The defender immediately becomes the attacker.
-- The puck auto-advances one zone.
-- If that auto-advance reaches a shot zone, the new attacker gets an immediate shot using the last played card.
-- Otherwise, hands refill and the new attack begins.
+- If the turnover happens in a shot zone for the new attacker, the new attacker gets an immediate shot from the current zone using the last played card.
+- Otherwise, the puck auto-advances one zone, then hands refill and the new attack begins.
 
 15. PUCK MOVEMENT
 
