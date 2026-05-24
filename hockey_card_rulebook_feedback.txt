@@ -1,0 +1,390 @@
+HOCKEY CARD PROTOTYPE
+RULEBOOK FOR FEEDBACK
+
+This document explains the current rules of the Hockey Card Prototype as implemented in the browser build. It is written for feedback and playtest discussion, not as final published packaging copy.
+
+1. GAME OVERVIEW
+
+This is a head-to-head card game about gaining possession, advancing the puck up the ice, creating shots, and scoring goals.
+
+Each side has a hand of cards. A card has a suit and a value.
+
+The main loop is:
+
+1. A faceoff determines who starts with possession.
+2. The attacker begins an exchange by playing cards that match the active card.
+3. The defender answers with matching cards of their own.
+4. The exchange ends when a player stops, runs out of legal plays, or wins/loses the comparison.
+5. The puck either advances, stays put, or changes possession.
+6. If an attacker empties their hand in a shot zone, a shot occurs.
+7. A goal leads to a center-ice faceoff. A save leads to a faceoff in the shot area.
+
+At the moment, the prototype tracks score but does not implement a final game-ending win condition. Play can continue indefinitely.
+
+2. COMPONENTS
+
+Cards
+
+- Each card has a suit and a value.
+- By default, the prototype uses 4 suits: Pace, Finesse, Grit, and Power.
+- Vision can be added in expanded suit-count setups.
+- Wild cards are optional. In the current default setup, there are no wild cards.
+
+Deck construction
+
+- The deck contains two copies of every active suit/value combination.
+- Default setup: 4 suits, values 1 through 8, 5-card hands, 0 wild cards.
+
+Hands
+
+- Each player normally plays from a 5-card hand in the default setup.
+- Hands are refilled in certain state changes described later in this document.
+
+Zones
+
+The rink is represented by six zones:
+
+1. Human Goal Zone
+2. Human Defensive Zone
+3. Neutral Zone A
+4. Neutral Zone B
+5. CPU Defensive Zone
+6. CPU Goal Zone
+
+Center ice is treated as the space between the two neutral zones. End-zone faceoffs are also represented between paired zones.
+
+3. OBJECTIVE
+
+Your short-term goal is to win exchanges and move the puck toward the opponent's end.
+
+Your scoring goal is to empty your hand in a shot zone, force a save challenge, and beat that challenge to score.
+
+4. TURN STRUCTURE
+
+Every live sequence has an attacker and a defender.
+
+- The attacker is the player with possession.
+- The defender is the player trying to answer the attack.
+- The current turn always belongs to one player in one role.
+
+An exchange has two sides:
+
+1. Attack phase: the attacker plays one or more legal cards.
+2. Defense phase: the defender tries to answer and beat or hold the exchange.
+
+The exchange is measured by card count:
+
+- Attacker chain count = how many cards the attacker played in that exchange.
+- Defender chain count = how many cards the defender played in that exchange.
+
+5. THE ACTIVE CARD AND MATCHING RULE
+
+The top card of the pile is the active card.
+
+To play a legal card, the card must match the active card by at least one of these:
+
+- Same suit
+- Same value
+- Wild interaction
+
+If there is no active card, any card may start the pile.
+
+Wild cards
+
+- A wild card acts as a bridge and is always legal against the active card.
+- If either the played card or the active card is wild, the match is treated as a legal wild bridge.
+
+6. RIVER RULE / MATCH LOCKING
+
+Default rule
+
+- In the default prototype setting, value and suit matching may alternate freely.
+- In that mode, a legal play simply has to match suit, value, or both.
+
+Optional single-cross mode
+
+- The prototype includes an optional "Cross River Once" mode.
+- In that mode, once a run becomes suit-matching or value-matching, it locks to that type.
+- A player may switch once from suit to value, or from value to suit, during that run.
+- After that single switch, the run stays locked.
+- A card that matches both suit and value does not force the run to lock either way if no lock exists yet.
+
+Important prototype note
+
+- River tracking is handled per active run, not globally for the whole match.
+- Each player gets their own run state when their side of the exchange begins.
+
+7. FACEOFFS
+
+The game begins with a faceoff at center ice. Other faceoffs happen after goals and saves.
+
+During a faceoff:
+
+- The Human chooses one card.
+- The CPU reveals one card.
+- The winner becomes the attacker.
+- The winner's card becomes the active card on the pile.
+- The puck is placed in the winner's resulting faceoff zone.
+
+Faceoff suit cycle
+
+The suit priority uses a clockwise cycle based on the active suit set.
+
+Default 4-suit cycle:
+
+Grit > Finesse > Pace > Power > Grit
+
+Faceoff resolution rules
+
+- If both cards share a suit, the higher value wins.
+- If an exact same-suit tie occurs, the winner is chosen randomly.
+- If wild cards are involved in a faceoff, the comparison falls back to value.
+- In odd-suit loops, each suit beats the next half of the cycle clockwise.
+- In 2-suit setups, different suits fall back entirely to value.
+- In even loops larger than 2 suits, a suit beats its immediate clockwise neighbor, while opposite suits fall back to value.
+- Exact fallback ties are resolved randomly.
+
+After the faceoff resolves, hands are refilled and normal attack play begins.
+
+8. EXCHANGES
+
+8.1 Attack phase
+
+The attacker starts by playing a legal card.
+
+- If there is no active card, any card can start the pile.
+- Otherwise, the attacker must match the active card under the current matching rule.
+
+The attacker may continue the chain as long as legal plays remain.
+
+The Human attacker can stage multiple cards on a normal turn, then choose Submit to commit the turn or Undo to take back the last staged card.
+
+8.2 Ending the attack phase
+
+The attack phase ends when one of these happens:
+
+- The attacker chooses End Chain or Submit.
+- The attacker has no further legal continuation and the turn resolves.
+- The attacker empties their hand.
+
+When the attacker ends the chain without emptying the hand, the defender gets a chance to answer.
+
+8.3 Defense phase
+
+The defender tries to answer the attack with legal matching cards.
+
+- The defender may continue chaining as long as legal answers remain.
+- If the defender has already exceeded the attacker's count, the defender may end the chain and take possession.
+- If the defender does not exceed the attacker, the attacker holds the exchange.
+
+The Human defender also uses Undo and Submit on normal turns.
+
+9. HOW EXCHANGES ARE WON
+
+When the exchange resolves, compare card counts:
+
+- If defender chain count is greater than attacker chain count, the defender wins the exchange and takes possession.
+- Otherwise, the attacker holds or wins the exchange.
+
+Zone advancement rule
+
+- The attacker advances one zone only if the attacker played more cards than the defender.
+- Exception: a 0-0 exchange still counts as forward momentum and advances the attacker.
+- Non-zero ties do not advance the puck.
+
+This means:
+
+- 0-0 advances
+- 1-1 does not advance
+- 2-1 advances
+- 2-2 does not advance
+
+If the defender wins the exchange, possession changes immediately and the new attacker begins from the current zone.
+
+10. DRAWING / CANNOT PLAY
+
+The prototype includes a draw/cannot-play action.
+
+When a player cannot legally act in the appropriate moment, they draw one card from the deck.
+
+After drawing:
+
+- If the drawn card is immediately playable for the CPU, the CPU may play it at once.
+- If the Human draws a playable card, the Human still chooses manually whether to use it.
+- If the drawn card still does not help, the turn resolves according to role.
+
+Role-based result after an unsuccessful draw
+
+- Attacker: the attack chain ends and passes to defense.
+- Defender: the attacker wins the exchange.
+
+Prototype-specific note
+
+- In the current prototype flow, drawing is mainly used before a live chain has been established on that turn.
+- Once a Human has already played into a chain, the intended resolution is usually to continue, End Chain, Undo, or Submit rather than draw.
+
+If the deck is empty, the draw attempt fails and the same role-based resolution occurs.
+
+11. SHOTS
+
+A shot occurs when the attacker empties their hand while in a shot zone.
+
+Shot zones
+
+- Far shot zone: the attacker's offensive zone
+- Close shot zone: the opponent's goal zone
+
+Shot value
+
+- Far shot: shot value equals the played card's value.
+- Close shot: shot value equals played card value + 1, capped at 6.
+
+Examples
+
+- A 2 in close range becomes a shot value of 3.
+- A 6 in close range stays 6.
+
+12. SAVES
+
+The defender answers a shot by completing a save chain.
+
+Required save length by shot value
+
+- Shot value 1-2: 1 save card
+- Shot value 3-4: 2 save cards
+- Shot value 5-6: 3 save cards
+
+Each save card must legally continue from the current active card under the same matching system.
+
+Save outcomes
+
+- If the defender completes the full chain, the result is a save and frozen puck.
+- A successful save causes a faceoff in the shot area.
+- If the defender cannot complete the required chain, the shot becomes a goal.
+
+Prototype interface note
+
+- Human save chains are played manually and resolve immediately.
+- The current Undo/Submit staging system applies to normal attack/defense turns, not to save chains.
+
+13. GOALS AND SCORING
+
+- Each successful shot that is not fully saved scores 1 goal.
+- Human goals increase Human score by 1.
+- CPU goals increase CPU score by 1.
+- After a goal, play resets to a center-ice faceoff.
+
+14. EMPTY-HAND SPECIAL CASES
+
+14.1 Attacker empties hand outside a shot zone
+
+If the attacker empties the hand outside a shot zone:
+
+- Hands are refilled.
+- The attacker wins the exchange.
+- The normal exchange resolution then applies.
+
+14.2 Attacker empties hand in a shot zone
+
+If the attacker empties the hand in a shot zone:
+
+- A shot is created immediately instead of resolving as a standard exchange.
+
+14.3 Defender empties hand on defense
+
+If the defender empties the hand while defending, a special turnover occurs.
+
+The special turnover reward is:
+
+- The defender immediately becomes the attacker.
+- The puck auto-advances one zone.
+- If that auto-advance reaches a shot zone, the new attacker gets an immediate shot using the last played card.
+- Otherwise, hands refill and the new attack begins.
+
+15. PUCK MOVEMENT
+
+Human attacks toward the CPU end.
+CPU attacks toward the Human end.
+
+Movement is mirrored by side:
+
+- From center ice, Human advances into Neutral Zone B and CPU advances into Neutral Zone A.
+- Further exchange wins move the puck one zone deeper toward the opponent's goal.
+- If already at the deepest zone, the puck stays there.
+
+16. HUMAN TURN CONTROLS IN THE PROTOTYPE
+
+Normal Human attack/defense turns support staged play.
+
+Undo
+
+- Removes the most recently staged Human card.
+- Restores the prior hand, pile state, active card, recent-play history, and exchange counts for that staged step.
+
+Submit
+
+- Commits the staged Human plays.
+- If the committed play emptied the hand, the normal empty-hand rules apply.
+- Otherwise, the exchange continues or resolves normally.
+
+End Chain
+
+- Ends a live chain and passes or resolves the exchange.
+- If unsubmitted Human cards are pending, End Chain is blocked until the Human uses Submit or Undo.
+
+17. PROTOTYPE OPTIONS
+
+The debug setup can change the ruleset for testing.
+
+Available settings include:
+
+- Suit count: 2 to 5
+- Maximum card value: 5 to 10
+- Hand size: 3 to 10
+- Wild card count: 0 to 20
+- CPU speed percentage
+- Cross River Once: on or off
+
+Default prototype configuration
+
+- 4 suits
+- Values 1-8
+- Hand size 5
+- 0 wild cards
+- CPU speed 100%
+- Cross River Once OFF
+
+18. CURRENT PROTOTYPE LIMITS
+
+These are important when gathering feedback.
+
+- The prototype currently tracks score but does not end the match at a target score.
+- The CPU plays automatically on its turn.
+- Human faceoffs and Human save chains are resolved immediately rather than through the Undo/Submit staging flow.
+- The rules have been implemented for prototype clarity and testability, not yet for final presentation language.
+
+19. SHORT PLAY SUMMARY
+
+1. Faceoff decides possession.
+2. Winner's faceoff card becomes the active card.
+3. Attacker starts an exchange by matching the active card.
+4. Attacker may continue the chain while legal plays remain.
+5. Defender answers with legal matching cards.
+6. Compare chain lengths when the exchange ends.
+7. Attacker advances only on a true edge in card count, except that 0-0 still advances.
+8. If the attacker empties the hand in a shot zone, create a shot.
+9. Defender must complete a save chain based on shot value.
+10. Goal resets to center ice. Save resets to a local faceoff.
+
+20. FEEDBACK QUESTIONS THIS RULESET IS LIKELY TO PROMPT
+
+If this document is being used for feedback, the biggest rules questions are probably:
+
+- Is the faceoff suit cycle intuitive?
+- Is the attacker/defender exchange counting easy to read?
+- Does the 0-0 advance exception feel right?
+- Is the defender empty-hand special turnover too strong, too weak, or just right?
+- Is the save-chain table easy to learn?
+- Is free matching better than single-cross river mode?
+
+End of rulebook.

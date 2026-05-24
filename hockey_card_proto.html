@@ -6,6 +6,7 @@
   <title>Hockey Card Prototype</title>
   <style>
     :root {
+      /* Card-size defaults for desktop and tablet. Phones override these below. */
       --bg: #f5f7fb;
       --panel: #ffffff;
       --ink: #1c2430;
@@ -13,13 +14,20 @@
       --border: #d7deea;
       --pace: #2f6fe4;
       --finesse: #2e9b4f;
-      --grit: #d26b1b;
+      --grit: #b3be20;
       --power: #d63f3f;
       --vision: #8a52d8;
       --wild: #16181d;
       --ok: #167a45;
       --warn: #a66a00;
       --danger: #a62a2a;
+      --play-card-width: 74px;
+      --play-card-height: 108px;
+      --play-card-radius: 13px;
+      --play-card-pad-x: 7px;
+      --play-card-pad-top: 24px;
+      --play-card-pad-bottom: 20px;
+      --play-card-banner-height: 14px;
     }
 
     * {
@@ -187,8 +195,37 @@
     }
 
     .hand-panel {
+      position: relative;
       min-width: 0;
       transition: border-color 120ms ease, background-color 120ms ease, box-shadow 120ms ease;
+    }
+
+    .hand-notice[hidden] {
+      display: none;
+    }
+
+    .hand-notice {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      z-index: 3;
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 0.74rem;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: #fff;
+      box-shadow: 0 8px 18px rgba(28, 36, 48, 0.18);
+      pointer-events: none;
+    }
+
+    .hand-notice.danger {
+      background: rgba(166, 42, 42, 0.94);
+    }
+
+    .hand-notice.info {
+      background: rgba(47, 111, 228, 0.92);
     }
 
     .hand-panel.possession {
@@ -287,11 +324,11 @@
 
     .active-card-row {
       display: flex;
-      align-items: stretch;
+      align-items: flex-end;
       justify-content: center;
-      gap: 10px;
+      gap: 8px;
       width: 100%;
-      max-width: 240px;
+      max-width: 172px;
       margin: 0 auto;
     }
 
@@ -301,52 +338,86 @@
       align-items: center;
       gap: 6px;
       min-width: 0;
-      flex: 1;
+      flex: 0 0 auto;
+      width: var(--play-card-width);
     }
 
     .active-card-pill {
+      position: relative;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
       border: 2px solid var(--border);
-      border-radius: 10px;
-      padding: 10px 12px;
-      min-width: 110px;
-      min-height: 72px;
+      border-radius: var(--play-card-radius);
+      padding: var(--play-card-pad-top) var(--play-card-pad-x) var(--play-card-pad-bottom);
+      width: var(--play-card-width);
+      min-width: var(--play-card-width);
+      min-height: var(--play-card-height);
+      gap: 6px;
+      text-align: center;
       font-weight: 700;
-      background: #fff;
+      background: linear-gradient(180deg, #ffffff 0%, #fbfcff 58%, #eef3ff 100%);
+      box-shadow: 0 10px 18px rgba(28, 36, 48, 0.12), inset 0 0 0 1px rgba(255, 255, 255, 0.88);
       margin: 0 auto;
-      width: 100%;
+      overflow: hidden;
     }
 
-    .active-card-pill.pace {
+    .active-card-pill::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 0;
+      height: var(--play-card-banner-height);
+      background: currentColor;
+      opacity: 0.14;
+      pointer-events: none;
+    }
+
+    .active-card-pill.pace,
+    .card-btn.pace {
       color: var(--pace);
       border-color: var(--pace);
     }
 
-    .active-card-pill.finesse {
+    .active-card-pill.finesse,
+    .card-btn.finesse {
       color: var(--finesse);
       border-color: var(--finesse);
     }
 
-    .active-card-pill.grit {
+    .active-card-pill.grit,
+    .card-btn.grit {
       color: var(--grit);
       border-color: var(--grit);
     }
 
-    .active-card-pill.power {
+    .active-card-pill.power,
+    .card-btn.power {
       color: var(--power);
       border-color: var(--power);
     }
 
-    .active-card-pill.vision {
+    .active-card-pill.vision,
+    .card-btn.vision {
       color: var(--vision);
       border-color: var(--vision);
     }
 
-    .active-card-pill.wild {
+    .active-card-pill.wild,
+    .card-btn.wild {
       color: var(--wild);
       border-color: var(--wild);
+    }
+
+    .card-placeholder-label {
+      font-size: 0.78rem;
+      font-weight: 800;
+      line-height: 1.15;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      pointer-events: none;
     }
 
     .recent-plays {
@@ -432,13 +503,30 @@
       margin: 0;
     }
 
-    .chain-float-btn {
+    .chain-float-row {
       position: absolute;
       top: 8px;
       left: 8px;
+      z-index: 2;
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      max-width: calc(100% - 16px);
+    }
+
+    .chain-float-btn {
       padding: 4px 8px;
       font-size: 0.78rem;
-      z-index: 2;
+    }
+
+    .chain-float-btn.submit-btn {
+      border-color: var(--pace);
+      background: var(--pace);
+      color: #fff;
+    }
+
+    .chain-float-btn.submit-btn:hover:not(:disabled) {
+      background: #2459b9;
     }
 
     .deck-draw-btn {
@@ -572,16 +660,88 @@
     .cards {
       display: flex;
       flex-wrap: wrap;
-      gap: 6px;
+      gap: 8px;
+      align-items: flex-end;
     }
 
     .card-btn {
+      position: relative;
       border-width: 2px;
-      min-width: 92px;
-      text-align: left;
-      font-weight: 600;
-      background: #fff;
+      width: var(--play-card-width);
+      min-width: var(--play-card-width);
+      min-height: var(--play-card-height);
+      padding: var(--play-card-pad-top) var(--play-card-pad-x) var(--play-card-pad-bottom);
+      border-radius: var(--play-card-radius);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      text-align: center;
+      font-weight: 700;
+      background: linear-gradient(180deg, #ffffff 0%, #fbfcff 58%, #eef3ff 100%);
+      box-shadow: 0 10px 18px rgba(28, 36, 48, 0.12), inset 0 0 0 1px rgba(255, 255, 255, 0.88);
+      overflow: hidden;
       touch-action: manipulation;
+      transition: transform 120ms ease, box-shadow 120ms ease, background-color 120ms ease, opacity 120ms ease;
+    }
+
+    .card-btn::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 0;
+      height: var(--play-card-banner-height);
+      background: currentColor;
+      opacity: 0.14;
+      pointer-events: none;
+    }
+
+    .card-corner {
+      position: absolute;
+      font-size: 0.62rem;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      line-height: 1;
+      pointer-events: none;
+    }
+
+    .card-corner.top {
+      top: 6px;
+      left: 7px;
+    }
+
+    .card-corner.bottom {
+      right: 7px;
+      bottom: 6px;
+      transform: rotate(180deg);
+    }
+
+    .card-value {
+      font-size: 1.4rem;
+      line-height: 1;
+      letter-spacing: -0.03em;
+      pointer-events: none;
+    }
+
+    .card-suit-label {
+      font-size: 0.6rem;
+      line-height: 1.15;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      pointer-events: none;
+    }
+
+    .card-back-label {
+      font-size: 0.68rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #eef3fb;
+      text-shadow: 0 1px 0 rgba(34, 46, 64, 0.35);
+      pointer-events: none;
     }
 
     .card-btn.draggable-card {
@@ -593,53 +753,32 @@
     }
 
     .card-btn.legal {
-      box-shadow: 0 0 0 2px #dce8ff inset;
-      background: #f5f9ff;
+      box-shadow: 0 12px 22px rgba(28, 36, 48, 0.14), 0 0 0 2px #dce8ff inset;
+      background: linear-gradient(180deg, #ffffff 0%, #f6f9ff 58%, #e8f0ff 100%);
     }
 
     .card-btn.combo-legal {
-      box-shadow: 0 0 0 2px #ffe4aa inset;
-      background: #fff8ea;
+      transform: translateY(-4px);
+      box-shadow: 0 16px 26px rgba(28, 36, 48, 0.16), 0 0 0 2px #ffe4aa inset;
+      background: linear-gradient(180deg, #ffffff 0%, #fffaf1 58%, #ffefc9 100%);
     }
 
     .card-btn.illegal {
-      opacity: 0.45;
-    }
-
-    .card-btn.pace {
-      border-color: var(--pace);
-      color: var(--pace);
-    }
-
-    .card-btn.finesse {
-      border-color: var(--finesse);
-      color: var(--finesse);
-    }
-
-    .card-btn.grit {
-      border-color: var(--grit);
-      color: var(--grit);
-    }
-
-    .card-btn.power {
-      border-color: var(--power);
-      color: var(--power);
-    }
-
-    .card-btn.vision {
-      border-color: var(--vision);
-      color: var(--vision);
-    }
-
-    .card-btn.wild {
-      border-color: var(--wild);
-      color: var(--wild);
+      opacity: 0.42;
+      filter: saturate(0.7);
     }
 
     .card-btn.hidden-card {
       border-color: #b6bfcb;
-      color: #778292;
-      background: #f5f7fb;
+      color: #dfe7f2;
+      background:
+        linear-gradient(135deg, rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0) 42%),
+        repeating-linear-gradient(135deg, #49586f 0 8px, #5a6b84 8px 16px);
+    }
+
+    .card-btn.hidden-card::before {
+      background: rgba(255, 255, 255, 0.7);
+      opacity: 0.16;
     }
 
     .card-btn.cpu-preview {
@@ -794,12 +933,24 @@
       align-items: center;
       justify-content: center;
       border: 2px solid var(--border);
-      border-radius: 10px;
+      border-radius: 14px;
       padding: 10px 12px;
-      background: #fff;
+      background: linear-gradient(180deg, #ffffff 0%, #fbfcff 58%, #eef3ff 100%);
       font-weight: 700;
       box-shadow: 0 10px 24px rgba(18, 27, 39, 0.18);
       opacity: 0;
+      overflow: hidden;
+    }
+
+    .floating-play-card::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 0;
+      height: 16px;
+      background: currentColor;
+      opacity: 0.14;
     }
 
     .floating-play-card.pace {
@@ -835,7 +986,14 @@
     .floating-play-card.hidden {
       color: #778292;
       border-color: #b6bfcb;
-      background: #f5f7fb;
+      background:
+        linear-gradient(135deg, rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0) 42%),
+        repeating-linear-gradient(135deg, #49586f 0 8px, #5a6b84 8px 16px);
+    }
+
+    .floating-play-card.hidden::before {
+      background: rgba(255, 255, 255, 0.7);
+      opacity: 0.16;
     }
 
     body::before {
@@ -883,8 +1041,27 @@
         padding: 10px;
       }
 
-      .card-btn {
-        min-width: 0;
+      :root {
+        /* Phone card-size overrides. If mobile card size is not changing, edit these values. */
+        --play-card-width: 45px;
+        --play-card-height: 50px;
+        --play-card-radius: 12px;
+        --play-card-pad-x: 6px;
+        --play-card-pad-top: 21px;
+        --play-card-pad-bottom: 17px;
+        --play-card-banner-height: 12px;
+      }
+
+      .active-card-row {
+        max-width: 156px;
+      }
+
+      .card-value {
+        font-size: 1.2rem;
+      }
+
+      .card-placeholder-label {
+        font-size: 0.72rem;
       }
     }
   </style>
@@ -912,14 +1089,14 @@
               <span>Suit Count</span>
               <select id="debugSuitCount">
                 <option value="2">2</option>
-                <option value="3" selected>3</option>
-                <option value="4">4</option>
+                <option value="3">3</option>
+                <option value="4" selected>4</option>
                 <option value="5">5</option>
               </select>
             </label>
             <label class="debug-field">
               <span>Max Card Value</span>
-              <input id="debugMaxValue" type="number" min="5" max="10" step="1" value="6" />
+              <input id="debugMaxValue" type="number" min="5" max="10" step="1" value="8" />
             </label>
             <label class="debug-field">
               <span>Hand Size</span>
@@ -931,7 +1108,7 @@
             </label>
             <label class="debug-field">
               <span>CPU Speed %</span>
-              <input id="debugCpuSpeed" type="number" min="10" max="200" step="10" value="50" />
+              <input id="debugCpuSpeed" type="number" min="10" max="200" step="10" value="100" />
             </label>
             <label class="debug-field">
               <span>Cross River Once</span>
@@ -959,7 +1136,11 @@
         <div id="humanHand" class="cards"></div>
       </div>
       <div class="active-middle" id="activeMiddle">
-        <button id="doneComboBtn" class="chain-float-btn">End Chain</button>
+        <div class="chain-float-row">
+          <button id="doneComboBtn" class="chain-float-btn">End Chain</button>
+          <button id="undoTurnBtn" class="chain-float-btn" type="button">Undo</button>
+          <button id="submitTurnBtn" class="chain-float-btn submit-btn" type="button">Submit</button>
+        </div>
         <div class="active-status-row">
           <div class="active-status-chip"><span class="k">Score</span><span class="v" id="scoreLabel"></span></div>
           <div class="active-status-chip"><span class="k">Exchange</span><span class="v" id="comboLabel"></span></div>
@@ -981,6 +1162,7 @@
       </div>
       <div class="panel hand-panel" id="cpuPanel">
         <h3>CPU Hand</h3>
+        <div id="cpuNotice" class="hand-notice danger" hidden>CANNOT PLAY</div>
         <div id="cpuHand" class="cards"></div>
       </div>
     </section>
@@ -1021,7 +1203,7 @@
       handSize: 5,
       wildCardCount: 0,
       cpuSpeedPercent: 100,
-      singleRiverCrossMode: true
+      singleRiverCrossMode: false
     };
     const ZONES = [
       "Human Goal Zone",
@@ -1061,6 +1243,8 @@
       eventType: "contain",
       lastShot: null,
       recentPlayedCards: [],
+      cpuNotice: null,
+      humanPendingTurn: null,
       zoneIndex: 0,
       humanScore: 0,
       cpuScore: 0,
@@ -1071,6 +1255,7 @@
     let suppressHumanCardClickUntil = 0;
     let goalFlashTimeoutId = null;
     let phaseFlashTimeoutId = null;
+    let cpuNoticeTimeoutId = null;
 
     // ---------------------------
     // Utility and setup functions
@@ -1121,7 +1306,7 @@
       ];
 
       const stateLines = [
-        `Score: Human ${state.humanScore} - ${state.cpuScore} CPU`,
+        `Score: (${state.humanHand.length}) Human ${state.humanScore} - ${state.cpuScore} CPU (${state.cpuHand.length})`,
         `Zone: ${zoneLabel(state.zoneIndex)}`,
         `Attacker: ${lowerPlayerName(state.attacker)}`,
         `Defender: ${lowerPlayerName(state.defender)}`,
@@ -1187,12 +1372,89 @@
       return `${card.suit} ${card.value}`;
     }
 
+    function cardDisplayRank(card) {
+      if (!card) {
+        return "";
+      }
+      return card.suit === WILD_SUIT ? "W" : String(card.value);
+    }
+
     function cardsToText(cards) {
       return cards.length > 0 ? cards.map(cardToText).join(", ") : "none";
     }
 
     function cardsAtIndexesToText(hand, indexes) {
       return indexes.length > 0 ? indexes.map((index) => cardToText(hand[index])).join(", ") : "none";
+    }
+
+    function cloneCard(card) {
+      return card ? { suit: card.suit, value: card.value } : null;
+    }
+
+    function cloneCards(cards) {
+      return cards.map((card) => ({ suit: card.suit, value: card.value }));
+    }
+
+    function cloneRecentPlayedCards(entries) {
+      return entries.map((entry) => ({
+        player: entry.player,
+        card: { suit: entry.card.suit, value: entry.card.value }
+      }));
+    }
+
+    function getHumanPendingPlayCount() {
+      return state.humanPendingTurn?.snapshots.length || 0;
+    }
+
+    function hasHumanPendingTurn() {
+      return getHumanPendingPlayCount() > 0;
+    }
+
+    function clearHumanPendingTurn() {
+      state.humanPendingTurn = null;
+    }
+
+    function captureHumanTurnSnapshot(playedCardIndex, playedCard) {
+      return {
+        humanHand: cloneCards(state.humanHand),
+        discardPile: cloneCards(state.discardPile),
+        activeCard: cloneCard(state.activeCard),
+        runMatchMode: state.runMatchMode,
+        runHasCrossedRiver: state.runHasCrossedRiver,
+        comboWindow: state.comboWindow,
+        comboPlayer: state.comboPlayer,
+        turnPlayCount: state.turnPlayCount,
+        attackerChainCount: state.attackerChainCount,
+        defenderChainCount: state.defenderChainCount,
+        activeBattleState: state.activeBattleState,
+        comboImmunityActive: state.comboImmunityActive,
+        recentPlayedCards: cloneRecentPlayedCards(state.recentPlayedCards),
+        logMessages: [...state.logMessages],
+        eventText: state.eventText,
+        eventType: state.eventType,
+        playedCardIndex,
+        playedCard: cloneCard(playedCard)
+      };
+    }
+
+    function restoreHumanTurnSnapshot(snapshot) {
+      state.humanHand = cloneCards(snapshot.humanHand);
+      state.discardPile = cloneCards(snapshot.discardPile);
+      state.activeCard = cloneCard(snapshot.activeCard);
+      state.runMatchMode = snapshot.runMatchMode;
+      state.runHasCrossedRiver = snapshot.runHasCrossedRiver;
+      state.comboWindow = snapshot.comboWindow;
+      state.comboPlayer = snapshot.comboPlayer;
+      state.turnPlayCount = snapshot.turnPlayCount;
+      state.attackerChainCount = snapshot.attackerChainCount;
+      state.defenderChainCount = snapshot.defenderChainCount;
+      state.activeBattleState = snapshot.activeBattleState;
+      state.comboImmunityActive = snapshot.comboImmunityActive;
+      state.recentPlayedCards = cloneRecentPlayedCards(snapshot.recentPlayedCards);
+      state.logMessages = [...snapshot.logMessages];
+      state.eventText = snapshot.eventText;
+      state.eventType = snapshot.eventType;
+      refreshComboWindow();
     }
 
     function playerEmoji(player) {
@@ -1233,6 +1495,25 @@
         return "CPU";
       }
       return "None";
+    }
+
+    function clearCpuNotice() {
+      if (cpuNoticeTimeoutId) {
+        clearTimeout(cpuNoticeTimeoutId);
+        cpuNoticeTimeoutId = null;
+      }
+      state.cpuNotice = null;
+    }
+
+    function showCpuNotice(text, tone = "danger", duration = 1000) {
+      clearCpuNotice();
+      state.cpuNotice = { text, tone };
+      render();
+      cpuNoticeTimeoutId = setTimeout(() => {
+        state.cpuNotice = null;
+        cpuNoticeTimeoutId = null;
+        render();
+      }, duration);
     }
 
     function triggerPhaseFlash(tone = "neutral") {
@@ -1685,6 +1966,95 @@
       state.runHasCrossedRiver = false;
     }
 
+    function queueHumanTurnPlay(cardIndex) {
+      const hand = playerHand("human");
+      const card = hand[cardIndex];
+      if (!card) {
+        return false;
+      }
+
+      const snapshot = captureHumanTurnSnapshot(cardIndex, card);
+      if (!playCard("human", cardIndex, { deferResolution: true })) {
+        return false;
+      }
+
+      if (!state.humanPendingTurn) {
+        state.humanPendingTurn = { snapshots: [] };
+      }
+
+      state.humanPendingTurn.snapshots.push(snapshot);
+      return true;
+    }
+
+    async function undoHumanTurnPlay() {
+      if (state.currentTurn !== "human" || state.cpuBusy || !hasHumanPendingTurn()) {
+        return;
+      }
+
+      const snapshot = state.humanPendingTurn.snapshots.pop();
+      const activeCardElement = document.getElementById("activeCardMiddle");
+      let ghost = null;
+
+      if (snapshot?.playedCard && activeCardElement) {
+        const fromRect = activeCardElement.getBoundingClientRect();
+        ghost = createFloatingPlayCard(cardToText(snapshot.playedCard), snapshot.playedCard.suit, fromRect, false);
+        ghost.style.opacity = "0.94";
+        ghost.style.transform = "scale(0.96)";
+      }
+
+      restoreHumanTurnSnapshot(snapshot);
+
+      if (!hasHumanPendingTurn()) {
+        clearHumanPendingTurn();
+      }
+
+      render();
+
+      const humanButtons = document.querySelectorAll("#humanHand .card-btn");
+      const target = humanButtons[snapshot.playedCardIndex] || document.getElementById("humanHand");
+      if (ghost && target) {
+        await animateGhostToTarget(ghost, target, 220);
+      }
+
+      render();
+    }
+
+    async function submitHumanTurn() {
+      if (state.currentTurn !== "human" || state.cpuBusy || state.faceoffPending || state.shotPending || !hasHumanPendingTurn()) {
+        return;
+      }
+
+      const pendingCount = getHumanPendingPlayCount();
+      const lastSnapshot = state.humanPendingTurn.snapshots[state.humanPendingTurn.snapshots.length - 1];
+      const lastPlayedCard = cloneCard(lastSnapshot?.playedCard);
+
+      clearHumanPendingTurn();
+      addLog(`Human submits the ${state.roleOfCurrentTurn} turn after ${pendingCount} card${pendingCount === 1 ? "" : "s"}.`);
+
+      if (lastPlayedCard && checkHandEmpty("human", lastPlayedCard)) {
+        render();
+        runCpuAuto();
+        render();
+        return;
+      }
+
+      if (state.roleOfCurrentTurn === "attacker") {
+        addLog("Turn ends because Human submits the attack chain.");
+        passAttackTurn();
+      } else {
+        addLog("Turn ends because Human submits the defense chain.");
+        if (state.defenderChainCount > state.attackerChainCount) {
+          resolveExchange(state.defender, `${lowerPlayerName(state.defender)} wins the exchange ${state.defenderChainCount}-${state.attackerChainCount}. Turnover.`);
+        } else {
+          resolveExchange(state.attacker, `${lowerPlayerName(state.attacker)} holds the exchange ${state.attackerChainCount}-${state.defenderChainCount}.`);
+        }
+      }
+
+      render();
+      runCpuAuto();
+      render();
+    }
+
     function getAvailableMatchTypes(card, activeCard) {
       if (!activeCard) {
         return ["start"];
@@ -1875,8 +2245,47 @@
       state.turnPlayCount = 0;
     }
 
+    function attackerAdvancesOnExchangeWin() {
+      if (state.attackerChainCount === 0 && state.defenderChainCount === 0) {
+        return true;
+      }
+      return state.attackerChainCount > state.defenderChainCount;
+    }
+
+    function resolveDefenderRunoutTurnover(winner, lastPlayedCard) {
+      clearComboWindow();
+      state.activeBattleState = "none";
+      state.comboImmunityActive = false;
+      state.attacker = winner;
+      syncDefender();
+
+      addLog(`${lowerPlayerName(winner)} empties the hand on defense and forces a special turnover.`);
+
+      const previousZone = state.zoneIndex;
+      advanceZone();
+
+      if (previousZone !== state.zoneIndex) {
+        addLog(`${lowerPlayerName(state.attacker)} auto-advances the puck to ${zoneLabel(state.zoneIndex)} because the defense ran out of cards.`);
+      } else {
+        addLog(`Puck stays in ${zoneLabel(state.zoneIndex)} after the special turnover.`);
+      }
+
+      if (isShotZone(state.attacker, state.zoneIndex)) {
+        addLog(`Special turnover reward: ${lowerPlayerName(state.attacker)} gets an immediate shot with ${cardToText(lastPlayedCard)}.`);
+        setEvent("Special turnover shot", "shot");
+        resolveShot(state.attacker, state.defender, lastPlayedCard);
+        return;
+      }
+
+      setEvent("Special turnover", "turnover");
+      refillHands();
+      startAttackerTurn();
+      logTurnDiagnostics(state.currentTurn, "Special turnover.");
+    }
+
     function startAttackerTurn() {
       clearComboWindow();
+      clearHumanPendingTurn();
       resetExchangeCounts();
       resetRunMatchState();
       clearShotPending();
@@ -1888,7 +2297,9 @@
 
     function passAttackTurn() {
       clearComboWindow();
+      clearHumanPendingTurn();
       state.defenderChainCount = 0;
+      resetRunMatchState();
       state.activeBattleState = "defense";
       state.comboImmunityActive = false;
       setCurrentTurn(state.defender, "defender");
@@ -1904,14 +2315,28 @@
 
       if (winner === state.attacker) {
         const previousZone = state.zoneIndex;
-        advanceZone();
+        const attackerAdvances = attackerAdvancesOnExchangeWin();
+        if (attackerAdvances) {
+          advanceZone();
+        }
         addLog(reason || `${lowerPlayerName(state.attacker)} wins the exchange ${state.attackerChainCount}-${state.defenderChainCount}.`);
+
+        if (!attackerAdvances) {
+          addLog(`Puck stays in ${zoneLabel(state.zoneIndex)} because played-card ties do not advance the attacker.`);
+        } else if (state.attackerChainCount === 0 && state.defenderChainCount === 0) {
+          addLog(`${lowerPlayerName(state.attacker)} advances because a 0-0 exchange still counts as forward momentum.`);
+        } else {
+          addLog(`${lowerPlayerName(state.attacker)} advances because the attack beat the defense outright.`);
+        }
+
         if (previousZone !== state.zoneIndex) {
           addLog(`${lowerPlayerName(state.attacker)} advances the puck to ${zoneLabel(state.zoneIndex)}.`);
+        } else if (attackerAdvances) {
+          addLog(`Puck stays in ${zoneLabel(state.zoneIndex)} because ${lowerPlayerName(state.attacker)} is already at the deepest zone.`);
         } else {
           addLog(`Puck stays in ${zoneLabel(state.zoneIndex)}.`);
         }
-        setEvent("Exchange Win (+1 Zone)", "shot");
+        setEvent(attackerAdvances ? "Exchange Win (+1 Zone)" : "Exchange Hold / No Advance", attackerAdvances ? "shot" : "contain");
         startAttackerTurn();
         logTurnDiagnostics(state.currentTurn);
         return;
@@ -1920,6 +2345,7 @@
       state.attacker = winner;
       syncDefender();
       addLog(reason || `${lowerPlayerName(state.attacker)} wins the exchange ${state.defenderChainCount}-${state.attackerChainCount}. Turnover.`);
+      addLog(`Possession changes because ${lowerPlayerName(state.attacker)} won the exchange on defense.`);
       setEvent("Turnover", "turnover");
       startAttackerTurn();
       logTurnDiagnostics(state.currentTurn);
@@ -1927,6 +2353,11 @@
 
     function endComboByChoice(player) {
       if (player !== state.currentTurn || !currentTurnCanPass()) {
+        return;
+      }
+
+      if (player === "human" && hasHumanPendingTurn()) {
+        addLog("Human has unsubmitted cards. Use Submit or Undo before ending the chain.");
         return;
       }
 
@@ -2152,14 +2583,21 @@
     async function commitHumanCardPlay(cardIndex) {
       if (state.faceoffPending) {
         resolveFaceoff(cardIndex);
-      } else if (state.shotPending) {
-        playShotSaveCard("human", cardIndex);
-      } else {
-        playCard("human", cardIndex);
+        render();
+        runCpuAuto();
+        render();
+        return;
       }
 
-      render();
-      runCpuAuto();
+      if (state.shotPending) {
+        playShotSaveCard("human", cardIndex);
+        render();
+        runCpuAuto();
+        render();
+        return;
+      }
+
+      queueHumanTurnPlay(cardIndex);
       render();
     }
 
@@ -2246,6 +2684,7 @@
 
     function startFaceoff(zoneIndex, reason) {
       refillHands();
+      clearHumanPendingTurn();
       state.faceoffPending = true;
       state.zoneIndex = getFaceoffPairCenter(zoneIndex);
       state.attacker = null;
@@ -2380,6 +2819,8 @@
       const requiredLength = requiredSaveLengthFromShotValue(shotValue);
       const defenderHand = playerHand(defenderPlayer);
 
+      resetRunMatchState();
+
       addLog(`${lowerPlayerName(attackerPlayer)} empties hand in ${closeShot ? "close" : "far"} shot range. Shot quality ${shotValue}.`);
       if (closeShot) {
         addLog(`Close-range bonus applies: ${shotCard.value} becomes ${shotValue}.`);
@@ -2447,6 +2888,10 @@
     // ---------------------------
 
     async function handleCannotPlay(player) {
+      if (player === "cpu") {
+        showCpuNotice("CANNOT PLAY");
+      }
+
       const drawnCard = drawOneCard(player);
 
       if (drawnCard) {
@@ -2455,6 +2900,9 @@
         await animateDrawToHand(player, drawnCard, player === "cpu" ? getCpuSimDuration(460, 140) : 320);
       } else {
         addLog(`${lowerPlayerName(player)} tries to draw, but the deck is empty.`);
+        if (player === "cpu") {
+          showCpuNotice("DECK EMPTY");
+        }
       }
 
       if (player === "human" && drawnCard && isNewestDrawnCardPlayable(player)) {
@@ -2475,12 +2923,14 @@
       state.cpuPreviewIndex = null;
 
       if (state.roleOfCurrentTurn === "attacker") {
+        addLog(`Turn ends because ${lowerPlayerName(player)} has no legal attacker play ${drawnCard ? "after drawing" : "and the deck is empty"}.`);
         addLog(`${lowerPlayerName(player)} ${drawnCard ? "ends the attack chain after the draw" : "cannot draw and ends the attack chain"} at ${state.attackerChainCount}.`);
         setEvent("Attack chain ends", "contain");
         passAttackTurn();
         return;
       }
 
+      addLog(`Turn ends because ${lowerPlayerName(player)} has no legal defense play ${drawnCard ? "after drawing" : "and the deck is empty"}.`);
       addLog(`${lowerPlayerName(player)} ${drawnCard ? "cannot continue the defense after the draw" : "cannot draw and cannot continue the defense"}.`);
       resolveExchange(state.attacker, `${lowerPlayerName(state.attacker)} wins the exchange ${state.attackerChainCount}-${state.defenderChainCount}.`);
     }
@@ -2501,8 +2951,7 @@
         return true;
       }
 
-      refillHands();
-      resolveExchange(player, `${lowerPlayerName(player)} empties the hand and steals the exchange.`);
+      resolveDefenderRunoutTurnover(player, lastPlayedCard);
       return true;
     }
 
@@ -2515,21 +2964,23 @@
       }
     }
 
-    function playCard(player, cardIndex) {
+    function playCard(player, cardIndex, options = {}) {
+      const deferResolution = Boolean(options.deferResolution);
+
       if (state.shotPending) {
         playShotSaveCard(player, cardIndex);
-        return;
+        return true;
       }
 
       if (state.currentTurn !== player) {
         addLog(`Ignored: not ${lowerPlayerName(player)} turn.`);
-        return;
+        return false;
       }
 
       const hand = playerHand(player);
       if (cardIndex < 0 || cardIndex >= hand.length) {
         addLog(`Ignored: invalid card index for ${lowerPlayerName(player)}.`);
-        return;
+        return false;
       }
 
       const card = hand[cardIndex];
@@ -2541,7 +2992,7 @@
 
       if (!legalForTurn.includes(cardIndex) || !matchDecision.legal || matchType === "illegal") {
         addLog(`Illegal play: ${lowerPlayerName(player)} tried ${cardToText(card)} (${matchDecision.reason}).`);
-        return;
+        return false;
       }
 
       hand.splice(cardIndex, 1);
@@ -2572,8 +3023,13 @@
         setEvent(`${lowerPlayerName(player)} defense chain ${state.defenderChainCount}`, "contain");
       }
 
+      if (deferResolution) {
+        refreshComboWindow();
+        return true;
+      }
+
       if (checkHandEmpty(player, card)) {
-        return;
+        return true;
       }
 
       if (canStartOrContinueCombo(player, card)) {
@@ -2586,19 +3042,23 @@
           addLog(`${lowerPlayerName(player)} may keep defending or press End Chain.`);
         }
         logTurnDiagnostics(player, "Chain continues.");
-        return;
+        return true;
       }
 
       if (state.roleOfCurrentTurn === "attacker") {
+        addLog(`Turn ends because ${lowerPlayerName(player)} has no further legal attack plays in this chain.`);
         passAttackTurn();
-        return;
+        return true;
       }
 
+      addLog(`Turn ends because ${lowerPlayerName(player)} has no further legal defense plays in this chain.`);
       if (state.defenderChainCount > state.attackerChainCount) {
         resolveExchange(state.defender, `${lowerPlayerName(state.defender)} wins the exchange ${state.defenderChainCount}-${state.attackerChainCount}. Turnover.`);
       } else {
         resolveExchange(state.attacker, `${lowerPlayerName(state.attacker)} holds the exchange ${state.attackerChainCount}-${state.defenderChainCount}.`);
       }
+
+      return true;
     }
 
     // ---------------------------
@@ -2700,11 +3160,15 @@
       const legal = getLegalCardsForTurn("cpu");
 
       if (state.roleOfCurrentTurn === "defender" && currentTurnCanPass() && state.defenderChainCount > state.attackerChainCount) {
+        showCpuNotice("TAKES PUCK", "info");
+        addLog("CPU ends the defense chain because it already leads the exchange; no draw is required.");
         endComboByChoice("cpu");
         return true;
       }
 
       if (state.roleOfCurrentTurn === "attacker" && currentTurnCanPass() && legal.length === 0) {
+        showCpuNotice("ENDS CHAIN", "info");
+        addLog("CPU ends the attack chain because there are no legal continuation cards; drawing is only used before a live chain begins.");
         endComboByChoice("cpu");
         return true;
       }
@@ -2787,6 +3251,47 @@
       return getSuitInfo(suit)?.className || "";
     }
 
+    function fillCardVisual(element, card, options = {}) {
+      if (!element) {
+        return;
+      }
+
+      const placeholderText = options.placeholderText || "";
+      const hiddenLabel = options.hiddenLabel || "";
+      element.innerHTML = "";
+
+      if (card) {
+        const rankText = cardDisplayRank(card);
+
+        const topCorner = document.createElement("span");
+        topCorner.className = "card-corner top";
+        topCorner.textContent = rankText;
+
+        const value = document.createElement("span");
+        value.className = "card-value";
+        value.textContent = rankText;
+
+        const suit = document.createElement("span");
+        suit.className = "card-suit-label";
+        suit.textContent = card.suit;
+
+        const bottomCorner = document.createElement("span");
+        bottomCorner.className = "card-corner bottom";
+        bottomCorner.textContent = rankText;
+
+        element.appendChild(topCorner);
+        element.appendChild(value);
+        element.appendChild(suit);
+        element.appendChild(bottomCorner);
+        return;
+      }
+
+      const label = document.createElement("span");
+      label.className = hiddenLabel ? "card-back-label" : "card-placeholder-label";
+      label.textContent = hiddenLabel || placeholderText;
+      element.appendChild(label);
+    }
+
     function renderZoneTrack() {
       const zoneTrack = document.getElementById("zoneTrack");
       zoneTrack.innerHTML = "";
@@ -2833,7 +3338,13 @@
       hand.forEach((card, i) => {
         const btn = document.createElement("button");
         btn.className = `card-btn ${shouldShowCpuCards ? suitClass(card.suit) : "hidden-card"}`;
-        btn.textContent = shouldShowCpuCards ? cardToText(card) : "Hidden";
+        btn.setAttribute("aria-label", shouldShowCpuCards ? cardToText(card) : "Hidden CPU card");
+
+        if (shouldShowCpuCards) {
+          fillCardVisual(btn, card);
+        } else {
+          fillCardVisual(btn, null, { hiddenLabel: "Hidden" });
+        }
 
         if (owner === "human") {
           const isLegal = legal.has(i);
@@ -2971,7 +3482,7 @@
           ? `${lowerPlayerName(state.currentTurn)} (save chain)`
           : `${lowerPlayerName(state.currentTurn)} (${state.roleOfCurrentTurn === "attacker" ? "attacking" : "defending"})`;
       document.getElementById("deckCountLabel").textContent = String(state.deck.length);
-      document.getElementById("scoreLabel").textContent = `Human ${state.humanScore} - ${state.cpuScore} CPU`;
+      document.getElementById("scoreLabel").textContent = `(${state.humanHand.length}) Human ${state.humanScore} - ${state.cpuScore} CPU (${state.cpuHand.length})`;
       document.getElementById("comboLabel").textContent = state.faceoffPending
         ? "Faceoff pending"
         : state.shotPending
@@ -2994,18 +3505,24 @@
 
       activeCardMiddle.className = "active-card-pill";
       if (state.activeCard) {
-        activeCardMiddle.textContent = cardToText(state.activeCard);
         activeCardMiddle.classList.add(suitClass(state.activeCard.suit));
+        fillCardVisual(activeCardMiddle, state.activeCard);
       } else if (state.faceoffPending) {
-        activeCardMiddle.textContent = "Faceoff";
+        fillCardVisual(activeCardMiddle, null, { placeholderText: "Faceoff" });
       } else {
-        activeCardMiddle.textContent = "Any Card";
+        fillCardVisual(activeCardMiddle, null, { placeholderText: "Any Card" });
       }
 
       renderRecentPlays();
 
       const comboHint = document.getElementById("comboHint");
-      if (state.faceoffPending) {
+      const humanPendingCount = getHumanPendingPlayCount();
+      if (state.currentTurn === "human" && humanPendingCount > 0 && !state.faceoffPending && !state.shotPending) {
+        const suffix = humanPendingCount === 1 ? "card" : "cards";
+        comboHint.textContent = canStartOrContinueCombo("human", state.activeCard)
+          ? `Human has ${humanPendingCount} unsubmitted ${suffix}. Play more, Undo, or Submit.`
+          : `Human has ${humanPendingCount} unsubmitted ${suffix}. Undo or Submit the turn.`;
+      } else if (state.faceoffPending) {
         comboHint.textContent = "Choose one card for the faceoff. RPS suit rules decide first.";
       } else if (state.shotPending) {
         comboHint.textContent = `Human must complete a ${state.shotPending.requiredLength}-card save chain or press No Save.`;
@@ -3049,10 +3566,13 @@
       renderLog();
 
       const cannotPlayBtn = document.getElementById("cannotPlayBtn");
+      const cpuNotice = document.getElementById("cpuNotice");
       const deckDrawTitle = document.getElementById("deckDrawTitle");
       const deckDrawCount = document.getElementById("deckDrawCount");
       const deckDrawAction = document.getElementById("deckDrawAction");
       const doneComboBtn = document.getElementById("doneComboBtn");
+      const undoTurnBtn = document.getElementById("undoTurnBtn");
+      const submitTurnBtn = document.getElementById("submitTurnBtn");
       cannotPlayBtn.className = `deck-draw-btn${state.shotPending ? " no-save" : ""}`;
       deckDrawTitle.textContent = state.shotPending ? "Goalie" : "Deck";
       deckDrawCount.textContent = String(state.deck.length);
@@ -3076,9 +3596,11 @@
           ? "You have legal cards"
           : "Draw and trigger cannot-play rule";
 
-      doneComboBtn.disabled = state.faceoffPending || state.shotPending || !humanCanPass;
+      doneComboBtn.disabled = state.faceoffPending || state.shotPending || !humanCanPass || humanPendingCount > 0;
       doneComboBtn.title = state.faceoffPending
         ? "No chain during a faceoff"
+        : humanPendingCount > 0
+          ? "Submit or Undo pending human cards first"
         : doneComboBtn.disabled
           ? "No active chain to end"
           : state.roleOfCurrentTurn === "attacker"
@@ -3086,6 +3608,28 @@
             : state.defenderChainCount > state.attackerChainCount
               ? "End the defense chain and take the puck"
               : "End the defense chain and resolve the exchange";
+
+      if (undoTurnBtn) {
+        undoTurnBtn.disabled = state.faceoffPending || state.shotPending || !canHumanAct || humanPendingCount === 0;
+        undoTurnBtn.title = humanPendingCount > 0 ? "Undo the last unsubmitted human play" : "No unsubmitted human play to undo";
+      }
+
+      if (submitTurnBtn) {
+        submitTurnBtn.disabled = state.faceoffPending || state.shotPending || !canHumanAct || humanPendingCount === 0;
+        submitTurnBtn.title = humanPendingCount > 0 ? "Commit the pending human plays and continue the game" : "Play at least one card before submitting";
+      }
+
+      if (cpuNotice) {
+        if (state.cpuNotice) {
+          cpuNotice.hidden = false;
+          cpuNotice.className = `hand-notice ${state.cpuNotice.tone}`;
+          cpuNotice.textContent = state.cpuNotice.text;
+        } else {
+          cpuNotice.hidden = true;
+          cpuNotice.className = "hand-notice danger";
+          cpuNotice.textContent = "CANNOT PLAY";
+        }
+      }
     }
 
     async function onHumanCannotPlay() {
@@ -3105,6 +3649,12 @@
 
       if (state.currentTurn !== "human") {
         addLog("Cannot use Draw/Cannot Play on CPU turn.");
+        render();
+        return;
+      }
+
+      if (hasHumanPendingTurn()) {
+        addLog("Human has unsubmitted cards. Use Undo or Submit instead of drawing.");
         render();
         return;
       }
@@ -3129,6 +3679,8 @@
     }
 
     function newGame() {
+      clearCpuNotice();
+      clearHumanPendingTurn();
       state.config = getDraftConfigFromControls();
       state.deck = shuffle(createDeck());
       state.discardPile = [];
@@ -3150,6 +3702,7 @@
       state.eventType = "contain";
       state.lastShot = null;
       state.recentPlayedCards = [];
+      state.cpuNotice = null;
       state.faceoffPending = false;
       state.logMessages = [];
       state.humanScore = 0;
@@ -3182,6 +3735,14 @@
         render();
         runCpuAuto();
         render();
+      });
+
+      document.getElementById("undoTurnBtn").addEventListener("click", () => {
+        void undoHumanTurnPlay();
+      });
+
+      document.getElementById("submitTurnBtn").addEventListener("click", () => {
+        void submitHumanTurn();
       });
 
       document.getElementById("cpuStepBtn").addEventListener("click", () => {
