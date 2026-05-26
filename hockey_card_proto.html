@@ -670,6 +670,71 @@
       color: #8c331a;
     }
 
+    .deck-draw-wrap {
+      position: relative;
+      display: inline-flex;
+      align-self: flex-end;
+    }
+
+    .deck-event-toast {
+      position: absolute;
+      left: 50%;
+      bottom: calc(100% + 10px);
+      transform: translate(-50%, 8px) scale(0.96);
+      min-width: 98px;
+      max-width: 140px;
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 1px solid #d6dde9;
+      background: rgba(255, 255, 255, 0.97);
+      box-shadow: 0 12px 24px rgba(27, 39, 57, 0.16);
+      color: #243247;
+      font-size: 0.84rem;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      text-align: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 140ms ease, transform 180ms ease;
+      z-index: 5;
+    }
+
+    .deck-event-toast.show {
+      opacity: 1;
+      transform: translate(-50%, 0) scale(1);
+    }
+
+    .deck-event-toast.contain {
+      border-color: #7e9ecf;
+      color: #21497a;
+      background: #f1f7ff;
+    }
+
+    .deck-event-toast.turnover {
+      border-color: #e6ad5d;
+      color: #8a4c03;
+      background: #fff7e9;
+    }
+
+    .deck-event-toast.shot {
+      border-color: #d67a7a;
+      color: #862121;
+      background: #fff0f0;
+    }
+
+    .deck-event-toast.goal {
+      border-color: #cb5252;
+      color: #ffffff;
+      background: #b62c2c;
+    }
+
+    .deck-event-toast.period {
+      border-color: #61b986;
+      color: #114d29;
+      background: #eefcf3;
+    }
+
     .deck-draw-title {
       font-size: 0.63rem;
       letter-spacing: 0.08em;
@@ -764,6 +829,12 @@
       border-color: #cb5252;
       color: #ffffff;
       background: #b62c2c;
+    }
+
+    .event-banner.period {
+      border-color: #61b986;
+      color: #114d29;
+      background: #eefcf3;
     }
 
     .cards {
@@ -1120,6 +1191,12 @@
       animation: goalFlash 2400ms cubic-bezier(0.18, 0.7, 0.16, 1) forwards;
     }
 
+    body.period-flash::before {
+      background:
+        radial-gradient(circle at 50% 45%, rgba(184, 255, 202, 0.84) 0%, rgba(104, 201, 132, 0.4) 30%, rgba(55, 149, 82, 0.18) 54%, rgba(255, 255, 255, 0) 74%);
+      animation: periodFlash 1800ms cubic-bezier(0.18, 0.7, 0.16, 1) forwards;
+    }
+
     @keyframes goalFlash {
       0% {
         opacity: 0;
@@ -1129,6 +1206,21 @@
       }
       35% {
         opacity: 0.6;
+      }
+      100% {
+        opacity: 0;
+      }
+    }
+
+    @keyframes periodFlash {
+      0% {
+        opacity: 0;
+      }
+      12% {
+        opacity: 0.92;
+      }
+      40% {
+        opacity: 0.5;
       }
       100% {
         opacity: 0;
@@ -1201,6 +1293,13 @@
         font-size: 0.78rem;
       }
 
+      .deck-event-toast {
+        min-width: 88px;
+        max-width: 118px;
+        padding: 7px 8px;
+        font-size: 0.72rem;
+      }
+
       :root {
         /* Phone card-size overrides. If mobile card size is not changing, edit these values. */
         --play-card-width: 45px;
@@ -1271,6 +1370,10 @@
               <input id="debugCpuSpeed" type="number" min="10" max="200" step="10" value="200" />
             </label>
             <label class="debug-field">
+              <span>Decks Per Period</span>
+              <input id="debugDecksPerPeriod" type="number" min="1" max="5" step="1" value="4" />
+            </label>
+            <label class="debug-field">
               <span>Cross River Once</span>
               <select id="debugRiverMode">
                 <option value="off" selected>Off</option>
@@ -1284,6 +1387,9 @@
                 <option value="off">Off</option>
               </select>
             </label>
+          </div>
+          <div class="controls">
+            <button id="saveDefaultsBtn" type="button">Save Defaults</button>
           </div>
           <p class="debug-preview" id="debugPreview"></p>
           <p class="debug-preview" id="debugRulesPreview"></p>
@@ -1332,11 +1438,14 @@
             <div id="activeCardLabel" class="label">Active Card</div>
             <div id="activeCardMiddle" class="active-card-pill">Any Card</div>
           </div>
-          <button id="cannotPlayBtn" class="deck-draw-btn" type="button">
-            <span id="deckDrawTitle" class="deck-draw-title">Deck</span>
-            <span id="deckDrawCount" class="deck-draw-count">0</span>
-            <span id="deckDrawAction" class="deck-draw-action">Draw</span>
-          </button>
+          <div class="deck-draw-wrap">
+            <div id="deckEventToast" class="deck-event-toast" hidden></div>
+            <button id="cannotPlayBtn" class="deck-draw-btn" type="button">
+              <span id="deckDrawTitle" class="deck-draw-title">Deck</span>
+              <span id="deckDrawCount" class="deck-draw-count">0</span>
+              <span id="deckDrawAction" class="deck-draw-action">Draw</span>
+            </button>
+          </div>
         </div>
         <div id="recentPlays" class="recent-plays"></div>
         <div id="comboHint" class="hint"></div>
@@ -1389,11 +1498,14 @@
       handSize: 5,
       wildCardCount: 0,
       cpuSpeedPercent: 200,
-      singleRiverCrossMode: false
+      singleRiverCrossMode: false,
+      decksPerPeriod: 4
     };
+    const CPU_SPEED_BASELINE_PERCENT = 100;
     const REGULATION_PERIOD_COUNT = 3;
     const PERIOD_MINUTES = 20;
-    const DECK_CYCLE_MINUTES = 5;
+    const PERIOD_SECONDS = PERIOD_MINUTES * 60;
+    const DEFAULTS_STORAGE_KEY = "hockey-card-prototype-defaults.v1";
     const ZONES = [
       "Human Goal Zone",
       "Human Defensive Zone",
@@ -1445,18 +1557,22 @@
       humanScore: 0,
       cpuScore: 0,
       periodNumber: 1,
-      periodClockMinutes: PERIOD_MINUTES,
+      periodClockSeconds: PERIOD_SECONDS,
+      deckCycleSecondsRemaining: PERIOD_SECONDS / DEFAULT_CONFIG.decksPerPeriod,
       pendingPeriodBreak: null,
       gameOver: false,
       gameWinner: null,
+      deckEvent: null,
       logMessages: []
     };
 
     let activeDrag = null;
     let suppressHumanCardClickUntil = 0;
     let goalFlashTimeoutId = null;
+    let periodFlashTimeoutId = null;
     let phaseFlashTimeoutId = null;
     let cpuNoticeTimeoutId = null;
+    let deckEventTimeoutId = null;
 
     // ---------------------------
     // Utility and setup functions
@@ -1495,8 +1611,34 @@
       state.eventType = type;
     }
 
-    function formatGameClock(minutes = state.periodClockMinutes) {
-      return `${minutes}:00`;
+    function clearDeckEvent() {
+      if (deckEventTimeoutId) {
+        clearTimeout(deckEventTimeoutId);
+        deckEventTimeoutId = null;
+      }
+      state.deckEvent = null;
+    }
+
+    function showDeckEvent(text, type = "contain", duration = 1200) {
+      clearDeckEvent();
+      state.deckEvent = { text, type };
+      render();
+      deckEventTimeoutId = setTimeout(() => {
+        state.deckEvent = null;
+        deckEventTimeoutId = null;
+        render();
+      }, duration);
+    }
+
+    function formatClockSeconds(totalSeconds) {
+      const safeSeconds = Math.max(0, Math.ceil((Number.isFinite(totalSeconds) ? totalSeconds : 0) - 0.0001));
+      const minutes = Math.floor(safeSeconds / 60);
+      const seconds = safeSeconds % 60;
+      return `${minutes}:${String(seconds).padStart(2, "0")}`;
+    }
+
+    function formatGameClock(seconds = state.periodClockSeconds) {
+      return formatClockSeconds(seconds);
     }
 
     function getPeriodLabel(periodNumber = state.periodNumber) {
@@ -1508,6 +1650,28 @@
 
     function isSuddenDeathOvertime(periodNumber = state.periodNumber) {
       return periodNumber > REGULATION_PERIOD_COUNT;
+    }
+
+    function getDeckSliceSeconds(config = state.config) {
+      return PERIOD_SECONDS / clamp(Number.parseInt(String(config?.decksPerPeriod ?? DEFAULT_CONFIG.decksPerPeriod), 10), 1, 5);
+    }
+
+    function clampClockSeconds(seconds) {
+      return seconds <= 0.0001 ? 0 : seconds;
+    }
+
+    function resetDeckCycleClock(config = state.config) {
+      state.deckCycleSecondsRemaining = Math.min(getDeckSliceSeconds(config), state.periodClockSeconds);
+    }
+
+    function consumeClockForDraw(cardsRemainingInDeck) {
+      if (state.gameOver || cardsRemainingInDeck <= 0 || state.periodClockSeconds <= 0 || state.deckCycleSecondsRemaining <= 0) {
+        return;
+      }
+
+      const drawCostSeconds = state.deckCycleSecondsRemaining / cardsRemainingInDeck;
+      state.deckCycleSecondsRemaining = clampClockSeconds(state.deckCycleSecondsRemaining - drawCostSeconds);
+      state.periodClockSeconds = clampClockSeconds(state.periodClockSeconds - drawCostSeconds);
     }
 
     function rebuildDeckFromDiscard() {
@@ -1545,6 +1709,7 @@
       state.cpuBusy = false;
       state.cpuPreviewIndex = null;
       state.pendingPeriodBreak = null;
+      state.deckCycleSecondsRemaining = 0;
       if (reason) {
         addLog(reason);
       }
@@ -1577,7 +1742,9 @@
       state.defender = null;
 
       addLog(`${pending.endedLabel} ended.`);
-      setEvent(`${pending.endedLabel} Ended`, "contain");
+      setEvent(`${pending.endedLabel} Ended`, "period");
+      showDeckEvent("PERIOD OVER", "period", 1600);
+      triggerPeriodFlash();
       triggerPhaseFlash("neutral");
 
       if (state.periodNumber >= REGULATION_PERIOD_COUNT && state.humanScore !== state.cpuScore) {
@@ -1587,10 +1754,11 @@
       }
 
       state.periodNumber += 1;
-      state.periodClockMinutes = PERIOD_MINUTES;
+  state.periodClockSeconds = PERIOD_SECONDS;
+  resetDeckCycleClock();
       const nextLabel = getPeriodLabel();
       addLog(isSuddenDeathOvertime() ? `${nextLabel} begins at ${formatGameClock()}. Next goal wins.` : `${nextLabel} begins at ${formatGameClock()}.`);
-      startFaceoff(CENTER_ICE, `${nextLabel} begins. Center-ice faceoff.`);
+      startFaceoff(CENTER_ICE, `${nextLabel} begins. Center-ice faceoff.`, { refillConsumesClock: false });
       return true;
     }
 
@@ -1606,10 +1774,11 @@
       }
 
       const endedLabel = getPeriodLabel();
-      state.periodClockMinutes = Math.max(0, state.periodClockMinutes - DECK_CYCLE_MINUTES);
+      state.deckCycleSecondsRemaining = 0;
 
-      if (state.periodClockMinutes > 0) {
-        addLog(`Deck rebuilt from discard pile (${recoveredCount} cards). ${endedLabel} clock drops to ${formatGameClock()}.`);
+      if (state.periodClockSeconds > 0) {
+        resetDeckCycleClock();
+        addLog(`Deck rebuilt from discard pile (${recoveredCount} cards). ${endedLabel} clock is now ${formatGameClock()}.`);
         return;
       }
 
@@ -1634,6 +1803,7 @@
         `Hand Size: ${state.config.handSize}`,
         `Wild Cards: ${state.config.wildCardCount}`,
         `CPU Speed %: ${state.config.cpuSpeedPercent}`,
+        `Decks Per Period: ${state.config.decksPerPeriod}`,
         `Cross River Once: ${state.config.singleRiverCrossMode}`,
         `Momentum System: ${FEATURES.momentumSystem}`,
         `Show CPU Cards: ${state.showCpuCards}`
@@ -2068,6 +2238,7 @@
       } else {
         addLog(`${lowerPlayerName(player)} keeps the puck deep in ${zoneLabel(dumpZone)} with the dump.`);
       }
+      showDeckEvent("DUMP", "turnover", 1100);
       resolveExchange(state.defender, `${lowerPlayerName(state.defender)} wins the exchange after ${lowerPlayerName(player)} dumps the puck deep and chases. Turnover.`);
       return true;
     }
@@ -2135,7 +2306,7 @@
         clearTimeout(goalFlashTimeoutId);
       }
 
-      document.body.classList.remove("goal-flash");
+      document.body.classList.remove("goal-flash", "period-flash");
       void document.body.offsetWidth;
       document.body.classList.add("goal-flash");
 
@@ -2143,6 +2314,21 @@
         document.body.classList.remove("goal-flash");
         goalFlashTimeoutId = null;
       }, 2400);
+    }
+
+    function triggerPeriodFlash() {
+      if (periodFlashTimeoutId) {
+        clearTimeout(periodFlashTimeoutId);
+      }
+
+      document.body.classList.remove("period-flash", "goal-flash");
+      void document.body.offsetWidth;
+      document.body.classList.add("period-flash");
+
+      periodFlashTimeoutId = setTimeout(() => {
+        document.body.classList.remove("period-flash");
+        periodFlashTimeoutId = null;
+      }, 1800);
     }
 
     function lowerPlayerName(player) {
@@ -2197,6 +2383,65 @@
 
     function clamp(value, min, max) {
       return Math.min(max, Math.max(min, value));
+    }
+
+    function sanitizeStoredConfig(rawConfig = {}) {
+      return {
+        suitCount: clamp(Number.parseInt(rawConfig.suitCount ?? DEFAULT_CONFIG.suitCount, 10), 2, 5),
+        maxValue: clamp(Number.parseInt(rawConfig.maxValue ?? DEFAULT_CONFIG.maxValue, 10), 5, 10),
+        handSize: clamp(Number.parseInt(rawConfig.handSize ?? DEFAULT_CONFIG.handSize, 10), 3, 10),
+        wildCardCount: clamp(Number.parseInt(rawConfig.wildCardCount ?? DEFAULT_CONFIG.wildCardCount, 10), 0, 20),
+        cpuSpeedPercent: clamp(Number.parseInt(rawConfig.cpuSpeedPercent ?? DEFAULT_CONFIG.cpuSpeedPercent, 10), 10, 200),
+        singleRiverCrossMode: rawConfig.singleRiverCrossMode === true || rawConfig.singleRiverCrossMode === "on",
+        decksPerPeriod: clamp(Number.parseInt(rawConfig.decksPerPeriod ?? DEFAULT_CONFIG.decksPerPeriod, 10), 1, 5)
+      };
+    }
+
+    function sanitizeStoredFeatures(rawFeatures = {}) {
+      return {
+        momentumSystem: rawFeatures.momentumSystem === undefined ? DEFAULT_FEATURES.momentumSystem : Boolean(rawFeatures.momentumSystem)
+      };
+    }
+
+    function loadSavedDefaults() {
+      try {
+        const raw = window.localStorage?.getItem(DEFAULTS_STORAGE_KEY);
+        if (!raw) {
+          return null;
+        }
+
+        const parsed = JSON.parse(raw);
+        return {
+          config: sanitizeStoredConfig(parsed?.config || {}),
+          features: sanitizeStoredFeatures(parsed?.features || {})
+        };
+      } catch {
+        return null;
+      }
+    }
+
+    function saveDraftDefaults() {
+      try {
+        const payload = {
+          config: getDraftConfigFromControls(),
+          features: getDraftFeaturesFromControls()
+        };
+        window.localStorage?.setItem(DEFAULTS_STORAGE_KEY, JSON.stringify(payload));
+        return true;
+      } catch {
+        return false;
+      }
+    }
+
+    function applySavedDefaults() {
+      const saved = loadSavedDefaults();
+      if (!saved) {
+        return false;
+      }
+
+      state.config = { ...state.config, ...saved.config };
+      Object.assign(FEATURES, saved.features);
+      return true;
     }
 
     function getSuitInfo(suit) {
@@ -2258,6 +2503,7 @@
       const handSizeInput = document.getElementById("debugHandSize");
       const wildCountInput = document.getElementById("debugWildCount");
       const cpuSpeedInput = document.getElementById("debugCpuSpeed");
+      const decksPerPeriodInput = document.getElementById("debugDecksPerPeriod");
       const riverModeInput = document.getElementById("debugRiverMode");
 
       return {
@@ -2266,6 +2512,7 @@
         handSize: clamp(Number.parseInt(handSizeInput?.value || String(DEFAULT_CONFIG.handSize), 10), 3, 10),
         wildCardCount: clamp(Number.parseInt(wildCountInput?.value || String(DEFAULT_CONFIG.wildCardCount), 10), 0, 20),
         cpuSpeedPercent: clamp(Number.parseInt(cpuSpeedInput?.value || String(DEFAULT_CONFIG.cpuSpeedPercent), 10), 10, 200),
+        decksPerPeriod: clamp(Number.parseInt(decksPerPeriodInput?.value || String(DEFAULT_CONFIG.decksPerPeriod), 10), 1, 5),
         singleRiverCrossMode: (riverModeInput?.value || "off") === "on"
       };
     }
@@ -2284,6 +2531,7 @@
       const handSizeInput = document.getElementById("debugHandSize");
       const wildCountInput = document.getElementById("debugWildCount");
       const cpuSpeedInput = document.getElementById("debugCpuSpeed");
+      const decksPerPeriodInput = document.getElementById("debugDecksPerPeriod");
       const riverModeInput = document.getElementById("debugRiverMode");
       const momentumSystemInput = document.getElementById("debugMomentumSystem");
 
@@ -2302,6 +2550,9 @@
       if (cpuSpeedInput) {
         cpuSpeedInput.value = String(config.cpuSpeedPercent);
       }
+      if (decksPerPeriodInput) {
+        decksPerPeriodInput.value = String(config.decksPerPeriod);
+      }
       if (riverModeInput) {
         riverModeInput.value = config.singleRiverCrossMode ? "on" : "off";
       }
@@ -2318,8 +2569,10 @@
       const wildText = `${config.wildCardCount} wild card${config.wildCardCount === 1 ? "" : "s"}`;
       const riverText = config.singleRiverCrossMode ? "cross river once ON" : "cross river once OFF";
       const momentumText = features.momentumSystem ? "Momentum/Dump ON" : "Momentum/Dump OFF";
+      const deckSliceText = formatClockSeconds(getDeckSliceSeconds(config));
+      const deckText = `${config.decksPerPeriod} deck${config.decksPerPeriod === 1 ? "" : "s"} per period (${deckSliceText} each)`;
       if (preview) {
-        preview.textContent = `Next game: ${config.suitCount} suits, values 1-${config.maxValue}, hand size ${config.handSize}, ${wildText}, deck ${getDeckSizeForConfig(config)} cards, ${riverText}, ${momentumText}. CPU speed ${config.cpuSpeedPercent}% applies immediately.`;
+        preview.textContent = `Next game: ${config.suitCount} suits, values 1-${config.maxValue}, hand size ${config.handSize}, ${wildText}, deck ${getDeckSizeForConfig(config)} cards, ${deckText}, ${riverText}, ${momentumText}. CPU speed ${config.cpuSpeedPercent}% applies immediately.`;
       }
       if (rulesPreview) {
         rulesPreview.textContent = `Next-game faceoff cycle: ${getFaceoffCycleText(config)}. ${getFaceoffRuleSummary(config)} Chain mode: ${config.singleRiverCrossMode ? "you may switch between value and suit matching once per pile run." : "value and suit matching may alternate freely."} Experimental feature flag: Momentum, Loose Puck, Burn, and Dump are ${features.momentumSystem ? "enabled" : "disabled"}.`;
@@ -2459,6 +2712,7 @@
       setLastShotSummary(shot, "save", selectedCards);
       addLog(`${lowerPlayerName(shot.defenderPlayer)} makes ${shot.requiredLength}-card save: ${selectedCards.map(cardToText).join(" -> ")}. Frozen puck.`);
       setEvent("Save / Frozen puck", "contain");
+      showDeckEvent("SAVE", "contain", 1200);
       clearShotPending();
       startFaceoff(shot.shotZoneIndex, "Save/frozen puck.");
     }
@@ -2479,6 +2733,7 @@
 
       addLog(`${lowerPlayerName(shot.defenderPlayer)} cannot complete ${shot.requiredLength}-card save chain. GOAL ${lowerPlayerName(shot.attackerPlayer)}.`);
       setEvent(`GOAL ${lowerPlayerName(shot.attackerPlayer)}`, "goal");
+      showDeckEvent("GOAL", "goal", 1500);
       triggerGoalFlash();
       clearShotPending();
       handleGoalAfterScore(shot.attackerPlayer);
@@ -2532,14 +2787,15 @@
 
       if (state.discardPile.length > 0) {
         const recoveredCount = rebuildDeckFromDiscard();
+        resetDeckCycleClock();
         addLog(`Deck rebuilt from discard pile (${recoveredCount} cards).`);
       }
     }
 
-    function drawCard(player, count = 1) {
+    function drawCard(player, count = 1, options = {}) {
       let drew = 0;
       for (let i = 0; i < count; i += 1) {
-        if (!drawOneCard(player)) {
+        if (!drawOneCard(player, options)) {
           break;
         }
         drew += 1;
@@ -2550,15 +2806,19 @@
       return drew;
     }
 
-    function drawOneCard(player) {
+    function drawOneCard(player, options = {}) {
       const hand = player === "human" ? state.humanHand : state.cpuHand;
       ensureDeckHasCards();
       if (state.deck.length === 0) {
         return null;
       }
 
+      const deckCountBeforeDraw = state.deck.length;
       const card = state.deck.pop();
       hand.push(card);
+      if (options.consumeClock !== false) {
+        consumeClockForDraw(deckCountBeforeDraw);
+      }
       if (state.deck.length === 0) {
         handleDeckCycleCompletion();
       }
@@ -2597,14 +2857,14 @@
       await animateGhostToTarget(ghost, target, duration);
     }
 
-    function refillHands() {
+    function refillHands(options = {}) {
       while (state.humanHand.length < state.config.handSize) {
-        if (drawCard("human", 1) === 0 || state.pendingPeriodBreak) {
+        if (drawCard("human", 1, options) === 0 || state.pendingPeriodBreak) {
           break;
         }
       }
       while (state.cpuHand.length < state.config.handSize) {
-        if (drawCard("cpu", 1) === 0 || state.pendingPeriodBreak) {
+        if (drawCard("cpu", 1, options) === 0 || state.pendingPeriodBreak) {
           break;
         }
       }
@@ -2960,6 +3220,7 @@
       }
 
       setEvent("Special turnover", "turnover");
+      showDeckEvent("TURNOVER", "turnover", 1100);
       refillHands();
       if (resolvePendingPeriodBreak()) {
         return;
@@ -3065,6 +3326,7 @@
       }
 
       setEvent("Turnover", "turnover");
+      showDeckEvent("TURNOVER", "turnover", 1100);
       startAttackerTurn();
       logTurnDiagnostics(state.currentTurn);
     }
@@ -3450,9 +3712,10 @@
 
       const faceoffMode = options.mode || "standard";
       const refillForFaceoff = options.refillHands !== false;
+      const refillConsumesClock = options.refillConsumesClock !== false;
 
       if (refillForFaceoff) {
-        refillHands();
+        refillHands({ consumeClock: refillConsumesClock });
         if (resolvePendingPeriodBreak()) {
           return;
         }
@@ -3681,6 +3944,7 @@
         addLog(`Close-range bonus applies: ${shotCard.value} becomes ${shotValue}.`);
       }
       setEvent(`Shot quality ${shotValue}`, "shot");
+      showDeckEvent("SHOT", "shot", 1000);
 
       if (defenderPlayer === "human") {
         state.shotPending = {
@@ -3723,6 +3987,7 @@
         setLastShotSummary({ attackerPlayer, defenderPlayer, shotCard, shotValue, shotZoneIndex, shotKind: options.shotKind || "card", powerHandSize: options.powerHandSize || null }, "save", selectedCards);
         addLog(`${lowerPlayerName(defenderPlayer)} makes ${requiredLength}-card save: ${selectedCards.map(cardToText).join(" -> ")}. Frozen puck.`);
         setEvent("Save / Frozen puck", "contain");
+        showDeckEvent("SAVE", "contain", 1200);
         startFaceoff(shotZoneIndex, "Save/frozen puck.");
         return;
       }
@@ -3736,6 +4001,7 @@
 
       addLog(`${lowerPlayerName(defenderPlayer)} cannot complete ${requiredLength}-card save chain. GOAL ${lowerPlayerName(attackerPlayer)}.`);
       setEvent(`GOAL ${lowerPlayerName(attackerPlayer)}`, "goal");
+      showDeckEvent("GOAL", "goal", 1500);
       triggerGoalFlash();
       handleGoalAfterScore(attackerPlayer);
     }
@@ -3965,7 +4231,7 @@
 
     function getCpuSimDuration(baseMs, minimumMs = 0) {
       const speedPercent = clamp(state.config.cpuSpeedPercent || DEFAULT_CONFIG.cpuSpeedPercent, 10, 200);
-      const scaledMs = Math.round(baseMs * (DEFAULT_CONFIG.cpuSpeedPercent / speedPercent));
+      const scaledMs = Math.round(baseMs * (CPU_SPEED_BASELINE_PERCENT / speedPercent));
       return Math.max(minimumMs, scaledMs);
     }
 
@@ -4111,19 +4377,58 @@
       const lowValueThreshold = Math.max(2, Math.ceil(state.config.maxValue / 2));
       const lowValueCount = hand.filter((card) => card.value <= lowValueThreshold).length;
       const mostlyLowValue = lowValueCount >= Math.ceil(hand.length / 2);
+      const veryWeakHand = lowValueCount >= Math.max(3, hand.length - 1);
       const shortHand = hand.length <= Math.max(2, Math.ceil(state.config.handSize / 2));
-      const conservingMomentum = getMomentum("cpu") > 0;
+      const unusedMomentum = getMomentum("cpu");
       const deckLow = state.deck.length <= Math.max(6, state.config.handSize * 2);
+      const scoreDiff = state.cpuScore - state.humanScore;
+      const regulationSecondsRemaining = state.periodNumber > REGULATION_PERIOD_COUNT
+        ? 0
+        : (((REGULATION_PERIOD_COUNT - state.periodNumber) * PERIOD_SECONDS) + state.periodClockSeconds);
+      const lateGame = state.periodNumber > REGULATION_PERIOD_COUNT || regulationSecondsRemaining <= 300;
+      const veryLateGame = state.periodNumber > REGULATION_PERIOD_COUNT || regulationSecondsRemaining <= 120;
 
+      let dumpBias = 0.34;
       if (isCloseOffensiveZone("cpu")) {
-        return mostlyLowValue || conservingMomentum || shortHand;
+        dumpBias += 0.12;
+      } else if (isFarOffensiveZone("cpu")) {
+        dumpBias += 0.05;
       }
 
-      if (isFarOffensiveZone("cpu")) {
-        return mostlyLowValue && (conservingMomentum || shortHand || deckLow);
+      if (mostlyLowValue) {
+        dumpBias += 0.14;
+      }
+      if (veryWeakHand) {
+        dumpBias += 0.12;
+      }
+      if (shortHand) {
+        dumpBias += 0.08;
+      }
+      if (deckLow) {
+        dumpBias += 0.08;
+      }
+      if (unusedMomentum > 0) {
+        dumpBias -= 0.08;
       }
 
-      return mostlyLowValue && deckLow && conservingMomentum;
+      if (scoreDiff >= 2 && lateGame) {
+        dumpBias += 0.18;
+      } else if (scoreDiff > 0 && veryLateGame) {
+        dumpBias += 0.1;
+      }
+
+      if (scoreDiff <= -2) {
+        dumpBias -= 0.18;
+      } else if (scoreDiff < 0 && lateGame) {
+        dumpBias -= 0.14;
+      }
+
+      if (state.periodNumber > REGULATION_PERIOD_COUNT) {
+        dumpBias -= 0.16;
+      }
+
+      const dumpChance = clamp(dumpBias, 0.15, 0.82);
+      return Math.random() < dumpChance;
     }
 
     function cpuShouldBurnMomentum(legalIndexes = getLegalCardsForTurn("cpu")) {
@@ -4663,6 +4968,19 @@
       eventBanner.className = `event-banner ${state.eventType || "contain"}`;
       eventBanner.textContent = state.eventText || "";
 
+      const deckEventToast = document.getElementById("deckEventToast");
+      if (deckEventToast) {
+        if (state.deckEvent?.text) {
+          deckEventToast.hidden = false;
+          deckEventToast.className = `deck-event-toast show ${state.deckEvent.type || "contain"}`;
+          deckEventToast.textContent = state.deckEvent.text;
+        } else {
+          deckEventToast.hidden = true;
+          deckEventToast.className = "deck-event-toast";
+          deckEventToast.textContent = "";
+        }
+      }
+
       const humanPanel = document.getElementById("humanPanel");
       const cpuPanel = document.getElementById("cpuPanel");
       const activeMiddle = document.getElementById("activeMiddle");
@@ -4920,10 +5238,12 @@
       state.humanScore = 0;
       state.cpuScore = 0;
       state.periodNumber = 1;
-      state.periodClockMinutes = PERIOD_MINUTES;
+      state.periodClockSeconds = PERIOD_SECONDS;
+      state.deckCycleSecondsRemaining = getDeckSliceSeconds(state.config);
       state.pendingPeriodBreak = null;
       state.gameOver = false;
       state.gameWinner = null;
+      state.deckEvent = null;
 
       state.attacker = null;
       state.defender = null;
@@ -4932,8 +5252,8 @@
       state.roleOfCurrentTurn = "faceoff";
 
       addLog("New game started.");
-      addLog(`Config: ${state.config.suitCount} suits, values 1-${state.config.maxValue}, hand size ${state.config.handSize}, wild ${state.config.wildCardCount}, CPU speed ${state.config.cpuSpeedPercent}%, cross river once ${state.config.singleRiverCrossMode ? "on" : "off"}.`);
-      startFaceoff(CENTER_ICE, "Opening faceoff at center ice.");
+      addLog(`Config: ${state.config.suitCount} suits, values 1-${state.config.maxValue}, hand size ${state.config.handSize}, wild ${state.config.wildCardCount}, CPU speed ${state.config.cpuSpeedPercent}%, ${state.config.decksPerPeriod} deck${state.config.decksPerPeriod === 1 ? "" : "s"} per period, cross river once ${state.config.singleRiverCrossMode ? "on" : "off"}.`);
+      startFaceoff(CENTER_ICE, "Opening faceoff at center ice.", { refillConsumesClock: false });
 
       render();
     }
@@ -5027,7 +5347,19 @@
         render();
       });
 
-      ["debugSuitCount", "debugMaxValue", "debugHandSize", "debugWildCount", "debugCpuSpeed", "debugRiverMode", "debugMomentumSystem"].forEach((id) => {
+      document.getElementById("saveDefaultsBtn").addEventListener("click", () => {
+        if (saveDraftDefaults()) {
+          addLog("Saved debug defaults in this browser.");
+          showDeckEvent("DEFAULTS SAVED", "contain", 1200);
+        } else {
+          addLog("Could not save debug defaults in this browser.");
+          showDeckEvent("SAVE FAILED", "turnover", 1400);
+        }
+        refreshDebugPreview();
+        render();
+      });
+
+      ["debugSuitCount", "debugMaxValue", "debugHandSize", "debugWildCount", "debugCpuSpeed", "debugDecksPerPeriod", "debugRiverMode", "debugMomentumSystem"].forEach((id) => {
         const element = document.getElementById(id);
         element?.addEventListener("input", () => {
           if (id === "debugCpuSpeed") {
@@ -5038,8 +5370,9 @@
       });
     }
 
+    applySavedDefaults();
     setupEvents();
-    syncDebugControlsFromConfig(DEFAULT_CONFIG);
+    syncDebugControlsFromConfig(state.config);
     refreshDebugPreview();
     newGame();
   </script>
