@@ -17,7 +17,7 @@ The main loop is:
 4. The exchange ends when a player stops, runs out of legal plays, or wins/loses the comparison.
 5. The puck either advances, stays put, or changes possession.
 6. If an attacker empties their hand in a shot zone, a shot occurs.
-7. A goal leads to a center-ice faceoff. A save leads to a faceoff in the shot area.
+7. A goal usually leads to a center-ice faceoff (except sudden-death overtime, where the goal ends the game). A save leads to a faceoff in the shot area.
 
 The prototype now tracks score across regulation and overtime.
 
@@ -69,10 +69,11 @@ Your scoring goal is to empty your hand in a shot zone, force a save challenge, 
 The prototype uses a deck-based game clock instead of tracking real-time seconds.
 
 - Each period starts at 20:00.
-- Each time the deck is exhausted and rebuilt from the discard pile, the clock loses 5:00.
-- This means each period contains 4 full deck cycles.
-- The clock only changes when the last card of a deck is drawn.
-- If that draw drops the clock from 5:00 to 0:00, the period ends immediately, even if it happens in the middle of a play sequence.
+- The default pacing is 4 decks per period, but this is configurable in debug setup.
+- Time is linked to deck progression: each deck in a period is worth an equal slice of the 20:00 period clock.
+- The clock updates as cards are drawn during live play, rather than only jumping at reshuffle moments.
+- Setup refills for period-opening faceoffs do not consume clock.
+- If the period clock reaches 0:00 when a deck cycle completes, the period ends immediately, even if it happens in the middle of a play sequence.
 - When a period ends, play stops and the next period begins with a center-ice faceoff.
 - There is no side switch between periods in the current prototype.
 
@@ -93,6 +94,17 @@ The exchange is measured by card count:
 
 - Attacker chain count = how many cards the attacker played in that exchange.
 - Defender chain count = how many cards the defender played in that exchange.
+
+Current core states
+
+- Standard Faceoff: a normal restart after game start, goals, saves, and period starts.
+- Loose Puck Faceoff: a special in-place restart created by a 0-0 exchange when Momentum System is ON.
+- Icing Faceoff: a special defensive-zone restart created by the Ice Puck / Icing action.
+- Live Exchange: the normal attack phase followed by the defense phase.
+- Stabilize Attempt: a one-card emergency answer the attacker gets when the defender leads the exchange by exactly 1.
+- Save Chain: the defender's response state after a shot is created.
+- Period Break: live play stops, the current sequence is cleared, and the next period begins with a center-ice faceoff.
+- Game Over: the match has ended and no further play is resolved.
 
 5. THE ACTIVE CARD AND MATCHING RULE
 
@@ -133,15 +145,22 @@ Important prototype note
 
 7. FACEOFFS
 
-The game begins with a faceoff at center ice. Other standard faceoffs happen after goals, saves, and period starts.
+The game begins with a faceoff at center ice. Other standard faceoffs happen after goals, saves, and period starts. Icing creates a special Icing Faceoff in the icing side's defensive end.
 
-During a faceoff:
+Standard faceoff
 
 - The Human chooses one card.
 - The CPU reveals one card.
 - The winner becomes the attacker.
 - The winner's card becomes the active card on the pile.
 - The puck is placed in the winner's resulting faceoff zone.
+
+Icing Faceoff
+
+- The player who iced must reveal and commit a faceoff card first.
+- The opponent then chooses a faceoff card after seeing that reveal.
+- The same normal faceoff suit/value rules still decide the winner.
+- The winner becomes the attacker, the winner's card becomes the active card, and the puck goes to the normal resulting faceoff zone.
 
 Faceoff suit cycle
 
@@ -165,7 +184,10 @@ After the faceoff resolves, normal attack play begins.
 
 Current prototype note
 
+- Any faceoff clears both sides' Momentum.
 - Standard faceoffs refill hands before the faceoff begins.
+- Icing Faceoffs also refill both hands before the faceoff begins, then force the icing side to reveal first.
+- Loose Puck faceoffs do not use that full pre-faceoff refill step; they resolve in the current zone and only the winner may refill afterward if that player spent the last card.
 - The faceoff cards themselves are spent cards and do not automatically refill after the faceoff resolves.
 - Only a player who somehow reaches an empty hand after the faceoff draws a fresh hand.
 
@@ -206,23 +228,29 @@ The Human defender also uses Undo and Submit on normal turns.
 
 When the exchange resolves, compare card counts:
 
-- If defender chain count is greater than attacker chain count, the defender wins the exchange and takes possession.
+- If defender chain count is greater than attacker chain count by 2 or more, the defender wins the exchange and takes possession immediately.
+- If defender chain count is greater than attacker chain count by exactly 1, the attacker gets one immediate Stabilize attempt.
+- During a Stabilize attempt, the attacker may play 1 legal card. If no legal card is available, the attacker draws 1 card; if that card is legal, it is played immediately.
+- If the attacker completes the Stabilize attempt, the turnover is denied, the attacker keeps possession, and there is no zone advance from that exchange.
+- If the attacker cannot complete the Stabilize attempt, the turnover stands and the defender takes possession.
 - Otherwise, the attacker holds or wins the exchange.
 
 Zone advancement rule
 
 - The attacker advances one zone only if the attacker played more cards than the defender.
-- Exception: a 0-0 exchange still counts as forward momentum and advances the attacker.
+- With Momentum System ON, a 0-0 exchange triggers an immediate Loose Puck faceoff in the current zone (no automatic zone advance).
+- With Momentum System OFF, a 0-0 exchange still counts as forward momentum and advances the attacker.
 - Non-zero ties do not advance the puck.
 
 This means:
 
-- 0-0 advances
+- Momentum ON: 0-0 creates a Loose Puck faceoff in place
+- Momentum OFF: 0-0 advances
 - 1-1 does not advance
 - 2-1 advances
 - 2-2 does not advance
 
-If the defender wins the exchange, possession changes immediately and the new attacker begins from the current zone.
+If the defender wins the exchange, possession changes and the new attacker begins from the current zone.
 
 10. DRAWING / CANNOT PLAY
 
@@ -245,12 +273,26 @@ Prototype-specific note
 
 - In the current prototype flow, drawing is mainly used before a live chain has been established on that turn.
 - Once a Human has already played into a chain, the intended resolution is usually to continue, End Chain, Undo, or Submit rather than draw.
+- Hidden or shown action buttons follow the same legality rule: if an option is not currently legal in that state, it is not offered.
+
+Practical order when a player appears stuck
+
+- First, check for any legal card play.
+- If the player is the attacker at the start of a new attack, check any currently legal Momentum actions.
+- If Ice Puck / Icing is available, it is the defensive-zone emergency reset before surrendering the exchange.
+- If Dump Hand is available, it is the offensive-zone field-position reset before surrendering the exchange.
+- If no legal play or legal special action exists, use Draw / Cannot Play and resolve the turn normally.
 
 If the deck is empty, the draw attempt fails and the same role-based resolution occurs.
 
 11. SHOTS
 
 A shot occurs when the attacker empties their hand while in a shot zone.
+
+Once a shot begins, the game enters a shot sequence.
+
+- During the shot sequence, neither player refills their hand until the full result is resolved.
+- The shot sequence ends only on a goal, a frozen puck, or a defensive recovery.
 
 Shot zones
 
@@ -260,42 +302,72 @@ Shot zones
 Shot value
 
 - Far shot: shot value equals the played card's value.
-- Close shot: shot value equals played card value + 1, capped at 6.
+- Close shot: shot value equals played card value + 1.
 
 Examples
 
 - A 2 in close range becomes a shot value of 3.
-- A 6 in close range stays 6.
+- A 6 in close range becomes a shot value of 7.
 
-12. SAVES
+12. SAVES AND REBOUNDS
 
 The defender answers a shot by completing a save chain.
 
 Required save length by shot value
 
-- Shot value 1-2: 1 save card
-- Shot value 3-4: 2 save cards
-- Shot value 5-6: 3 save cards
+- Save bands scale with the current max card value.
+- Let the save band size be the max card value divided by 3, rounded up.
+- Shot value 1 through band size: 1 save card
+- Shot value band size + 1 through band size x 2: 2 save cards
+- Shot value above that: 3 save cards
+- Example: with max card value 7, shot values 1-3 need 1 save card, 4-6 need 2 save cards, and 7+ need 3 save cards.
 
 Each save card must legally continue from the current active card under the same matching system.
 
-Save outcomes
+Normal save outcomes
 
 - If the defender completes the full chain, the result is a save and frozen puck.
-- A successful save causes a faceoff in the shot area.
-- If the defender cannot complete the required chain, the shot becomes a goal.
+- If the defender comes up exactly 1 card short, and the shot required 2 or more save cards, a rebound occurs.
+- If the defender comes up 2 or more cards short, the shot becomes a goal.
+- If the shot required only 1 save card and the defender produces 0, that is a goal, not a rebound.
+
+Rebound sequence
+
+- On a rebound, the shooter reveals the top card of the deck.
+- If that revealed card legally matches the current active card, it is played immediately as a rebound shot.
+- Rebound reveals reset any prior Cross River Once state; the revealed card only has to match the current active card from scratch.
+- The rebound shot's value is the revealed card's printed value.
+- If the revealed card does not legally match, the defender recovers possession in their own goal zone.
+- On that failed rebound reveal, the shooter keeps the revealed card, then both players refill normally after the recovery.
+
+Rebound save
+
+- A rebound shot requires exactly 1 legal save card.
+- If the defender has no legal rebound save in hand, the defender may reveal 1 desperation save card from the top of the deck.
+- If no legal save card is produced, the result is a goal.
+- If the defender's rebound save value is greater than or equal to the rebound shot value, the puck is frozen.
+- If the defender's rebound save value is lower than the rebound shot value, another rebound occurs.
+
+Shot-sequence outcomes
+
+- Frozen puck causes a faceoff in the shot area.
+- Goal scores immediately and then follows normal goal reset rules.
+- Defensive recovery ends the shot sequence, gives possession to the defender in their own goal zone, and then hands refill before normal play resumes.
 
 Prototype interface note
 
-- Human save chains are played manually and resolve immediately.
-- The current Undo/Submit staging system applies to normal attack/defense turns, not to save chains.
+- Human save chains and Human rebound saves are selected manually and require Submit to confirm.
+- The normal multi-card staging system applies to standard attack/defense turns; shot-sequence saves use their own one-card Submit flow.
 
 13. GOALS AND SCORING
 
 - Each successful shot that is not fully saved scores 1 goal.
 - Human goals increase Human score by 1.
 - CPU goals increase CPU score by 1.
-- After a goal, play resets to a center-ice faceoff.
+- A fully frozen shot sequence does not score; it resets play with a faceoff in the shot area.
+- A defensive recovery does not score; it gives the defending side possession in its own goal zone.
+- In regulation, after a goal, play resets to a center-ice faceoff.
+- In sudden-death overtime, a goal ends the game immediately.
 
 14. EMPTY-HAND SPECIAL CASES
 
@@ -354,6 +426,32 @@ End Chain
 - Ends a live chain and passes or resolves the exchange.
 - If unsubmitted Human cards are pending, End Chain is blocked until the Human uses Submit or Undo.
 
+- Full staged play applies only to normal Human attack/defense turns.
+- Faceoffs, save chains, rebound saves, and Stabilize attempts use their own one-card selection flow and still require Submit.
+
+16.1 MOMENTUM TIMING WINDOWS
+
+Momentum actions are controlled windows, not always-on abilities.
+
+- Momentum is capped at 3.
+- Momentum actions are only available to the current attacker at the start of a new attack.
+- They are not available during faceoffs, save chains, defense turns, or Stabilize attempts.
+- They are also not available after the attacker has already committed cards into the current attack chain.
+- Gain 1 Momentum when you cross into a new major zone band (defensive, neutral, offensive).
+- Gain 1 Momentum when you win an exchange by 3 or more cards.
+- Gain 1 Momentum when you successfully Stabilize.
+- Lose 1 Momentum when you cannot play and must draw.
+- Lose all Momentum on any faceoff.
+- Lose all Momentum after any shot is created.
+- Normal possession loss by itself does not remove Momentum.
+- Cycle costs 1 Momentum and replaces one card from hand with a draw.
+- Burn costs 2 Momentum and removes one card from hand to the bottom of the deck.
+- Force Shot costs 3 Momentum and is only available from a shot zone.
+- Ice Puck / Icing only appears when the attacker is in the attack-start window, is stuck in the player's own defensive zone, and has no legal opening play.
+- Ice Puck / Icing is a defensive reset: it clears all Momentum, refills both hands, and creates an Icing Faceoff in the icing side's defensive zone.
+- Dump Hand only appears when the attacker is on the opponent's side, has not started the attack chain yet, and has no legal opening play.
+- Dump Hand is a deliberate field-position reset, not a free attack: it sends the puck deep and refreshes the hand, but it concedes the current exchange and gives up immediate possession.
+
 17. PROTOTYPE OPTIONS
 
 The debug setup can change the ruleset for testing.
@@ -365,7 +463,11 @@ Available settings include:
 - Hand size: 3 to 10
 - Wild card count: 0 to 20
 - CPU speed percentage
+- Decks per period: 1 to 5
 - Cross River Once: on or off
+- Momentum System: on or off
+
+The debug panel also includes a Save Defaults button that stores current debug defaults in browser local storage for future sessions on the same browser/device.
 
 Default prototype configuration
 
@@ -373,16 +475,18 @@ Default prototype configuration
 - Values 1-8
 - Hand size 5
 - 0 wild cards
-- CPU speed 100%
+- CPU speed 200%
+- Decks per period 4
 - Cross River Once OFF
+- Momentum System ON
 
 18. CURRENT PROTOTYPE LIMITS
 
 These are important when gathering feedback.
 
-- The prototype currently tracks score but does not end the match at a target score.
+- The game ends by period/overtime flow (3 regulation periods, then sudden-death overtime as needed), not by a target score setting.
 - The CPU plays automatically on its turn.
-- Human faceoffs and Human save chains are resolved immediately rather than through the Undo/Submit staging flow.
+- Human faceoffs, Human save chains, Human rebound saves, and Human Stabilize attempts use one-card selection plus Submit rather than the normal staged multi-card flow.
 - The rules have been implemented for prototype clarity and testability, not yet for final presentation language.
 
 19. SHORT PLAY SUMMARY
@@ -393,10 +497,16 @@ These are important when gathering feedback.
 4. Attacker may continue the chain while legal plays remain.
 5. Defender answers with legal matching cards.
 6. Compare chain lengths when the exchange ends.
-7. Attacker advances only on a true edge in card count, except that 0-0 still advances.
-8. If the attacker empties the hand in a shot zone, create a shot.
-9. Defender must complete a save chain based on shot value.
-10. Goal resets to center ice. Save resets to a local faceoff.
+7. If the defender leads by exactly 1, the attacker gets one Stabilize attempt; if the defender leads by 2 or more, the turnover is immediate.
+8. Attacker advances only on a true edge in card count; with Momentum ON, 0-0 instead triggers a Loose Puck faceoff in place.
+9. A stuck attacker in the defensive zone may choose Icing: clear Momentum, refill both hands, then resolve an Icing Faceoff with the icing side revealing first.
+10. If the attacker empties the hand in a shot zone, create a shot sequence. Hands do not refill until the shot sequence ends.
+11. Defender must complete the required save chain based on shot value.
+12. Full save chain = frozen puck. Exactly 1 short on a 2+ card save requirement = rebound. Otherwise = goal.
+13. On a rebound, the shooter reveals the top deck card. Legal reveal = immediate rebound shot. Illegal reveal = defensive recovery.
+14. Rebound save needs 1 legal card; if none are in hand, the defender gets 1 desperation reveal from the deck.
+15. Rebound save value greater than or equal to the rebound shot value freezes the puck. Lower value creates another rebound.
+16. Goal usually resets to center ice (except sudden-death overtime). Frozen puck resets to a local faceoff. Defensive recovery gives possession to the defender in their own goal zone.
 
 20. FEEDBACK QUESTIONS THIS RULESET IS LIKELY TO PROMPT
 
@@ -404,7 +514,7 @@ If this document is being used for feedback, the biggest rules questions are pro
 
 - Is the faceoff suit cycle intuitive?
 - Is the attacker/defender exchange counting easy to read?
-- Does the 0-0 advance exception feel right?
+- Does the 0-0 Loose Puck faceoff flow (with Momentum ON) feel right?
 - Is the defender empty-hand special turnover too strong, too weak, or just right?
 - Is the save-chain table easy to learn?
 - Is free matching better than single-cross river mode?

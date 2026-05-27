@@ -107,6 +107,12 @@
       background: #ffffff;
     }
 
+    .zone-track.puck-battle {
+      border-color: #d7b11e;
+      box-shadow: 0 0 0 3px rgba(221, 184, 42, 0.18);
+      background: #fffef4;
+    }
+
     .hands-rink-stack {
       width: min(100%, 520px);
       max-width: 520px;
@@ -367,6 +373,13 @@
       box-shadow: 0 0 0 3px #8db5ff inset;
     }
 
+    .active-middle.puck-battle {
+      border-color: #d7b11e;
+      background: linear-gradient(180deg, #fffdf0 0%, #fff5c9 100%);
+      box-shadow: 0 0 0 3px rgba(221, 184, 42, 0.22) inset, 0 0 28px rgba(221, 184, 42, 0.18);
+      animation: puckBattlePulse 1.1s ease-in-out infinite alternate;
+    }
+
     .active-middle.phase-flash-human {
       animation: phaseFlashHuman 560ms ease-out;
     }
@@ -377,6 +390,15 @@
 
     .active-middle.phase-flash-neutral {
       animation: phaseFlashNeutral 560ms ease-out;
+    }
+
+    @keyframes puckBattlePulse {
+      0% {
+        box-shadow: 0 0 0 3px rgba(221, 184, 42, 0.18) inset, 0 0 18px rgba(221, 184, 42, 0.12);
+      }
+      100% {
+        box-shadow: 0 0 0 3px rgba(221, 184, 42, 0.28) inset, 0 0 34px rgba(221, 184, 42, 0.24);
+      }
     }
 
     @keyframes phaseFlashHuman {
@@ -735,6 +757,12 @@
       background: #eefcf3;
     }
 
+    .deck-event-toast.puck {
+      border-color: #d7b11e;
+      color: #765400;
+      background: #fff8d8;
+    }
+
     .deck-draw-title {
       font-size: 0.63rem;
       letter-spacing: 0.08em;
@@ -835,6 +863,12 @@
       border-color: #61b986;
       color: #114d29;
       background: #eefcf3;
+    }
+
+    .event-banner.puck {
+      border-color: #d7b11e;
+      color: #765400;
+      background: #fff8d8;
     }
 
     .cards {
@@ -941,6 +975,12 @@
       transform: translateY(-4px);
       box-shadow: 0 16px 26px rgba(28, 36, 48, 0.16), 0 0 0 2px #ffe4aa inset;
       background: linear-gradient(180deg, #ffffff 0%, #fffaf1 58%, #ffefc9 100%);
+    }
+
+    .card-btn.special-selected {
+      transform: translateY(-5px) scale(1.01);
+      box-shadow: 0 18px 30px rgba(28, 36, 48, 0.2), 0 0 0 3px #ffcd4d inset;
+      background: linear-gradient(180deg, #fffef8 0%, #fff8df 58%, #ffeaa7 100%);
     }
 
     .card-btn.illegal {
@@ -1417,7 +1457,8 @@
           <div id="humanMomentumActions" class="hand-panel-actions" hidden>
             <button id="cycleMomentumBtn" class="hand-panel-btn" type="button" disabled><span class="btn-label-full">Cycle (Cost: 1)</span><span class="btn-label-short">Cycle 1</span></button>
             <button id="burnMomentumBtn" class="hand-panel-btn" type="button" disabled><span class="btn-label-full">Burn (Cost: 2)</span><span class="btn-label-short">Burn 2</span></button>
-            <button id="powerShotBtn" class="hand-panel-btn" type="button" disabled><span class="btn-label-full">Power Shot (Cost: 3)</span><span class="btn-label-short">Shot 3</span></button>
+            <button id="powerShotBtn" class="hand-panel-btn" type="button" disabled><span class="btn-label-full">Force Shot (Cost: 3)</span><span class="btn-label-short">Force 3</span></button>
+            <button id="icePuckBtn" class="hand-panel-btn" type="button" disabled><span class="btn-label-full">Ice Puck</span><span class="btn-label-short">Ice</span></button>
             <button id="dumpChaseBtn" class="hand-panel-btn" type="button" disabled><span class="btn-label-full">Dump Hand</span><span class="btn-label-short">Dump</span></button>
           </div>
         </div>
@@ -1543,14 +1584,18 @@
       faceoffMode: "standard",
       faceoffReturnZone: null,
       loosePuckOriginAttacker: null,
+      icingFaceoffPlayer: null,
+      icingFaceoffLeadCard: null,
       eventText: "",
       eventType: "contain",
       lastShot: null,
       recentPlayedCards: [],
       cpuNotice: null,
       humanPendingTurn: null,
+      humanSpecialSelectionIndex: null,
       pendingBurnSelection: false,
       pendingCycleSelection: false,
+      stabilizePending: null,
       humanMomentum: 0,
       cpuMomentum: 0,
       zoneIndex: 0,
@@ -1692,11 +1737,9 @@
       clearComboWindow();
       clearHumanPendingTurn();
       clearBurnSelection();
+      clearStabilizePending();
       resetRunMatchState();
-      state.faceoffPending = false;
-      state.faceoffMode = "standard";
-      state.faceoffReturnZone = null;
-      state.loosePuckOriginAttacker = null;
+      clearFaceoffState();
       state.attacker = null;
       state.defender = null;
       state.currentTurn = null;
@@ -1727,6 +1770,7 @@
       clearComboWindow();
       clearHumanPendingTurn();
       clearBurnSelection();
+      clearStabilizePending();
       resetRunMatchState();
       state.turnPlayCount = 0;
       state.attackerChainCount = 0;
@@ -1734,10 +1778,7 @@
       state.activeBattleState = "none";
       state.comboImmunityActive = false;
       state.cpuPreviewIndex = null;
-      state.faceoffPending = false;
-      state.faceoffMode = "standard";
-      state.faceoffReturnZone = null;
-      state.loosePuckOriginAttacker = null;
+      clearFaceoffState();
       state.attacker = null;
       state.defender = null;
 
@@ -1919,11 +1960,64 @@
 
     function clearHumanPendingTurn() {
       state.humanPendingTurn = null;
+      state.humanSpecialSelectionIndex = null;
+    }
+
+    function hasHumanSpecialSelection() {
+      return Number.isInteger(state.humanSpecialSelectionIndex);
+    }
+
+    function clearHumanSpecialSelection() {
+      state.humanSpecialSelectionIndex = null;
+    }
+
+    function humanMoveRequiresSubmitConfirmation() {
+      return Boolean(state.faceoffPending || state.shotPending || state.stabilizePending);
+    }
+
+    function getHumanSpecialSelectionMode() {
+      if (state.faceoffPending) {
+        return isLoosePuckFaceoff() ? "puckBattle" : isIcingFaceoff() ? "icingFaceoff" : "faceoff";
+      }
+      if (state.shotPending) {
+        return isReboundSavePhase(state.shotPending) ? "reboundSave" : "save";
+      }
+      if (state.stabilizePending) {
+        return "stabilize";
+      }
+      return null;
+    }
+
+    function selectHumanSpecialCard(cardIndex) {
+      if (!humanMoveRequiresSubmitConfirmation()) {
+        return false;
+      }
+
+      state.humanSpecialSelectionIndex = state.humanSpecialSelectionIndex === cardIndex ? null : cardIndex;
+      return true;
     }
 
     function clearBurnSelection() {
       state.pendingBurnSelection = false;
       state.pendingCycleSelection = false;
+    }
+
+    function clearStabilizePending() {
+      state.stabilizePending = null;
+    }
+
+    function clearIcingFaceoffState() {
+      state.icingFaceoffPlayer = null;
+      state.icingFaceoffLeadCard = null;
+    }
+
+    function clearFaceoffState() {
+      state.faceoffPending = false;
+      state.faceoffMode = "standard";
+      state.faceoffReturnZone = null;
+      state.loosePuckOriginAttacker = null;
+      clearIcingFaceoffState();
+      clearHumanSpecialSelection();
     }
 
     function getPendingMomentumAction() {
@@ -1991,8 +2085,64 @@
       }
     }
 
+    function awardMomentumForZoneAdvance(player, previousZone, nextZone) {
+      if (!FEATURES.momentumSystem || !player) {
+        return;
+      }
+
+      const previousBand = getMomentumZoneBand(player, previousZone);
+      const nextBand = getMomentumZoneBand(player, nextZone);
+      if (previousZone !== nextZone && previousBand && nextBand && previousBand !== nextBand) {
+        changeMomentum(player, 1, `crossing into the ${nextBand} zone`);
+      }
+    }
+
+    function awardMomentumForExchangeWin(player, exchangeMargin) {
+      if (FEATURES.momentumSystem && player && exchangeMargin >= 3) {
+        changeMomentum(player, 1, `exchange win by ${exchangeMargin}`);
+      }
+    }
+
+    function awardMomentumForSuccessfulStabilize(player) {
+      if (FEATURES.momentumSystem && player) {
+        changeMomentum(player, 1, "successful Stabilize");
+      }
+    }
+
+    function applyMomentumPenaltyForCannotPlay(player) {
+      if (FEATURES.momentumSystem && player) {
+        changeMomentum(player, -1, "cannot play and must draw");
+      }
+    }
+
+    function resetMomentumForFaceoff(faceoffLabel = "faceoff") {
+      if (FEATURES.momentumSystem) {
+        resetMomentum(`Momentum resets for the ${faceoffLabel.toLowerCase()}.`);
+      }
+    }
+
+    function resetMomentumAfterShot() {
+      if (FEATURES.momentumSystem) {
+        resetMomentum("Momentum resets after the shot.");
+      }
+    }
+
     function isLoosePuckFaceoff() {
       return state.faceoffMode === "loosePuck";
+    }
+
+    function isIcingFaceoff() {
+      return state.faceoffMode === "icing";
+    }
+
+    function getFaceoffUiLabel(faceoffMode = state.faceoffMode) {
+      if (faceoffMode === "loosePuck") {
+        return "Puck Battle";
+      }
+      if (faceoffMode === "icing") {
+        return "Icing Faceoff";
+      }
+      return "Faceoff";
     }
 
     function isPlayerOnOpponentSide(player, zoneIndex = state.zoneIndex) {
@@ -2040,6 +2190,23 @@
 
       const hand = playerHand(player);
       if (hand.length === 0 || !isPlayerOnOpponentSide(player)) {
+        return false;
+      }
+
+      return getLegalCardsForTurn(player).length === 0;
+    }
+
+    function canPlayerIcePuck(player) {
+      if (state.faceoffPending || state.shotPending || state.pendingPeriodBreak || state.currentTurn !== player) {
+        return false;
+      }
+
+      if (state.attacker !== player || state.roleOfCurrentTurn !== "attacker" || currentTurnCanPass()) {
+        return false;
+      }
+
+      const hand = playerHand(player);
+      if (hand.length === 0 || state.zoneIndex !== getDefensiveZoneIndex(player)) {
         return false;
       }
 
@@ -2208,12 +2375,12 @@
       clearBurnSelection();
 
       const rangeLabel = isCloseOffensiveZone(player) ? "close" : "far";
-      addLog(`${lowerPlayerName(player)} spends 3 Momentum for a Power Shot from ${rangeLabel} range.`);
+      addLog(`${lowerPlayerName(player)} spends 3 Momentum for a Force Shot from ${rangeLabel} range.`);
       resolveShot(player, state.defender, shotCard, {
         shotValueOverride: handSize,
         shotKind: "powerShot",
         powerHandSize: handSize,
-        logLine: `${lowerPlayerName(player)} uses Power Shot from ${rangeLabel} range. Shot quality ${handSize} from ${handSize} card${handSize === 1 ? "" : "s"} in hand.`
+        logLine: `${lowerPlayerName(player)} uses Force Shot from ${rangeLabel} range. Shot quality ${handSize} from ${handSize} card${handSize === 1 ? "" : "s"} in hand.`
       });
       return true;
     }
@@ -2240,6 +2407,27 @@
       }
       showDeckEvent("DUMP", "turnover", 1100);
       resolveExchange(state.defender, `${lowerPlayerName(state.defender)} wins the exchange after ${lowerPlayerName(player)} dumps the puck deep and chases. Turnover.`);
+      return true;
+    }
+
+    function icePuck(player) {
+      if (!canPlayerIcePuck(player)) {
+        return false;
+      }
+
+      addLog(`${lowerPlayerName(player)} uses Icing from ${zoneLabel(state.zoneIndex)}.`);
+      addLog("Both sides refill to full hand size before the Icing Faceoff.");
+      setEvent("Icing", "turnover");
+      showDeckEvent("ICING", "turnover", 1200);
+      startFaceoff(getDefensiveZoneIndex(player), "", {
+        mode: "icing",
+        initiator: player
+      });
+
+      if (player === "cpu") {
+        revealCpuIcingFaceoffLeadCard();
+      }
+
       return true;
     }
 
@@ -2614,7 +2802,8 @@
       }
 
       const wildText = state.config.wildCardCount > 0 ? " Wild cards fall back to value in faceoffs." : "";
-      const text = `Faceoff cycle: ${getFaceoffCycleText()}. ${getFaceoffRuleSummary()} Same suit: higher number wins, and exact ties resolve randomly.${wildText}`;
+      const icingText = isIcingFaceoff() ? " Icing Faceoff: the icing side reveals first, then the opponent answers after seeing it." : "";
+      const text = `Faceoff cycle: ${getFaceoffCycleText()}. ${getFaceoffRuleSummary()} Same suit: higher number wins, and exact ties resolve randomly.${wildText}${icingText}`;
       hint.textContent = text;
       hint.title = text;
     }
@@ -2633,6 +2822,10 @@
 
     function getGoalZoneIndex(player) {
       return player === "human" ? 5 : 0;
+    }
+
+    function getHomeGoalZoneIndex(player) {
+      return player === "human" ? 0 : 5;
     }
 
     function isCenterIce(zoneIndex = state.zoneIndex) {
@@ -2689,6 +2882,28 @@
       state.shotPending = null;
     }
 
+    function isReboundSavePhase(shot = state.shotPending) {
+      return Boolean(shot && shot.phase === "reboundSave");
+    }
+
+    function getShotCurrentRequiredLength(shot = state.shotPending) {
+      return shot ? (shot.phaseRequiredLength ?? shot.requiredLength) : 0;
+    }
+
+    function syncShotPendingTurnState(label = "Save setup.", flash = false) {
+      const shot = state.shotPending;
+      if (!shot) {
+        return;
+      }
+
+      setCurrentTurn(shot.defenderPlayer, "save");
+      state.turnPlayCount = shot.savedCount;
+      if (flash) {
+        triggerPhaseFlash(shot.defenderPlayer === "human" ? "human" : "cpu");
+      }
+      logTurnDiagnostics(shot.defenderPlayer, label);
+    }
+
     function setLastShotSummary(shot, outcome, saveCards = []) {
       state.lastShot = {
         attackerPlayer: shot.attackerPlayer,
@@ -2703,21 +2918,33 @@
       };
     }
 
-    function finishShotWithSave(selectedCards) {
+    function recordShotSequencePlay(player, card, matchDecision) {
+      state.discardPile.push(card);
+      recordPlayedCard(player, card);
+      state.activeCard = card;
+      state.runMatchMode = matchDecision.nextMode;
+      state.runHasCrossedRiver = matchDecision.nextHasCrossed;
+      addLog(`Pile top is now ${cardToText(state.activeCard)}.`);
+      addLog(`Match debug: ${describeMatchDecision(matchDecision)}.`);
+    }
+
+    function finishShotWithSave(reason = "") {
       const shot = state.shotPending;
       if (!shot) {
         return;
       }
 
-      setLastShotSummary(shot, "save", selectedCards);
-      addLog(`${lowerPlayerName(shot.defenderPlayer)} makes ${shot.requiredLength}-card save: ${selectedCards.map(cardToText).join(" -> ")}. Frozen puck.`);
+      setLastShotSummary(shot, "save", shot.savedCards);
+      addLog(reason || (isReboundSavePhase(shot)
+        ? `${lowerPlayerName(shot.defenderPlayer)} smothers the rebound and freezes the puck.`
+        : `${lowerPlayerName(shot.defenderPlayer)} makes ${shot.requiredLength}-card save: ${shot.savedCards.map(cardToText).join(" -> ")}. Frozen puck.`));
       setEvent("Save / Frozen puck", "contain");
       showDeckEvent("SAVE", "contain", 1200);
       clearShotPending();
       startFaceoff(shot.shotZoneIndex, "Save/frozen puck.");
     }
 
-    function finishShotAsGoal() {
+    function finishShotAsGoal(reason = "") {
       const shot = state.shotPending;
       if (!shot) {
         return;
@@ -2731,12 +2958,179 @@
         state.cpuScore += 1;
       }
 
-      addLog(`${lowerPlayerName(shot.defenderPlayer)} cannot complete ${shot.requiredLength}-card save chain. GOAL ${lowerPlayerName(shot.attackerPlayer)}.`);
+      addLog(reason || (isReboundSavePhase(shot)
+        ? `${lowerPlayerName(shot.defenderPlayer)} cannot stop the rebound. GOAL ${lowerPlayerName(shot.attackerPlayer)}.`
+        : `${lowerPlayerName(shot.defenderPlayer)} cannot complete ${shot.requiredLength}-card save chain. GOAL ${lowerPlayerName(shot.attackerPlayer)}.`));
       setEvent(`GOAL ${lowerPlayerName(shot.attackerPlayer)}`, "goal");
       showDeckEvent("GOAL", "goal", 1500);
       triggerGoalFlash();
       clearShotPending();
       handleGoalAfterScore(shot.attackerPlayer);
+    }
+
+    function finishShotWithRecovery(reboundCard = null, reason = "") {
+      const shot = state.shotPending;
+      if (!shot) {
+        return;
+      }
+
+      if (reboundCard) {
+        playerHand(shot.attackerPlayer).push(reboundCard);
+      }
+
+      setLastShotSummary(shot, "recovery", shot.savedCards);
+      addLog(reason || `${lowerPlayerName(shot.defenderPlayer)} recovers the loose puck near the net.`);
+      if (reboundCard) {
+        addLog(`${lowerPlayerName(shot.attackerPlayer)} keeps the failed rebound reveal ${cardToText(reboundCard)}.`);
+      }
+      setEvent("Defensive recovery", "turnover");
+      showDeckEvent("RECOVERY", "turnover", 1200);
+
+      clearShotPending();
+      state.attacker = shot.defenderPlayer;
+      syncDefender();
+      state.zoneIndex = getHomeGoalZoneIndex(shot.defenderPlayer);
+
+      refillHands();
+      if (resolvePendingPeriodBreak()) {
+        return;
+      }
+
+      startAttackerTurn();
+      logTurnDiagnostics(state.currentTurn, "Defensive recovery.");
+    }
+
+    function resolveReboundSaveResult(player, card) {
+      const shot = state.shotPending;
+      if (!shot) {
+        return;
+      }
+
+      if (card.value >= shot.reboundShotValue) {
+        finishShotWithSave(`${lowerPlayerName(player)} freezes the rebound with ${cardToText(card)} (${card.value} >= ${shot.reboundShotValue}).`);
+        return;
+      }
+
+      addLog(`${cardToText(card)} is below rebound value ${shot.reboundShotValue}. Another rebound follows.`);
+      startRebound();
+    }
+
+    function tryReboundDesperationSave(player) {
+      const shot = state.shotPending;
+      if (!shot || !isReboundSavePhase(shot) || player !== shot.defenderPlayer) {
+        return false;
+      }
+
+      const desperationCard = revealTopDeckCard();
+      if (resolvePendingPeriodBreak()) {
+        return true;
+      }
+
+      if (!desperationCard) {
+        finishShotAsGoal(`${lowerPlayerName(player)} has no desperation save available. GOAL ${lowerPlayerName(shot.attackerPlayer)}.`);
+        return true;
+      }
+
+      addLog(`${lowerPlayerName(player)} reveals desperation save ${cardToText(desperationCard)}.`);
+      const matchDecision = getMatchDecision(desperationCard, state.activeCard, state.runMatchMode, state.runHasCrossedRiver);
+      if (!matchDecision.legal) {
+        state.discardPile.push(desperationCard);
+        addLog(`${cardToText(desperationCard)} does not match ${cardToText(state.activeCard)}.`);
+        finishShotAsGoal(`${lowerPlayerName(player)} cannot produce a legal desperation save. GOAL ${lowerPlayerName(shot.attackerPlayer)}.`);
+        return true;
+      }
+
+      shot.savedCards.push(desperationCard);
+      shot.savedCount = 1;
+      state.turnPlayCount = 1;
+      addLog(`${lowerPlayerName(player)} uses ${cardToText(desperationCard)} as the desperation save.`);
+      recordShotSequencePlay(player, desperationCard, matchDecision);
+      resolveReboundSaveResult(player, desperationCard);
+      return true;
+    }
+
+    function startRebound() {
+      const shot = state.shotPending;
+      if (!shot) {
+        return;
+      }
+
+      shot.phase = "reboundReveal";
+      shot.reboundCount = (shot.reboundCount || 0) + 1;
+      shot.savedCount = 0;
+      shot.phaseRequiredLength = 1;
+      resetRunMatchState();
+
+      setEvent("Rebound", "shot");
+      showDeckEvent("REBOUND", "shot", 1100);
+
+      const reboundCard = revealTopDeckCard();
+      if (resolvePendingPeriodBreak()) {
+        return;
+      }
+
+      if (!reboundCard) {
+        finishShotWithRecovery(null, `${lowerPlayerName(shot.attackerPlayer)} cannot reveal a rebound card. ${lowerPlayerName(shot.defenderPlayer)} recovers near the crease.`);
+        return;
+      }
+
+      addLog(`Rebound ${shot.reboundCount}: ${lowerPlayerName(shot.attackerPlayer)} reveals ${cardToText(reboundCard)}.`);
+      const matchDecision = getMatchDecision(reboundCard, state.activeCard, state.runMatchMode, state.runHasCrossedRiver);
+      if (!matchDecision.legal) {
+        addLog(`${cardToText(reboundCard)} does not match ${cardToText(state.activeCard)}. ${lowerPlayerName(shot.defenderPlayer)} recovers possession.`);
+        finishShotWithRecovery(reboundCard, `${lowerPlayerName(shot.defenderPlayer)} recovers the loose puck in ${zoneLabel(getHomeGoalZoneIndex(shot.defenderPlayer))}.`);
+        return;
+      }
+
+      shot.reboundShotCard = { suit: reboundCard.suit, value: reboundCard.value };
+      shot.reboundShotValue = reboundCard.value;
+      shot.phase = "reboundSave";
+      shot.savedCount = 0;
+      shot.phaseRequiredLength = 1;
+
+      addLog(`${lowerPlayerName(shot.attackerPlayer)} plays ${cardToText(reboundCard)} immediately as a rebound shot. Rebound value ${shot.reboundShotValue}.`);
+      recordShotSequencePlay(shot.attackerPlayer, reboundCard, matchDecision);
+      syncShotPendingTurnState("Rebound save.", true);
+    }
+
+    function resolveNormalShotSaveAttempt() {
+      const shot = state.shotPending;
+      if (!shot) {
+        return;
+      }
+
+      const shortfall = shot.requiredLength - shot.savedCount;
+      if (shortfall <= 0) {
+        finishShotWithSave();
+        return;
+      }
+
+      if (shot.requiredLength > 1 && shortfall === 1) {
+        addLog(`${lowerPlayerName(shot.defenderPlayer)} comes up exactly 1 short on the save chain. Rebound.`);
+        startRebound();
+        return;
+      }
+
+      finishShotAsGoal(`${lowerPlayerName(shot.defenderPlayer)} comes up ${shortfall} card${shortfall === 1 ? "" : "s"} short on the save chain. GOAL ${lowerPlayerName(shot.attackerPlayer)}.`);
+    }
+
+    function handleHumanShotNoSave() {
+      const shot = state.shotPending;
+      if (!shot || state.currentTurn !== "human") {
+        return false;
+      }
+
+      if (isReboundSavePhase(shot)) {
+        const legal = getLegalCardsForTurn("human");
+        if (legal.length === 0) {
+          return tryReboundDesperationSave("human");
+        }
+        finishShotAsGoal(`Human declines the rebound save. GOAL ${lowerPlayerName(shot.attackerPlayer)}.`);
+        return true;
+      }
+
+      resolveNormalShotSaveAttempt();
+      return true;
     }
 
     function playShotSaveCard(player, cardIndex) {
@@ -2752,32 +3146,35 @@
       }
 
       const legal = getLegalCardsForTurn(player);
-      const matchDecision = getMatchDecision(hand[cardIndex], state.activeCard);
+      const matchDecision = getMatchDecision(hand[cardIndex], state.activeCard, state.runMatchMode, state.runHasCrossedRiver);
       if (!legal.includes(cardIndex) || !matchDecision.legal) {
         addLog(`Illegal save attempt: ${lowerPlayerName(player)} tried ${cardToText(hand[cardIndex])} (${matchDecision.reason}).`);
         return;
       }
 
       const card = hand.splice(cardIndex, 1)[0];
-      state.discardPile.push(card);
-      recordPlayedCard(player, card);
-      state.activeCard = card;
-      state.runMatchMode = matchDecision.nextMode;
-      state.runHasCrossedRiver = matchDecision.nextHasCrossed;
       shot.savedCards.push(card);
       shot.savedCount += 1;
       state.turnPlayCount = shot.savedCount;
 
-      addLog(`${lowerPlayerName(player)} plays save card ${shot.savedCount}/${shot.requiredLength}: ${cardToText(card)}.`);
-      addLog(`Pile top is now ${cardToText(state.activeCard)}.`);
-      addLog(`Match debug: ${describeMatchDecision(matchDecision)}.`);
-      setEvent(`Save chain ${shot.savedCount}/${shot.requiredLength}`, "contain");
-
-      if (shot.savedCount >= shot.requiredLength) {
-        finishShotWithSave(shot.savedCards);
-      } else {
-        logTurnDiagnostics(player, "Save continues.");
+      if (isReboundSavePhase(shot)) {
+        addLog(`${lowerPlayerName(player)} plays rebound save ${cardToText(card)} against rebound value ${shot.reboundShotValue}.`);
+        recordShotSequencePlay(player, card, matchDecision);
+        setEvent("Rebound save", "contain");
+        resolveReboundSaveResult(player, card);
+        return;
       }
+
+      addLog(`${lowerPlayerName(player)} plays save card ${shot.savedCount}/${getShotCurrentRequiredLength(shot)}: ${cardToText(card)}.`);
+      recordShotSequencePlay(player, card, matchDecision);
+      setEvent(`Save chain ${shot.savedCount}/${getShotCurrentRequiredLength(shot)}`, "contain");
+
+      if (shot.savedCount >= getShotCurrentRequiredLength(shot)) {
+        finishShotWithSave();
+        return;
+      }
+
+      logTurnDiagnostics(player, "Save continues.");
     }
 
     function ensureDeckHasCards() {
@@ -2806,8 +3203,7 @@
       return drew;
     }
 
-    function drawOneCard(player, options = {}) {
-      const hand = player === "human" ? state.humanHand : state.cpuHand;
+    function revealTopDeckCard(options = {}) {
       ensureDeckHasCards();
       if (state.deck.length === 0) {
         return null;
@@ -2815,13 +3211,23 @@
 
       const deckCountBeforeDraw = state.deck.length;
       const card = state.deck.pop();
-      hand.push(card);
       if (options.consumeClock !== false) {
         consumeClockForDraw(deckCountBeforeDraw);
       }
       if (state.deck.length === 0) {
         handleDeckCycleCompletion();
       }
+      return card;
+    }
+
+    function drawOneCard(player, options = {}) {
+      const hand = player === "human" ? state.humanHand : state.cpuHand;
+      const card = revealTopDeckCard(options);
+      if (!card) {
+        return null;
+      }
+
+      hand.push(card);
       return card;
     }
 
@@ -2924,7 +3330,45 @@
       return true;
     }
 
+    async function submitHumanSpecialSelection() {
+      if (state.currentTurn !== "human" || state.cpuBusy || !humanMoveRequiresSubmitConfirmation() || !hasHumanSpecialSelection()) {
+        return false;
+      }
+
+      const cardIndex = state.humanSpecialSelectionIndex;
+      const card = state.humanHand[cardIndex];
+      const humanButtons = document.querySelectorAll("#humanHand .card-btn");
+      const sourceButton = humanButtons[cardIndex];
+
+      clearHumanSpecialSelection();
+
+      if (card && sourceButton) {
+        await animatePlayToPileFromElement(sourceButton, card, false, 300);
+      }
+
+      if (state.faceoffPending) {
+        resolveFaceoff(cardIndex);
+      } else if (state.shotPending) {
+        playShotSaveCard("human", cardIndex);
+      } else if (state.stabilizePending) {
+        playCard("human", cardIndex);
+      } else {
+        return false;
+      }
+
+      render();
+      runCpuAuto();
+      render();
+      return true;
+    }
+
     async function undoHumanTurnPlay() {
+      if (state.currentTurn === "human" && hasHumanSpecialSelection()) {
+        clearHumanSpecialSelection();
+        render();
+        return;
+      }
+
       if (state.currentTurn !== "human" || state.cpuBusy || !hasHumanPendingTurn()) {
         return;
       }
@@ -2958,7 +3402,11 @@
     }
 
     async function submitHumanTurn() {
-      if (state.currentTurn !== "human" || state.cpuBusy || state.faceoffPending || state.shotPending || !hasHumanPendingTurn()) {
+      if (await submitHumanSpecialSelection()) {
+        return;
+      }
+
+      if (state.currentTurn !== "human" || state.cpuBusy || state.faceoffPending || state.shotPending || state.stabilizePending || !hasHumanPendingTurn()) {
         return;
       }
 
@@ -3122,7 +3570,12 @@
 
       const hand = playerHand(player);
       if (state.shotPending) {
-        addLog(`${label} ${lowerPlayerName(player)} save turn. Must answer ${cardToText(state.activeCard)} with ${state.shotPending.requiredLength} linked save card(s). Hand: ${cardsToText(hand)}.`);
+        const shot = state.shotPending;
+        if (isReboundSavePhase(shot)) {
+          addLog(`${label} ${lowerPlayerName(player)} rebound save turn. Must answer ${cardToText(state.activeCard)} with 1 legal save card against rebound value ${shot.reboundShotValue}. Hand: ${cardsToText(hand)}.`);
+        } else {
+          addLog(`${label} ${lowerPlayerName(player)} save turn. Must answer ${cardToText(state.activeCard)} with ${getShotCurrentRequiredLength(shot)} linked save card(s). Hand: ${cardsToText(hand)}.`);
+        }
         return;
       }
 
@@ -3194,9 +3647,6 @@
       clearComboWindow();
       state.activeBattleState = "none";
       state.comboImmunityActive = false;
-      if (FEATURES.momentumSystem && state.attacker && winner !== state.attacker) {
-        changeMomentum(state.attacker, -1, "turnover");
-      }
       state.attacker = winner;
       syncDefender();
 
@@ -3233,6 +3683,7 @@
       clearComboWindow();
       clearHumanPendingTurn();
       clearBurnSelection();
+      clearStabilizePending();
       resetExchangeCounts();
       resetRunMatchState();
       clearShotPending();
@@ -3246,6 +3697,7 @@
       clearComboWindow();
       clearHumanPendingTurn();
       clearBurnSelection();
+      clearStabilizePending();
       state.defenderChainCount = 0;
       resetRunMatchState();
       state.activeBattleState = "defense";
@@ -3254,6 +3706,71 @@
       addLog(`Turn passes to ${lowerPlayerName(state.defender)} to defend the exchange.`);
       setEvent(`${lowerPlayerName(state.defender)} defending`, "contain");
       logTurnDiagnostics(state.currentTurn);
+    }
+
+    function beginStabilizeAttempt() {
+      const pendingAttacker = state.attacker;
+      const pendingDefender = state.defender;
+      if (!pendingAttacker || !pendingDefender) {
+        return;
+      }
+
+      clearComboWindow();
+      clearHumanPendingTurn();
+      clearBurnSelection();
+      state.activeBattleState = "none";
+      state.comboImmunityActive = false;
+      state.cpuPreviewIndex = null;
+      state.stabilizePending = {
+        attackerPlayer: pendingAttacker,
+        defenderPlayer: pendingDefender,
+        attackerCount: state.attackerChainCount,
+        defenderCount: state.defenderChainCount
+      };
+      setCurrentTurn(pendingAttacker, "stabilize");
+      addLog(`${lowerPlayerName(pendingDefender)} edges the exchange ${state.defenderChainCount}-${state.attackerChainCount}, but only by 1 card.`);
+      addLog(`${lowerPlayerName(pendingAttacker)} gets one Stabilize attempt: play 1 legal card, or draw 1 if none.`);
+      setEvent("Stabilize attempt", "contain");
+      showDeckEvent("STABILIZE", "contain", 1100);
+      logTurnDiagnostics(state.currentTurn, "Stabilize attempt.");
+    }
+
+    function completeTurnoverToDefender(reason, exchangeMargin = Math.abs(state.attackerChainCount - state.defenderChainCount)) {
+      const turnoverWinner = state.defender;
+      if (!turnoverWinner) {
+        return;
+      }
+
+      clearStabilizePending();
+
+      state.attacker = turnoverWinner;
+      syncDefender();
+      addLog(reason || `${lowerPlayerName(turnoverWinner)} wins the exchange ${state.defenderChainCount}-${state.attackerChainCount}. Turnover.`);
+      addLog(`Possession changes because ${lowerPlayerName(turnoverWinner)} won the exchange on defense.`);
+
+      awardMomentumForExchangeWin(turnoverWinner, exchangeMargin);
+
+      setEvent("Turnover", "turnover");
+      showDeckEvent("TURNOVER", "turnover", 1100);
+      startAttackerTurn();
+      logTurnDiagnostics(state.currentTurn);
+    }
+
+    function resolveSuccessfulStabilize(player, card) {
+      const pending = state.stabilizePending;
+      if (!pending || player !== pending.attackerPlayer) {
+        return false;
+      }
+
+      clearStabilizePending();
+      addLog(`${lowerPlayerName(player)} stabilizes with ${cardToText(card)} and denies the turnover.`);
+      addLog(`${lowerPlayerName(player)} keeps possession in ${zoneLabel(state.zoneIndex)}. No zone advance this exchange.`);
+      setEvent("Stabilized / No Turnover", "contain");
+      showDeckEvent("STABLE", "contain", 1100);
+      awardMomentumForSuccessfulStabilize(player);
+      startAttackerTurn();
+      logTurnDiagnostics(state.currentTurn, "Stabilized.");
+      return true;
     }
 
     function resolveExchange(winner, reason) {
@@ -3302,9 +3819,7 @@
           addLog(`Puck stays in ${zoneLabel(state.zoneIndex)}.`);
         }
 
-        if (FEATURES.momentumSystem && exchangeMargin >= 3) {
-          changeMomentum(winner, 1, `exchange win by ${exchangeMargin}`);
-        }
+        awardMomentumForExchangeWin(winner, exchangeMargin);
 
         setEvent(attackerAdvances ? "Exchange Win (+1 Zone)" : "Exchange Hold / No Advance", attackerAdvances ? "shot" : "contain");
         startAttackerTurn();
@@ -3312,23 +3827,12 @@
         return;
       }
 
-      if (FEATURES.momentumSystem && previousAttacker) {
-        changeMomentum(previousAttacker, -1, "turnover");
+      if (exchangeMargin === 1) {
+        beginStabilizeAttempt();
+        return;
       }
 
-      state.attacker = winner;
-      syncDefender();
-      addLog(reason || `${lowerPlayerName(state.attacker)} wins the exchange ${state.defenderChainCount}-${state.attackerChainCount}. Turnover.`);
-      addLog(`Possession changes because ${lowerPlayerName(state.attacker)} won the exchange on defense.`);
-
-      if (FEATURES.momentumSystem && exchangeMargin >= 3) {
-        changeMomentum(winner, 1, `exchange win by ${exchangeMargin}`);
-      }
-
-      setEvent("Turnover", "turnover");
-      showDeckEvent("TURNOVER", "turnover", 1100);
-      startAttackerTurn();
-      logTurnDiagnostics(state.currentTurn);
+      completeTurnoverToDefender(reason, exchangeMargin);
     }
 
     function endComboByChoice(player) {
@@ -3398,11 +3902,7 @@
         }
       }
 
-      const previousBand = getMomentumZoneBand(state.attacker, previousZone);
-      const nextBand = getMomentumZoneBand(state.attacker, state.zoneIndex);
-      if (FEATURES.momentumSystem && state.attacker && previousZone !== state.zoneIndex && previousBand && nextBand && previousBand !== nextBand) {
-        changeMomentum(state.attacker, 1, `crossing into the ${nextBand} zone`);
-      }
+      awardMomentumForZoneAdvance(state.attacker, previousZone, state.zoneIndex);
     }
 
     function flipPossession() {
@@ -3440,7 +3940,7 @@
       return `${winningCard.suit} beats ${losingCard.suit}`;
     }
 
-    function resolveFaceoffByValue(humanCard, cpuCard, label = "") {
+    function getFaceoffValueComparison(humanCard, cpuCard, label = "") {
       const prefix = label ? `${label}: ` : "";
       if (humanCard.value > cpuCard.value) {
         return { winner: "human", summary: `${prefix}${humanCard.value} beats ${cpuCard.value}` };
@@ -3449,18 +3949,29 @@
         return { winner: "cpu", summary: `${prefix}${cpuCard.value} beats ${humanCard.value}` };
       }
       return {
-        winner: Math.random() < 0.5 ? "human" : "cpu",
+        winner: null,
         summary: `${prefix}${humanCard.value} ties ${cpuCard.value}; random edge`
       };
     }
 
-    function getFaceoffComparisonDetails(humanCard, cpuCard, config = state.config) {
+    function resolveFaceoffByValue(humanCard, cpuCard, label = "") {
+      const comparison = getFaceoffValueComparison(humanCard, cpuCard, label);
+      if (comparison.winner) {
+        return comparison;
+      }
+      return {
+        winner: Math.random() < 0.5 ? "human" : "cpu",
+        summary: comparison.summary
+      };
+    }
+
+    function getFaceoffComparisonPreview(humanCard, cpuCard, config = state.config) {
       if (humanCard.suit === cpuCard.suit) {
-        return resolveFaceoffByValue(humanCard, cpuCard);
+        return getFaceoffValueComparison(humanCard, cpuCard);
       }
 
       if (isWildCard(humanCard) || isWildCard(cpuCard)) {
-        return resolveFaceoffByValue(humanCard, cpuCard, "wild card");
+        return getFaceoffValueComparison(humanCard, cpuCard, "wild card");
       }
 
       const ordered = getOrderedActiveFaceoffSuits(config);
@@ -3469,7 +3980,7 @@
       const cpuIndex = ordered.indexOf(cpuCard.suit);
 
       if (humanIndex === -1 || cpuIndex === -1 || suitCount === 0) {
-        return resolveFaceoffByValue(humanCard, cpuCard, "value fallback");
+        return getFaceoffValueComparison(humanCard, cpuCard, "value fallback");
       }
 
       const clockwiseDistance = (cpuIndex - humanIndex + suitCount) % suitCount;
@@ -3482,7 +3993,7 @@
       }
 
       if (clockwiseDistance === suitCount / 2) {
-        return resolveFaceoffByValue(humanCard, cpuCard, "opposite suits");
+        return getFaceoffValueComparison(humanCard, cpuCard, "opposite suits");
       }
 
       if (clockwiseDistance === 1) {
@@ -3490,6 +4001,72 @@
       }
 
       return { winner: "cpu", summary: `${cpuCard.suit} beats ${humanCard.suit}` };
+    }
+
+    function getFaceoffComparisonDetails(humanCard, cpuCard, config = state.config) {
+      const comparison = getFaceoffComparisonPreview(humanCard, cpuCard, config);
+      if (comparison.winner) {
+        return comparison;
+      }
+      return {
+        winner: Math.random() < 0.5 ? "human" : "cpu",
+        summary: comparison.summary
+      };
+    }
+
+    function chooseCpuIcingRevealIndex() {
+      const indexes = state.cpuHand.map((_, index) => index);
+      if (indexes.length === 0) {
+        return null;
+      }
+
+      const ordered = [...indexes].sort((left, right) => {
+        const valueDiff = state.cpuHand[left].value - state.cpuHand[right].value;
+        if (valueDiff !== 0) {
+          return valueDiff;
+        }
+        return left - right;
+      });
+      return ordered[Math.floor(ordered.length / 2)];
+    }
+
+    function chooseCpuIcingResponseIndex(humanCard) {
+      const cpuIndexes = state.cpuHand.map((_, index) => index);
+      if (cpuIndexes.length === 0) {
+        return null;
+      }
+
+      const winningIndexes = cpuIndexes.filter((index) => getFaceoffComparisonPreview(humanCard, state.cpuHand[index]).winner === "cpu");
+      if (winningIndexes.length > 0) {
+        return chooseLowestValueIndex(state.cpuHand, winningIndexes);
+      }
+
+      const tyingIndexes = cpuIndexes.filter((index) => getFaceoffComparisonPreview(humanCard, state.cpuHand[index]).winner === null);
+      if (tyingIndexes.length > 0) {
+        return chooseLowestValueIndex(state.cpuHand, tyingIndexes);
+      }
+
+      return chooseLowestValueIndex(state.cpuHand, cpuIndexes);
+    }
+
+    function revealCpuIcingFaceoffLeadCard() {
+      if (!state.faceoffPending || !isIcingFaceoff() || state.icingFaceoffPlayer !== "cpu" || state.icingFaceoffLeadCard) {
+        return false;
+      }
+
+      const cpuIndex = chooseCpuIcingRevealIndex();
+      if (cpuIndex === null || cpuIndex === undefined || cpuIndex < 0 || cpuIndex >= state.cpuHand.length) {
+        return false;
+      }
+
+      const cpuCard = state.cpuHand.splice(cpuIndex, 1)[0];
+      state.icingFaceoffLeadCard = cpuCard;
+      state.activeCard = cpuCard;
+      state.currentTurn = "human";
+      state.roleOfCurrentTurn = "faceoff";
+      addLog(`CPU reveals ${cardToText(cpuCard)} first for the Icing Faceoff. Human choose a response card.`);
+      setEvent(`Icing Faceoff: CPU reveals ${cardToText(cpuCard)}`, "contain");
+      return true;
     }
 
     function zoneMarkerForIndex(index) {
@@ -3604,18 +4181,8 @@
         return;
       }
 
-      if (state.faceoffPending) {
-        resolveFaceoff(cardIndex);
-        render();
-        runCpuAuto();
-        render();
-        return;
-      }
-
-      if (state.shotPending) {
-        playShotSaveCard("human", cardIndex);
-        render();
-        runCpuAuto();
+      if (humanMoveRequiresSubmitConfirmation()) {
+        selectHumanSpecialCard(cardIndex);
         render();
         return;
       }
@@ -3625,6 +4192,11 @@
     }
 
     async function animateAndCommitHumanPlay(cardIndex, sourceElement) {
+      if (humanMoveRequiresSubmitConfirmation()) {
+        await commitHumanCardPlay(cardIndex);
+        return;
+      }
+
       const card = state.faceoffPending ? state.humanHand[cardIndex] : state.humanHand[cardIndex];
       if (card && sourceElement) {
         await animatePlayToPileFromElement(sourceElement, card, false, 300);
@@ -3634,7 +4206,7 @@
     }
 
     function startHumanCardDrag(event, cardIndex, card, isLegal) {
-      if (!isLegal || state.cpuBusy) {
+      if (!isLegal || state.cpuBusy || humanMoveRequiresSubmitConfirmation()) {
         return;
       }
 
@@ -3711,8 +4283,11 @@
       }
 
       const faceoffMode = options.mode || "standard";
+      const loosePuckFaceoff = faceoffMode === "loosePuck";
+      const icingFaceoff = faceoffMode === "icing";
       const refillForFaceoff = options.refillHands !== false;
       const refillConsumesClock = options.refillConsumesClock !== false;
+      const faceoffLabel = getFaceoffUiLabel(faceoffMode);
 
       if (refillForFaceoff) {
         refillHands({ consumeClock: refillConsumesClock });
@@ -3721,16 +4296,18 @@
         }
       }
 
-      if (FEATURES.momentumSystem && faceoffMode === "standard") {
-        resetMomentum("Momentum resets for the faceoff.");
-      }
+      resetMomentumForFaceoff(faceoffLabel);
 
       clearHumanPendingTurn();
       clearBurnSelection();
+      clearStabilizePending();
+      clearHumanSpecialSelection();
       state.faceoffPending = true;
       state.faceoffMode = faceoffMode;
       state.faceoffReturnZone = options.preserveZone ? zoneIndex : null;
       state.loosePuckOriginAttacker = options.originAttacker || null;
+      state.icingFaceoffPlayer = icingFaceoff ? options.initiator || null : null;
+      state.icingFaceoffLeadCard = null;
       state.zoneIndex = options.preserveZone ? zoneIndex : getFaceoffPairCenter(zoneIndex);
       state.attacker = null;
       state.defender = null;
@@ -3749,9 +4326,15 @@
         addLog(reason);
       }
 
-      const faceoffLabel = faceoffMode === "loosePuck" ? "Loose Puck" : "Faceoff";
-      addLog(`${faceoffLabel} at ${zoneLabel(state.zoneIndex)}. Human choose a card.`);
-      setEvent(`${faceoffLabel} at ${zoneLabel(state.zoneIndex)}`, "contain");
+      if (icingFaceoff) {
+        addLog(`${faceoffLabel} at ${zoneLabel(state.zoneIndex)}. ${state.icingFaceoffPlayer === "cpu" ? "CPU reveals first." : "Human reveals first."}`);
+      } else {
+        addLog(`${faceoffLabel} at ${zoneLabel(state.zoneIndex)}. Human choose a card.`);
+      }
+      setEvent(`${faceoffLabel} at ${zoneLabel(state.zoneIndex)}`, loosePuckFaceoff ? "puck" : "contain");
+      if (loosePuckFaceoff) {
+        showDeckEvent("PUCK BATTLE", "puck", 1600);
+      }
       triggerPhaseFlash("neutral");
     }
 
@@ -3760,36 +4343,33 @@
         return;
       }
 
+      const faceoffMode = state.faceoffMode;
       const loosePuckFaceoff = isLoosePuckFaceoff();
-      const originAttacker = state.loosePuckOriginAttacker;
+      const icingFaceoff = isIcingFaceoff();
+      const faceoffLabel = getFaceoffUiLabel(faceoffMode);
+      const cpuNeedsResponseCard = !icingFaceoff || state.icingFaceoffPlayer === "human";
 
       if (humanIndex < 0 || humanIndex >= state.humanHand.length) {
         addLog("Ignored: invalid human faceoff card.");
         return;
       }
 
-      if (!loosePuckFaceoff && state.cpuHand.length === 0) {
+      if (cpuNeedsResponseCard && !loosePuckFaceoff && state.cpuHand.length === 0) {
         refillToFive("cpu");
         if (resolvePendingPeriodBreak()) {
           return;
         }
       }
 
-      const cpuIndexes = state.cpuHand.map((_, index) => index);
-      if (cpuIndexes.length === 0) {
+      const cpuIndexes = cpuNeedsResponseCard ? state.cpuHand.map((_, index) => index) : [];
+      if (cpuNeedsResponseCard && cpuIndexes.length === 0) {
         if (loosePuckFaceoff) {
           const fallbackZoneIndex = state.faceoffReturnZone ?? state.zoneIndex;
-          state.faceoffPending = false;
-          state.faceoffMode = "standard";
-          state.faceoffReturnZone = null;
-          state.loosePuckOriginAttacker = null;
+          clearFaceoffState();
           state.zoneIndex = fallbackZoneIndex;
           state.attacker = "human";
           syncDefender();
           resetRunMatchState();
-          if (FEATURES.momentumSystem && originAttacker && originAttacker !== "human") {
-            changeMomentum(originAttacker, -1, "losing the loose puck");
-          }
           addLog(`CPU has no card for the Loose Puck faceoff. Human wins possession in ${zoneLabel(state.zoneIndex)}.`);
           if (state.humanHand.length === 0) {
             refillToFive("human");
@@ -3806,14 +4386,28 @@
       }
 
       const humanCard = state.humanHand.splice(humanIndex, 1)[0];
-      const cpuIndex = chooseRandomFrom(cpuIndexes);
-      const cpuCard = state.cpuHand.splice(cpuIndex, 1)[0];
+      let cpuCard = null;
+
+      if (icingFaceoff && state.icingFaceoffPlayer === "cpu" && state.icingFaceoffLeadCard) {
+        cpuCard = state.icingFaceoffLeadCard;
+        addLog(`Icing Faceoff: CPU revealed ${cardToText(cpuCard)}. Human answers with ${cardToText(humanCard)}.`);
+      } else if (icingFaceoff && state.icingFaceoffPlayer === "human") {
+        const cpuIndex = chooseCpuIcingResponseIndex(humanCard);
+        if (cpuIndex === null || cpuIndex === undefined || cpuIndex < 0 || cpuIndex >= state.cpuHand.length) {
+          addLog("CPU has no reply for the Icing Faceoff.");
+          return;
+        }
+        cpuCard = state.cpuHand.splice(cpuIndex, 1)[0];
+        addLog(`Icing Faceoff: Human reveals ${cardToText(humanCard)} first. CPU answers with ${cardToText(cpuCard)}.`);
+      } else {
+        const cpuIndex = chooseRandomFrom(cpuIndexes);
+        cpuCard = state.cpuHand.splice(cpuIndex, 1)[0];
+        addLog(`Faceoff: Human ${cardToText(humanCard)} vs CPU ${cardToText(cpuCard)}.`);
+      }
 
       state.discardPile.push(humanCard, cpuCard);
       recordPlayedCard("human", humanCard);
       recordPlayedCard("cpu", cpuCard);
-
-      addLog(`Faceoff: Human ${cardToText(humanCard)} vs CPU ${cardToText(cpuCard)}.`);
 
       const faceoffResult = getFaceoffComparisonDetails(humanCard, cpuCard);
       const winner = faceoffResult.winner;
@@ -3825,10 +4419,7 @@
       const resolvedZoneIndex = loosePuckFaceoff
         ? (state.faceoffReturnZone ?? state.zoneIndex)
         : resolveFaceoffWinningZone(state.zoneIndex, winner);
-      state.faceoffPending = false;
-      state.faceoffMode = "standard";
-      state.faceoffReturnZone = null;
-      state.loosePuckOriginAttacker = null;
+      clearFaceoffState();
       state.zoneIndex = resolvedZoneIndex;
       state.attacker = winner;
       syncDefender();
@@ -3857,18 +4448,14 @@
         }
       }
 
-      if (FEATURES.momentumSystem && loosePuckFaceoff && originAttacker && winner !== originAttacker) {
-        changeMomentum(originAttacker, -1, "losing the loose puck");
-      }
-
       startAttackerTurn();
 
-      addLog(`${lowerPlayerName(winner)} wins the ${loosePuckFaceoff ? "Loose Puck" : "faceoff"} at ${zoneLabel(state.zoneIndex)} (${describeFaceoffWin(winningCard, losingCard, faceoffResult.summary)}).`);
+      addLog(`${lowerPlayerName(winner)} wins the ${faceoffMode === "standard" ? "faceoff" : faceoffLabel} at ${zoneLabel(state.zoneIndex)} (${describeFaceoffWin(winningCard, losingCard, faceoffResult.summary)}).`);
       addLog(`Pile top is now ${cardToText(state.activeCard)} from the faceoff win.`);
       if (loosePuckFaceoff && winnerUsedLastCard) {
         addLog(`${lowerPlayerName(winner)} used the last card to win the Loose Puck and draws a fresh hand.`);
       }
-      setEvent(`${lowerPlayerName(winner)} wins the ${loosePuckFaceoff ? "Loose Puck" : "faceoff"}`, "turnover");
+      setEvent(`${lowerPlayerName(winner)} wins the ${faceoffMode === "standard" ? "faceoff" : faceoffLabel}`, "turnover");
       logTurnDiagnostics(state.currentTurn);
     }
 
@@ -3877,10 +4464,11 @@
     // ----------------------------------------
 
     function requiredSaveLengthFromShotValue(value) {
-      if (value <= 2) {
+      const saveTierSpan = Math.max(1, Math.ceil((state.config.maxValue || DEFAULT_CONFIG.maxValue) / 3));
+      if (value <= saveTierSpan) {
         return 1;
       }
-      if (value <= 4) {
+      if (value <= saveTierSpan * 2) {
         return 2;
       }
       return 3;
@@ -3924,18 +4512,107 @@
       return success ? [...chainIndexes] : null;
     }
 
+    function findBestSaveChain(hand, maxLength, startingCard) {
+      const used = new Set();
+      const chainIndexes = [];
+      let bestChain = [];
+
+      function search(prevCard, currentMode, hasCrossed) {
+        if (chainIndexes.length > bestChain.length) {
+          bestChain = [...chainIndexes];
+        }
+
+        if (chainIndexes.length >= maxLength) {
+          return;
+        }
+
+        for (let i = 0; i < hand.length; i += 1) {
+          if (used.has(i)) {
+            continue;
+          }
+
+          const candidate = hand[i];
+          const decision = getMatchDecision(candidate, prevCard, currentMode, hasCrossed);
+          if (!decision.legal) {
+            continue;
+          }
+
+          used.add(i);
+          chainIndexes.push(i);
+          search(candidate, decision.nextMode, decision.nextHasCrossed);
+          chainIndexes.pop();
+          used.delete(i);
+        }
+      }
+
+      search(startingCard, state.runMatchMode, state.runHasCrossedRiver);
+      return bestChain.length > 0 ? bestChain : null;
+    }
+
+    function processCpuShotSequenceTurn() {
+      const shot = state.shotPending;
+      if (!shot || shot.defenderPlayer !== "cpu" || state.currentTurn !== "cpu") {
+        return false;
+      }
+
+      if (isReboundSavePhase(shot)) {
+        const legal = getLegalCardsForTurn("cpu");
+        if (legal.length === 0) {
+          return tryReboundDesperationSave("cpu");
+        }
+
+        const idx = chooseHighestValueIndex(state.cpuHand, legal);
+        playShotSaveCard("cpu", idx);
+        return true;
+      }
+
+      const chainIndexes = findBestSaveChain(state.cpuHand, shot.requiredLength, state.activeCard);
+      if (!chainIndexes || chainIndexes.length === 0) {
+        finishShotAsGoal(`${lowerPlayerName(shot.defenderPlayer)} cannot start the ${shot.requiredLength}-card save chain. GOAL ${lowerPlayerName(shot.attackerPlayer)}.`);
+        return true;
+      }
+
+      const selectedCards = chainIndexes.map((idx) => state.cpuHand[idx]);
+      let currentCard = state.activeCard;
+      let currentMode = state.runMatchMode;
+      let hasCrossed = state.runHasCrossedRiver;
+
+      for (const saveCard of selectedCards) {
+        const decision = getMatchDecision(saveCard, currentCard, currentMode, hasCrossed);
+        shot.savedCards.push(saveCard);
+        shot.savedCount += 1;
+        state.turnPlayCount = shot.savedCount;
+
+        addLog(`${lowerPlayerName(shot.defenderPlayer)} plays save card ${shot.savedCount}/${shot.requiredLength}: ${cardToText(saveCard)}.`);
+        recordShotSequencePlay(shot.defenderPlayer, saveCard, decision);
+        currentCard = saveCard;
+        currentMode = decision.nextMode;
+        hasCrossed = decision.nextHasCrossed;
+      }
+
+      const descending = [...chainIndexes].sort((a, b) => b - a);
+      for (const idx of descending) {
+        state.cpuHand.splice(idx, 1);
+      }
+
+      if (shot.savedCount >= shot.requiredLength) {
+        finishShotWithSave();
+        return true;
+      }
+
+      resolveNormalShotSaveAttempt();
+      return true;
+    }
+
     function resolveShot(attackerPlayer, defenderPlayer, shotCard, options = {}) {
       const shotZoneIndex = state.zoneIndex;
       const closeShot = isCloseOffensiveZone(attackerPlayer, shotZoneIndex);
       const hasShotValueOverride = Number.isFinite(options.shotValueOverride);
       const shotValueBase = hasShotValueOverride ? options.shotValueOverride : shotCard.value;
-      const shotValue = hasShotValueOverride ? shotValueBase : closeShot ? Math.min(6, shotCard.value + 1) : shotCard.value;
+      const shotValue = hasShotValueOverride ? shotValueBase : closeShot ? shotCard.value + 1 : shotCard.value;
       const requiredLength = requiredSaveLengthFromShotValue(shotValue);
-      const defenderHand = playerHand(defenderPlayer);
 
-      if (FEATURES.momentumSystem) {
-        resetMomentum("Momentum resets after the shot.");
-      }
+      resetMomentumAfterShot();
 
       resetRunMatchState();
 
@@ -3946,64 +4623,28 @@
       setEvent(`Shot quality ${shotValue}`, "shot");
       showDeckEvent("SHOT", "shot", 1000);
 
-      if (defenderPlayer === "human") {
-        state.shotPending = {
-          attackerPlayer,
-          defenderPlayer,
-          shotCard: { suit: shotCard.suit, value: shotCard.value },
-          shotZoneIndex,
-          shotValue,
-          shotKind: options.shotKind || "card",
-          powerHandSize: options.powerHandSize || null,
-          requiredLength,
-          savedCards: [],
-          savedCount: 0
-        };
-        state.currentTurn = defenderPlayer;
-        state.roleOfCurrentTurn = "save";
-        state.turnPlayCount = 0;
-        state.activeCard = shotCard;
-        addLog(`Human must manually play a ${requiredLength}-card save chain or concede the goal.`);
-        setEvent(`Save chain needed: ${requiredLength}`, "contain");
-        logTurnDiagnostics(defenderPlayer, "Save setup.");
-        triggerPhaseFlash(defenderPlayer === "human" ? "human" : "cpu");
-        return;
-      }
+      state.shotPending = {
+        attackerPlayer,
+        defenderPlayer,
+        shotCard: { suit: shotCard.suit, value: shotCard.value },
+        shotZoneIndex,
+        shotValue,
+        shotKind: options.shotKind || "card",
+        powerHandSize: options.powerHandSize || null,
+        requiredLength,
+        phase: "normalSave",
+        phaseRequiredLength: requiredLength,
+        savedCards: [],
+        savedCount: 0,
+        reboundCount: 0,
+        reboundShotCard: null,
+        reboundShotValue: null
+      };
+      state.activeCard = shotCard;
 
-      const chainIndexes = findSaveChain(defenderHand, requiredLength, shotCard);
-      if (chainIndexes && chainIndexes.length === requiredLength) {
-        const selectedCards = chainIndexes.map((idx) => defenderHand[idx]);
-
-        for (const saveCard of selectedCards) {
-          recordPlayedCard(defenderPlayer, saveCard);
-        }
-
-        const descending = [...chainIndexes].sort((a, b) => b - a);
-        for (const idx of descending) {
-          const removed = defenderHand.splice(idx, 1)[0];
-          state.discardPile.push(removed);
-        }
-
-        setLastShotSummary({ attackerPlayer, defenderPlayer, shotCard, shotValue, shotZoneIndex, shotKind: options.shotKind || "card", powerHandSize: options.powerHandSize || null }, "save", selectedCards);
-        addLog(`${lowerPlayerName(defenderPlayer)} makes ${requiredLength}-card save: ${selectedCards.map(cardToText).join(" -> ")}. Frozen puck.`);
-        setEvent("Save / Frozen puck", "contain");
-        showDeckEvent("SAVE", "contain", 1200);
-        startFaceoff(shotZoneIndex, "Save/frozen puck.");
-        return;
-      }
-
-      setLastShotSummary({ attackerPlayer, defenderPlayer, shotCard, shotValue, shotZoneIndex, shotKind: options.shotKind || "card", powerHandSize: options.powerHandSize || null }, "goal", []);
-      if (attackerPlayer === "human") {
-        state.humanScore += 1;
-      } else {
-        state.cpuScore += 1;
-      }
-
-      addLog(`${lowerPlayerName(defenderPlayer)} cannot complete ${requiredLength}-card save chain. GOAL ${lowerPlayerName(attackerPlayer)}.`);
-      setEvent(`GOAL ${lowerPlayerName(attackerPlayer)}`, "goal");
-      showDeckEvent("GOAL", "goal", 1500);
-      triggerGoalFlash();
-      handleGoalAfterScore(attackerPlayer);
+      addLog(`${lowerPlayerName(defenderPlayer)} must complete a ${requiredLength}-card save chain to freeze the puck.`);
+      setEvent(`Save chain needed: ${requiredLength}`, "contain");
+      syncShotPendingTurnState("Save setup.", true);
     }
 
     // ---------------------------
@@ -4015,9 +4656,7 @@
         showCpuNotice("CANNOT PLAY");
       }
 
-      if (FEATURES.momentumSystem) {
-        changeMomentum(player, -1, "standard draw penalty");
-      }
+      applyMomentumPenaltyForCannotPlay(player);
 
       const drawnCard = drawOneCard(player);
 
@@ -4036,7 +4675,7 @@
         return;
       }
 
-      if (player === "human" && drawnCard && isNewestDrawnCardPlayable(player)) {
+      if (!state.stabilizePending && player === "human" && drawnCard && isNewestDrawnCardPlayable(player)) {
         addLog(`Human drew ${cardToText(drawnCard)}. It is playable; choose it manually if you want to use it.`);
         logTurnDiagnostics(player, "Draw result.");
         return;
@@ -4052,6 +4691,13 @@
 
       clearComboWindow();
       state.cpuPreviewIndex = null;
+
+      if (state.stabilizePending) {
+        const pending = state.stabilizePending;
+        addLog(`${lowerPlayerName(player)} cannot complete the Stabilize attempt${drawnCard ? " after the draw" : ""}.`);
+        completeTurnoverToDefender(`${lowerPlayerName(pending.defenderPlayer)} wins the exchange ${pending.defenderCount}-${pending.attackerCount}. Turnover stands after the failed Stabilize attempt.`, pending.defenderCount - pending.attackerCount);
+        return;
+      }
 
       if (state.roleOfCurrentTurn === "attacker") {
         addLog(`Turn ends because ${lowerPlayerName(player)} has no legal attacker play ${drawnCard ? "after drawing" : "and the deck is empty"}.`);
@@ -4118,6 +4764,7 @@
       }
 
       const card = hand[cardIndex];
+      const stabilizePlay = Boolean(state.stabilizePending);
       const isOpeningAttackPlay = state.roleOfCurrentTurn === "attacker" && state.attackerChainCount === 0;
       const previousActiveCard = state.activeCard;
       const matchDecision = getMatchDecision(card, previousActiveCard);
@@ -4136,12 +4783,14 @@
       state.activeCard = card;
         state.runMatchMode = matchDecision.nextMode;
         state.runHasCrossedRiver = matchDecision.nextHasCrossed;
-      state.activeBattleState = state.roleOfCurrentTurn === "attacker" ? "attack" : "defense";
+      state.activeBattleState = stabilizePlay || state.roleOfCurrentTurn === "attacker" ? "attack" : "defense";
       state.comboImmunityActive = false;
       addLog(`Pile top is now ${cardToText(state.activeCard)}.`);
         addLog(`Match debug: ${describeMatchDecision(matchDecision)}.`);
 
-      if (state.roleOfCurrentTurn === "attacker") {
+      if (stabilizePlay) {
+        addLog(`${lowerPlayerName(player)} makes the Stabilize play with ${cardToText(card)}.`);
+      } else if (state.roleOfCurrentTurn === "attacker") {
         state.attackerChainCount += 1;
         syncTurnPlayCount();
         if (isOpeningAttackPlay) {
@@ -4155,6 +4804,10 @@
         syncTurnPlayCount();
         addLog(`${lowerPlayerName(player)} answers with ${cardToText(card)}.`);
         setEvent(`${lowerPlayerName(player)} defense chain ${state.defenderChainCount}`, "contain");
+      }
+
+      if (stabilizePlay) {
+        return resolveSuccessfulStabilize(player, card);
       }
 
       if (deferResolution) {
@@ -4387,6 +5040,12 @@
         : (((REGULATION_PERIOD_COUNT - state.periodNumber) * PERIOD_SECONDS) + state.periodClockSeconds);
       const lateGame = state.periodNumber > REGULATION_PERIOD_COUNT || regulationSecondsRemaining <= 300;
       const veryLateGame = state.periodNumber > REGULATION_PERIOD_COUNT || regulationSecondsRemaining <= 120;
+      const comebackPressure = state.periodNumber > REGULATION_PERIOD_COUNT || regulationSecondsRemaining <= 480;
+      const desperateOffensivePush = scoreDiff < 0 && comebackPressure && isShotZone("cpu");
+
+      if (desperateOffensivePush && hand.length <= 1) {
+        return false;
+      }
 
       let dumpBias = 0.34;
       if (isCloseOffensiveZone("cpu")) {
@@ -4423,12 +5082,36 @@
         dumpBias -= 0.14;
       }
 
+      if (desperateOffensivePush) {
+        dumpBias -= hand.length <= 2 ? 0.28 : 0.18;
+      }
+
       if (state.periodNumber > REGULATION_PERIOD_COUNT) {
         dumpBias -= 0.16;
       }
 
       const dumpChance = clamp(dumpBias, 0.15, 0.82);
       return Math.random() < dumpChance;
+    }
+
+    function cpuShouldIcePuck(legalIndexes = getLegalCardsForTurn("cpu")) {
+      if (!canPlayerIcePuck("cpu") || legalIndexes.length > 0) {
+        return false;
+      }
+
+      if (FEATURES.momentumSystem && canPlayerUseCycle("cpu")) {
+        return false;
+      }
+
+      const hand = state.cpuHand;
+      const lowValueThreshold = Math.max(2, Math.ceil(state.config.maxValue / 2));
+      const lowValueCount = hand.filter((card) => card.value <= lowValueThreshold).length;
+      const weakHand = hand.length <= 2 || lowValueCount >= Math.ceil(hand.length / 2);
+      const shortHand = hand.length <= Math.max(2, Math.ceil(state.config.handSize / 2));
+      const opponentShortHand = state.humanHand.length <= 2;
+      const opponentHighMomentum = FEATURES.momentumSystem && getMomentum("human") >= 2;
+
+      return opponentShortHand || opponentHighMomentum || weakHand || shortHand;
     }
 
     function cpuShouldBurnMomentum(legalIndexes = getLegalCardsForTurn("cpu")) {
@@ -4467,10 +5150,14 @@
         return false;
       }
 
+      if (state.shotPending) {
+        return processCpuShotSequenceTurn();
+      }
+
       const legal = getLegalCardsForTurn("cpu");
 
       if (FEATURES.momentumSystem && cpuShouldPowerShotMomentum(legal)) {
-        showCpuNotice("POWER SHOT", "info");
+        showCpuNotice("FORCE SHOT", "info");
         render();
         await sleep(getCpuSimDuration(900, 180));
 
@@ -4480,31 +5167,6 @@
 
         powerShot("cpu");
         return true;
-      }
-
-      if (FEATURES.momentumSystem && cpuShouldBurnMomentum(legal)) {
-        const burnIndex = getCpuBurnIndex();
-        if (burnIndex !== null && burnIndex !== undefined) {
-          showCpuNotice("BURN", "info");
-
-          state.cpuPreviewIndex = burnIndex;
-          render();
-          await sleep(getCpuSimDuration(850, 180));
-
-          if (state.currentTurn !== "cpu" || burnIndex < 0 || burnIndex >= state.cpuHand.length) {
-            state.cpuPreviewIndex = null;
-            return false;
-          }
-
-          const cpuButtons = document.querySelectorAll("#cpuHand .card-btn");
-          const sourceButton = cpuButtons[burnIndex];
-          const burnCard = state.cpuHand[burnIndex];
-          await animatePlayToPileFromElement(sourceButton, burnCard, !state.showCpuCards, getCpuSimDuration(420, 120));
-
-          burnMomentumCard("cpu", burnIndex);
-          state.cpuPreviewIndex = null;
-          return true;
-        }
       }
 
       if (FEATURES.momentumSystem && cpuShouldCycleMomentum(legal)) {
@@ -4532,6 +5194,31 @@
         }
       }
 
+      if (FEATURES.momentumSystem && cpuShouldBurnMomentum(legal)) {
+        const burnIndex = getCpuBurnIndex();
+        if (burnIndex !== null && burnIndex !== undefined) {
+          showCpuNotice("BURN", "info");
+
+          state.cpuPreviewIndex = burnIndex;
+          render();
+          await sleep(getCpuSimDuration(850, 180));
+
+          if (state.currentTurn !== "cpu" || burnIndex < 0 || burnIndex >= state.cpuHand.length) {
+            state.cpuPreviewIndex = null;
+            return false;
+          }
+
+          const cpuButtons = document.querySelectorAll("#cpuHand .card-btn");
+          const sourceButton = cpuButtons[burnIndex];
+          const burnCard = state.cpuHand[burnIndex];
+          await animatePlayToPileFromElement(sourceButton, burnCard, !state.showCpuCards, getCpuSimDuration(420, 120));
+
+          burnMomentumCard("cpu", burnIndex);
+          state.cpuPreviewIndex = null;
+          return true;
+        }
+      }
+
       if (state.roleOfCurrentTurn === "defender" && currentTurnCanPass() && state.defenderChainCount > state.attackerChainCount) {
         showCpuNotice("TAKES PUCK", "info");
         addLog("CPU ends the defense chain because it already leads the exchange; no draw is required.");
@@ -4543,6 +5230,12 @@
         showCpuNotice("ENDS CHAIN", "info");
         addLog("CPU ends the attack chain because there are no legal continuation cards; drawing is only used before a live chain begins.");
         endComboByChoice("cpu");
+        return true;
+      }
+
+      if (cpuShouldIcePuck(legal)) {
+        showCpuNotice("ICING", "info");
+        icePuck("cpu");
         return true;
       }
 
@@ -4725,6 +5418,7 @@
 
       const humanInteractionBlocked = state.cpuBusy;
       const isHumanTurn = owner === "human" && !humanInteractionBlocked && (state.faceoffPending || state.currentTurn === "human");
+      const humanSpecialSelectionIndex = owner === "human" && humanMoveRequiresSubmitConfirmation() ? state.humanSpecialSelectionIndex : null;
       const pendingMomentumAction = owner === "human" && state.currentTurn === "human" && !state.faceoffPending && !state.shotPending
         ? getPendingMomentumAction()
         : null;
@@ -4751,18 +5445,32 @@
           if (isComboTurn && isLegal) {
             btn.classList.add("combo-legal");
           }
-          if (isLegal) {
+          if (isLegal && !humanMoveRequiresSubmitConfirmation()) {
             btn.classList.add("draggable-card");
+          }
+          if (i === humanSpecialSelectionIndex) {
+            btn.classList.add("special-selected");
           }
           btn.disabled = !isHumanTurn || !isLegal;
           if (state.faceoffPending) {
-            btn.title = isLegal ? "Choose this card for the faceoff" : "Choose a faceoff card";
+            const faceoffName = getFaceoffUiLabel().toLowerCase();
+            btn.title = isLegal
+              ? (i === humanSpecialSelectionIndex ? `Selected for the ${faceoffName}. Press Submit to confirm.` : `Select this card for the ${faceoffName}.`)
+              : "Choose a faceoff card";
           } else if (pendingMomentumAction === "burn") {
             btn.title = isLegal ? "Burn this card out of hand" : "Choose a Burn card";
           } else if (pendingMomentumAction === "cycle") {
             btn.title = isLegal ? "Cycle out this card and draw 1" : "Choose a Cycle card";
           } else if (state.shotPending) {
-            btn.title = isLegal ? "Play this save card" : "Not legal in the current save chain";
+            btn.title = isLegal
+              ? (i === humanSpecialSelectionIndex
+                ? `Selected ${isReboundSavePhase(state.shotPending) ? "rebound save" : "save"}. Press Submit to confirm.`
+                : (isReboundSavePhase(state.shotPending) ? "Select this rebound save" : "Select this save card"))
+              : (isReboundSavePhase(state.shotPending) ? "Not legal for the rebound save" : "Not legal in the current save chain");
+          } else if (state.stabilizePending) {
+            btn.title = isLegal
+              ? (i === humanSpecialSelectionIndex ? "Selected for Stabilize. Press Submit to confirm." : "Select this card for Stabilize.")
+              : "Not legal for Stabilize";
           } else {
             btn.title = isHumanTurn
               ? (isLegal ? (isComboTurn ? "Continue the chain" : "Play this card") : "Not legal on the current chain")
@@ -4870,25 +5578,36 @@
       const shot = state.lastShot;
       const responseText = shot.saveCards.length > 0 ? shot.saveCards.map(cardToText).join(" -> ") : "No completed save response";
       const shooterText = shot.shotKind === "powerShot"
-        ? `${lowerPlayerName(shot.attackerPlayer)} used Power Shot from ${zoneLabel(shot.shotZoneIndex)} (quality ${shot.shotValue}${shot.powerHandSize ? `, hand ${shot.powerHandSize}` : ""}).`
+        ? `${lowerPlayerName(shot.attackerPlayer)} used Force Shot from ${zoneLabel(shot.shotZoneIndex)} (quality ${shot.shotValue}${shot.powerHandSize ? `, hand ${shot.powerHandSize}` : ""}).`
         : `${lowerPlayerName(shot.attackerPlayer)} played ${cardToText(shot.shotCard)} from ${zoneLabel(shot.shotZoneIndex)} (quality ${shot.shotValue}).`;
+      const outcomeText = shot.outcome === "save"
+        ? "Save / frozen puck"
+        : shot.outcome === "recovery"
+          ? `Defensive recovery for ${lowerPlayerName(shot.defenderPlayer)}`
+          : `Goal for ${lowerPlayerName(shot.attackerPlayer)}`;
       panel.innerHTML = [
         `<div class="last-shot-row"><strong>Shooter</strong>${shooterText}</div>`,
         `<div class="last-shot-row"><strong>Defender</strong>${lowerPlayerName(shot.defenderPlayer)} responded with ${responseText}.</div>`,
-        `<div class="last-shot-row"><strong>Outcome</strong>${shot.outcome === "save" ? "Save / frozen puck" : `Goal for ${lowerPlayerName(shot.attackerPlayer)}`}</div>`
+        `<div class="last-shot-row"><strong>Outcome</strong>${outcomeText}</div>`
       ].join("");
     }
 
     function render() {
-      const faceoffUiLabel = state.faceoffPending && isLoosePuckFaceoff() ? "Puck Battle" : "Faceoff";
+      const faceoffUiLabel = state.faceoffPending ? getFaceoffUiLabel() : "Faceoff";
+      const shotPhaseLabel = state.shotPending
+        ? (isReboundSavePhase(state.shotPending) ? "rebound save" : "save chain")
+        : "";
+      const puckBattleActive = state.faceoffPending && isLoosePuckFaceoff();
       document.getElementById("attackerLabel").textContent = lowerPlayerName(state.attacker);
       document.getElementById("defenderLabel").textContent = lowerPlayerName(state.defender);
       document.getElementById("turnLabel").textContent = state.gameOver
         ? "Final"
         : state.faceoffPending
         ? faceoffUiLabel
+        : state.stabilizePending
+          ? `${lowerPlayerName(state.currentTurn)} (stabilize)`
         : state.shotPending
-          ? `${lowerPlayerName(state.currentTurn)} (save chain)`
+          ? `${lowerPlayerName(state.currentTurn)} (${shotPhaseLabel})`
           : `${lowerPlayerName(state.currentTurn)} (${state.roleOfCurrentTurn === "attacker" ? "attacking" : "defending"})`;
       document.getElementById("deckCountLabel").textContent = String(state.deck.length);
       document.getElementById("scoreLabel").textContent = `(${state.humanHand.length}) Human ${state.humanScore} - ${state.cpuScore} CPU (${state.cpuHand.length})`;
@@ -4896,7 +5615,7 @@
       document.getElementById("comboLabel").textContent = state.faceoffPending
         ? `${faceoffUiLabel} pending`
         : state.shotPending
-          ? `Save ${state.shotPending.savedCount}/${state.shotPending.requiredLength}`
+          ? `${isReboundSavePhase(state.shotPending) ? "Rebound Save" : "Save"} ${state.shotPending.savedCount}/${getShotCurrentRequiredLength(state.shotPending)}`
           : `Attack ${state.attackerChainCount} | Defense ${state.defenderChainCount}`;
       document.getElementById("showCpuCardsCheckbox").checked = state.showCpuCards;
       renderLegend();
@@ -4905,10 +5624,11 @@
 
       const activeCardLabel = document.getElementById("activeCardLabel");
       const activeCardMiddle = document.getElementById("activeCardMiddle");
+      const zoneTrack = document.getElementById("zoneTrack");
       if (state.faceoffPending) {
         activeCardLabel.textContent = faceoffUiLabel;
       } else if (state.shotPending) {
-        activeCardLabel.textContent = "Save Must Match";
+        activeCardLabel.textContent = isReboundSavePhase(state.shotPending) ? "Rebound Save Must Match" : "Save Must Match";
       } else {
         activeCardLabel.textContent = "Active Card";
       }
@@ -4927,19 +5647,54 @@
 
       const comboHint = document.getElementById("comboHint");
       const humanPendingCount = getHumanPendingPlayCount();
+      const humanHasSpecialSelection = state.currentTurn === "human" && hasHumanSpecialSelection();
+      const selectedHumanCard = humanHasSpecialSelection ? state.humanHand[state.humanSpecialSelectionIndex] : null;
+      const humanShotLegalCount = state.shotPending && state.currentTurn === "human" ? getLegalCardsForTurn("human").length : 0;
+      activeMiddle.classList.toggle("puck-battle", puckBattleActive);
+      zoneTrack.classList.toggle("puck-battle", puckBattleActive);
       if (state.pendingBurnSelection) {
         comboHint.textContent = "Burn is active. Choose exactly 1 Human card to discard out of hand.";
       } else if (state.pendingCycleSelection) {
         comboHint.textContent = "Cycle is active. Choose exactly 1 Human card to discard and redraw.";
+      } else if (state.stabilizePending && state.currentTurn === "human") {
+        comboHint.textContent = selectedHumanCard
+          ? `Human selected ${cardToText(selectedHumanCard)} for Stabilize. Press Submit to confirm, or Undo to clear it.`
+          : "Human gets 1 Stabilize attempt: choose 1 legal card and press Submit, or draw 1 if none.";
+      } else if (state.stabilizePending) {
+        comboHint.textContent = `${lowerPlayerName(state.currentTurn)} gets 1 Stabilize attempt to deny the turnover.`;
       } else if (state.currentTurn === "human" && humanPendingCount > 0 && !state.faceoffPending && !state.shotPending) {
         const suffix = humanPendingCount === 1 ? "card" : "cards";
         comboHint.textContent = canStartOrContinueCombo("human", state.activeCard)
           ? `Human has ${humanPendingCount} unsubmitted ${suffix}. Play more, Undo, or Submit.`
           : `Human has ${humanPendingCount} unsubmitted ${suffix}. Undo or Submit the turn.`;
       } else if (state.faceoffPending) {
-        comboHint.textContent = "Choose one card for the faceoff. RPS suit rules decide first.";
+        if (isIcingFaceoff()) {
+          if (state.icingFaceoffPlayer === "cpu" && state.icingFaceoffLeadCard) {
+            comboHint.textContent = selectedHumanCard
+              ? `CPU revealed ${cardToText(state.icingFaceoffLeadCard)}. Human selected ${cardToText(selectedHumanCard)} for the Icing Faceoff response. Press Submit to confirm, or Undo to clear it.`
+              : `CPU revealed ${cardToText(state.icingFaceoffLeadCard)} for the Icing Faceoff. Choose 1 response card and press Submit.`;
+          } else {
+            comboHint.textContent = selectedHumanCard
+              ? `Human selected ${cardToText(selectedHumanCard)} to reveal first for the Icing Faceoff. Press Submit to confirm, or Undo to clear it.`
+              : "Human must reveal first for the Icing Faceoff. Choose 1 card and press Submit; CPU will answer after seeing it.";
+          }
+        } else {
+          comboHint.textContent = selectedHumanCard
+            ? `${faceoffUiLabel} selected: ${cardToText(selectedHumanCard)}. Press Submit to confirm, or Undo to clear it.`
+            : `Choose 1 card for the ${faceoffUiLabel.toLowerCase()} and press Submit. RPS suit rules decide first.`;
+        }
       } else if (state.shotPending) {
-        comboHint.textContent = `Human must complete a ${state.shotPending.requiredLength}-card save chain or press No Save.`;
+        comboHint.textContent = state.currentTurn !== "human"
+          ? `${lowerPlayerName(state.currentTurn)} is resolving the ${shotPhaseLabel}.`
+          : selectedHumanCard
+            ? `Human selected ${cardToText(selectedHumanCard)} for the ${isReboundSavePhase(state.shotPending) ? "rebound save" : "save chain"}. Press Submit to confirm, or Undo to clear it.`
+          : isReboundSavePhase(state.shotPending)
+            ? (humanShotLegalCount > 0
+              ? `Human must play 1 legal rebound save. If its value is below ${state.shotPending.reboundShotValue}, another rebound occurs. Press Concede to allow the goal.`
+              : "Human has no legal rebound save in hand. Press Desperation to reveal 1 top-deck save card.")
+            : `Human must build a ${state.shotPending.requiredLength}-card save chain. Press End Save to resolve freeze, rebound, or goal from the current save count.`;
+      } else if (state.currentTurn === "human" && canPlayerIcePuck("human")) {
+        comboHint.textContent = "Human is stuck in the defensive zone. Draw normally, or use Ice Puck to reset both hands and force an Icing Faceoff.";
       } else if (state.currentTurn === "human" && canPlayerDumpAndChase("human")) {
         comboHint.textContent = "Human is stuck on the opponent's side. Draw normally, or use Dump Hand to send the puck deep.";
       } else if (currentTurnCanPass() && canStartOrContinueCombo(state.currentTurn, state.activeCard)) {
@@ -5024,6 +5779,7 @@
       const cycleMomentumBtn = document.getElementById("cycleMomentumBtn");
       const burnMomentumBtn = document.getElementById("burnMomentumBtn");
       const powerShotBtn = document.getElementById("powerShotBtn");
+      const icePuckBtn = document.getElementById("icePuckBtn");
       const dumpChaseBtn = document.getElementById("dumpChaseBtn");
       cannotPlayBtn.className = `deck-draw-btn${state.shotPending ? " no-save" : ""}`;
       deckDrawTitle.textContent = state.shotPending ? "Goalie" : "Deck";
@@ -5041,17 +5797,26 @@
       const humanCanCycle = canHumanAct && !hasHumanPendingTurn() && canPlayerUseCycle("human");
       const humanCanBurn = canHumanAct && !hasHumanPendingTurn() && canPlayerUseBurn("human");
       const humanCanPowerShot = canHumanAct && !hasHumanPendingTurn() && canPlayerUsePowerShot("human");
+      const humanCanIce = canHumanAct && !hasHumanPendingTurn() && !momentumSelectionActive && canPlayerIcePuck("human");
       const humanCanDump = canHumanAct && !hasHumanPendingTurn() && canPlayerDumpAndChase("human");
       const showCycleMomentumBtn = FEATURES.momentumSystem && (cycleSelectionActive || humanCanCycle);
       const showBurnMomentumBtn = FEATURES.momentumSystem && (burnSelectionActive || humanCanBurn);
       const showPowerShotBtn = FEATURES.momentumSystem && humanCanPowerShot;
+      const showIcePuckBtn = humanCanIce;
       const showDumpChaseBtn = FEATURES.momentumSystem && humanCanDump;
+      const shotActionText = !state.shotPending
+        ? "Draw"
+        : isReboundSavePhase(state.shotPending)
+          ? (state.currentTurn === "human" && humanShotLegalCount === 0 ? "Desperation" : "Concede")
+          : "End Save";
+      const humanSpecialSelectionMode = canHumanAct ? getHumanSpecialSelectionMode() : null;
+      const humanHasSpecialPendingSelection = canHumanAct && humanHasSpecialSelection;
 
       if (humanMomentumActions) {
-        humanMomentumActions.hidden = !showCycleMomentumBtn && !showBurnMomentumBtn && !showPowerShotBtn && !showDumpChaseBtn;
+        humanMomentumActions.hidden = !showCycleMomentumBtn && !showBurnMomentumBtn && !showPowerShotBtn && !showIcePuckBtn && !showDumpChaseBtn;
       }
 
-      cannotPlayBtn.disabled = state.faceoffPending || !canHumanAct || momentumSelectionActive || (!state.shotPending && (humanCanPass || legal.length > 0));
+      cannotPlayBtn.disabled = state.faceoffPending || !canHumanAct || momentumSelectionActive || humanHasSpecialPendingSelection || (!state.shotPending && (humanCanPass || legal.length > 0));
       cannotPlayBtn.title = state.faceoffPending
         ? "Choose a faceoff card"
         : !canHumanAct
@@ -5061,14 +5826,22 @@
         : cycleSelectionActive
           ? "Choose a Cycle card or cancel Cycle"
         : state.shotPending
-          ? "Concede the goal"
+          ? (isReboundSavePhase(state.shotPending)
+            ? (state.currentTurn === "human" && humanShotLegalCount === 0
+              ? "Reveal 1 top-deck desperation save card"
+              : "Allow the rebound to become a goal")
+            : "Stop the current save chain and resolve the outcome")
         : humanCanPass
           ? "Use End Chain to resolve the current exchange"
         : legal.length > 0
           ? "You have legal cards"
+          : humanCanIce
+            ? "Draw and trigger cannot-play rule, or use Ice Puck to force an Icing Faceoff"
           : humanCanDump
             ? "Draw and trigger cannot-play rule, or use Dump Hand to send the puck deep"
             : "Draw and trigger cannot-play rule";
+
+      deckDrawAction.textContent = shotActionText;
 
       doneComboBtn.disabled = state.faceoffPending || state.shotPending || !humanCanPass || humanPendingCount > 0;
       doneComboBtn.title = state.faceoffPending
@@ -5084,13 +5857,35 @@
               : "End the defense chain and resolve the exchange";
 
       if (undoTurnBtn) {
-        undoTurnBtn.disabled = state.faceoffPending || state.shotPending || !canHumanAct || humanPendingCount === 0;
-        undoTurnBtn.title = humanPendingCount > 0 ? "Undo the last unsubmitted human play" : "No unsubmitted human play to undo";
+        undoTurnBtn.disabled = humanHasSpecialPendingSelection ? false : state.faceoffPending || state.shotPending || state.stabilizePending || !canHumanAct || humanPendingCount === 0;
+        undoTurnBtn.title = humanHasSpecialPendingSelection
+          ? "Clear the selected card before submitting"
+          : humanPendingCount > 0
+            ? "Undo the last unsubmitted human play"
+            : humanMoveRequiresSubmitConfirmation()
+              ? "Select a card first"
+              : "No unsubmitted human play to undo";
       }
 
       if (submitTurnBtn) {
-        submitTurnBtn.disabled = state.faceoffPending || state.shotPending || !canHumanAct || humanPendingCount === 0;
-        submitTurnBtn.title = humanPendingCount > 0 ? "Commit the pending human plays and continue the game" : "Play at least one card before submitting";
+        submitTurnBtn.disabled = humanHasSpecialPendingSelection ? false : state.faceoffPending || state.shotPending || state.stabilizePending || !canHumanAct || humanPendingCount === 0;
+        submitTurnBtn.title = humanHasSpecialPendingSelection
+          ? (humanSpecialSelectionMode === "puckBattle"
+            ? "Commit the selected Puck Battle card"
+            : humanSpecialSelectionMode === "icingFaceoff"
+              ? "Commit the selected Icing Faceoff card"
+            : humanSpecialSelectionMode === "faceoff"
+              ? "Commit the selected faceoff card"
+              : humanSpecialSelectionMode === "reboundSave"
+                ? "Commit the selected rebound save"
+                : humanSpecialSelectionMode === "save"
+                  ? "Commit the selected save card"
+                  : "Commit the selected Stabilize card")
+          : humanPendingCount > 0
+            ? "Commit the pending human plays and continue the game"
+            : humanMoveRequiresSubmitConfirmation()
+              ? "Select a card first"
+              : "Play at least one card before submitting";
       }
 
       if (cycleMomentumBtn) {
@@ -5117,8 +5912,16 @@
         powerShotBtn.disabled = !FEATURES.momentumSystem || state.faceoffPending || state.shotPending || hasHumanPendingTurn() || momentumSelectionActive || !humanCanPowerShot;
         powerShotBtn.hidden = !showPowerShotBtn;
         powerShotBtn.title = humanCanPowerShot
-          ? "Spend 3 Momentum to take an immediate Power Shot. Shot quality equals cards in hand"
-          : "Power Shot is only available to the Human attacker at the start of the turn in a shot zone with 3 Momentum";
+          ? "Spend 3 Momentum to take an immediate Force Shot. Shot quality equals cards in hand"
+          : "Force Shot is only available to the Human attacker at the start of the turn in a shot zone with 3 Momentum";
+      }
+
+      if (icePuckBtn) {
+        icePuckBtn.disabled = momentumSelectionActive || !humanCanIce;
+        icePuckBtn.hidden = !showIcePuckBtn;
+        icePuckBtn.title = humanCanIce
+          ? "Reset all Momentum, refill both hands, and force an Icing Faceoff in your defensive zone"
+          : "Icing is only available to a stuck attacker in their own defensive zone";
       }
 
       if (dumpChaseBtn) {
@@ -5150,7 +5953,7 @@
       }
 
       if (state.shotPending) {
-        finishShotAsGoal();
+        handleHumanShotNoSave();
         render();
         runCpuAuto();
         render();
@@ -5226,12 +6029,10 @@
       state.lastShot = null;
       state.recentPlayedCards = [];
       state.cpuNotice = null;
-      state.faceoffPending = false;
-      state.faceoffMode = "standard";
-      state.faceoffReturnZone = null;
-      state.loosePuckOriginAttacker = null;
+      clearFaceoffState();
       state.pendingBurnSelection = false;
       state.pendingCycleSelection = false;
+      state.stabilizePending = null;
       state.logMessages = [];
       state.humanMomentum = 0;
       state.cpuMomentum = 0;
@@ -5312,6 +6113,16 @@
 
       document.getElementById("dumpChaseBtn").addEventListener("click", () => {
         if (!dumpAndChase("human")) {
+          render();
+          return;
+        }
+        render();
+        runCpuAuto();
+        render();
+      });
+
+      document.getElementById("icePuckBtn").addEventListener("click", () => {
+        if (!icePuck("human")) {
           render();
           return;
         }
