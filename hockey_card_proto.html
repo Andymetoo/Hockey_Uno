@@ -871,6 +871,16 @@
       background: #fff8d8;
     }
 
+    .play-by-play-banner {
+      width: min(100%, 520px);
+      max-width: 520px;
+      min-height: 38px;
+      padding: 8px 14px;
+      text-align: center;
+      font-size: 0.92rem;
+      box-shadow: 0 10px 18px rgba(28, 36, 48, 0.08);
+    }
+
     .cards {
       display: flex;
       flex-wrap: wrap;
@@ -1340,6 +1350,12 @@
         font-size: 0.72rem;
       }
 
+      .play-by-play-banner {
+        min-height: 34px;
+        padding: 7px 10px;
+        font-size: 0.82rem;
+      }
+
       :root {
         /* Phone card-size overrides. If mobile card size is not changing, edit these values. */
         --play-card-width: 45px;
@@ -1449,6 +1465,7 @@
             <div id="cpuMomentumDots" class="momentum-side cpu" aria-label="CPU momentum"></div>
           </div>
           <div class="zone-track" id="zoneTrack"></div>
+          <div id="playByPlayBanner" class="event-banner play-by-play-banner contain">Opening faceoff.</div>
         </div>
       </div>
       <div class="panel hand-panel" id="humanPanel">
@@ -1588,6 +1605,8 @@
       icingFaceoffLeadCard: null,
       eventText: "",
       eventType: "contain",
+      playByPlayText: "Opening faceoff.",
+      playByPlayType: "contain",
       lastShot: null,
       recentPlayedCards: [],
       cpuNotice: null,
@@ -1654,6 +1673,11 @@
     function setEvent(text, type = "contain") {
       state.eventText = text;
       state.eventType = type;
+    }
+
+    function setPlayByPlay(text, type = "contain") {
+      state.playByPlayText = text;
+      state.playByPlayType = type;
     }
 
     function clearDeckEvent() {
@@ -1756,6 +1780,9 @@
       if (reason) {
         addLog(reason);
       }
+      if (state.playByPlayType !== "goal") {
+        setPlayByPlay(`${lowerPlayerName(winner)} wins!`, "goal");
+      }
       setEvent(`Final: ${lowerPlayerName(winner)} wins`, "goal");
     }
 
@@ -1800,6 +1827,7 @@
       const nextLabel = getPeriodLabel();
       addLog(isSuddenDeathOvertime() ? `${nextLabel} begins at ${formatGameClock()}. Next goal wins.` : `${nextLabel} begins at ${formatGameClock()}.`);
       startFaceoff(CENTER_ICE, `${nextLabel} begins. Center-ice faceoff.`, { refillConsumesClock: false });
+      setPlayByPlay(`${nextLabel} begins. Faceoff at center ice.`, "period");
       return true;
     }
 
@@ -1830,11 +1858,13 @@
     function handleGoalAfterScore(attackerPlayer) {
       if (isSuddenDeathOvertime()) {
         addLog(`${getPeriodLabel()} ends on the winning goal.`);
+        setPlayByPlay(`${lowerPlayerName(attackerPlayer)} scores the winner!`, "goal");
         endGame(attackerPlayer, `${lowerPlayerName(attackerPlayer)} wins in ${getPeriodLabel()} ${state.humanScore}-${state.cpuScore}.`);
         return;
       }
 
       startFaceoff(CENTER_ICE, "Goal scored. Center-ice faceoff.");
+      setPlayByPlay(`${lowerPlayerName(attackerPlayer)} scores! Center-ice faceoff.`, "goal");
     }
 
     function buildDebugDumpText() {
@@ -2407,6 +2437,7 @@
       }
       showDeckEvent("DUMP", "turnover", 1100);
       resolveExchange(state.defender, `${lowerPlayerName(state.defender)} wins the exchange after ${lowerPlayerName(player)} dumps the puck deep and chases. Turnover.`);
+      setPlayByPlay(`${lowerPlayerName(player)} dumps the puck deep. Turnover.`, "turnover");
       return true;
     }
 
@@ -2427,6 +2458,8 @@
       if (player === "cpu") {
         revealCpuIcingFaceoffLeadCard();
       }
+
+      setPlayByPlay(`${lowerPlayerName(player)} ices the puck. Icing faceoff.`, "turnover");
 
       return true;
     }
@@ -2857,6 +2890,34 @@
       return ZONES[zoneIndex] || "Unknown Zone";
     }
 
+    function getPlayByPlayZoneText(player, zoneIndex = state.zoneIndex) {
+      if (isCenterIce(zoneIndex)) {
+        return "center ice";
+      }
+
+      if (isCloseOffensiveZone(player, zoneIndex)) {
+        return "close range";
+      }
+
+      if (isFarOffensiveZone(player, zoneIndex)) {
+        return "the offensive zone";
+      }
+
+      const zoneBand = getMomentumZoneBand(player, zoneIndex);
+      if (zoneBand === "neutral") {
+        return "the neutral zone";
+      }
+      if (zoneBand === "defensive") {
+        return "the defensive zone";
+      }
+
+      if (zoneIndex === getHomeGoalZoneIndex(player)) {
+        return "their goal zone";
+      }
+
+      return zoneLabel(zoneIndex).toLowerCase();
+    }
+
     function getFaceoffPairCenter(zoneIndex) {
       if (zoneIndex <= 1) {
         return 0.5;
@@ -2942,6 +3003,7 @@
       showDeckEvent("SAVE", "contain", 1200);
       clearShotPending();
       startFaceoff(shot.shotZoneIndex, "Save/frozen puck.");
+      setPlayByPlay(`${lowerPlayerName(shot.defenderPlayer)} makes the${isReboundSavePhase(shot) ? " rebound" : ""} save. Faceoff.`, "contain");
     }
 
     function finishShotAsGoal(reason = "") {
@@ -2985,6 +3047,7 @@
       }
       setEvent("Defensive recovery", "turnover");
       showDeckEvent("RECOVERY", "turnover", 1200);
+      setPlayByPlay(`${lowerPlayerName(shot.defenderPlayer)} recovers the puck.`, "turnover");
 
       clearShotPending();
       state.attacker = shot.defenderPlayer;
@@ -3063,6 +3126,7 @@
 
       setEvent("Rebound", "shot");
       showDeckEvent("REBOUND", "shot", 1100);
+      setPlayByPlay("Rebound!", "shot");
 
       const reboundCard = revealTopDeckCard();
       if (resolvePendingPeriodBreak()) {
@@ -3732,6 +3796,7 @@
       addLog(`${lowerPlayerName(pendingAttacker)} gets one Stabilize attempt: play 1 legal card, or draw 1 if none.`);
       setEvent("Stabilize attempt", "contain");
       showDeckEvent("STABILIZE", "contain", 1100);
+      setPlayByPlay(`${lowerPlayerName(pendingAttacker)} gets a chance to stabilize.`, "contain");
       logTurnDiagnostics(state.currentTurn, "Stabilize attempt.");
     }
 
@@ -3752,6 +3817,7 @@
 
       setEvent("Turnover", "turnover");
       showDeckEvent("TURNOVER", "turnover", 1100);
+      setPlayByPlay(`${lowerPlayerName(turnoverWinner)} forces a turnover.`, "turnover");
       startAttackerTurn();
       logTurnDiagnostics(state.currentTurn);
     }
@@ -3767,6 +3833,7 @@
       addLog(`${lowerPlayerName(player)} keeps possession in ${zoneLabel(state.zoneIndex)}. No zone advance this exchange.`);
       setEvent("Stabilized / No Turnover", "contain");
       showDeckEvent("STABLE", "contain", 1100);
+      setPlayByPlay(`${lowerPlayerName(player)} stabilizes and keeps the puck.`, "contain");
       awardMomentumForSuccessfulStabilize(player);
       startAttackerTurn();
       logTurnDiagnostics(state.currentTurn, "Stabilized.");
@@ -3822,6 +3889,9 @@
         awardMomentumForExchangeWin(winner, exchangeMargin);
 
         setEvent(attackerAdvances ? "Exchange Win (+1 Zone)" : "Exchange Hold / No Advance", attackerAdvances ? "shot" : "contain");
+        setPlayByPlay(attackerAdvances
+          ? `${lowerPlayerName(state.attacker)} advances to ${getPlayByPlayZoneText(state.attacker, state.zoneIndex)}.`
+          : `${lowerPlayerName(state.attacker)} keeps the puck in ${getPlayByPlayZoneText(state.attacker, state.zoneIndex)}.`, attackerAdvances ? "shot" : "contain");
         startAttackerTurn();
         logTurnDiagnostics(state.currentTurn);
         return;
@@ -4326,6 +4396,8 @@
         addLog(reason);
       }
 
+      setPlayByPlay(icingFaceoff ? "Icing faceoff." : loosePuckFaceoff ? "Puck battle." : "Faceoff.", loosePuckFaceoff ? "puck" : icingFaceoff ? "turnover" : "contain");
+
       if (icingFaceoff) {
         addLog(`${faceoffLabel} at ${zoneLabel(state.zoneIndex)}. ${state.icingFaceoffPlayer === "cpu" ? "CPU reveals first." : "Human reveals first."}`);
       } else {
@@ -4456,6 +4528,7 @@
         addLog(`${lowerPlayerName(winner)} used the last card to win the Loose Puck and draws a fresh hand.`);
       }
       setEvent(`${lowerPlayerName(winner)} wins the ${faceoffMode === "standard" ? "faceoff" : faceoffLabel}`, "turnover");
+      setPlayByPlay(`${lowerPlayerName(winner)} wins the ${faceoffMode === "standard" ? "faceoff" : faceoffLabel.toLowerCase()}.`, loosePuckFaceoff ? "puck" : "turnover");
       logTurnDiagnostics(state.currentTurn);
     }
 
@@ -4620,6 +4693,11 @@
       if (closeShot && !hasShotValueOverride) {
         addLog(`Close-range bonus applies: ${shotCard.value} becomes ${shotValue}.`);
       }
+      setPlayByPlay(hasShotValueOverride
+        ? `${lowerPlayerName(attackerPlayer)} unleashes a Force Shot!`
+        : closeShot
+          ? `${lowerPlayerName(attackerPlayer)} shoots from close range!`
+          : `${lowerPlayerName(attackerPlayer)} takes a shot!`, "shot");
       setEvent(`Shot quality ${shotValue}`, "shot");
       showDeckEvent("SHOT", "shot", 1000);
 
@@ -5650,7 +5728,6 @@
       const humanHasSpecialSelection = state.currentTurn === "human" && hasHumanSpecialSelection();
       const selectedHumanCard = humanHasSpecialSelection ? state.humanHand[state.humanSpecialSelectionIndex] : null;
       const humanShotLegalCount = state.shotPending && state.currentTurn === "human" ? getLegalCardsForTurn("human").length : 0;
-      activeMiddle.classList.toggle("puck-battle", puckBattleActive);
       zoneTrack.classList.toggle("puck-battle", puckBattleActive);
       if (state.pendingBurnSelection) {
         comboHint.textContent = "Burn is active. Choose exactly 1 Human card to discard out of hand.";
@@ -5723,6 +5800,12 @@
       eventBanner.className = `event-banner ${state.eventType || "contain"}`;
       eventBanner.textContent = state.eventText || "";
 
+      const playByPlayBanner = document.getElementById("playByPlayBanner");
+      if (playByPlayBanner) {
+        playByPlayBanner.className = `event-banner play-by-play-banner ${state.playByPlayType || "contain"}`;
+        playByPlayBanner.textContent = state.playByPlayText || "Opening faceoff.";
+      }
+
       const deckEventToast = document.getElementById("deckEventToast");
       if (deckEventToast) {
         if (state.deckEvent?.text) {
@@ -5745,6 +5828,7 @@
       const humanMomentumActions = document.getElementById("humanMomentumActions");
       humanPanel.classList.toggle("possession", state.attacker === "human");
       cpuPanel.classList.toggle("possession", state.attacker === "cpu");
+      activeMiddle.classList.toggle("puck-battle", puckBattleActive);
       activeMiddle.classList.toggle("possession", true);
 
       if (momentumTracker) {
@@ -6033,6 +6117,8 @@
       state.pendingBurnSelection = false;
       state.pendingCycleSelection = false;
       state.stabilizePending = null;
+      state.playByPlayText = "Opening faceoff.";
+      state.playByPlayType = "contain";
       state.logMessages = [];
       state.humanMomentum = 0;
       state.cpuMomentum = 0;
