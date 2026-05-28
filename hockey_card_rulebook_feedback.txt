@@ -159,32 +159,23 @@ Icing Faceoff
 
 - The player who iced must reveal and commit a faceoff card first.
 - The opponent then chooses a faceoff card after seeing that reveal.
-- The same normal faceoff suit/value rules still decide the winner.
+- The same normal faceoff rule still decides the winner: higher card wins, and exact ties are resolved randomly.
 - The winner becomes the attacker, the winner's card becomes the active card, and the puck goes to the normal resulting faceoff zone.
-
-Faceoff suit cycle
-
-The suit priority uses a clockwise cycle based on the active suit set.
-
-Default 4-suit cycle:
-
-Grit > Finesse > Pace > Power > Grit
 
 Faceoff resolution rules
 
-- If both cards share a suit, the higher value wins.
-- If an exact same-suit tie occurs, the winner is chosen randomly.
-- If wild cards are involved in a faceoff, the comparison falls back to value.
-- In odd-suit loops, each suit beats the next half of the cycle clockwise.
-- In 2-suit setups, different suits fall back entirely to value.
-- In even loops larger than 2 suits, a suit beats its immediate clockwise neighbor, while opposite suits fall back to value.
-- Exact fallback ties are resolved randomly.
+- Each side commits 1 faceoff card.
+- Suit does not matter in faceoffs.
+- The higher value wins.
+- Exact value ties are resolved randomly.
+- Wild cards just use their printed value like any other faceoff card.
 
 After the faceoff resolves, normal attack play begins.
 
 Current prototype note
 
-- Any faceoff clears both sides' Momentum.
+- Standard and Icing Faceoffs trim 1 Momentum from each side instead of clearing it.
+- Loose Puck faceoffs / Puck Battles do not trim Momentum.
 - Standard faceoffs refill hands before the faceoff begins.
 - Icing Faceoffs also refill both hands before the faceoff begins, then force the icing side to reveal first.
 - Loose Puck faceoffs do not use that full pre-faceoff refill step; they resolve in the current zone and only the winner may refill afterward if that player spent the last card.
@@ -202,13 +193,13 @@ The attacker starts by playing a legal card.
 
 The attacker may continue the chain as long as legal plays remain.
 
-The Human attacker can stage multiple cards on a normal turn, then choose Submit to commit the turn or Undo to take back the last staged card.
+The Human attacker can stage multiple cards on a normal turn, then confirm the turn with Submit, a Deck tap, or a tap on the staged pile card. Undo still takes back the last staged card.
 
 8.2 Ending the attack phase
 
 The attack phase ends when one of these happens:
 
-- The attacker chooses End Chain or Submit.
+- The attacker chooses End Chain or confirms the staged turn.
 - The attacker has no further legal continuation and the turn resolves.
 - The attacker empties their hand.
 
@@ -222,7 +213,7 @@ The defender tries to answer the attack with legal matching cards.
 - If the defender has already exceeded the attacker's count, the defender may end the chain and take possession.
 - If the defender does not exceed the attacker, the attacker holds the exchange.
 
-The Human defender also uses Undo and Submit on normal turns.
+The Human defender also stages normal turns the same way: continue the chain, Undo, or confirm with Submit, a Deck tap, or a tap on the staged pile card.
 
 9. HOW EXCHANGES ARE WON
 
@@ -272,7 +263,7 @@ Role-based result after an unsuccessful draw
 Prototype-specific note
 
 - In the current prototype flow, drawing is mainly used before a live chain has been established on that turn.
-- Once a Human has already played into a chain, the intended resolution is usually to continue, End Chain, Undo, or Submit rather than draw.
+- Once a Human has already played into a chain, the intended resolution is usually to continue, End Chain, Undo, or confirm with Submit, a Deck tap, or a tap on the staged pile card rather than draw.
 - Hidden or shown action buttons follow the same legality rule: if an option is not currently legal in that state, it is not offered.
 
 Practical order when a player appears stuck
@@ -327,6 +318,8 @@ Each save card must legally continue from the current active card under the same
 Normal save outcomes
 
 - If the defender completes the full chain, the result is a save and frozen puck.
+- If the defender is exactly 1 legal save card short during a normal save chain and has no legal save in hand, the defender gets 1 pity draw from the deck.
+- If that pity draw is legal, it may be used as the final save card.
 - If the defender comes up exactly 1 card short, and the shot required 2 or more save cards, a rebound occurs.
 - If the defender comes up 2 or more cards short, the shot becomes a goal.
 - If the shot required only 1 save card and the defender produces 0, that is a goal, not a rebound.
@@ -343,7 +336,8 @@ Rebound sequence
 Rebound save
 
 - A rebound shot requires exactly 1 legal save card.
-- If the defender has no legal rebound save in hand, the defender may reveal 1 desperation save card from the top of the deck.
+- If the defender has no legal rebound save in hand, the defender gets 1 desperation draw from the top of the deck.
+- If that desperation draw is legal, it may be used as the rebound save.
 - If no legal save card is produced, the result is a goal.
 - If the defender's rebound save value is greater than or equal to the rebound shot value, the puck is frozen.
 - If the defender's rebound save value is lower than the rebound shot value, another rebound occurs.
@@ -356,8 +350,13 @@ Shot-sequence outcomes
 
 Prototype interface note
 
-- Human save chains and Human rebound saves are selected manually and require Submit to confirm.
-- The normal multi-card staging system applies to standard attack/defense turns; shot-sequence saves use their own one-card Submit flow.
+- Human rebound reveals are manual: tap the Deck to reveal and play the rebound card.
+- Human pity draws for normal saves also use the Deck button.
+- Human rebound desperation draws and Human Stabilize draws go into the hand first; if the drawn card is playable, the Human stages it manually.
+- Human faceoffs resolve immediately when the Human plays the card to the pile.
+- Human rebound saves and Human Stabilize plays stage 1 card onto the pile immediately.
+- Those staged rebound saves and Stabilize plays may then be confirmed with Submit, a Deck tap, or a tap on the staged pile card.
+- Normal Human save chains use the same multi-card staging flow as standard attack/defense turns: each played save card leaves the hand immediately, Undo can pull the last one back, and Submit, a Deck tap, or a tap on the pile resolves the staged chain.
 
 13. GOALS AND SCORING
 
@@ -420,14 +419,19 @@ Submit
 - Commits the staged Human plays.
 - If the committed play emptied the hand, the normal empty-hand rules apply.
 - Otherwise, the exchange continues or resolves normally.
+- A Deck tap or a tap on the staged pile card can also confirm those staged Human plays.
 
 End Chain
 
 - Ends a live chain and passes or resolves the exchange.
-- If unsubmitted Human cards are pending, End Chain is blocked until the Human uses Submit or Undo.
+- If staged Human cards are pending, End Chain is blocked until the Human confirms them or uses Undo.
 
-- Full staged play applies only to normal Human attack/defense turns.
-- Faceoffs, save chains, rebound saves, and Stabilize attempts use their own one-card selection flow and still require Submit.
+- Full staged play applies to normal Human attack/defense turns and to normal multi-card save chains.
+- Those staged normal Human turns and staged normal save chains can be confirmed with Submit, a Deck tap, or a tap on the staged pile card.
+- Faceoffs resolve immediately when the Human plays a faceoff card.
+- Rebound saves and Stabilize attempts use their own one-card staging flow on the pile.
+- Those staged rebound saves and Stabilize plays can be confirmed with Submit, a Deck tap, or a tap on the staged pile card.
+- Human rebound reveals are a Deck tap rather than a staged hand-card confirmation.
 
 16.1 MOMENTUM TIMING WINDOWS
 
@@ -438,7 +442,7 @@ Momentum actions are controlled windows, not always-on abilities.
 - They are not available during faceoffs, save chains, defense turns, or Stabilize attempts.
 - They are also not available after the attacker has already committed cards into the current attack chain.
 - Gain 1 Momentum when you cross into a new major zone band (defensive, neutral, offensive).
-- Gain 1 Momentum when you win an exchange by 3 or more cards.
+- Gain 1 Momentum when you win an exchange by 2 or more cards.
 - Gain 1 Momentum when you successfully Stabilize.
 - Lose 1 Momentum when you cannot play and must draw.
 - Lose all Momentum on any faceoff.
@@ -486,7 +490,10 @@ These are important when gathering feedback.
 
 - The game ends by period/overtime flow (3 regulation periods, then sudden-death overtime as needed), not by a target score setting.
 - The CPU plays automatically on its turn.
-- Human faceoffs, Human save chains, Human rebound saves, and Human Stabilize attempts use one-card selection plus Submit rather than the normal staged multi-card flow.
+- Human rebound reveals use a deck tap.
+- Human faceoffs resolve immediately on play.
+- Human rebound saves and Human Stabilize attempts stage 1 card onto the pile and are then confirmed with Submit, a Deck tap, or a tap on the staged pile card.
+- Normal Human save chains use staged multi-card play, with each save card leaving the hand immediately until Undo or final resolution.
 - The rules have been implemented for prototype clarity and testability, not yet for final presentation language.
 
 19. SHORT PLAY SUMMARY
@@ -499,14 +506,15 @@ These are important when gathering feedback.
 6. Compare chain lengths when the exchange ends.
 7. If the defender leads by exactly 1, the attacker gets one Stabilize attempt; if the defender leads by 2 or more, the turnover is immediate.
 8. Attacker advances only on a true edge in card count; with Momentum ON, 0-0 instead triggers a Loose Puck faceoff in place.
-9. A stuck attacker in the defensive zone may choose Icing: clear Momentum, refill both hands, then resolve an Icing Faceoff with the icing side revealing first.
+9. A stuck attacker in the defensive zone may choose Icing: trim 1 Momentum from each side, refill both hands, then resolve an Icing Faceoff with the icing side revealing first.
 10. If the attacker empties the hand in a shot zone, create a shot sequence. Hands do not refill until the shot sequence ends.
 11. Defender must complete the required save chain based on shot value.
-12. Full save chain = frozen puck. Exactly 1 short on a 2+ card save requirement = rebound. Otherwise = goal.
-13. On a rebound, the shooter reveals the top deck card. Legal reveal = immediate rebound shot. Illegal reveal = defensive recovery.
-14. Rebound save needs 1 legal card; if none are in hand, the defender gets 1 desperation reveal from the deck.
-15. Rebound save value greater than or equal to the rebound shot value freezes the puck. Lower value creates another rebound.
-16. Goal usually resets to center ice (except sudden-death overtime). Frozen puck resets to a local faceoff. Defensive recovery gives possession to the defender in their own goal zone.
+12. If a normal save chain is exactly 1 legal save short and the defender has no legal save in hand, the defender gets 1 pity draw.
+13. Full save chain = frozen puck. Exactly 1 short on a 2+ card save requirement = rebound. Otherwise = goal.
+14. On a rebound, the shooter reveals the top deck card. Legal reveal = immediate rebound shot. Illegal reveal = defensive recovery.
+15. Rebound save needs 1 legal card; if none are in hand, the defender gets 1 desperation draw from the deck.
+16. Rebound save value greater than or equal to the rebound shot value freezes the puck. Lower value creates another rebound.
+17. Goal usually resets to center ice (except sudden-death overtime). Frozen puck resets to a local faceoff. Defensive recovery gives possession to the defender in their own goal zone.
 
 20. FEEDBACK QUESTIONS THIS RULESET IS LIKELY TO PROMPT
 

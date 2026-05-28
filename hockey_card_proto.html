@@ -113,6 +113,18 @@
       background: #fffef4;
     }
 
+    .zone-track.human-control {
+      box-shadow: 0 0 0 3px rgba(214, 63, 63, 0.12);
+    }
+
+    .zone-track.cpu-control {
+      box-shadow: 0 0 0 3px rgba(47, 111, 228, 0.12);
+    }
+
+    .zone-track.shot-pressure {
+      box-shadow: 0 0 0 3px rgba(218, 142, 53, 0.14);
+    }
+
     .hands-rink-stack {
       width: min(100%, 520px);
       max-width: 520px;
@@ -254,15 +266,36 @@
     .zone.active {
       color: var(--ink);
       background: #f3f8ff;
+      box-shadow: inset 0 0 0 2px rgba(64, 92, 135, 0.12);
     }
 
     .zone.active.offensive {
       background: #fff7ea;
     }
 
+    .zone.active.human-control {
+      background: linear-gradient(180deg, #fff0f0 0%, #ffe0e0 100%);
+      color: #8a2020;
+    }
+
+    .zone.active.cpu-control {
+      background: linear-gradient(180deg, #eef5ff 0%, #dfeaff 100%);
+      color: #21497a;
+    }
+
+    .zone.active.faceoff-focus {
+      background: linear-gradient(180deg, #fffdf0 0%, #fff2c0 100%);
+      color: #7b5c00;
+    }
+
     .zone-marker {
       font-size: 1.15rem;
       line-height: 1;
+      transition: transform 140ms ease;
+    }
+
+    .zone.active .zone-marker {
+      transform: scale(1.14);
     }
 
     .zone-center-marker {
@@ -506,6 +539,11 @@
       pointer-events: none;
     }
 
+    .active-card-pill.staged-submit {
+      cursor: pointer;
+      box-shadow: 0 14px 24px rgba(28, 36, 48, 0.16), 0 0 0 3px rgba(64, 119, 211, 0.18);
+    }
+
     .active-card-pill.pace,
     .card-btn.pace {
       color: var(--pace);
@@ -704,7 +742,7 @@
       bottom: calc(100% + 10px);
       transform: translate(-50%, 8px) scale(0.96);
       min-width: 98px;
-      max-width: 140px;
+      max-width: 180px;
       padding: 8px 10px;
       border-radius: 10px;
       border: 1px solid #d6dde9;
@@ -716,6 +754,8 @@
       letter-spacing: 0.05em;
       text-transform: uppercase;
       text-align: center;
+      line-height: 1.18;
+      white-space: pre-line;
       opacity: 0;
       pointer-events: none;
       transition: opacity 140ms ease, transform 180ms ease;
@@ -725,6 +765,19 @@
     .deck-event-toast.show {
       opacity: 1;
       transform: translate(-50%, 0) scale(1);
+    }
+
+    .deck-event-toast.quiet {
+      box-shadow: 0 8px 18px rgba(27, 39, 57, 0.12);
+      letter-spacing: 0.04em;
+    }
+
+    .deck-event-toast.steady {
+      box-shadow: 0 12px 24px rgba(27, 39, 57, 0.16);
+    }
+
+    .deck-event-toast.show.hero {
+      animation: deckToastHeroPop 260ms cubic-bezier(0.2, 0.85, 0.24, 1) both;
     }
 
     .deck-event-toast.contain {
@@ -790,6 +843,79 @@
       margin: 0 auto 4px;
     }
 
+    .state-readout {
+      width: min(100%, 360px);
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(108px, 1fr));
+      gap: 6px;
+      margin: 0 auto 4px;
+    }
+
+    .state-readout-chip {
+      border: 1px solid #d8e1ef;
+      border-radius: 10px;
+      padding: 6px 8px;
+      background: rgba(255, 255, 255, 0.96);
+      text-align: left;
+      box-shadow: 0 6px 16px rgba(24, 37, 58, 0.08);
+      min-width: 0;
+    }
+
+    .state-readout-chip .k {
+      display: block;
+      font-size: 0.62rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin: 0 0 3px;
+    }
+
+    .state-readout-chip .v {
+      display: block;
+      font-size: 0.82rem;
+      font-weight: 800;
+      line-height: 1.16;
+      text-align: left;
+      word-break: break-word;
+    }
+
+    .state-readout-chip.contain {
+      border-color: #9bb8df;
+      background: #f4f8ff;
+    }
+
+    .state-readout-chip.shot {
+      border-color: #e1b469;
+      background: #fff7e8;
+    }
+
+    .state-readout-chip.goal {
+      border-color: #cb5252;
+      background: #fff0f0;
+    }
+
+    .state-readout-chip.period {
+      border-color: #8ec3a5;
+      background: #eefbf3;
+    }
+
+    .state-readout-chip.puck {
+      border-color: #d7b11e;
+      background: #fff8d8;
+    }
+
+    .state-readout-chip.human-side {
+      border-color: #7ac39a;
+      background: #edf9f2;
+      color: #1a5a34;
+    }
+
+    .state-readout-chip.cpu-side {
+      border-color: #8fb5e8;
+      background: #eef5ff;
+      color: #21497a;
+    }
+
     .active-status-chip {
       border: 1px solid var(--border);
       border-radius: 8px;
@@ -818,6 +944,83 @@
       text-align: right;
     }
 
+    .score-details {
+      padding: 0;
+      display: block;
+      overflow: hidden;
+    }
+
+    .score-summary {
+      list-style: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 7px 8px;
+    }
+
+    #scoreLabel {
+      white-space: nowrap;
+      font-size: clamp(0.74rem, 2.7vw, 0.9rem);
+      letter-spacing: 0.01em;
+    }
+
+    .score-summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .score-details[open] .score-summary {
+      border-bottom: 1px solid var(--border);
+      background: #f7faff;
+    }
+
+    .goal-log-list {
+      display: grid;
+      gap: 6px;
+      padding: 8px;
+      background: #fbfdff;
+    }
+
+    .goal-log-entry {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 7px 8px;
+      display: grid;
+      gap: 3px;
+      background: #fff;
+    }
+
+    .goal-log-entry.human {
+      border-color: rgba(188, 62, 62, 0.35);
+      background: #fff5f5;
+    }
+
+    .goal-log-entry.cpu {
+      border-color: rgba(51, 92, 177, 0.32);
+      background: #f4f8ff;
+    }
+
+    .goal-log-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 0.82rem;
+      font-weight: 700;
+    }
+
+    .goal-log-meta {
+      font-size: 0.74rem;
+      color: var(--muted);
+      line-height: 1.35;
+    }
+
+    .goal-log-empty {
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+
     @media (max-width: 860px) {
       .active-status-row {
         grid-template-columns: 1fr;
@@ -833,6 +1036,24 @@
       font-size: 0.84rem;
       font-weight: 700;
       color: #243247;
+      transition: box-shadow 180ms ease, transform 180ms ease, opacity 180ms ease, background-color 180ms ease;
+    }
+
+    .event-banner.quiet {
+      min-height: 26px;
+      font-size: 0.76rem;
+      font-weight: 600;
+      opacity: 0.84;
+      box-shadow: none;
+    }
+
+    .event-banner.steady {
+      box-shadow: 0 6px 14px rgba(24, 37, 58, 0.05);
+    }
+
+    .event-banner.hero {
+      box-shadow: 0 12px 24px rgba(24, 37, 58, 0.12);
+      animation: bannerHeroPop 240ms cubic-bezier(0.2, 0.8, 0.24, 1) both;
     }
 
     .event-banner.contain {
@@ -879,6 +1100,42 @@
       text-align: center;
       font-size: 0.92rem;
       box-shadow: 0 10px 18px rgba(28, 36, 48, 0.08);
+    }
+
+    .play-by-play-banner.quiet {
+      opacity: 0.88;
+      box-shadow: 0 6px 14px rgba(28, 36, 48, 0.05);
+    }
+
+    .play-by-play-banner.hero {
+      min-height: 42px;
+      box-shadow: 0 14px 26px rgba(28, 36, 48, 0.14);
+    }
+
+    @keyframes bannerHeroPop {
+      0% {
+        opacity: 0.72;
+        transform: translateY(4px) scale(0.985);
+      }
+      100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    @keyframes deckToastHeroPop {
+      0% {
+        opacity: 0;
+        transform: translate(-50%, 10px) scale(0.92);
+      }
+      75% {
+        opacity: 1;
+        transform: translate(-50%, -1px) scale(1.03);
+      }
+      100% {
+        opacity: 1;
+        transform: translate(-50%, 0) scale(1);
+      }
     }
 
     .cards {
@@ -1120,6 +1377,100 @@
       margin: 0 0 6px;
     }
 
+    .stats-details {
+      margin-top: 10px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #f8fbff;
+      overflow: hidden;
+    }
+
+    .stats-details summary {
+      cursor: pointer;
+      padding: 9px 11px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      user-select: none;
+    }
+
+    .stats-details[open] summary {
+      border-bottom: 1px solid var(--border);
+      background: #eff5ff;
+    }
+
+    .stats-panel-body {
+      display: grid;
+      gap: 12px;
+      padding: 11px;
+    }
+
+    .stats-section {
+      display: grid;
+      gap: 8px;
+    }
+
+    .stats-section-title {
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #53657d;
+    }
+
+    .stats-table-wrap {
+      overflow-x: auto;
+    }
+
+    .stats-table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 420px;
+      font-size: 0.84rem;
+    }
+
+    .stats-table th,
+    .stats-table td {
+      padding: 7px 8px;
+      border-bottom: 1px solid #dbe6f5;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    .stats-table thead th {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #617691;
+      background: #f0f5fc;
+    }
+
+    .stats-table tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    .stats-table td.stat-value {
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+
+    .stats-note {
+      font-size: 0.8rem;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .stats-list {
+      margin: 0;
+      padding-left: 18px;
+      color: #233246;
+      font-size: 0.84rem;
+      line-height: 1.45;
+    }
+
+    .stats-list li + li {
+      margin-top: 4px;
+    }
+
     .hint {
       color: var(--muted);
       font-size: 0.88rem;
@@ -1138,6 +1489,56 @@
     .last-shot-panel {
       display: grid;
       gap: 6px;
+    }
+
+    .match-snapshot {
+      display: grid;
+      gap: 8px;
+      padding: 9px;
+      border: 1px solid #d8e1ef;
+      border-radius: 10px;
+      background: #f8fbff;
+    }
+
+    .match-snapshot-title,
+    .last-shot-subtitle {
+      font-size: 0.68rem;
+      font-weight: 800;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .match-snapshot-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 6px;
+    }
+
+    .match-snapshot-card {
+      border: 1px solid #d8e1ef;
+      border-radius: 9px;
+      padding: 7px 8px;
+      background: #fff;
+    }
+
+    .match-snapshot-card .k {
+      margin: 0 0 3px;
+      font-size: 0.62rem;
+    }
+
+    .match-snapshot-card .v {
+      display: block;
+      font-size: 0.82rem;
+      font-weight: 800;
+      line-height: 1.16;
+      word-break: break-word;
+    }
+
+    .match-snapshot-note {
+      font-size: 0.78rem;
+      color: var(--muted);
+      line-height: 1.35;
     }
 
     .last-shot-panel.empty {
@@ -1356,6 +1757,33 @@
         font-size: 0.82rem;
       }
 
+      .event-banner.quiet {
+        font-size: 0.72rem;
+      }
+
+      .play-by-play-banner.hero {
+        min-height: 38px;
+      }
+
+      .state-readout {
+        width: 100%;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .state-readout-chip,
+      .match-snapshot-card {
+        padding: 6px 7px;
+      }
+
+      .state-readout-chip .v,
+      .match-snapshot-card .v {
+        font-size: 0.78rem;
+      }
+
+      .match-snapshot-grid {
+        gap: 5px;
+      }
+
       :root {
         /* Phone card-size overrides. If mobile card size is not changing, edit these values. */
         --play-card-width: 45px;
@@ -1427,7 +1855,7 @@
             </label>
             <label class="debug-field">
               <span>Decks Per Period</span>
-              <input id="debugDecksPerPeriod" type="number" min="1" max="5" step="1" value="4" />
+              <input id="debugDecksPerPeriod" type="number" min="1" max="5" step="1" value="3" />
             </label>
             <label class="debug-field">
               <span>Cross River Once</span>
@@ -1488,9 +1916,12 @@
           <button id="submitTurnBtn" class="chain-float-btn submit-btn" type="button">Submit</button>
         </div>
         <div class="active-status-row">
-          <div class="active-status-chip"><span class="k">Score</span><span class="v" id="scoreLabel"></span></div>
-          <div class="active-status-chip"><span class="k">Exchange</span><span class="v" id="comboLabel"></span></div>
+          <details class="active-status-chip score-details">
+            <summary class="score-summary"><span class="k"></span><span class="v" id="scoreLabel"></span></summary>
+            <div id="goalLogList" class="goal-log-list"></div>
+          </details>
         </div>
+        <div id="stateReadout" class="state-readout" aria-live="polite"></div>
         <div class="active-card-row">
           <div class="active-card-stack">
             <div id="activeCardLabel" class="label">Active Card</div>
@@ -1524,8 +1955,13 @@
     <section class="panel">
       <h3>Action Log</h3>
       <div id="logFeed" class="log"></div>
+      <details class="stats-details" open>
+        <summary>Game Stats</summary>
+        <div id="statsPanel" class="stats-panel-body"></div>
+      </details>
       <div class="controls">
-        <button id="downloadDebugDumpBtn">Download Debug Dump</button>
+        <button id="downloadDebugDumpBtn">Action Log Debug Dump</button>
+        <button id="downloadStatsDumpBtn">Stats Log Debug Dump</button>
       </div>
     </section>
   </div>
@@ -1557,7 +1993,7 @@
       wildCardCount: 0,
       cpuSpeedPercent: 200,
       singleRiverCrossMode: false,
-      decksPerPeriod: 4
+      decksPerPeriod: 3
     };
     const CPU_SPEED_BASELINE_PERCENT = 100;
     const REGULATION_PERIOD_COUNT = 3;
@@ -1627,6 +2063,8 @@
       gameOver: false,
       gameWinner: null,
       deckEvent: null,
+      goalLog: [],
+      stats: createEmptyMatchStats(),
       logMessages: []
     };
 
@@ -1641,6 +2079,128 @@
     // ---------------------------
     // Utility and setup functions
     // ---------------------------
+
+    function createEmptyZoneCounter() {
+      return {
+        0: 0,
+        1: 0,
+        2: 0,
+        3: 0,
+        4: 0,
+        5: 0
+      };
+    }
+
+    function createEmptyPlayerStats() {
+      return {
+        goals: 0,
+        shotsOnGoal: 0,
+        savesMade: 0,
+        exchangeWins: 0,
+        faceoffsWon: 0,
+        loosePucksWon: 0,
+        dumpsUsed: 0,
+        icingsUsed: 0,
+        burnsUsed: 0,
+        cyclesUsed: 0,
+        forceShotsUsed: 0,
+        stabilizeSuccesses: 0,
+        reboundsCreated: 0,
+        reboundSavesMade: 0,
+        defensiveRecoveries: 0,
+        totalShotValue: 0,
+        highestShotValue: 0,
+        shotValues: [],
+        zonePlays: createEmptyZoneCounter(),
+        shotOrigins: createEmptyZoneCounter()
+      };
+    }
+
+    function createEmptyMatchStats() {
+      return {
+        human: createEmptyPlayerStats(),
+        cpu: createEmptyPlayerStats(),
+        zoneTime: createEmptyZoneCounter(),
+        scoringSummary: []
+      };
+    }
+
+    function getPlayerStats(player) {
+      return player === "human" || player === "cpu" ? state.stats[player] : null;
+    }
+
+    function getNormalizedStatsZoneIndex(zoneIndex = state.zoneIndex) {
+      if (Number.isInteger(zoneIndex) && zoneIndex >= 0 && zoneIndex < ZONES.length) {
+        return zoneIndex;
+      }
+      if (zoneIndex === 0.5) {
+        return 0;
+      }
+      if (zoneIndex === CENTER_ICE) {
+        return 2;
+      }
+      if (zoneIndex === 4.5) {
+        return 5;
+      }
+      return null;
+    }
+
+    function incrementZoneCounter(counter, zoneIndex = state.zoneIndex) {
+      const normalizedZoneIndex = getNormalizedStatsZoneIndex(zoneIndex);
+      if (normalizedZoneIndex === null || !counter) {
+        return;
+      }
+      counter[normalizedZoneIndex] += 1;
+    }
+
+    function incrementPlayerStat(player, statKey, amount = 1) {
+      const stats = getPlayerStats(player);
+      if (!stats || typeof stats[statKey] !== "number") {
+        return;
+      }
+      stats[statKey] += amount;
+    }
+
+    function recordZonePlayForStats(player, zoneIndex = state.zoneIndex) {
+      const stats = getPlayerStats(player);
+      if (!stats) {
+        return;
+      }
+      incrementZoneCounter(stats.zonePlays, zoneIndex);
+    }
+
+    function recordZoneResolution(zoneIndex = state.zoneIndex) {
+      incrementZoneCounter(state.stats.zoneTime, zoneIndex);
+    }
+
+    function recordShotForStats(player, shotValue, zoneIndex = state.zoneIndex) {
+      const stats = getPlayerStats(player);
+      if (!stats) {
+        return;
+      }
+
+      stats.shotsOnGoal += 1;
+      stats.totalShotValue += shotValue;
+      stats.highestShotValue = Math.max(stats.highestShotValue, shotValue);
+      stats.shotValues.push(shotValue);
+      incrementZoneCounter(stats.shotOrigins, zoneIndex);
+    }
+
+    function recordGoalForStats(player, shotZoneIndex, shotValue) {
+      incrementPlayerStat(player, "goals");
+      const periodLabel = getPeriodLabel();
+      const clockText = formatGameClock();
+      state.stats.scoringSummary.push(`${periodLabel} | ${clockText} | ${lowerPlayerName(player)} goal from ${zoneLabel(shotZoneIndex)} (shot ${shotValue}).`);
+      state.goalLog.push({
+        player,
+        periodLabel,
+        clockText,
+        zoneLabel: zoneLabel(shotZoneIndex),
+        shotValue,
+        humanScore: state.humanScore,
+        cpuScore: state.cpuScore
+      });
+    }
 
     function createDeck() {
       const deck = [];
@@ -1697,6 +2257,35 @@
         deckEventTimeoutId = null;
         render();
       }, duration);
+    }
+
+    function getPresentationIntensity(type = "contain", text = "", channel = "event") {
+      const normalized = String(text || "").trim().toLowerCase();
+      if (!normalized) {
+        return "quiet";
+      }
+
+      if (/goal|wins!|rebound$|shot quality|special turnover shot|turnover|icing|period .*ended|puck battle|loose puck won|defensive recovery/.test(normalized)) {
+        return "hero";
+      }
+
+      if (/attack chain \d+|defense chain \d+|save chain \d+\/\d+|save chain needed|defending$|attack chain ends/.test(normalized)) {
+        return "quiet";
+      }
+
+      if (/stabilize attempt|stabilized|save \/ frozen puck|exchange win|exchange hold|faceoff/.test(normalized)) {
+        return channel === "play" ? "steady" : "steady";
+      }
+
+      if (type === "goal" || type === "period" || type === "turnover" || type === "puck") {
+        return "hero";
+      }
+
+      if (type === "shot") {
+        return /attack chain \d+/.test(normalized) ? "quiet" : "hero";
+      }
+
+      return type === "contain" ? "steady" : "hero";
     }
 
     function formatClockSeconds(totalSeconds) {
@@ -1867,8 +2456,8 @@
       setPlayByPlay(`${lowerPlayerName(attackerPlayer)} scores! Center-ice faceoff.`, "goal");
     }
 
-    function buildDebugDumpText() {
-      const configLines = [
+    function buildDumpConfigLines() {
+      return [
         `Suit Count: ${state.config.suitCount}`,
         `Max Card Value: ${state.config.maxValue}`,
         `Hand Size: ${state.config.handSize}`,
@@ -1879,8 +2468,10 @@
         `Momentum System: ${FEATURES.momentumSystem}`,
         `Show CPU Cards: ${state.showCpuCards}`
       ];
+    }
 
-      const stateLines = [
+    function buildDumpStateLines() {
+      return [
         `Score: (${state.humanHand.length}) Human ${state.humanScore} - ${state.cpuScore} CPU (${state.cpuHand.length})`,
         `Period: ${getPeriodLabel()}`,
         `Clock: ${formatGameClock()}`,
@@ -1896,8 +2487,10 @@
         `Deck Count: ${state.deck.length}`,
         `Discard Count: ${state.discardPile.length}`
       ];
+    }
 
-      const lastShotLines = state.lastShot
+    function buildLastShotDumpLines() {
+      return state.lastShot
         ? [
             `Shooter: ${lowerPlayerName(state.lastShot.attackerPlayer)} ${cardToText(state.lastShot.shotCard)}`,
             `Defender: ${lowerPlayerName(state.lastShot.defenderPlayer)}`,
@@ -1905,7 +2498,184 @@
             `Responses: ${state.lastShot.saveCards.length > 0 ? state.lastShot.saveCards.map(cardToText).join(" -> ") : "None"}`
           ]
         : ["No recorded shot."];
+    }
 
+    function getAverageShotValue(stats) {
+      if (!stats || stats.shotValues.length === 0) {
+        return "0.00";
+      }
+      return (stats.totalShotValue / stats.shotValues.length).toFixed(2);
+    }
+
+    function getStatsOverviewRows() {
+      const humanStats = state.stats.human;
+      const cpuStats = state.stats.cpu;
+
+      return [
+        { label: "Goals", human: humanStats.goals, cpu: cpuStats.goals },
+        { label: "Shots On Goal", human: humanStats.shotsOnGoal, cpu: cpuStats.shotsOnGoal },
+        { label: "Saves Made", human: humanStats.savesMade, cpu: cpuStats.savesMade },
+        { label: "Exchange Wins", human: humanStats.exchangeWins, cpu: cpuStats.exchangeWins },
+        { label: "Faceoffs Won", human: humanStats.faceoffsWon, cpu: cpuStats.faceoffsWon },
+        { label: "Loose Pucks Won", human: humanStats.loosePucksWon, cpu: cpuStats.loosePucksWon },
+        { label: "Dumps Used", human: humanStats.dumpsUsed, cpu: cpuStats.dumpsUsed },
+        { label: "Icings Used", human: humanStats.icingsUsed, cpu: cpuStats.icingsUsed },
+        { label: "Burns Used", human: humanStats.burnsUsed, cpu: cpuStats.burnsUsed },
+        { label: "Cycles Used", human: humanStats.cyclesUsed, cpu: cpuStats.cyclesUsed },
+        { label: "Force Shots", human: humanStats.forceShotsUsed, cpu: cpuStats.forceShotsUsed },
+        { label: "Stabilize Saves", human: humanStats.stabilizeSuccesses, cpu: cpuStats.stabilizeSuccesses },
+        { label: "Rebounds Created", human: humanStats.reboundsCreated, cpu: cpuStats.reboundsCreated },
+        { label: "Rebound Saves", human: humanStats.reboundSavesMade, cpu: cpuStats.reboundSavesMade },
+        { label: "Defensive Recoveries", human: humanStats.defensiveRecoveries, cpu: cpuStats.defensiveRecoveries },
+        { label: "Total Shot Value", human: humanStats.totalShotValue, cpu: cpuStats.totalShotValue },
+        { label: "Highest Shot Value", human: humanStats.highestShotValue, cpu: cpuStats.highestShotValue },
+        { label: "Average Shot Value", human: getAverageShotValue(humanStats), cpu: getAverageShotValue(cpuStats) }
+      ];
+    }
+
+    function getStateReadoutItems(options = {}) {
+      const items = [];
+      const faceoffUiLabel = options.faceoffUiLabel || (state.faceoffPending ? getFaceoffUiLabel() : "Faceoff");
+      const humanPendingCount = options.humanPendingCount ?? getHumanPendingPlayCount();
+      const humanShotLegalCount = options.humanShotLegalCount ?? (state.shotPending && state.currentTurn === "human" ? getLegalCardsForTurn("human").length : 0);
+      const humanPitySaveDraw = options.humanPitySaveDraw ?? (state.shotPending && state.currentTurn === "human" && canUsePitySaveDraw("human", state.shotPending));
+
+      if (state.gameOver) {
+        items.push({ label: "Final", value: `Human ${state.humanScore} - ${state.cpuScore} CPU`, tone: "goal" });
+        items.push({ label: "Winner", value: lowerPlayerName(state.gameWinner), tone: "goal" });
+        items.push({ label: "Ended", value: `${getPeriodLabel()} ${formatGameClock()}`, tone: "period" });
+        return items;
+      }
+
+      const turnValue = state.faceoffPending
+        ? `${lowerPlayerName(state.currentTurn)} ${faceoffUiLabel.toLowerCase()}`
+        : state.stabilizePending
+          ? `${lowerPlayerName(state.currentTurn)} stabilize`
+          : state.shotPending
+            ? `${lowerPlayerName(state.currentTurn)} ${isReboundRevealPhase(state.shotPending) ? "rebound reveal" : isReboundSavePhase(state.shotPending) ? "rebound save" : "save chain"}`
+            : `${lowerPlayerName(state.currentTurn)} ${state.roleOfCurrentTurn === "attacker" ? "attack" : "defense"}`;
+      items.push({ label: "Turn", value: turnValue, tone: state.faceoffPending ? "puck" : state.shotPending ? "shot" : "contain" });
+
+      if (state.faceoffPending) {
+        items.push({ label: "Rule", value: "Higher card wins", tone: "puck" });
+        items.push({ label: "Ties", value: "Random", tone: "puck" });
+        if (isIcingFaceoff()) {
+          if (state.icingFaceoffLeadCard) {
+            items.push({ label: "Lead", value: cardToText(state.icingFaceoffLeadCard), tone: "puck" });
+          } else if (state.icingFaceoffPlayer) {
+            items.push({ label: "Reveal First", value: lowerPlayerName(state.icingFaceoffPlayer), tone: "puck" });
+          }
+        }
+        return items;
+      }
+
+      if (state.stabilizePending) {
+        items.push({ label: "Need", value: "1 legal card", tone: "contain" });
+        items.push({ label: "Fallback", value: "Draw 1 if none", tone: "period" });
+        return items;
+      }
+
+      if (state.shotPending) {
+        const shot = state.shotPending;
+        if (isReboundRevealPhase(shot)) {
+          items.push({ label: "Rebound", value: String(shot.reboundCount), tone: "shot" });
+          items.push({ label: "Action", value: "Reveal top card", tone: "puck" });
+          return items;
+        }
+
+        if (isReboundSavePhase(shot)) {
+          items.push({ label: "Need", value: "1 rebound save", tone: "shot" });
+          items.push({ label: "Target", value: String(shot.reboundShotValue), tone: "shot" });
+          if (state.currentTurn === "human" && humanShotLegalCount === 0) {
+            items.push({ label: "Fallback", value: "Desperation draw", tone: "period" });
+          }
+          return items;
+        }
+
+        const requiredLength = getShotCurrentRequiredLength(shot);
+        items.push({ label: "Shot", value: String(shot.shotValue), tone: "shot" });
+        items.push({ label: "Save Needs", value: String(requiredLength), tone: "shot" });
+        items.push({ label: "Progress", value: `${shot.savedCount}/${requiredLength}`, tone: "contain" });
+        if (state.currentTurn === "human" && humanPitySaveDraw) {
+          items.push({ label: "Last Chance", value: "Pity draw live", tone: "puck" });
+        }
+        return items;
+      }
+
+      items.push({ label: "Attack", value: String(state.attackerChainCount), tone: state.attacker === "human" ? "human-side" : "cpu-side" });
+      items.push({ label: "Defense", value: String(state.defenderChainCount), tone: state.defender === "human" ? "human-side" : "cpu-side" });
+
+      return items;
+    }
+
+    function renderStateReadout(options = {}) {
+      const container = document.getElementById("stateReadout");
+      if (!container) {
+        return;
+      }
+
+      const items = getStateReadoutItems(options);
+      container.hidden = items.length === 0;
+      container.innerHTML = items.map((item) => `
+        <div class="state-readout-chip ${item.tone || "contain"}">
+          <span class="k">${item.label}</span>
+          <span class="v">${item.value}</span>
+        </div>
+      `).join("");
+    }
+
+    function buildMatchSnapshotHtml() {
+      const humanStats = state.stats.human;
+      const cpuStats = state.stats.cpu;
+      const latestGoal = state.goalLog.length > 0 ? state.goalLog[state.goalLog.length - 1] : null;
+      const summaryCards = [
+        { label: "Final", value: `Human ${state.humanScore} - ${state.cpuScore} CPU`, tone: "goal" },
+        { label: "Winner", value: lowerPlayerName(state.gameWinner), tone: "goal" },
+        { label: "Shots", value: `${humanStats.shotsOnGoal}-${cpuStats.shotsOnGoal}`, tone: "shot" },
+        { label: "Saves", value: `${humanStats.savesMade}-${cpuStats.savesMade}`, tone: "contain" },
+        { label: "Faceoffs", value: `${humanStats.faceoffsWon}-${cpuStats.faceoffsWon}`, tone: "puck" },
+        { label: "Stabilize", value: `${humanStats.stabilizeSuccesses}-${cpuStats.stabilizeSuccesses}`, tone: "period" }
+      ];
+
+      return [
+        '<div class="match-snapshot">',
+        '<div class="match-snapshot-title">Final Snapshot</div>',
+        '<div class="match-snapshot-grid">',
+        ...summaryCards.map((card) => `
+          <div class="match-snapshot-card ${card.tone}">
+            <span class="k">${card.label}</span>
+            <span class="v">${card.value}</span>
+          </div>
+        `),
+        '</div>',
+        `<div class="match-snapshot-note">Avg shot value: Human ${getAverageShotValue(humanStats)} | CPU ${getAverageShotValue(cpuStats)} | Rebounds ${humanStats.reboundsCreated}-${cpuStats.reboundsCreated}</div>`,
+        `<div class="match-snapshot-note">${latestGoal ? `Last goal: ${lowerPlayerName(latestGoal.player)} ${latestGoal.periodLabel} ${latestGoal.clockText}.` : 'No goals recorded.'}</div>`,
+        '</div>'
+      ].join('');
+    }
+
+    function buildMatchStatisticsLines() {
+      const overviewRows = getStatsOverviewRows();
+      const zoneLines = ZONES.map((zoneName, zoneIndex) => `${zoneName}: Human plays ${state.stats.human.zonePlays[zoneIndex]}, CPU plays ${state.stats.cpu.zonePlays[zoneIndex]}, Human shots ${state.stats.human.shotOrigins[zoneIndex]}, CPU shots ${state.stats.cpu.shotOrigins[zoneIndex]}, resolved turns ${state.stats.zoneTime[zoneIndex]}`);
+      const scoringLines = state.stats.scoringSummary.length > 0 ? state.stats.scoringSummary : ["No goals recorded."];
+
+      return [
+        "Match Statistics",
+        ...overviewRows.map((row) => `${row.label}: Human ${row.human} | CPU ${row.cpu}`),
+        "",
+        "Shot Value Lists",
+        `Human: ${state.stats.human.shotValues.length > 0 ? state.stats.human.shotValues.join(", ") : "none"}`,
+        `CPU: ${state.stats.cpu.shotValues.length > 0 ? state.stats.cpu.shotValues.join(", ") : "none"}`,
+        "",
+        "Zone Activity",
+        ...zoneLines,
+        "",
+        "Scoring Summary",
+        ...scoringLines
+      ];
+    }
+
+    function buildDebugDumpText() {
       const logLines = state.logMessages.length > 0 ? state.logMessages : ["(empty log)"];
 
       return [
@@ -1913,31 +2683,56 @@
         `Exported: ${new Date().toISOString()}`,
         "",
         "Settings",
-        ...configLines,
+        ...buildDumpConfigLines(),
         "",
         "Game State",
-        ...stateLines,
+        ...buildDumpStateLines(),
         "",
         "Last Shot",
-        ...lastShotLines,
+        ...buildLastShotDumpLines(),
+        "",
+        ...buildMatchStatisticsLines(),
         "",
         "Action Log",
         ...logLines
       ].join("\n");
     }
 
-    function downloadDebugDump() {
+    function buildStatsDumpText() {
+      return [
+        "Hockey Card Prototype Stats Dump",
+        `Exported: ${new Date().toISOString()}`,
+        "",
+        "Settings",
+        ...buildDumpConfigLines(),
+        "",
+        "Game State",
+        ...buildDumpStateLines(),
+        "",
+        ...buildMatchStatisticsLines()
+      ].join("\n");
+    }
+
+    function downloadTextFile(text, filenamePrefix, successMessage) {
       const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-      const blob = new Blob([buildDebugDumpText()], { type: "text/plain;charset=utf-8" });
+      const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `hockey-card-debug-${stamp}.txt`;
+      link.download = `${filenamePrefix}-${stamp}.txt`;
       document.body.appendChild(link);
       link.click();
       link.remove();
       setTimeout(() => URL.revokeObjectURL(url), 0);
-      addLog("Debug dump downloaded.");
+      addLog(successMessage);
+    }
+
+    function downloadDebugDump() {
+      downloadTextFile(buildDebugDumpText(), "hockey-card-debug", "Action log debug dump downloaded.");
+    }
+
+    function downloadStatsDump() {
+      downloadTextFile(buildStatsDumpText(), "hockey-card-stats", "Stats debug dump downloaded.");
     }
 
     function cardToText(card) {
@@ -1980,6 +2775,19 @@
       }));
     }
 
+    function cloneShotPending(shot) {
+      if (!shot) {
+        return null;
+      }
+
+      return {
+        ...shot,
+        shotCard: cloneCard(shot.shotCard),
+        savedCards: cloneCards(shot.savedCards || []),
+        reboundShotCard: cloneCard(shot.reboundShotCard)
+      };
+    }
+
     function getHumanPendingPlayCount() {
       return state.humanPendingTurn?.snapshots.length || 0;
     }
@@ -2002,20 +2810,45 @@
     }
 
     function humanMoveRequiresSubmitConfirmation() {
-      return Boolean(state.faceoffPending || state.shotPending || state.stabilizePending);
+      return Boolean(
+        state.stabilizePending
+        || (state.shotPending && isReboundSavePhase(state.shotPending))
+      );
     }
 
     function getHumanSpecialSelectionMode() {
       if (state.faceoffPending) {
         return isLoosePuckFaceoff() ? "puckBattle" : isIcingFaceoff() ? "icingFaceoff" : "faceoff";
       }
-      if (state.shotPending) {
-        return isReboundSavePhase(state.shotPending) ? "reboundSave" : "save";
+      if (state.shotPending && isReboundSavePhase(state.shotPending)) {
+        return "reboundSave";
       }
       if (state.stabilizePending) {
         return "stabilize";
       }
       return null;
+    }
+
+    function getHumanSpecialSelectionLabel(mode = getHumanSpecialSelectionMode()) {
+      if (mode === "puckBattle") {
+        return "Puck Battle";
+      }
+      if (mode === "icingFaceoff") {
+        return "Icing Faceoff";
+      }
+      if (mode === "faceoff") {
+        return "Faceoff";
+      }
+      if (mode === "reboundSave") {
+        return "Rebound Save";
+      }
+      if (mode === "save") {
+        return "Save";
+      }
+      if (mode === "stabilize") {
+        return "Stabilize";
+      }
+      return "Play";
     }
 
     function selectHumanSpecialCard(cardIndex) {
@@ -2075,13 +2908,28 @@
       return key ? state[key] : 0;
     }
 
-    function setMomentum(player, value) {
+    function logMomentumChange(player, delta, nextValue, reason = "") {
+      if (!reason || delta === 0) {
+        return;
+      }
+
+      addLog(`${lowerPlayerName(player)} ${delta > 0 ? "gains" : "loses"} ${Math.abs(delta)} Momentum (${reason}). Now ${nextValue}/3.`);
+    }
+
+    function setMomentum(player, value, reason = "") {
       const key = momentumStateKey(player);
       if (!FEATURES.momentumSystem || !key) {
         return;
       }
 
-      state[key] = clamp(value, 0, 3);
+      const current = state[key];
+      const next = clamp(value, 0, 3);
+      if (next === current) {
+        return;
+      }
+
+      state[key] = next;
+      logMomentumChange(player, next - current, next, reason);
     }
 
     function changeMomentum(player, delta, reason = "") {
@@ -2097,9 +2945,7 @@
       }
 
       state[key] = next;
-      if (reason) {
-        addLog(`${lowerPlayerName(player)} ${delta > 0 ? "gains" : "loses"} 1 Momentum (${reason}). Now ${next}/3.`);
-      }
+      logMomentumChange(player, next - current, next, reason);
     }
 
     function resetMomentum(reason = "") {
@@ -2107,12 +2953,8 @@
         return;
       }
 
-      const hadMomentum = state.humanMomentum > 0 || state.cpuMomentum > 0;
-      state.humanMomentum = 0;
-      state.cpuMomentum = 0;
-      if (hadMomentum && reason) {
-        addLog(reason);
-      }
+      setMomentum("human", 0, reason);
+      setMomentum("cpu", 0, reason);
     }
 
     function awardMomentumForZoneAdvance(player, previousZone, nextZone) {
@@ -2128,7 +2970,7 @@
     }
 
     function awardMomentumForExchangeWin(player, exchangeMargin) {
-      if (FEATURES.momentumSystem && player && exchangeMargin >= 3) {
+      if (FEATURES.momentumSystem && player && exchangeMargin >= 2) {
         changeMomentum(player, 1, `exchange win by ${exchangeMargin}`);
       }
     }
@@ -2145,15 +2987,18 @@
       }
     }
 
-    function resetMomentumForFaceoff(faceoffLabel = "faceoff") {
-      if (FEATURES.momentumSystem) {
-        resetMomentum(`Momentum resets for the ${faceoffLabel.toLowerCase()}.`);
+    function trimMomentumForFaceoff(faceoffMode = state.faceoffMode, faceoffLabel = "faceoff") {
+      if (!FEATURES.momentumSystem || faceoffMode === "loosePuck") {
+        return;
       }
+
+      changeMomentum("human", -1, faceoffLabel.toLowerCase());
+      changeMomentum("cpu", -1, faceoffLabel.toLowerCase());
     }
 
     function resetMomentumAfterShot() {
       if (FEATURES.momentumSystem) {
-        resetMomentum("Momentum resets after the shot.");
+        resetMomentum("shot taken");
       }
     }
 
@@ -2316,7 +3161,7 @@
       }
 
       const card = hand.splice(cardIndex, 1)[0];
-      setMomentum(player, momentumBefore - 1);
+      setMomentum(player, momentumBefore - 1, "Cycle");
       state.deck.unshift(card);
       clearBurnSelection();
 
@@ -2326,6 +3171,7 @@
       } else {
         addLog(`${lowerPlayerName(player)} spends 1 Momentum to Cycle ${cardToText(card)} away, but the deck is empty.`);
       }
+      incrementPlayerStat(player, "cyclesUsed");
 
       if (resolvePendingPeriodBreak()) {
         return true;
@@ -2365,11 +3211,12 @@
       }
 
       const card = hand.splice(cardIndex, 1)[0];
-      setMomentum(player, momentumBefore - 2);
+      setMomentum(player, momentumBefore - 2, "Burn");
       state.deck.unshift(card);
       clearBurnSelection();
 
       addLog(`${lowerPlayerName(player)} spends 2 Momentum to Burn ${cardToText(card)} out of hand and send it to the bottom of the deck.`);
+      incrementPlayerStat(player, "burnsUsed");
       setEvent(`${lowerPlayerName(player)} burns a card`, "contain");
       refreshComboWindow();
 
@@ -2401,8 +3248,9 @@
         return false;
       }
 
-      setMomentum(player, momentumBefore - 3);
+      setMomentum(player, momentumBefore - 3, "Force Shot");
       clearBurnSelection();
+  incrementPlayerStat(player, "forceShotsUsed");
 
       const rangeLabel = isCloseOffensiveZone(player) ? "close" : "far";
       addLog(`${lowerPlayerName(player)} spends 3 Momentum for a Force Shot from ${rangeLabel} range.`);
@@ -2428,6 +3276,7 @@
       refillToFive(player);
       clearBurnSelection();
       state.zoneIndex = dumpZone;
+      incrementPlayerStat(player, "dumpsUsed");
 
       addLog(`${lowerPlayerName(player)} uses Dump and Chase: the hand is shuffled to the bottom of the deck, then refreshed.`);
       if (previousZone !== dumpZone) {
@@ -2446,6 +3295,7 @@
         return false;
       }
 
+      incrementPlayerStat(player, "icingsUsed");
       addLog(`${lowerPlayerName(player)} uses Icing from ${zoneLabel(state.zoneIndex)}.`);
       addLog("Both sides refill to full hand size before the Icing Faceoff.");
       setEvent("Icing", "turnover");
@@ -2468,6 +3318,7 @@
       return {
         humanHand: cloneCards(state.humanHand),
         discardPile: cloneCards(state.discardPile),
+        shotPending: cloneShotPending(state.shotPending),
         activeCard: cloneCard(state.activeCard),
         runMatchMode: state.runMatchMode,
         runHasCrossedRiver: state.runHasCrossedRiver,
@@ -2490,6 +3341,7 @@
     function restoreHumanTurnSnapshot(snapshot) {
       state.humanHand = cloneCards(snapshot.humanHand);
       state.discardPile = cloneCards(snapshot.discardPile);
+      state.shotPending = cloneShotPending(snapshot.shotPending);
       state.activeCard = cloneCard(snapshot.activeCard);
       state.runMatchMode = snapshot.runMatchMode;
       state.runHasCrossedRiver = snapshot.runHasCrossedRiver;
@@ -2512,6 +3364,7 @@
     }
 
     function recordPlayedCard(player, card) {
+      recordZonePlayForStats(player);
       state.recentPlayedCards.push({
         player,
         card: { suit: card.suit, value: card.value }
@@ -2684,36 +3537,6 @@
       return getActiveSuitInfos(config).map((entry) => entry.name);
     }
 
-    function getOrderedActiveFaceoffSuits(config = state.config) {
-      const activeSuitNames = new Set(getActiveSuitNames(config));
-      return FACEOFF_PRIORITY.filter((name) => activeSuitNames.has(name));
-    }
-
-    function getFaceoffCycleText(config = state.config) {
-      const ordered = getOrderedActiveFaceoffSuits(config);
-      if (ordered.length === 0) {
-        return "";
-      }
-      return `${ordered.join(" > ")} > ${ordered[0]}`;
-    }
-
-    function getFaceoffRuleSummary(config = state.config) {
-      const ordered = getOrderedActiveFaceoffSuits(config);
-      if (ordered.length === 0) {
-        return "No active faceoff suits.";
-      }
-
-      if (ordered.length % 2 === 1) {
-        return `Odd loop: each suit beats the next ${(ordered.length - 1) / 2} clockwise suit${ordered.length === 3 ? "" : "s"}. Same-suit ties resolve randomly.`;
-      }
-
-      if (ordered.length === 2) {
-        return "Even loop: different suits fall back to value only, and exact value ties resolve randomly.";
-      }
-
-      return "Even loop: each suit beats its immediate clockwise neighbor; opposite suits fall back to value, and exact value ties resolve randomly.";
-    }
-
     function getDeckSizeForConfig(config) {
       return (config.suitCount * config.maxValue * 2) + config.wildCardCount;
     }
@@ -2796,7 +3619,7 @@
         preview.textContent = `Next game: ${config.suitCount} suits, values 1-${config.maxValue}, hand size ${config.handSize}, ${wildText}, deck ${getDeckSizeForConfig(config)} cards, ${deckText}, ${riverText}, ${momentumText}. CPU speed ${config.cpuSpeedPercent}% applies immediately.`;
       }
       if (rulesPreview) {
-        rulesPreview.textContent = `Next-game faceoff cycle: ${getFaceoffCycleText(config)}. ${getFaceoffRuleSummary(config)} Chain mode: ${config.singleRiverCrossMode ? "you may switch between value and suit matching once per pile run." : "value and suit matching may alternate freely."} Experimental feature flag: Momentum, Loose Puck, Burn, and Dump are ${features.momentumSystem ? "enabled" : "disabled"}.`;
+        rulesPreview.textContent = `Next-game faceoffs: higher card wins and exact ties resolve randomly. Chain mode: ${config.singleRiverCrossMode ? "you may switch between value and suit matching once per pile run." : "value and suit matching may alternate freely."} Experimental feature flag: Momentum, Loose Puck, Burn, and Dump are ${features.momentumSystem ? "enabled" : "disabled"}.`;
       }
     }
 
@@ -2834,9 +3657,8 @@
         return;
       }
 
-      const wildText = state.config.wildCardCount > 0 ? " Wild cards fall back to value in faceoffs." : "";
       const icingText = isIcingFaceoff() ? " Icing Faceoff: the icing side reveals first, then the opponent answers after seeing it." : "";
-      const text = `Faceoff cycle: ${getFaceoffCycleText()}. ${getFaceoffRuleSummary()} Same suit: higher number wins, and exact ties resolve randomly.${wildText}${icingText}`;
+      const text = `Faceoff: higher card wins and exact ties resolve randomly.${icingText}`;
       hint.textContent = text;
       hint.title = text;
     }
@@ -2943,8 +3765,25 @@
       state.shotPending = null;
     }
 
+    function isReboundRevealPhase(shot = state.shotPending) {
+      return Boolean(shot && shot.phase === "reboundReveal");
+    }
+
     function isReboundSavePhase(shot = state.shotPending) {
       return Boolean(shot && shot.phase === "reboundSave");
+    }
+
+    function canUsePitySaveDraw(player, shot = state.shotPending) {
+      if (!shot || shot.defenderPlayer !== player || isReboundRevealPhase(shot) || isReboundSavePhase(shot) || shot.pitySaveDrawUsed) {
+        return false;
+      }
+
+      const shortfall = getShotCurrentRequiredLength(shot) - shot.savedCount;
+      if (shortfall !== 1 || player !== state.currentTurn) {
+        return false;
+      }
+
+      return getLegalCardsForTurn(player).length === 0;
     }
 
     function getShotCurrentRequiredLength(shot = state.shotPending) {
@@ -2963,6 +3802,20 @@
         triggerPhaseFlash(shot.defenderPlayer === "human" ? "human" : "cpu");
       }
       logTurnDiagnostics(shot.defenderPlayer, label);
+    }
+
+    function syncReboundRevealTurnState(label = "Rebound reveal.", flash = false) {
+      const shot = state.shotPending;
+      if (!shot) {
+        return;
+      }
+
+      setCurrentTurn(shot.attackerPlayer, "rebound");
+      state.turnPlayCount = shot.reboundCount;
+      if (flash) {
+        triggerPhaseFlash(shot.attackerPlayer === "human" ? "human" : "cpu");
+      }
+      logTurnDiagnostics(shot.attackerPlayer, label);
     }
 
     function setLastShotSummary(shot, outcome, saveCards = []) {
@@ -2995,15 +3848,21 @@
         return;
       }
 
+      const reboundSave = isReboundSavePhase(shot);
+      const saveRequirement = getShotCurrentRequiredLength(shot);
       setLastShotSummary(shot, "save", shot.savedCards);
-      addLog(reason || (isReboundSavePhase(shot)
+      incrementPlayerStat(shot.defenderPlayer, "savesMade");
+      if (reboundSave) {
+        incrementPlayerStat(shot.defenderPlayer, "reboundSavesMade");
+      }
+      addLog(reason || (reboundSave
         ? `${lowerPlayerName(shot.defenderPlayer)} smothers the rebound and freezes the puck.`
         : `${lowerPlayerName(shot.defenderPlayer)} makes ${shot.requiredLength}-card save: ${shot.savedCards.map(cardToText).join(" -> ")}. Frozen puck.`));
       setEvent("Save / Frozen puck", "contain");
-      showDeckEvent("SAVE", "contain", 1200);
+      showDeckEvent(`${reboundSave ? "Rebound Save" : "Save"}\n${shot.savedCards.length}/${saveRequirement}`, "contain", 1500);
       clearShotPending();
       startFaceoff(shot.shotZoneIndex, "Save/frozen puck.");
-      setPlayByPlay(`${lowerPlayerName(shot.defenderPlayer)} makes the${isReboundSavePhase(shot) ? " rebound" : ""} save. Faceoff.`, "contain");
+      setPlayByPlay(`${lowerPlayerName(shot.defenderPlayer)} makes the${reboundSave ? " rebound" : ""} save. Faceoff.`, "contain");
     }
 
     function finishShotAsGoal(reason = "") {
@@ -3012,6 +3871,8 @@
         return;
       }
 
+      const reboundGoal = isReboundSavePhase(shot);
+      const goalShotValue = reboundGoal ? shot.reboundShotValue : shot.shotValue;
       setLastShotSummary(shot, "goal", shot.savedCards);
 
       if (shot.attackerPlayer === "human") {
@@ -3019,12 +3880,17 @@
       } else {
         state.cpuScore += 1;
       }
+      recordGoalForStats(
+        shot.attackerPlayer,
+        reboundGoal ? getGoalZoneIndex(shot.attackerPlayer) : shot.shotZoneIndex,
+        goalShotValue
+      );
 
-      addLog(reason || (isReboundSavePhase(shot)
+      addLog(reason || (reboundGoal
         ? `${lowerPlayerName(shot.defenderPlayer)} cannot stop the rebound. GOAL ${lowerPlayerName(shot.attackerPlayer)}.`
         : `${lowerPlayerName(shot.defenderPlayer)} cannot complete ${shot.requiredLength}-card save chain. GOAL ${lowerPlayerName(shot.attackerPlayer)}.`));
       setEvent(`GOAL ${lowerPlayerName(shot.attackerPlayer)}`, "goal");
-      showDeckEvent("GOAL", "goal", 1500);
+      showDeckEvent(`${reboundGoal ? "Rebound Goal" : "Goal"}\nShot ${goalShotValue}`, "goal", 1700);
       triggerGoalFlash();
       clearShotPending();
       handleGoalAfterScore(shot.attackerPlayer);
@@ -3041,12 +3907,13 @@
       }
 
       setLastShotSummary(shot, "recovery", shot.savedCards);
+      incrementPlayerStat(shot.defenderPlayer, "defensiveRecoveries");
       addLog(reason || `${lowerPlayerName(shot.defenderPlayer)} recovers the loose puck near the net.`);
       if (reboundCard) {
         addLog(`${lowerPlayerName(shot.attackerPlayer)} keeps the failed rebound reveal ${cardToText(reboundCard)}.`);
       }
       setEvent("Defensive recovery", "turnover");
-      showDeckEvent("RECOVERY", "turnover", 1200);
+      showDeckEvent("Recovery\nPuck", "turnover", 1400);
       setPlayByPlay(`${lowerPlayerName(shot.defenderPlayer)} recovers the puck.`, "turnover");
 
       clearShotPending();
@@ -3078,10 +3945,40 @@
       startRebound();
     }
 
-    function tryReboundDesperationSave(player) {
+    async function tryReboundDesperationSave(player) {
       const shot = state.shotPending;
       if (!shot || !isReboundSavePhase(shot) || player !== shot.defenderPlayer) {
         return false;
+      }
+
+      if (player === "human") {
+        const desperationCard = drawOneCard(player);
+        if (!desperationCard) {
+          finishShotAsGoal(`${lowerPlayerName(player)} has no desperation save available. GOAL ${lowerPlayerName(shot.attackerPlayer)}.`);
+          return true;
+        }
+
+        addLog(`${lowerPlayerName(player)} draws desperation save ${cardToText(desperationCard)} into hand.`);
+        render();
+        await animateDrawToHand(player, desperationCard, 320);
+
+        if (resolvePendingPeriodBreak()) {
+          return true;
+        }
+
+        const drawnIndex = playerHand(player).length - 1;
+        const legal = getLegalCardsForTurn(player);
+        if (!legal.includes(drawnIndex)) {
+          const failedCard = playerHand(player).splice(drawnIndex, 1)[0];
+          state.discardPile.push(failedCard);
+          addLog(`${cardToText(failedCard)} does not match ${cardToText(state.activeCard)}.`);
+          finishShotAsGoal(`${lowerPlayerName(player)} cannot produce a legal desperation save. GOAL ${lowerPlayerName(shot.attackerPlayer)}.`);
+          return true;
+        }
+
+        addLog(`Human may now stage ${cardToText(desperationCard)} as the rebound save.`);
+        logTurnDiagnostics(player, "Desperation draw.");
+        return true;
       }
 
       const desperationCard = revealTopDeckCard();
@@ -3112,6 +4009,60 @@
       return true;
     }
 
+    function resolveReboundRevealCard(player, reboundCard) {
+      const shot = state.shotPending;
+      if (!shot || !isReboundRevealPhase(shot) || player !== shot.attackerPlayer) {
+        return false;
+      }
+
+      if (!reboundCard) {
+        finishShotWithRecovery(null, `${lowerPlayerName(shot.attackerPlayer)} cannot reveal a rebound card. ${lowerPlayerName(shot.defenderPlayer)} recovers near the crease.`);
+        return true;
+      }
+
+      addLog(`Rebound ${shot.reboundCount}: ${lowerPlayerName(shot.attackerPlayer)} reveals ${cardToText(reboundCard)}.`);
+      const matchDecision = getMatchDecision(reboundCard, state.activeCard, state.runMatchMode, state.runHasCrossedRiver);
+      if (!matchDecision.legal) {
+        addLog(`${cardToText(reboundCard)} does not match ${cardToText(state.activeCard)}. ${lowerPlayerName(shot.defenderPlayer)} recovers possession.`);
+        finishShotWithRecovery(reboundCard, `${lowerPlayerName(shot.defenderPlayer)} recovers the loose puck in ${zoneLabel(getHomeGoalZoneIndex(shot.defenderPlayer))}.`);
+        return true;
+      }
+
+      shot.reboundShotCard = { suit: reboundCard.suit, value: reboundCard.value };
+      shot.reboundShotValue = reboundCard.value;
+      shot.phase = "reboundSave";
+      shot.savedCount = 0;
+      shot.phaseRequiredLength = 1;
+      incrementPlayerStat(shot.attackerPlayer, "reboundsCreated");
+      recordShotForStats(shot.attackerPlayer, shot.reboundShotValue, getGoalZoneIndex(shot.attackerPlayer));
+
+      addLog(`${lowerPlayerName(shot.attackerPlayer)} plays ${cardToText(reboundCard)} immediately as a rebound shot. Rebound value ${shot.reboundShotValue}.`);
+      recordShotSequencePlay(shot.attackerPlayer, reboundCard, matchDecision);
+      showDeckEvent(`Rebound ${shot.reboundShotValue}\nSave 1`, "shot", 1600);
+      syncShotPendingTurnState("Rebound save.", true);
+      return true;
+    }
+
+    async function revealReboundShotCard(player, options = {}) {
+      const shot = state.shotPending;
+      if (!shot || !isReboundRevealPhase(shot) || player !== shot.attackerPlayer || player !== state.currentTurn) {
+        return false;
+      }
+
+      const reboundCard = revealTopDeckCard();
+      if (resolvePendingPeriodBreak()) {
+        return true;
+      }
+
+      const duration = options.duration ?? (player === "cpu" ? getCpuSimDuration(440, 140) : 320);
+      const deckButton = document.getElementById("cannotPlayBtn");
+      if (reboundCard && deckButton) {
+        await animatePlayToPileFromElement(deckButton, reboundCard, false, duration);
+      }
+
+      return resolveReboundRevealCard(player, reboundCard);
+    }
+
     function startRebound() {
       const shot = state.shotPending;
       if (!shot) {
@@ -3125,36 +4076,9 @@
       resetRunMatchState();
 
       setEvent("Rebound", "shot");
-      showDeckEvent("REBOUND", "shot", 1100);
+      showDeckEvent("Rebound", "shot", 1200);
       setPlayByPlay("Rebound!", "shot");
-
-      const reboundCard = revealTopDeckCard();
-      if (resolvePendingPeriodBreak()) {
-        return;
-      }
-
-      if (!reboundCard) {
-        finishShotWithRecovery(null, `${lowerPlayerName(shot.attackerPlayer)} cannot reveal a rebound card. ${lowerPlayerName(shot.defenderPlayer)} recovers near the crease.`);
-        return;
-      }
-
-      addLog(`Rebound ${shot.reboundCount}: ${lowerPlayerName(shot.attackerPlayer)} reveals ${cardToText(reboundCard)}.`);
-      const matchDecision = getMatchDecision(reboundCard, state.activeCard, state.runMatchMode, state.runHasCrossedRiver);
-      if (!matchDecision.legal) {
-        addLog(`${cardToText(reboundCard)} does not match ${cardToText(state.activeCard)}. ${lowerPlayerName(shot.defenderPlayer)} recovers possession.`);
-        finishShotWithRecovery(reboundCard, `${lowerPlayerName(shot.defenderPlayer)} recovers the loose puck in ${zoneLabel(getHomeGoalZoneIndex(shot.defenderPlayer))}.`);
-        return;
-      }
-
-      shot.reboundShotCard = { suit: reboundCard.suit, value: reboundCard.value };
-      shot.reboundShotValue = reboundCard.value;
-      shot.phase = "reboundSave";
-      shot.savedCount = 0;
-      shot.phaseRequiredLength = 1;
-
-      addLog(`${lowerPlayerName(shot.attackerPlayer)} plays ${cardToText(reboundCard)} immediately as a rebound shot. Rebound value ${shot.reboundShotValue}.`);
-      recordShotSequencePlay(shot.attackerPlayer, reboundCard, matchDecision);
-      syncShotPendingTurnState("Rebound save.", true);
+      syncReboundRevealTurnState("Rebound reveal.", true);
     }
 
     function resolveNormalShotSaveAttempt() {
@@ -3178,42 +4102,91 @@
       finishShotAsGoal(`${lowerPlayerName(shot.defenderPlayer)} comes up ${shortfall} card${shortfall === 1 ? "" : "s"} short on the save chain. GOAL ${lowerPlayerName(shot.attackerPlayer)}.`);
     }
 
-    function handleHumanShotNoSave() {
+    async function drawPitySaveCard(player, options = {}) {
+      const shot = state.shotPending;
+      if (!canUsePitySaveDraw(player, shot)) {
+        return false;
+      }
+
+      shot.pitySaveDrawUsed = true;
+      const drawnCard = drawOneCard(player);
+      if (drawnCard) {
+        addLog(`${lowerPlayerName(player)} gets a 1-card pity draw for the last save chance: ${cardToText(drawnCard)}.`);
+        render();
+        await animateDrawToHand(player, drawnCard, options.drawDuration ?? (player === "cpu" ? getCpuSimDuration(460, 140) : 320));
+      } else {
+        addLog(`${lowerPlayerName(player)} has no pity draw available. Deck is empty.`);
+      }
+
+      if (resolvePendingPeriodBreak()) {
+        return true;
+      }
+
+      const legal = getLegalCardsForTurn(player);
+      if (!drawnCard || legal.length === 0) {
+        addLog(`${lowerPlayerName(player)} cannot turn the pity draw into a save.`);
+        resolveNormalShotSaveAttempt();
+        return true;
+      }
+
+      const drawnIndex = playerHand(player).length - 1;
+      if (player === "cpu") {
+        const cpuButtons = document.querySelectorAll("#cpuHand .card-btn");
+        const sourceButton = cpuButtons[drawnIndex];
+        await animatePlayToPileFromElement(sourceButton, drawnCard, !state.showCpuCards, options.playDuration ?? getCpuSimDuration(420, 120));
+        playShotSaveCard("cpu", drawnIndex);
+        return true;
+      }
+
+      addLog(`Human may now use ${cardToText(drawnCard)} as the last save card.`);
+      return true;
+    }
+
+    async function handleHumanShotNoSave() {
       const shot = state.shotPending;
       if (!shot || state.currentTurn !== "human") {
+        return false;
+      }
+
+      if (isReboundRevealPhase(shot)) {
         return false;
       }
 
       if (isReboundSavePhase(shot)) {
         const legal = getLegalCardsForTurn("human");
         if (legal.length === 0) {
-          return tryReboundDesperationSave("human");
+          return await tryReboundDesperationSave("human");
         }
         finishShotAsGoal(`Human declines the rebound save. GOAL ${lowerPlayerName(shot.attackerPlayer)}.`);
         return true;
+      }
+
+      if (canUsePitySaveDraw("human", shot)) {
+        return await drawPitySaveCard("human");
       }
 
       resolveNormalShotSaveAttempt();
       return true;
     }
 
-    function playShotSaveCard(player, cardIndex) {
+    function playShotSaveCard(player, cardIndex, options = {}) {
+      const deferResolution = Boolean(options.deferResolution);
       const shot = state.shotPending;
       if (!shot || player !== shot.defenderPlayer || player !== state.currentTurn) {
-        return;
+        return false;
       }
 
       const hand = playerHand(player);
       if (cardIndex < 0 || cardIndex >= hand.length) {
         addLog(`Ignored: invalid save card index for ${lowerPlayerName(player)}.`);
-        return;
+        return false;
       }
 
       const legal = getLegalCardsForTurn(player);
       const matchDecision = getMatchDecision(hand[cardIndex], state.activeCard, state.runMatchMode, state.runHasCrossedRiver);
       if (!legal.includes(cardIndex) || !matchDecision.legal) {
         addLog(`Illegal save attempt: ${lowerPlayerName(player)} tried ${cardToText(hand[cardIndex])} (${matchDecision.reason}).`);
-        return;
+        return false;
       }
 
       const card = hand.splice(cardIndex, 1)[0];
@@ -3225,20 +4198,27 @@
         addLog(`${lowerPlayerName(player)} plays rebound save ${cardToText(card)} against rebound value ${shot.reboundShotValue}.`);
         recordShotSequencePlay(player, card, matchDecision);
         setEvent("Rebound save", "contain");
+        showDeckEvent(`Rebound Save\n${card.value} vs ${shot.reboundShotValue}`, "contain", 1400);
         resolveReboundSaveResult(player, card);
-        return;
+        return true;
       }
 
       addLog(`${lowerPlayerName(player)} plays save card ${shot.savedCount}/${getShotCurrentRequiredLength(shot)}: ${cardToText(card)}.`);
       recordShotSequencePlay(player, card, matchDecision);
       setEvent(`Save chain ${shot.savedCount}/${getShotCurrentRequiredLength(shot)}`, "contain");
 
+      if (deferResolution) {
+        logTurnDiagnostics(player, "Save continues.");
+        return true;
+      }
+
       if (shot.savedCount >= getShotCurrentRequiredLength(shot)) {
         finishShotWithSave();
-        return;
+        return true;
       }
 
       logTurnDiagnostics(player, "Save continues.");
+      return true;
     }
 
     function ensureDeckHasCards() {
@@ -3345,6 +4325,10 @@
         return false;
       }
 
+      if (player === "human") {
+        return false;
+      }
+
       const hand = playerHand(player);
       const drawnIndex = hand.length - 1;
       const legalForTurn = getLegalCardsForTurn(player);
@@ -3400,15 +4384,7 @@
       }
 
       const cardIndex = state.humanSpecialSelectionIndex;
-      const card = state.humanHand[cardIndex];
-      const humanButtons = document.querySelectorAll("#humanHand .card-btn");
-      const sourceButton = humanButtons[cardIndex];
-
       clearHumanSpecialSelection();
-
-      if (card && sourceButton) {
-        await animatePlayToPileFromElement(sourceButton, card, false, 300);
-      }
 
       if (state.faceoffPending) {
         resolveFaceoff(cardIndex);
@@ -3470,13 +4446,36 @@
         return;
       }
 
-      if (state.currentTurn !== "human" || state.cpuBusy || state.faceoffPending || state.shotPending || state.stabilizePending || !hasHumanPendingTurn()) {
+      if (state.currentTurn !== "human" || state.cpuBusy || state.faceoffPending || state.stabilizePending || !hasHumanPendingTurn()) {
         return;
       }
 
       const pendingCount = getHumanPendingPlayCount();
       const lastSnapshot = state.humanPendingTurn.snapshots[state.humanPendingTurn.snapshots.length - 1];
       const lastPlayedCard = cloneCard(lastSnapshot?.playedCard);
+
+      if (state.shotPending) {
+        const shot = state.shotPending;
+        clearHumanPendingTurn();
+        addLog(`Human submits the save chain after ${pendingCount} card${pendingCount === 1 ? "" : "s"}.`);
+
+        if (canUsePitySaveDraw("human", shot)) {
+          render();
+          await drawPitySaveCard("human");
+          render();
+          if (!state.shotPending || state.currentTurn !== "human") {
+            runCpuAuto();
+            render();
+          }
+          return;
+        }
+
+        resolveNormalShotSaveAttempt();
+        render();
+        runCpuAuto();
+        render();
+        return;
+      }
 
       clearHumanPendingTurn();
       addLog(`Human submits the ${state.roleOfCurrentTurn} turn after ${pendingCount} card${pendingCount === 1 ? "" : "s"}.`);
@@ -3635,7 +4634,9 @@
       const hand = playerHand(player);
       if (state.shotPending) {
         const shot = state.shotPending;
-        if (isReboundSavePhase(shot)) {
+        if (isReboundRevealPhase(shot)) {
+          addLog(`${label} ${lowerPlayerName(player)} rebound reveal turn. Must reveal 1 rebound card from the deck.`);
+        } else if (isReboundSavePhase(shot)) {
           addLog(`${label} ${lowerPlayerName(player)} rebound save turn. Must answer ${cardToText(state.activeCard)} with 1 legal save card against rebound value ${shot.reboundShotValue}. Hand: ${cardsToText(hand)}.`);
         } else {
           addLog(`${label} ${lowerPlayerName(player)} save turn. Must answer ${cardToText(state.activeCard)} with ${getShotCurrentRequiredLength(shot)} linked save card(s). Hand: ${cardsToText(hand)}.`);
@@ -3713,6 +4714,8 @@
       state.comboImmunityActive = false;
       state.attacker = winner;
       syncDefender();
+      incrementPlayerStat(winner, "exchangeWins");
+      recordZoneResolution();
 
       addLog(`${lowerPlayerName(winner)} empties the hand on defense and forces a special turnover.`);
       addLog(`Possession flips to ${lowerPlayerName(state.attacker)} because the defender ran out of cards.`);
@@ -3810,6 +4813,8 @@
 
       state.attacker = turnoverWinner;
       syncDefender();
+  incrementPlayerStat(turnoverWinner, "exchangeWins");
+  recordZoneResolution();
       addLog(reason || `${lowerPlayerName(turnoverWinner)} wins the exchange ${state.defenderChainCount}-${state.attackerChainCount}. Turnover.`);
       addLog(`Possession changes because ${lowerPlayerName(turnoverWinner)} won the exchange on defense.`);
 
@@ -3829,6 +4834,8 @@
       }
 
       clearStabilizePending();
+      incrementPlayerStat(player, "stabilizeSuccesses");
+      recordZoneResolution();
       addLog(`${lowerPlayerName(player)} stabilizes with ${cardToText(card)} and denies the turnover.`);
       addLog(`${lowerPlayerName(player)} keeps possession in ${zoneLabel(state.zoneIndex)}. No zone advance this exchange.`);
       setEvent("Stabilized / No Turnover", "contain");
@@ -3851,6 +4858,7 @@
 
       if (winner === state.attacker) {
         if (loosePuckExchange) {
+          recordZoneResolution();
           addLog(reason || `${lowerPlayerName(state.attacker)} holds the puck after a 0-0 exchange.`);
           addLog(`Loose Puck: 0-0 exchange triggers an immediate faceoff in ${zoneLabel(state.zoneIndex)}.`);
           setEvent("Loose Puck", "contain");
@@ -3886,6 +4894,8 @@
           addLog(`Puck stays in ${zoneLabel(state.zoneIndex)}.`);
         }
 
+        incrementPlayerStat(winner, "exchangeWins");
+        recordZoneResolution();
         awardMomentumForExchangeWin(winner, exchangeMargin);
 
         setEvent(attackerAdvances ? "Exchange Win (+1 Zone)" : "Exchange Hold / No Advance", attackerAdvances ? "shot" : "contain");
@@ -3911,7 +4921,7 @@
       }
 
       if (player === "human" && hasHumanPendingTurn()) {
-        addLog("Human has unsubmitted cards. Use Submit or Undo before ending the chain.");
+        addLog("Human has staged cards. Confirm with Deck, the pile, or Submit, or use Undo before ending the chain.");
         return;
       }
 
@@ -4036,41 +5046,7 @@
     }
 
     function getFaceoffComparisonPreview(humanCard, cpuCard, config = state.config) {
-      if (humanCard.suit === cpuCard.suit) {
-        return getFaceoffValueComparison(humanCard, cpuCard);
-      }
-
-      if (isWildCard(humanCard) || isWildCard(cpuCard)) {
-        return getFaceoffValueComparison(humanCard, cpuCard, "wild card");
-      }
-
-      const ordered = getOrderedActiveFaceoffSuits(config);
-      const suitCount = ordered.length;
-      const humanIndex = ordered.indexOf(humanCard.suit);
-      const cpuIndex = ordered.indexOf(cpuCard.suit);
-
-      if (humanIndex === -1 || cpuIndex === -1 || suitCount === 0) {
-        return getFaceoffValueComparison(humanCard, cpuCard, "value fallback");
-      }
-
-      const clockwiseDistance = (cpuIndex - humanIndex + suitCount) % suitCount;
-      if (suitCount % 2 === 1) {
-        const humanWinReach = (suitCount - 1) / 2;
-        if (clockwiseDistance >= 1 && clockwiseDistance <= humanWinReach) {
-          return { winner: "human", summary: `${humanCard.suit} beats ${cpuCard.suit}` };
-        }
-        return { winner: "cpu", summary: `${cpuCard.suit} beats ${humanCard.suit}` };
-      }
-
-      if (clockwiseDistance === suitCount / 2) {
-        return getFaceoffValueComparison(humanCard, cpuCard, "opposite suits");
-      }
-
-      if (clockwiseDistance === 1) {
-        return { winner: "human", summary: `${humanCard.suit} beats ${cpuCard.suit}` };
-      }
-
-      return { winner: "cpu", summary: `${cpuCard.suit} beats ${humanCard.suit}` };
+      return getFaceoffValueComparison(humanCard, cpuCard);
     }
 
     function getFaceoffComparisonDetails(humanCard, cpuCard, config = state.config) {
@@ -4251,6 +5227,14 @@
         return;
       }
 
+      if (state.faceoffPending) {
+        resolveFaceoff(cardIndex);
+        render();
+        runCpuAuto();
+        render();
+        return;
+      }
+
       if (humanMoveRequiresSubmitConfirmation()) {
         selectHumanSpecialCard(cardIndex);
         render();
@@ -4263,6 +5247,15 @@
 
     async function animateAndCommitHumanPlay(cardIndex, sourceElement) {
       if (humanMoveRequiresSubmitConfirmation()) {
+        if (state.humanSpecialSelectionIndex === cardIndex) {
+          await commitHumanCardPlay(cardIndex);
+          return;
+        }
+
+        const stagedCard = state.humanHand[cardIndex];
+        if (stagedCard && sourceElement) {
+          await animatePlayToPileFromElement(sourceElement, stagedCard, false, 300);
+        }
         await commitHumanCardPlay(cardIndex);
         return;
       }
@@ -4276,7 +5269,7 @@
     }
 
     function startHumanCardDrag(event, cardIndex, card, isLegal) {
-      if (!isLegal || state.cpuBusy || humanMoveRequiresSubmitConfirmation()) {
+      if (!isLegal || state.cpuBusy) {
         return;
       }
 
@@ -4366,7 +5359,7 @@
         }
       }
 
-      resetMomentumForFaceoff(faceoffLabel);
+      trimMomentumForFaceoff(faceoffMode, faceoffLabel);
 
       clearHumanPendingTurn();
       clearBurnSelection();
@@ -4442,6 +5435,9 @@
           state.attacker = "human";
           syncDefender();
           resetRunMatchState();
+          incrementPlayerStat("human", "faceoffsWon");
+          incrementPlayerStat("human", "loosePucksWon");
+          recordZoneResolution(state.zoneIndex);
           addLog(`CPU has no card for the Loose Puck faceoff. Human wins possession in ${zoneLabel(state.zoneIndex)}.`);
           if (state.humanHand.length === 0) {
             refillToFive("human");
@@ -4497,6 +5493,11 @@
       syncDefender();
       state.activeCard = winningCard;
       resetRunMatchState();
+      incrementPlayerStat(winner, "faceoffsWon");
+      if (loosePuckFaceoff) {
+        incrementPlayerStat(winner, "loosePucksWon");
+      }
+      recordZoneResolution(state.zoneIndex);
 
       if (!loosePuckFaceoff) {
         if (state.humanHand.length === 0) {
@@ -4622,25 +5623,66 @@
       return bestChain.length > 0 ? bestChain : null;
     }
 
-    function processCpuShotSequenceTurn() {
+    async function processCpuShotSequenceTurn() {
       const shot = state.shotPending;
-      if (!shot || shot.defenderPlayer !== "cpu" || state.currentTurn !== "cpu") {
+      if (!shot || state.currentTurn !== "cpu") {
+        return false;
+      }
+
+      if (isReboundRevealPhase(shot)) {
+        if (shot.attackerPlayer !== "cpu") {
+          return false;
+        }
+
+        showCpuNotice("REBOUND", "info");
+        render();
+        await sleep(getCpuSimDuration(760, 160));
+
+        if (state.currentTurn !== "cpu" || !state.shotPending || !isReboundRevealPhase(state.shotPending)) {
+          return false;
+        }
+
+        await revealReboundShotCard("cpu", { duration: getCpuSimDuration(440, 140) });
+        return true;
+      }
+
+      if (shot.defenderPlayer !== "cpu") {
         return false;
       }
 
       if (isReboundSavePhase(shot)) {
         const legal = getLegalCardsForTurn("cpu");
         if (legal.length === 0) {
-          return tryReboundDesperationSave("cpu");
+          return await tryReboundDesperationSave("cpu");
         }
 
         const idx = chooseHighestValueIndex(state.cpuHand, legal);
+        state.cpuPreviewIndex = idx;
+        render();
+        await sleep(getCpuSimDuration(760, 160));
+
+        if (state.currentTurn !== "cpu" || idx < 0 || idx >= state.cpuHand.length) {
+          state.cpuPreviewIndex = null;
+          return false;
+        }
+
+        const cpuCard = state.cpuHand[idx];
+        const cpuButtons = document.querySelectorAll("#cpuHand .card-btn");
+        const sourceButton = cpuButtons[idx];
+        await animatePlayToPileFromElement(sourceButton, cpuCard, !state.showCpuCards, getCpuSimDuration(420, 120));
         playShotSaveCard("cpu", idx);
+        state.cpuPreviewIndex = null;
         return true;
       }
 
       const chainIndexes = findBestSaveChain(state.cpuHand, shot.requiredLength, state.activeCard);
       if (!chainIndexes || chainIndexes.length === 0) {
+        if (canUsePitySaveDraw("cpu", shot)) {
+          return await drawPitySaveCard("cpu", {
+            drawDuration: getCpuSimDuration(460, 140),
+            playDuration: getCpuSimDuration(420, 120)
+          });
+        }
         finishShotAsGoal(`${lowerPlayerName(shot.defenderPlayer)} cannot start the ${shot.requiredLength}-card save chain. GOAL ${lowerPlayerName(shot.attackerPlayer)}.`);
         return true;
       }
@@ -4673,6 +5715,13 @@
         return true;
       }
 
+      if (canUsePitySaveDraw("cpu", shot)) {
+        return await drawPitySaveCard("cpu", {
+          drawDuration: getCpuSimDuration(460, 140),
+          playDuration: getCpuSimDuration(420, 120)
+        });
+      }
+
       resolveNormalShotSaveAttempt();
       return true;
     }
@@ -4699,7 +5748,8 @@
           ? `${lowerPlayerName(attackerPlayer)} shoots from close range!`
           : `${lowerPlayerName(attackerPlayer)} takes a shot!`, "shot");
       setEvent(`Shot quality ${shotValue}`, "shot");
-      showDeckEvent("SHOT", "shot", 1000);
+      showDeckEvent(`Shot ${shotValue}\nSave ${requiredLength}`, "shot", 1600);
+      recordShotForStats(attackerPlayer, shotValue, shotZoneIndex);
 
       state.shotPending = {
         attackerPlayer,
@@ -4714,6 +5764,7 @@
         phaseRequiredLength: requiredLength,
         savedCards: [],
         savedCount: 0,
+        pitySaveDrawUsed: false,
         reboundCount: 0,
         reboundShotCard: null,
         reboundShotValue: null
@@ -4753,13 +5804,13 @@
         return;
       }
 
-      if (!state.stabilizePending && player === "human" && drawnCard && isNewestDrawnCardPlayable(player)) {
+      if (player === "human" && drawnCard && isNewestDrawnCardPlayable(player)) {
         addLog(`Human drew ${cardToText(drawnCard)}. It is playable; choose it manually if you want to use it.`);
         logTurnDiagnostics(player, "Draw result.");
         return;
       }
 
-      if (await tryPlayDrawnCard(player, drawnCard)) {
+      if (player === "cpu" && await tryPlayDrawnCard(player, drawnCard)) {
         return;
       }
 
@@ -4826,8 +5877,7 @@
       const deferResolution = Boolean(options.deferResolution);
 
       if (state.shotPending) {
-        playShotSaveCard(player, cardIndex);
-        return true;
+        return playShotSaveCard(player, cardIndex, { deferResolution });
       }
 
       if (state.currentTurn !== player) {
@@ -5229,7 +6279,7 @@
       }
 
       if (state.shotPending) {
-        return processCpuShotSequenceTurn();
+        return await processCpuShotSequenceTurn();
       }
 
       const legal = getLegalCardsForTurn("cpu");
@@ -5447,6 +6497,13 @@
 
     function renderZoneTrack() {
       const zoneTrack = document.getElementById("zoneTrack");
+      if (!zoneTrack) {
+        return;
+      }
+
+      zoneTrack.classList.toggle("human-control", state.attacker === "human" && !state.faceoffPending);
+      zoneTrack.classList.toggle("cpu-control", state.attacker === "cpu" && !state.faceoffPending);
+      zoneTrack.classList.toggle("shot-pressure", Boolean(state.shotPending));
       zoneTrack.innerHTML = "";
       ZONES.forEach((zoneName, idx) => {
         const div = document.createElement("div");
@@ -5456,7 +6513,11 @@
           (state.attacker === "human" && (idx === 4 || idx === 5))
           || (state.attacker === "cpu" && (idx === 0 || idx === 1))
         );
-        div.className = `zone${isActive ? " active" : ""}${isOffensive ? " offensive" : ""}`;
+        const controllerClass = isActive && !state.faceoffPending
+          ? (state.attacker === "human" ? " human-control" : state.attacker === "cpu" ? " cpu-control" : "")
+          : "";
+        const faceoffClass = isActive && state.faceoffPending ? " faceoff-focus" : "";
+        div.className = `zone${isActive ? " active" : ""}${isOffensive ? " offensive" : ""}${controllerClass}${faceoffClass}`;
         div.title = zoneName;
 
         const marker = document.createElement("span");
@@ -5505,8 +6566,13 @@
         : null;
       const isComboTurn = state.comboWindow && state.comboPlayer === owner;
       const shouldShowCpuCards = owner !== "cpu" || state.showCpuCards;
+      let renderedCount = 0;
 
       hand.forEach((card, i) => {
+        if (owner === "human" && i === humanSpecialSelectionIndex) {
+          return;
+        }
+
         const btn = document.createElement("button");
         btn.className = `card-btn ${shouldShowCpuCards ? suitClass(card.suit) : "hidden-card"}`;
         btn.setAttribute("aria-label", shouldShowCpuCards ? cardToText(card) : "Hidden CPU card");
@@ -5523,7 +6589,7 @@
           if (isComboTurn && isLegal) {
             btn.classList.add("combo-legal");
           }
-          if (isLegal && !humanMoveRequiresSubmitConfirmation()) {
+          if (isLegal) {
             btn.classList.add("draggable-card");
           }
           if (i === humanSpecialSelectionIndex) {
@@ -5533,7 +6599,7 @@
           if (state.faceoffPending) {
             const faceoffName = getFaceoffUiLabel().toLowerCase();
             btn.title = isLegal
-              ? (i === humanSpecialSelectionIndex ? `Selected for the ${faceoffName}. Press Submit to confirm.` : `Select this card for the ${faceoffName}.`)
+              ? `Play this card for the ${faceoffName}. It resolves immediately.`
               : "Choose a faceoff card";
           } else if (pendingMomentumAction === "burn") {
             btn.title = isLegal ? "Burn this card out of hand" : "Choose a Burn card";
@@ -5542,12 +6608,12 @@
           } else if (state.shotPending) {
             btn.title = isLegal
               ? (i === humanSpecialSelectionIndex
-                ? `Selected ${isReboundSavePhase(state.shotPending) ? "rebound save" : "save"}. Press Submit to confirm.`
-                : (isReboundSavePhase(state.shotPending) ? "Select this rebound save" : "Select this save card"))
+                ? `Staged ${isReboundSavePhase(state.shotPending) ? "rebound save" : "save"}. Tap Deck, tap the pile, or press Submit to confirm.`
+                : (isReboundSavePhase(state.shotPending) ? "Stage this rebound save" : "Add this save card to the staged save chain"))
               : (isReboundSavePhase(state.shotPending) ? "Not legal for the rebound save" : "Not legal in the current save chain");
           } else if (state.stabilizePending) {
             btn.title = isLegal
-              ? (i === humanSpecialSelectionIndex ? "Selected for Stabilize. Press Submit to confirm." : "Select this card for Stabilize.")
+              ? (i === humanSpecialSelectionIndex ? "Staged for Stabilize. Tap Deck, tap the pile, or press Submit to confirm." : "Stage this card for Stabilize.")
               : "Not legal for Stabilize";
           } else {
             btn.title = isHumanTurn
@@ -5573,12 +6639,13 @@
         }
 
         container.appendChild(btn);
+        renderedCount += 1;
       });
 
-      if (hand.length === 0) {
+      if (renderedCount === 0) {
         const empty = document.createElement("span");
         empty.className = "hint";
-        empty.textContent = "(empty hand)";
+        empty.textContent = owner === "human" && humanSpecialSelectionIndex !== null ? "(card staged on pile)" : "(empty hand)";
         container.appendChild(empty);
       }
     }
@@ -5646,36 +6713,148 @@
         return;
       }
 
-      if (!state.lastShot) {
+      if (!state.lastShot && !state.gameOver) {
         panel.className = "last-shot-panel empty";
         panel.textContent = "No shots yet.";
         return;
       }
 
       panel.className = "last-shot-panel";
-      const shot = state.lastShot;
-      const responseText = shot.saveCards.length > 0 ? shot.saveCards.map(cardToText).join(" -> ") : "No completed save response";
-      const shooterText = shot.shotKind === "powerShot"
-        ? `${lowerPlayerName(shot.attackerPlayer)} used Force Shot from ${zoneLabel(shot.shotZoneIndex)} (quality ${shot.shotValue}${shot.powerHandSize ? `, hand ${shot.powerHandSize}` : ""}).`
-        : `${lowerPlayerName(shot.attackerPlayer)} played ${cardToText(shot.shotCard)} from ${zoneLabel(shot.shotZoneIndex)} (quality ${shot.shotValue}).`;
-      const outcomeText = shot.outcome === "save"
-        ? "Save / frozen puck"
-        : shot.outcome === "recovery"
-          ? `Defensive recovery for ${lowerPlayerName(shot.defenderPlayer)}`
-          : `Goal for ${lowerPlayerName(shot.attackerPlayer)}`;
+      const parts = [];
+
+      if (state.gameOver) {
+        parts.push(buildMatchSnapshotHtml());
+      }
+
+      if (state.lastShot) {
+        const shot = state.lastShot;
+        const responseText = shot.saveCards.length > 0 ? shot.saveCards.map(cardToText).join(" -> ") : "No completed save response";
+        const shooterText = shot.shotKind === "powerShot"
+          ? `${lowerPlayerName(shot.attackerPlayer)} used Force Shot from ${zoneLabel(shot.shotZoneIndex)} (quality ${shot.shotValue}${shot.powerHandSize ? `, hand ${shot.powerHandSize}` : ""}).`
+          : `${lowerPlayerName(shot.attackerPlayer)} played ${cardToText(shot.shotCard)} from ${zoneLabel(shot.shotZoneIndex)} (quality ${shot.shotValue}).`;
+        const outcomeText = shot.outcome === "save"
+          ? "Save / frozen puck"
+          : shot.outcome === "recovery"
+            ? `Defensive recovery for ${lowerPlayerName(shot.defenderPlayer)}`
+            : `Goal for ${lowerPlayerName(shot.attackerPlayer)}`;
+
+        if (state.gameOver) {
+          parts.push('<div class="last-shot-subtitle">Last Shot</div>');
+        }
+
+        parts.push(
+          `<div class="last-shot-row"><strong>Shooter</strong>${shooterText}</div>`,
+          `<div class="last-shot-row"><strong>Defender</strong>${lowerPlayerName(shot.defenderPlayer)} responded with ${responseText}.</div>`,
+          `<div class="last-shot-row"><strong>Outcome</strong>${outcomeText}</div>`
+        );
+      }
+
+      panel.innerHTML = parts.join("");
+    }
+
+    function renderGoalLog() {
+      const container = document.getElementById("goalLogList");
+      if (!container) {
+        return;
+      }
+
+      container.innerHTML = "";
+      if (state.goalLog.length === 0) {
+        const empty = document.createElement("div");
+        empty.className = "goal-log-empty";
+        empty.textContent = "No goals yet.";
+        container.appendChild(empty);
+        return;
+      }
+
+      state.goalLog.forEach((entry) => {
+        const item = document.createElement("div");
+        item.className = `goal-log-entry ${entry.player}`;
+
+        const head = document.createElement("div");
+        head.className = "goal-log-head";
+        head.innerHTML = `<span>${lowerPlayerName(entry.player)} goal</span><span>${entry.periodLabel} ${entry.clockText}</span>`;
+
+        const meta = document.createElement("div");
+        meta.className = "goal-log-meta";
+        meta.textContent = `${entry.zoneLabel} | Shot ${entry.shotValue} | Human ${entry.humanScore} - ${entry.cpuScore} CPU`;
+
+        item.appendChild(head);
+        item.appendChild(meta);
+        container.appendChild(item);
+      });
+    }
+
+    function renderStatsPanel() {
+      const panel = document.getElementById("statsPanel");
+      if (!panel) {
+        return;
+      }
+
+      const overviewRows = getStatsOverviewRows().map((row) => `
+        <tr>
+          <td>${row.label}</td>
+          <td class="stat-value">${row.human}</td>
+          <td class="stat-value">${row.cpu}</td>
+        </tr>
+      `).join("");
+      const zoneRows = ZONES.map((zoneName, zoneIndex) => `
+        <tr>
+          <td>${zoneName}</td>
+          <td class="stat-value">${state.stats.human.zonePlays[zoneIndex]}</td>
+          <td class="stat-value">${state.stats.cpu.zonePlays[zoneIndex]}</td>
+          <td class="stat-value">${state.stats.human.shotOrigins[zoneIndex]}</td>
+          <td class="stat-value">${state.stats.cpu.shotOrigins[zoneIndex]}</td>
+          <td class="stat-value">${state.stats.zoneTime[zoneIndex]}</td>
+        </tr>
+      `).join("");
+      const humanShotValues = state.stats.human.shotValues.length > 0 ? state.stats.human.shotValues.join(", ") : "none";
+      const cpuShotValues = state.stats.cpu.shotValues.length > 0 ? state.stats.cpu.shotValues.join(", ") : "none";
+      const scoringSummary = state.stats.scoringSummary.length > 0
+        ? `<ul class="stats-list">${state.stats.scoringSummary.map((entry) => `<li>${entry}</li>`).join("")}</ul>`
+        : '<div class="stats-note">No goals recorded yet.</div>';
+
       panel.innerHTML = [
-        `<div class="last-shot-row"><strong>Shooter</strong>${shooterText}</div>`,
-        `<div class="last-shot-row"><strong>Defender</strong>${lowerPlayerName(shot.defenderPlayer)} responded with ${responseText}.</div>`,
-        `<div class="last-shot-row"><strong>Outcome</strong>${outcomeText}</div>`
-      ].join("");
+        '<div class="stats-section">',
+        '<div class="stats-section-title">Summary</div>',
+        '<div class="stats-table-wrap">',
+        '<table class="stats-table">',
+        '<thead><tr><th>Stat</th><th>Human</th><th>CPU</th></tr></thead>',
+        `<tbody>${overviewRows}</tbody>`,
+        '</table>',
+        '</div>',
+        '</div>',
+        '<div class="stats-section">',
+        '<div class="stats-section-title">Shot Values</div>',
+        `<div class="stats-note"><strong>Human:</strong> ${humanShotValues}</div>`,
+        `<div class="stats-note"><strong>CPU:</strong> ${cpuShotValues}</div>`,
+        '</div>',
+        '<div class="stats-section">',
+        '<div class="stats-section-title">Zone Activity</div>',
+        '<div class="stats-table-wrap">',
+        '<table class="stats-table">',
+        '<thead><tr><th>Zone</th><th>Human Plays</th><th>CPU Plays</th><th>Human Shots</th><th>CPU Shots</th><th>Resolved Turns</th></tr></thead>',
+        `<tbody>${zoneRows}</tbody>`,
+        '</table>',
+        '</div>',
+        '</div>',
+        '<div class="stats-section">',
+        '<div class="stats-section-title">Scoring Summary</div>',
+        scoringSummary,
+        '</div>'
+      ].join('');
     }
 
     function render() {
       const faceoffUiLabel = state.faceoffPending ? getFaceoffUiLabel() : "Faceoff";
       const shotPhaseLabel = state.shotPending
-        ? (isReboundSavePhase(state.shotPending) ? "rebound save" : "save chain")
+        ? (isReboundRevealPhase(state.shotPending) ? "rebound reveal" : isReboundSavePhase(state.shotPending) ? "rebound save" : "save chain")
         : "";
       const puckBattleActive = state.faceoffPending && isLoosePuckFaceoff();
+      const humanSpecialSelectionActive = state.currentTurn === "human" && humanMoveRequiresSubmitConfirmation() && hasHumanSpecialSelection();
+      const stagedHumanCard = humanSpecialSelectionActive ? state.humanHand[state.humanSpecialSelectionIndex] : null;
+      const humanSpecialSelectionMode = humanSpecialSelectionActive ? getHumanSpecialSelectionMode() : null;
+      const humanSpecialSelectionLabel = humanSpecialSelectionMode ? getHumanSpecialSelectionLabel(humanSpecialSelectionMode) : "";
       document.getElementById("attackerLabel").textContent = lowerPlayerName(state.attacker);
       document.getElementById("defenderLabel").textContent = lowerPlayerName(state.defender);
       document.getElementById("turnLabel").textContent = state.gameOver
@@ -5688,13 +6867,8 @@
           ? `${lowerPlayerName(state.currentTurn)} (${shotPhaseLabel})`
           : `${lowerPlayerName(state.currentTurn)} (${state.roleOfCurrentTurn === "attacker" ? "attacking" : "defending"})`;
       document.getElementById("deckCountLabel").textContent = String(state.deck.length);
-      document.getElementById("scoreLabel").textContent = `(${state.humanHand.length}) Human ${state.humanScore} - ${state.cpuScore} CPU (${state.cpuHand.length})`;
+          document.getElementById("scoreLabel").textContent = `(${state.humanHand.length}) HUMAN ${state.humanScore} - CPU ${state.cpuScore} (${state.cpuHand.length})`;
       document.getElementById("gameClockLabel").textContent = state.gameOver ? `${getPeriodLabel()} Final` : `${getPeriodLabel()} | ${formatGameClock()}`;
-      document.getElementById("comboLabel").textContent = state.faceoffPending
-        ? `${faceoffUiLabel} pending`
-        : state.shotPending
-          ? `${isReboundSavePhase(state.shotPending) ? "Rebound Save" : "Save"} ${state.shotPending.savedCount}/${getShotCurrentRequiredLength(state.shotPending)}`
-          : `Attack ${state.attackerChainCount} | Defense ${state.defenderChainCount}`;
       document.getElementById("showCpuCardsCheckbox").checked = state.showCpuCards;
       renderLegend();
       renderFaceoffRulesHint();
@@ -5703,31 +6877,58 @@
       const activeCardLabel = document.getElementById("activeCardLabel");
       const activeCardMiddle = document.getElementById("activeCardMiddle");
       const zoneTrack = document.getElementById("zoneTrack");
-      if (state.faceoffPending) {
+      if (stagedHumanCard) {
+        activeCardLabel.textContent = `${humanSpecialSelectionLabel} Staged`;
+      } else if (state.faceoffPending) {
         activeCardLabel.textContent = faceoffUiLabel;
       } else if (state.shotPending) {
-        activeCardLabel.textContent = isReboundSavePhase(state.shotPending) ? "Rebound Save Must Match" : "Save Must Match";
+        activeCardLabel.textContent = isReboundRevealPhase(state.shotPending)
+          ? "Rebound Must Match"
+          : isReboundSavePhase(state.shotPending)
+            ? "Rebound Save Must Match"
+            : "Save Must Match";
       } else {
         activeCardLabel.textContent = "Active Card";
       }
 
+      const humanPendingCount = getHumanPendingPlayCount();
+      const canConfirmPendingHumanTurn = state.currentTurn === "human"
+        && !state.cpuBusy
+        && humanPendingCount > 0
+        && !state.faceoffPending
+        && !state.stabilizePending;
+
       activeCardMiddle.className = "active-card-pill";
-      if (state.activeCard) {
+      if (stagedHumanCard) {
+        activeCardMiddle.classList.add(suitClass(stagedHumanCard.suit), "staged-submit");
+        fillCardVisual(activeCardMiddle, stagedHumanCard);
+        activeCardMiddle.title = `${humanSpecialSelectionLabel} staged. Tap the pile, tap Deck, or press Submit to confirm.`;
+      } else if (state.activeCard) {
         activeCardMiddle.classList.add(suitClass(state.activeCard.suit));
+        if (canConfirmPendingHumanTurn) {
+          activeCardMiddle.classList.add("staged-submit");
+        }
         fillCardVisual(activeCardMiddle, state.activeCard);
+        activeCardMiddle.title = canConfirmPendingHumanTurn
+          ? (state.shotPending
+            ? `Human has ${humanPendingCount} staged save card${humanPendingCount === 1 ? "" : "s"}. Tap the pile, tap Deck, or press Submit to resolve the save chain.`
+            : `Human has ${humanPendingCount} staged card${humanPendingCount === 1 ? "" : "s"}. Tap the pile, tap Deck, or press Submit to confirm.`)
+          : "";
       } else if (state.faceoffPending) {
         fillCardVisual(activeCardMiddle, null, { placeholderText: faceoffUiLabel });
+        activeCardMiddle.title = "";
       } else {
         fillCardVisual(activeCardMiddle, null, { placeholderText: "Any Card" });
+        activeCardMiddle.title = "";
       }
 
       renderRecentPlays();
 
       const comboHint = document.getElementById("comboHint");
-      const humanPendingCount = getHumanPendingPlayCount();
-      const humanHasSpecialSelection = state.currentTurn === "human" && hasHumanSpecialSelection();
-      const selectedHumanCard = humanHasSpecialSelection ? state.humanHand[state.humanSpecialSelectionIndex] : null;
+      const humanHasSpecialSelection = humanSpecialSelectionActive;
+      const selectedHumanCard = stagedHumanCard;
       const humanShotLegalCount = state.shotPending && state.currentTurn === "human" ? getLegalCardsForTurn("human").length : 0;
+      const humanPitySaveDraw = state.shotPending && state.currentTurn === "human" && canUsePitySaveDraw("human", state.shotPending);
       zoneTrack.classList.toggle("puck-battle", puckBattleActive);
       if (state.pendingBurnSelection) {
         comboHint.textContent = "Burn is active. Choose exactly 1 Human card to discard out of hand.";
@@ -5735,40 +6936,48 @@
         comboHint.textContent = "Cycle is active. Choose exactly 1 Human card to discard and redraw.";
       } else if (state.stabilizePending && state.currentTurn === "human") {
         comboHint.textContent = selectedHumanCard
-          ? `Human selected ${cardToText(selectedHumanCard)} for Stabilize. Press Submit to confirm, or Undo to clear it.`
-          : "Human gets 1 Stabilize attempt: choose 1 legal card and press Submit, or draw 1 if none.";
+          ? `Human staged ${cardToText(selectedHumanCard)} for Stabilize. Tap Deck, tap the pile, or press Submit to confirm; Undo clears it.`
+          : "Human gets 1 Stabilize attempt: stage 1 legal card, then tap Deck, tap the pile, or press Submit; draw 1 if none.";
       } else if (state.stabilizePending) {
         comboHint.textContent = `${lowerPlayerName(state.currentTurn)} gets 1 Stabilize attempt to deny the turnover.`;
       } else if (state.currentTurn === "human" && humanPendingCount > 0 && !state.faceoffPending && !state.shotPending) {
         const suffix = humanPendingCount === 1 ? "card" : "cards";
         comboHint.textContent = canStartOrContinueCombo("human", state.activeCard)
-          ? `Human has ${humanPendingCount} unsubmitted ${suffix}. Play more, Undo, or Submit.`
-          : `Human has ${humanPendingCount} unsubmitted ${suffix}. Undo or Submit the turn.`;
+          ? `Human has ${humanPendingCount} staged ${suffix}. Play more, Undo, or tap Deck, tap the pile, or press Submit.`
+          : `Human has ${humanPendingCount} staged ${suffix}. Undo, tap Deck, tap the pile, or press Submit the turn.`;
       } else if (state.faceoffPending) {
         if (isIcingFaceoff()) {
           if (state.icingFaceoffPlayer === "cpu" && state.icingFaceoffLeadCard) {
-            comboHint.textContent = selectedHumanCard
-              ? `CPU revealed ${cardToText(state.icingFaceoffLeadCard)}. Human selected ${cardToText(selectedHumanCard)} for the Icing Faceoff response. Press Submit to confirm, or Undo to clear it.`
-              : `CPU revealed ${cardToText(state.icingFaceoffLeadCard)} for the Icing Faceoff. Choose 1 response card and press Submit.`;
+            comboHint.textContent = `CPU revealed ${cardToText(state.icingFaceoffLeadCard)} for the Icing Faceoff. Play 1 response card; it resolves immediately.`;
           } else {
-            comboHint.textContent = selectedHumanCard
-              ? `Human selected ${cardToText(selectedHumanCard)} to reveal first for the Icing Faceoff. Press Submit to confirm, or Undo to clear it.`
-              : "Human must reveal first for the Icing Faceoff. Choose 1 card and press Submit; CPU will answer after seeing it.";
+            comboHint.textContent = "Human must reveal first for the Icing Faceoff. Play 1 card; it resolves immediately and CPU answers after seeing it.";
           }
         } else {
-          comboHint.textContent = selectedHumanCard
-            ? `${faceoffUiLabel} selected: ${cardToText(selectedHumanCard)}. Press Submit to confirm, or Undo to clear it.`
-            : `Choose 1 card for the ${faceoffUiLabel.toLowerCase()} and press Submit. RPS suit rules decide first.`;
+          comboHint.textContent = `Play 1 card for the ${faceoffUiLabel.toLowerCase()}. It resolves immediately; higher card wins and ties are random.`;
         }
       } else if (state.shotPending) {
         comboHint.textContent = state.currentTurn !== "human"
-          ? `${lowerPlayerName(state.currentTurn)} is resolving the ${shotPhaseLabel}.`
+          ? (isReboundRevealPhase(state.shotPending)
+            ? `${lowerPlayerName(state.currentTurn)} is revealing the rebound card.`
+            : canUsePitySaveDraw(state.currentTurn, state.shotPending)
+              ? `${lowerPlayerName(state.currentTurn)} gets a 1-card pity draw for the last save chance.`
+              : `${lowerPlayerName(state.currentTurn)} is resolving the ${shotPhaseLabel}.`)
+          : humanPendingCount > 0 && !isReboundSavePhase(state.shotPending)
+            ? (humanPitySaveDraw
+              ? `Human has ${humanPendingCount} staged save card${humanPendingCount === 1 ? "" : "s"}. Tap Deck, tap the pile, or press Submit to take the pity draw, or Undo to pull one back.`
+              : humanShotLegalCount > 0
+                ? `Human has ${humanPendingCount} staged save card${humanPendingCount === 1 ? "" : "s"}. Play more, Undo, or tap Deck, tap the pile, or press Submit to resolve the save chain.`
+                : `Human has ${humanPendingCount} staged save card${humanPendingCount === 1 ? "" : "s"}. Undo, or tap Deck, tap the pile, or press Submit to resolve the save chain.`)
           : selectedHumanCard
-            ? `Human selected ${cardToText(selectedHumanCard)} for the ${isReboundSavePhase(state.shotPending) ? "rebound save" : "save chain"}. Press Submit to confirm, or Undo to clear it.`
+            ? `Human staged ${cardToText(selectedHumanCard)} for the ${isReboundSavePhase(state.shotPending) ? "rebound save" : "save chain"}. Tap Deck, tap the pile, or press Submit to confirm; Undo clears it.`
+          : humanPitySaveDraw
+            ? "Human has no legal save card. Tap Deck for a 1-card pity draw."
+          : isReboundRevealPhase(state.shotPending)
+            ? `Rebound ${state.shotPending.reboundCount}: tap Deck to reveal and play the rebound card.`
           : isReboundSavePhase(state.shotPending)
             ? (humanShotLegalCount > 0
               ? `Human must play 1 legal rebound save. If its value is below ${state.shotPending.reboundShotValue}, another rebound occurs. Press Concede to allow the goal.`
-              : "Human has no legal rebound save in hand. Press Desperation to reveal 1 top-deck save card.")
+              : "Human has no legal rebound save in hand. Press Desperation to draw 1 top-deck save card into hand.")
             : `Human must build a ${state.shotPending.requiredLength}-card save chain. Press End Save to resolve freeze, rebound, or goal from the current save count.`;
       } else if (state.currentTurn === "human" && canPlayerIcePuck("human")) {
         comboHint.textContent = "Human is stuck in the defensive zone. Draw normally, or use Ice Puck to reset both hands and force an Icing Faceoff.";
@@ -5796,13 +7005,20 @@
         comboHint.textContent = "";
       }
 
+      renderStateReadout({
+        faceoffUiLabel,
+        humanPendingCount,
+        humanShotLegalCount,
+        humanPitySaveDraw
+      });
+
       const eventBanner = document.getElementById("eventBanner");
-      eventBanner.className = `event-banner ${state.eventType || "contain"}`;
+      eventBanner.className = `event-banner ${state.eventType || "contain"} ${getPresentationIntensity(state.eventType, state.eventText, "event")}`;
       eventBanner.textContent = state.eventText || "";
 
       const playByPlayBanner = document.getElementById("playByPlayBanner");
       if (playByPlayBanner) {
-        playByPlayBanner.className = `event-banner play-by-play-banner ${state.playByPlayType || "contain"}`;
+        playByPlayBanner.className = `event-banner play-by-play-banner ${state.playByPlayType || "contain"} ${getPresentationIntensity(state.playByPlayType, state.playByPlayText, "play")}`;
         playByPlayBanner.textContent = state.playByPlayText || "Opening faceoff.";
       }
 
@@ -5810,7 +7026,7 @@
       if (deckEventToast) {
         if (state.deckEvent?.text) {
           deckEventToast.hidden = false;
-          deckEventToast.className = `deck-event-toast show ${state.deckEvent.type || "contain"}`;
+          deckEventToast.className = `deck-event-toast show ${state.deckEvent.type || "contain"} ${getPresentationIntensity(state.deckEvent.type, state.deckEvent.text, "toast")}`;
           deckEventToast.textContent = state.deckEvent.text;
         } else {
           deckEventToast.hidden = true;
@@ -5850,7 +7066,9 @@
       renderHand("humanHand", state.humanHand, "human");
       renderHand("cpuHand", state.cpuHand, "cpu");
       renderLastShot();
+      renderGoalLog();
       renderLog();
+      renderStatsPanel();
 
       const cannotPlayBtn = document.getElementById("cannotPlayBtn");
       const cpuNotice = document.getElementById("cpuNotice");
@@ -5865,11 +7083,6 @@
       const powerShotBtn = document.getElementById("powerShotBtn");
       const icePuckBtn = document.getElementById("icePuckBtn");
       const dumpChaseBtn = document.getElementById("dumpChaseBtn");
-      cannotPlayBtn.className = `deck-draw-btn${state.shotPending ? " no-save" : ""}`;
-      deckDrawTitle.textContent = state.shotPending ? "Goalie" : "Deck";
-      deckDrawCount.textContent = String(state.deck.length);
-      deckDrawCount.hidden = Boolean(state.shotPending);
-      deckDrawAction.textContent = state.shotPending ? "No Save" : "Draw";
       doneComboBtn.textContent = "End Chain";
       const canHumanAct = state.currentTurn === "human" && !state.cpuBusy;
       const legal = canHumanAct ? getLegalCardsForTurn("human") : [];
@@ -5888,20 +7101,39 @@
       const showPowerShotBtn = FEATURES.momentumSystem && humanCanPowerShot;
       const showIcePuckBtn = humanCanIce;
       const showDumpChaseBtn = FEATURES.momentumSystem && humanCanDump;
-      const shotActionText = !state.shotPending
+      const humanCanUsePitySaveDraw = canHumanAct && Boolean(state.shotPending) && canUsePitySaveDraw("human", state.shotPending);
+      const humanHasSpecialPendingSelection = canHumanAct && humanHasSpecialSelection;
+      const canConfirmStagedSpecial = humanHasSpecialPendingSelection && humanMoveRequiresSubmitConfirmation();
+      const canConfirmDeckTap = canConfirmStagedSpecial || canConfirmPendingHumanTurn;
+      cannotPlayBtn.className = `deck-draw-btn${state.shotPending && !canConfirmDeckTap && !isReboundRevealPhase(state.shotPending) && !humanCanUsePitySaveDraw ? " no-save" : ""}`;
+      deckDrawTitle.textContent = canConfirmDeckTap ? "Submit" : state.shotPending
+        ? (isReboundRevealPhase(state.shotPending) ? "Rebound" : "Goalie")
+        : "Deck";
+      deckDrawCount.textContent = String(state.deck.length);
+      deckDrawCount.hidden = canConfirmDeckTap || Boolean(state.shotPending && !isReboundRevealPhase(state.shotPending));
+      const deckActionText = canConfirmDeckTap
+        ? "Play"
+        : !state.shotPending
         ? "Draw"
+        : isReboundRevealPhase(state.shotPending)
+          ? "Reveal"
         : isReboundSavePhase(state.shotPending)
           ? (state.currentTurn === "human" && humanShotLegalCount === 0 ? "Desperation" : "Concede")
+          : humanCanUsePitySaveDraw
+            ? "Pity Draw"
           : "End Save";
-      const humanSpecialSelectionMode = canHumanAct ? getHumanSpecialSelectionMode() : null;
-      const humanHasSpecialPendingSelection = canHumanAct && humanHasSpecialSelection;
-
       if (humanMomentumActions) {
         humanMomentumActions.hidden = !showCycleMomentumBtn && !showBurnMomentumBtn && !showPowerShotBtn && !showIcePuckBtn && !showDumpChaseBtn;
       }
 
-      cannotPlayBtn.disabled = state.faceoffPending || !canHumanAct || momentumSelectionActive || humanHasSpecialPendingSelection || (!state.shotPending && (humanCanPass || legal.length > 0));
-      cannotPlayBtn.title = state.faceoffPending
+      cannotPlayBtn.disabled = canConfirmDeckTap ? false : state.faceoffPending || !canHumanAct || momentumSelectionActive || humanHasSpecialPendingSelection || (!state.shotPending && (humanCanPass || legal.length > 0));
+      cannotPlayBtn.title = canConfirmDeckTap
+        ? (canConfirmStagedSpecial
+          ? `Confirm the staged ${humanSpecialSelectionLabel.toLowerCase()}.`
+          : state.shotPending
+            ? "Confirm the staged save chain."
+            : "Confirm the staged human turn.")
+        : state.faceoffPending
         ? "Choose a faceoff card"
         : !canHumanAct
         ? "CPU turn"
@@ -5910,10 +7142,14 @@
         : cycleSelectionActive
           ? "Choose a Cycle card or cancel Cycle"
         : state.shotPending
-          ? (isReboundSavePhase(state.shotPending)
+          ? (isReboundRevealPhase(state.shotPending)
+            ? "Reveal and play 1 rebound card from the top of the deck"
+            : isReboundSavePhase(state.shotPending)
             ? (state.currentTurn === "human" && humanShotLegalCount === 0
-              ? "Reveal 1 top-deck desperation save card"
+              ? "Draw 1 top-deck desperation save card into hand"
               : "Allow the rebound to become a goal")
+            : humanCanUsePitySaveDraw
+              ? "Draw 1 last-chance save card from the deck"
             : "Stop the current save chain and resolve the outcome")
         : humanCanPass
           ? "Use End Chain to resolve the current exchange"
@@ -5925,13 +7161,13 @@
             ? "Draw and trigger cannot-play rule, or use Dump Hand to send the puck deep"
             : "Draw and trigger cannot-play rule";
 
-      deckDrawAction.textContent = shotActionText;
+          deckDrawAction.textContent = deckActionText;
 
       doneComboBtn.disabled = state.faceoffPending || state.shotPending || !humanCanPass || humanPendingCount > 0;
       doneComboBtn.title = state.faceoffPending
         ? "No chain during a faceoff"
         : humanPendingCount > 0
-          ? "Submit or Undo pending human cards first"
+          ? "Confirm or Undo staged human cards first"
         : doneComboBtn.disabled
           ? "No active chain to end"
           : state.roleOfCurrentTurn === "attacker"
@@ -5941,34 +7177,28 @@
               : "End the defense chain and resolve the exchange";
 
       if (undoTurnBtn) {
-        undoTurnBtn.disabled = humanHasSpecialPendingSelection ? false : state.faceoffPending || state.shotPending || state.stabilizePending || !canHumanAct || humanPendingCount === 0;
+        undoTurnBtn.disabled = humanHasSpecialPendingSelection ? false : state.faceoffPending || (state.shotPending && isReboundSavePhase(state.shotPending)) || state.stabilizePending || !canHumanAct || humanPendingCount === 0;
         undoTurnBtn.title = humanHasSpecialPendingSelection
-          ? "Clear the selected card before submitting"
+          ? "Clear the staged card before confirming"
           : humanPendingCount > 0
-            ? "Undo the last unsubmitted human play"
+            ? "Undo the last staged human play"
             : humanMoveRequiresSubmitConfirmation()
-              ? "Select a card first"
-              : "No unsubmitted human play to undo";
+              ? "Stage a card first"
+              : "No staged human play to undo";
       }
 
       if (submitTurnBtn) {
-        submitTurnBtn.disabled = humanHasSpecialPendingSelection ? false : state.faceoffPending || state.shotPending || state.stabilizePending || !canHumanAct || humanPendingCount === 0;
+        submitTurnBtn.disabled = humanHasSpecialPendingSelection ? false : state.faceoffPending || (state.shotPending && isReboundSavePhase(state.shotPending)) || state.stabilizePending || !canHumanAct || humanPendingCount === 0;
         submitTurnBtn.title = humanHasSpecialPendingSelection
-          ? (humanSpecialSelectionMode === "puckBattle"
-            ? "Commit the selected Puck Battle card"
-            : humanSpecialSelectionMode === "icingFaceoff"
-              ? "Commit the selected Icing Faceoff card"
-            : humanSpecialSelectionMode === "faceoff"
-              ? "Commit the selected faceoff card"
-              : humanSpecialSelectionMode === "reboundSave"
-                ? "Commit the selected rebound save"
-                : humanSpecialSelectionMode === "save"
-                  ? "Commit the selected save card"
-                  : "Commit the selected Stabilize card")
+          ? (humanSpecialSelectionMode === "reboundSave"
+            ? "Confirm the staged rebound save"
+            : "Confirm the staged Stabilize card")
           : humanPendingCount > 0
-            ? "Commit the pending human plays and continue the game"
+            ? (state.shotPending
+              ? "Resolve the staged save chain"
+              : "Confirm the staged human turn and continue the game")
             : humanMoveRequiresSubmitConfirmation()
-              ? "Select a card first"
+              ? "Stage a card first"
               : "Play at least one card before submitting";
       }
 
@@ -6004,7 +7234,7 @@
         icePuckBtn.disabled = momentumSelectionActive || !humanCanIce;
         icePuckBtn.hidden = !showIcePuckBtn;
         icePuckBtn.title = humanCanIce
-          ? "Reset all Momentum, refill both hands, and force an Icing Faceoff in your defensive zone"
+          ? "Trim Momentum by 1 for each side, refill both hands, and force an Icing Faceoff in your defensive zone"
           : "Icing is only available to a stuck attacker in their own defensive zone";
       }
 
@@ -6030,6 +7260,11 @@
     }
 
     async function onHumanCannotPlay() {
+      if (state.currentTurn === "human" && !state.cpuBusy && ((hasHumanSpecialSelection() && humanMoveRequiresSubmitConfirmation()) || hasHumanPendingTurn())) {
+        await submitHumanTurn();
+        return;
+      }
+
       if (state.faceoffPending) {
         addLog("Faceoff is pending. Choose a faceoff card instead of drawing.");
         render();
@@ -6037,7 +7272,15 @@
       }
 
       if (state.shotPending) {
-        handleHumanShotNoSave();
+        if (isReboundRevealPhase(state.shotPending)) {
+          await revealReboundShotCard("human");
+          render();
+          runCpuAuto();
+          render();
+          return;
+        }
+
+        await handleHumanShotNoSave();
         render();
         runCpuAuto();
         render();
@@ -6063,7 +7306,7 @@
       }
 
       if (hasHumanPendingTurn()) {
-        addLog("Human has unsubmitted cards. Use Undo or Submit instead of drawing.");
+        addLog("Human has staged cards. Confirm with Deck, the pile, or Submit, or use Undo instead of drawing.");
         render();
         return;
       }
@@ -6131,6 +7374,8 @@
       state.gameOver = false;
       state.gameWinner = null;
       state.deckEvent = null;
+      state.goalLog = [];
+      state.stats = createEmptyMatchStats();
 
       state.attacker = null;
       state.defender = null;
@@ -6152,6 +7397,12 @@
 
       document.getElementById("cannotPlayBtn").addEventListener("click", () => {
         void onHumanCannotPlay();
+      });
+
+      document.getElementById("activeCardMiddle").addEventListener("click", () => {
+        if (state.currentTurn === "human" && !state.cpuBusy && ((hasHumanSpecialSelection() && humanMoveRequiresSubmitConfirmation()) || hasHumanPendingTurn())) {
+          void submitHumanTurn();
+        }
       });
 
       document.getElementById("doneComboBtn").addEventListener("click", () => {
@@ -6241,6 +7492,11 @@
 
       document.getElementById("downloadDebugDumpBtn").addEventListener("click", () => {
         downloadDebugDump();
+        render();
+      });
+
+      document.getElementById("downloadStatsDumpBtn").addEventListener("click", () => {
+        downloadStatsDump();
         render();
       });
 
