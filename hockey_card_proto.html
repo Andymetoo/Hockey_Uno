@@ -916,6 +916,157 @@
       color: #21497a;
     }
 
+    .exchange-meter {
+      grid-column: 1 / -1;
+      justify-self: center;
+      width: min(100%, 520px);
+      margin: 0 auto 6px;
+      display: grid;
+      gap: 4px;
+    }
+
+    .exchange-meter[hidden] {
+      display: none;
+    }
+
+    .exchange-meter-head {
+      width: 100%;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.68rem;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .exchange-meter-side.left {
+      text-align: left;
+    }
+
+    .exchange-meter-side.right {
+      text-align: right;
+    }
+
+    .exchange-meter-side.human {
+      color: #a82d2d;
+    }
+
+    .exchange-meter-side.cpu {
+      color: #315e9d;
+    }
+
+    .exchange-meter-center {
+      color: #5b6b80;
+    }
+
+    .exchange-meter-track {
+      position: relative;
+      width: 100%;
+      margin: 0 auto;
+      padding: 4px 12px 18px;
+    }
+
+    .exchange-meter-rail {
+      position: relative;
+      display: grid;
+      grid-template-columns: repeat(11, minmax(0, 1fr));
+      align-items: center;
+      min-height: 32px;
+    }
+
+    .exchange-meter-rail::before {
+      content: "";
+      position: absolute;
+      left: 12px;
+      right: 12px;
+      top: 50%;
+      height: 4px;
+      transform: translateY(-50%);
+      border-radius: 999px;
+      background: linear-gradient(90deg, rgba(212, 73, 73, 0.42) 0%, rgba(209, 218, 232, 0.84) 50%, rgba(90, 141, 221, 0.42) 100%);
+      box-shadow: inset 0 0 0 1px rgba(42, 52, 68, 0.12);
+    }
+
+    .exchange-meter-stop {
+      position: relative;
+      z-index: 1;
+      width: 10px;
+      height: 10px;
+      margin: 0 auto;
+      border-radius: 50%;
+      border: 2px solid #2b3444;
+      background: #ffffff;
+      box-shadow: 0 3px 8px rgba(28, 36, 48, 0.1);
+    }
+
+    .exchange-meter-stop.center {
+      transform: scale(1.12);
+      background: #f4f7fc;
+    }
+
+    .exchange-meter-center-label {
+      position: absolute;
+      left: 50%;
+      bottom: 0;
+      transform: translateX(-50%);
+      font-size: 0.68rem;
+      font-weight: 800;
+      color: #5b6b80;
+      letter-spacing: 0.04em;
+    }
+
+    .exchange-meter-node {
+      position: absolute;
+      z-index: 2;
+      top: 50%;
+      left: calc((var(--exchange-slot, 5) / 10) * 100%);
+      transform: translate(-50%, -50%);
+      min-width: 28px;
+      height: 28px;
+      padding: 0 7px;
+      border-radius: 999px;
+      border: 2px solid #b8c7da;
+      background: #ffffff;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.82rem;
+      font-weight: 800;
+      line-height: 1;
+      color: #4c5d74;
+      box-shadow: 0 8px 18px rgba(28, 36, 48, 0.16);
+      transition: left 180ms ease, background-color 180ms ease, border-color 180ms ease, color 180ms ease;
+    }
+
+    .exchange-meter-node.human {
+      border-color: #d44949;
+      background: #fff1f1;
+      color: #8f1d1d;
+    }
+
+    .exchange-meter-node.cpu {
+      border-color: #5a8ddd;
+      background: #eef5ff;
+      color: #21497a;
+    }
+
+    .exchange-meter-node.neutral {
+      border-color: #b8c7da;
+      background: #ffffff;
+      color: #4c5d74;
+    }
+
+    .exchange-meter-node.stabilize {
+      border-color: #d7b11e;
+      background: #fff6cf;
+      color: #7a5900;
+      box-shadow: 0 8px 18px rgba(215, 177, 30, 0.24);
+    }
+
     .active-status-chip {
       border: 1px solid var(--border);
       border-radius: 8px;
@@ -1093,13 +1244,140 @@
     }
 
     .play-by-play-banner {
-      width: min(100%, 520px);
-      max-width: 520px;
+      flex: 1 1 auto;
+      width: auto;
+      max-width: none;
       min-height: 38px;
       padding: 8px 14px;
       text-align: center;
       font-size: 0.92rem;
       box-shadow: 0 10px 18px rgba(28, 36, 48, 0.08);
+    }
+
+    .play-by-play-row {
+      display: flex;
+      align-items: stretch;
+      justify-content: center;
+      gap: 8px;
+      width: min(100%, 572px);
+      margin: 0 auto 10px;
+    }
+
+    .play-by-play-help-btn {
+      flex: 0 0 40px;
+      min-height: 38px;
+      border: 1px solid #d0d9e8;
+      border-radius: 10px;
+      background: #ffffff;
+      color: #21497a;
+      font-size: 1rem;
+      font-weight: 800;
+      cursor: pointer;
+      box-shadow: 0 8px 16px rgba(28, 36, 48, 0.08);
+      transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+    }
+
+    .play-by-play-help-btn:hover,
+    .play-by-play-help-btn:focus-visible {
+      transform: translateY(-1px);
+      border-color: #7e9ecf;
+      box-shadow: 0 10px 18px rgba(28, 36, 48, 0.12);
+    }
+
+    .play-by-play-help-btn:disabled {
+      cursor: default;
+      transform: none;
+      box-shadow: 0 4px 10px rgba(28, 36, 48, 0.05);
+    }
+
+    .play-by-play-help-modal[hidden] {
+      display: none;
+    }
+
+    .play-by-play-help-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 60;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+    }
+
+    .play-by-play-help-backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(18, 27, 39, 0.58);
+    }
+
+    .play-by-play-help-dialog {
+      position: relative;
+      width: min(92vw, 480px);
+      border: 1px solid #d7e0ee;
+      border-radius: 18px;
+      background: linear-gradient(180deg, #ffffff 0%, #f6f9ff 100%);
+      box-shadow: 0 24px 48px rgba(18, 27, 39, 0.24);
+      padding: 18px;
+      display: grid;
+      gap: 14px;
+    }
+
+    .play-by-play-help-head {
+      display: grid;
+      gap: 4px;
+    }
+
+    .play-by-play-help-head h3 {
+      margin: 0;
+      font-size: 1rem;
+      color: #162335;
+    }
+
+    .play-by-play-help-head p {
+      margin: 0;
+      font-size: 0.78rem;
+      color: #617087;
+    }
+
+    .play-by-play-help-grid {
+      display: grid;
+      gap: 10px;
+    }
+
+    .play-by-play-help-section {
+      border: 1px solid #dfe7f2;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.84);
+      padding: 11px 12px;
+      display: grid;
+      gap: 5px;
+    }
+
+    .play-by-play-help-label {
+      font-size: 0.68rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #5a6b83;
+    }
+
+    .play-by-play-help-value {
+      margin: 0;
+      font-size: 0.86rem;
+      line-height: 1.42;
+      color: #1b2a3e;
+    }
+
+    .play-by-play-help-dismiss {
+      justify-self: end;
+      border: 1px solid #b8c6d9;
+      border-radius: 999px;
+      background: #ffffff;
+      color: #173255;
+      padding: 8px 14px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      cursor: pointer;
     }
 
     .play-by-play-banner.quiet {
@@ -1375,6 +1653,16 @@
 
     .log-line {
       margin: 0 0 6px;
+    }
+
+    .log-line.sequence-lead {
+      margin-bottom: 8px;
+      padding: 4px 8px 4px 10px;
+      border-left: 3px solid #f1c85a;
+      border-radius: 6px;
+      background: rgba(241, 200, 90, 0.08);
+      color: #ffe7a2;
+      font-weight: 700;
     }
 
     .stats-details {
@@ -1757,12 +2045,73 @@
         font-size: 0.82rem;
       }
 
+      .play-by-play-row {
+        gap: 6px;
+        width: min(100%, 100%);
+      }
+
+      .play-by-play-help-btn {
+        flex-basis: 36px;
+        min-height: 34px;
+        border-radius: 9px;
+        font-size: 0.92rem;
+      }
+
+      .play-by-play-help-modal {
+        padding: 12px;
+      }
+
+      .play-by-play-help-dialog {
+        width: min(94vw, 94vw);
+        padding: 14px;
+        border-radius: 14px;
+      }
+
+      .play-by-play-help-value {
+        font-size: 0.8rem;
+      }
+
       .event-banner.quiet {
         font-size: 0.72rem;
       }
 
       .play-by-play-banner.hero {
         min-height: 38px;
+      }
+
+      .exchange-meter {
+        margin-bottom: 4px;
+      }
+
+      .exchange-meter-head {
+        width: 100%;
+        font-size: 0.6rem;
+        gap: 6px;
+      }
+
+      .exchange-meter-track {
+        width: 100%;
+        padding: 2px 4px 16px;
+      }
+
+      .exchange-meter-rail {
+        min-height: 26px;
+      }
+
+      .exchange-meter-stop {
+        width: 8px;
+        height: 8px;
+      }
+
+      .exchange-meter-node {
+        min-width: 24px;
+        height: 24px;
+        padding: 0 5px;
+        font-size: 0.74rem;
+      }
+
+      .exchange-meter-center-label {
+        font-size: 0.62rem;
       }
 
       .state-readout {
@@ -1854,6 +2203,92 @@
               <input id="debugCpuSpeed" type="number" min="10" max="200" step="10" value="200" />
             </label>
             <label class="debug-field">
+              <span>CPU Difficulty</span>
+              <select id="debugCpuDifficulty">
+                <option value="rookie">Rookie</option>
+                <option value="veteran" selected>Pro</option>
+                <option value="allstar">All-Star</option>
+                <option value="playoff">Playoff</option>
+                <option value="custom">Custom</option>
+              </select>
+            </label>
+            <label class="debug-field">
+              <span>CPU Attack Lookahead</span>
+              <input id="debugCpuAttackLookahead" type="number" min="0" max="10" step="1" value="1" />
+            </label>
+            <label class="debug-field">
+              <span>CPU Follow-Up Bias</span>
+              <input id="debugCpuAttackFollowUp" type="number" min="1" max="16" step="1" value="5" />
+            </label>
+            <label class="debug-field">
+              <span>CPU D-Zone Edge</span>
+              <input id="debugCpuDefensiveTarget" type="number" min="1" max="3" step="1" value="2" />
+            </label>
+            <label class="debug-field">
+              <span>CPU Goal-Zone Edge</span>
+              <input id="debugCpuGoalTarget" type="number" min="1" max="4" step="1" value="2" />
+            </label>
+            <label class="debug-field">
+              <span>CPU Neutral Faceoff %</span>
+              <input id="debugCpuFaceoffNeutral" type="number" min="20" max="100" step="1" value="68" />
+            </label>
+            <label class="debug-field">
+              <span>CPU End-Zone Faceoff %</span>
+              <input id="debugCpuFaceoffDanger" type="number" min="20" max="100" step="1" value="80" />
+            </label>
+            <label class="debug-field">
+              <span>CPU Icing Threshold</span>
+              <input id="debugCpuIcingThreshold" type="number" min="2" max="10" step="1" value="6" />
+            </label>
+            <label class="debug-field">
+              <span>CPU Dump Threshold</span>
+              <input id="debugCpuDumpThreshold" type="number" min="2" max="10" step="1" value="7" />
+            </label>
+            <label class="debug-field">
+              <span>CPU Chain Weight</span>
+              <input id="debugCpuChainWeight" type="number" min="0" max="16" step="1" value="5" />
+            </label>
+            <label class="debug-field">
+              <span>CPU Empty-Hand Shot</span>
+              <input id="debugCpuEmptyHandShot" type="number" min="0" max="20" step="1" value="6" />
+            </label>
+            <label class="debug-field">
+              <span>CPU Zone Advance</span>
+              <input id="debugCpuZoneAdvance" type="number" min="0" max="12" step="1" value="5" />
+            </label>
+            <label class="debug-field">
+              <span>CPU Shot-Zone Aggro</span>
+              <input id="debugCpuShotAggro" type="number" min="0" max="12" step="1" value="5" />
+            </label>
+            <label class="debug-field">
+              <span>CPU Card Conservation</span>
+              <input id="debugCpuConserve" type="number" min="0" max="12" step="1" value="5" />
+            </label>
+            <label class="debug-field">
+              <span>CPU Stabilize Denial</span>
+              <input id="debugCpuStabilizeDeny" type="number" min="0" max="16" step="1" value="5" />
+            </label>
+            <label class="debug-field">
+              <span>CPU Faceoff Aggro %</span>
+              <input id="debugCpuFaceoffAggro" type="number" min="0" max="100" step="1" value="58" />
+            </label>
+            <label class="debug-field">
+              <span>CPU Icing Reluctance</span>
+              <input id="debugCpuIcingReluctance" type="number" min="0" max="12" step="1" value="5" />
+            </label>
+            <label class="debug-field">
+              <span>CPU Momentum Aggro</span>
+              <input id="debugCpuMomentumAggro" type="number" min="0" max="12" step="1" value="4" />
+            </label>
+            <label class="debug-field">
+              <span>CPU Late-Game Risk</span>
+              <input id="debugCpuLateRisk" type="number" min="0" max="12" step="1" value="4" />
+            </label>
+            <label class="debug-field">
+              <span>CPU Panic Threshold</span>
+              <input id="debugCpuPanicThreshold" type="number" min="0" max="4" step="1" value="2" />
+            </label>
+            <label class="debug-field">
               <span>Decks Per Period</span>
               <input id="debugDecksPerPeriod" type="number" min="1" max="5" step="1" value="3" />
             </label>
@@ -1871,13 +2306,21 @@
                 <option value="off">Off</option>
               </select>
             </label>
+            <label class="debug-field">
+              <span>Stabilize Sanding</span>
+              <select id="debugStabilizeSanding">
+                <option value="default" selected>Default</option>
+                <option value="suit">Suit</option>
+                <option value="value">Numerical</option>
+              </select>
+            </label>
           </div>
           <div class="controls">
             <button id="saveDefaultsBtn" type="button">Save Defaults</button>
           </div>
           <p class="debug-preview" id="debugPreview"></p>
           <p class="debug-preview" id="debugRulesPreview"></p>
-          <p class="hint">Suit, value, hand size, wild-card settings, and feature flags apply on New Game. CPU speed applies immediately.</p>
+          <p class="hint">Suit, value, hand size, wild-card settings, feature flags, and Stabilize sanding apply on New Game. CPU speed, difficulty, and CPU AI knobs apply immediately.</p>
         </div>
       </details>
       <div class="legend" id="legendList"></div>
@@ -1893,9 +2336,13 @@
             <div id="cpuMomentumDots" class="momentum-side cpu" aria-label="CPU momentum"></div>
           </div>
           <div class="zone-track" id="zoneTrack"></div>
-          <div id="playByPlayBanner" class="event-banner play-by-play-banner contain">Opening faceoff.</div>
+          <div class="play-by-play-row">
+            <div id="playByPlayBanner" class="event-banner play-by-play-banner contain">Opening faceoff.</div>
+            <button id="playByPlayHelpBtn" class="play-by-play-help-btn" type="button" aria-label="Explain the latest play" aria-expanded="false" hidden>?</button>
+          </div>
         </div>
       </div>
+      <div id="exchangeMeter" class="exchange-meter" hidden aria-live="polite"></div>
       <div class="panel hand-panel" id="humanPanel">
         <div class="hand-panel-header">
           <h3>Human Hand</h3>
@@ -1965,6 +2412,30 @@
       </div>
     </section>
   </div>
+  <div id="playByPlayHelpModal" class="play-by-play-help-modal" hidden>
+    <div id="playByPlayHelpBackdrop" class="play-by-play-help-backdrop"></div>
+    <div class="play-by-play-help-dialog" role="dialog" aria-modal="true" aria-labelledby="playByPlayHelpTitle">
+      <div class="play-by-play-help-head">
+        <h3 id="playByPlayHelpTitle">What just happened?</h3>
+        <p>The latest play-by-play banner broken into the rule pieces that matter.</p>
+      </div>
+      <div class="play-by-play-help-grid">
+        <div class="play-by-play-help-section">
+          <div class="play-by-play-help-label">What happened</div>
+          <p id="playByPlayHelpWhat" class="play-by-play-help-value"></p>
+        </div>
+        <div class="play-by-play-help-section">
+          <div class="play-by-play-help-label">Why did it happen</div>
+          <p id="playByPlayHelpWhy" class="play-by-play-help-value"></p>
+        </div>
+        <div class="play-by-play-help-section">
+          <div class="play-by-play-help-label">What&apos;s the rule</div>
+          <p id="playByPlayHelpRule" class="play-by-play-help-value"></p>
+        </div>
+      </div>
+      <button id="playByPlayHelpDismissBtn" class="play-by-play-help-dismiss" type="button">Dismiss</button>
+    </div>
+  </div>
   <p class="micro-tooltip" id="faceoffRulesHint"></p>
 
   <script>
@@ -1992,8 +2463,185 @@
       handSize: 5,
       wildCardCount: 0,
       cpuSpeedPercent: 200,
+      cpuDifficulty: "veteran",
+      cpuAttackLookaheadDepth: 1,
+      cpuAttackFollowUpWeight: 5,
+      cpuDefensiveZoneDefenseTarget: 2,
+      cpuGoalZoneDefenseTarget: 2,
+      cpuFaceoffNeutralBiasPercent: 62,
+      cpuFaceoffDangerBiasPercent: 80,
+      cpuIcingDangerThreshold: 6,
+      cpuDumpThreshold: 7,
+      cpuChainLengthWeight: 5,
+      cpuEmptyHandShotWeight: 6,
+      cpuZoneAdvanceWeight: 5,
+      cpuShotZoneAggression: 5,
+      cpuCardConservationWeight: 5,
+      cpuAvoidStabilizeWindowWeight: 5,
+      cpuFaceoffAggressionPercent: 58,
+      cpuIcingReluctance: 5,
+      cpuMomentumSpendAggression: 4,
+      cpuLateGameRiskAggression: 4,
+      cpuDefensivePanicThreshold: 2,
+      stabilizeSanding: "default",
       singleRiverCrossMode: false,
       decksPerPeriod: 3
+    };
+    const CPU_DIFFICULTY_PRESETS = {
+      rookie: {
+        label: "Rookie",
+        attackLookaheadDepth: 0,
+        attackFollowUpWeight: 2,
+        attackChainWeight: 1,
+        chainLengthWeight: 2,
+        attackOffenseValueWeight: 0.8,
+        attackComebackValueWeight: 1.1,
+        attackConserveWeight: 1.8,
+        attackEmptyHandBonus: 2,
+        emptyHandShotWeight: 2,
+        zoneAdvanceWeight: 2,
+        shotZoneAggression: 2,
+        cardConservationWeight: 9,
+        defenseLookaheadDepth: 0,
+        defenseMarginWeight: 8,
+        defenseFollowUpWeight: 1,
+        dangerDefenseFollowUpWeight: 2,
+        avoidStabilizeWindowWeight: 1,
+        defenseStabilizePenalty: 4,
+        defenseConserveWeight: 1.6,
+        neutralDefenseTarget: 1,
+        defensiveZoneDefenseTarget: 1,
+        goalZoneDefenseTarget: 1,
+        faceoffAggression: 28,
+        faceoffOffenseBias: 0.32,
+        faceoffNeutralBias: 0.42,
+        faceoffDangerBias: 0.55,
+        icingReluctance: 2,
+        icingDangerThreshold: 4,
+        dumpThreshold: 6,
+        momentumSpendAggression: 1,
+        lateGameRiskAggression: 1,
+        shortHandThreat: 1,
+        defensivePanicThreshold: 1,
+        lateGamePressureSeconds: 120
+      },
+      veteran: {
+        label: "Pro",
+        attackLookaheadDepth: 1,
+        attackFollowUpWeight: 5,
+        attackChainWeight: 4,
+        chainLengthWeight: 5,
+        attackOffenseValueWeight: 1.4,
+        attackComebackValueWeight: 1.8,
+        attackConserveWeight: 1,
+        attackEmptyHandBonus: 8,
+        emptyHandShotWeight: 6,
+        zoneAdvanceWeight: 5,
+        shotZoneAggression: 5,
+        cardConservationWeight: 5,
+        defenseLookaheadDepth: 1,
+        defenseMarginWeight: 12,
+        defenseFollowUpWeight: 4,
+        dangerDefenseFollowUpWeight: 6,
+        avoidStabilizeWindowWeight: 5,
+        defenseStabilizePenalty: 14,
+        defenseConserveWeight: 0.9,
+        neutralDefenseTarget: 1,
+        defensiveZoneDefenseTarget: 2,
+        goalZoneDefenseTarget: 2,
+        faceoffAggression: 58,
+        faceoffOffenseBias: 0.46,
+        faceoffNeutralBias: 0.62,
+        faceoffDangerBias: 0.8,
+        icingReluctance: 5,
+        icingDangerThreshold: 6,
+        dumpThreshold: 7,
+        momentumSpendAggression: 4,
+        lateGameRiskAggression: 4,
+        shortHandThreat: 2,
+        defensivePanicThreshold: 2,
+        lateGamePressureSeconds: 240
+      },
+      allstar: {
+        label: "All-Star",
+        attackLookaheadDepth: 10,
+        attackFollowUpWeight: 8,
+        attackChainWeight: 8,
+        chainLengthWeight: 9,
+        attackOffenseValueWeight: 2.1,
+        attackComebackValueWeight: 2.5,
+        attackConserveWeight: 0.45,
+        attackEmptyHandBonus: 13,
+        emptyHandShotWeight: 11,
+        zoneAdvanceWeight: 7,
+        shotZoneAggression: 8,
+        cardConservationWeight: 3,
+        defenseLookaheadDepth: 10,
+        defenseMarginWeight: 16,
+        defenseFollowUpWeight: 6,
+        dangerDefenseFollowUpWeight: 11,
+        avoidStabilizeWindowWeight: 9,
+        defenseStabilizePenalty: 22,
+        defenseConserveWeight: 0.4,
+        neutralDefenseTarget: 1,
+        defensiveZoneDefenseTarget: 2,
+        goalZoneDefenseTarget: 3,
+        faceoffAggression: 74,
+        faceoffOffenseBias: 0.56,
+        faceoffNeutralBias: 0.74,
+        faceoffDangerBias: 0.92,
+        icingReluctance: 8,
+        icingDangerThreshold: 8,
+        dumpThreshold: 8,
+        momentumSpendAggression: 7,
+        lateGameRiskAggression: 7,
+        shortHandThreat: 2,
+        defensivePanicThreshold: 2,
+        lateGamePressureSeconds: 360
+      },
+      playoff: {
+        label: "Playoff",
+        attackLookaheadDepth: 10,
+        attackFollowUpWeight: 10,
+        attackChainWeight: 10,
+        chainLengthWeight: 12,
+        attackOffenseValueWeight: 2.6,
+        attackComebackValueWeight: 3.1,
+        attackConserveWeight: 0.15,
+        attackEmptyHandBonus: 18,
+        emptyHandShotWeight: 15,
+        zoneAdvanceWeight: 9,
+        shotZoneAggression: 10,
+        cardConservationWeight: 2,
+        defenseLookaheadDepth: 10,
+        defenseMarginWeight: 20,
+        defenseFollowUpWeight: 8,
+        dangerDefenseFollowUpWeight: 14,
+        avoidStabilizeWindowWeight: 12,
+        defenseStabilizePenalty: 28,
+        defenseConserveWeight: 0.2,
+        neutralDefenseTarget: 1,
+        defensiveZoneDefenseTarget: 2,
+        goalZoneDefenseTarget: 3,
+        faceoffAggression: 84,
+        faceoffOffenseBias: 0.62,
+        faceoffNeutralBias: 0.82,
+        faceoffDangerBias: 0.98,
+        icingReluctance: 10,
+        icingDangerThreshold: 9,
+        dumpThreshold: 9,
+        momentumSpendAggression: 9,
+        lateGameRiskAggression: 10,
+        shortHandThreat: 2,
+        defensivePanicThreshold: 3,
+        lateGamePressureSeconds: 480
+      }
+    };
+    const CPU_DIFFICULTY_ALIASES = {
+      easy: "rookie",
+      medium: "veteran",
+      hard: "allstar",
+      pro: "allstar"
     };
     const CPU_SPEED_BASELINE_PERCENT = 100;
     const REGULATION_PERIOD_COUNT = 3;
@@ -2043,6 +2691,9 @@
       eventType: "contain",
       playByPlayText: "Opening faceoff.",
       playByPlayType: "contain",
+      playByPlayDetails: null,
+      playByPlayHelpOpen: false,
+      pendingEncounterContext: null,
       lastShot: null,
       recentPlayedCards: [],
       cpuNotice: null,
@@ -2050,6 +2701,7 @@
       humanSpecialSelectionIndex: null,
       pendingBurnSelection: false,
       pendingCycleSelection: false,
+      pendingOverflowDiscard: null,
       stabilizePending: null,
       humanMomentum: 0,
       cpuMomentum: 0,
@@ -2067,6 +2719,8 @@
       stats: createEmptyMatchStats(),
       logMessages: []
     };
+
+    state.playByPlayDetails = buildPlayByPlayDetails(state.playByPlayText, state.playByPlayType);
 
     let activeDrag = null;
     let suppressHumanCardClickUntil = 0;
@@ -2094,6 +2748,7 @@
     function createEmptyPlayerStats() {
       return {
         goals: 0,
+        forceShotGoals: 0,
         shotsOnGoal: 0,
         savesMade: 0,
         exchangeWins: 0,
@@ -2186,17 +2841,22 @@
       incrementZoneCounter(stats.shotOrigins, zoneIndex);
     }
 
-    function recordGoalForStats(player, shotZoneIndex, shotValue) {
+    function recordGoalForStats(player, shotZoneIndex, shotValue, shotKind = "card") {
       incrementPlayerStat(player, "goals");
+      if (shotKind === "powerShot") {
+        incrementPlayerStat(player, "forceShotGoals");
+      }
       const periodLabel = getPeriodLabel();
       const clockText = formatGameClock();
-      state.stats.scoringSummary.push(`${periodLabel} | ${clockText} | ${lowerPlayerName(player)} goal from ${zoneLabel(shotZoneIndex)} (shot ${shotValue}).`);
+      const shotKindLabel = shotKind === "powerShot" ? " | Force Shot" : "";
+      state.stats.scoringSummary.push(`${periodLabel} | ${clockText} | ${lowerPlayerName(player)} goal from ${zoneLabel(shotZoneIndex)} (shot ${shotValue}${shotKindLabel}).`);
       state.goalLog.push({
         player,
         periodLabel,
         clockText,
         zoneLabel: zoneLabel(shotZoneIndex),
         shotValue,
+        shotKind,
         humanScore: state.humanScore,
         cpuScore: state.cpuScore
       });
@@ -2226,18 +2886,241 @@
       return deck;
     }
 
-    function addLog(message) {
-      state.logMessages.push(message);
-    }
-
     function setEvent(text, type = "contain") {
       state.eventText = text;
       state.eventType = type;
     }
 
-    function setPlayByPlay(text, type = "contain") {
+    function createPlayByPlayDetails(what, why, rule) {
+      return { what, why, rule };
+    }
+
+    function joinExplanationParts(...parts) {
+      return parts
+        .map((part) => typeof part === "string" ? part.trim() : "")
+        .filter(Boolean)
+        .join(" ");
+    }
+
+    function setPendingEncounterContext(whyText = "") {
+      state.pendingEncounterContext = whyText ? { why: whyText.trim() } : null;
+    }
+
+    function clearPendingEncounterContext() {
+      state.pendingEncounterContext = null;
+    }
+
+    function getStabilizeRuleSummary() {
+      if (state.config.stabilizeSanding === "suit") {
+        return "When the defense wins an exchange by exactly 1, the attacker gets 1 Stabilize try. In Suit sanding, that card has to match by suit. If it fails, the turnover stands.";
+      }
+      if (state.config.stabilizeSanding === "value") {
+        return "When the defense wins an exchange by exactly 1, the attacker gets 1 Stabilize try. In Numerical sanding, that card has to match by number. If it fails, the turnover stands.";
+      }
+      return "When the defense wins an exchange by exactly 1, the attacker gets 1 Stabilize try using any normal legal match. If that card fails, the turnover stands.";
+    }
+
+    function buildPlayByPlayDetails(text, type = "contain") {
+      if (!text) {
+        return null;
+      }
+
+      const lowerText = text.toLowerCase();
+
+      if (lowerText === "opening faceoff." || lowerText === "faceoff.") {
+        return createPlayByPlayDetails(
+          text,
+          "A fresh 1-card faceoff is setting possession before the next chain starts.",
+          "Each side plays 1 faceoff card. Higher card wins, ties break randomly, and the winner starts the next attack from the resolved faceoff lane."
+        );
+      }
+
+      if (lowerText.includes("icing faceoff")) {
+        return createPlayByPlayDetails(
+          text,
+          "The puck was iced, so play reset to a special defensive-zone faceoff.",
+          "Icing forces a faceoff in the offending side's defensive zone. The faceoff still resolves immediately off 1 card per side."
+        );
+      }
+
+      if (lowerText.includes("puck battle")) {
+        return createPlayByPlayDetails(
+          text,
+          "The previous sequence created a loose-puck contest instead of a normal possession start.",
+          "A loose puck resolves through an immediate 1-card puck battle. The winner claims possession in the contested zone."
+        );
+      }
+
+      if (lowerText.includes("wins the faceoff") || lowerText.includes("wins the icing faceoff") || lowerText.includes("wins the puck battle")) {
+        return createPlayByPlayDetails(
+          text,
+          "One side won the single-card faceoff exchange and took the next possession.",
+          "Faceoffs and puck battles resolve immediately from the higher card, so the winner becomes the attacker with the winning card on the pile."
+        );
+      }
+
+      if (lowerText.includes("gets a chance to stabilize")) {
+        return createPlayByPlayDetails(
+          text,
+          "The attacker narrowly lost the exchange and gets one shot to deny the turnover.",
+          "The defense only finished 1 card ahead, which is the exact window that triggers Stabilize.",
+          getStabilizeRuleSummary()
+        );
+      }
+
+      if (lowerText.includes("stabilizes and keeps the puck")) {
+        return createPlayByPlayDetails(
+          text,
+          "The attacker completed the Stabilize response and kept possession alive.",
+          "The Stabilize card met the current sanding rule, so the turnover was cancelled.",
+          getStabilizeRuleSummary()
+        );
+      }
+
+      if (lowerText.includes("forces a turnover")) {
+        return createPlayByPlayDetails(
+          text,
+          "Possession flipped because the defense won the exchange cleanly.",
+          "The defending side finished ahead after the chain resolved, and no valid Stabilize save kept the puck alive.",
+          "When the defense wins the exchange, the puck turns over. A 1-card edge offers Stabilize first; larger edges turn over immediately."
+        );
+      }
+
+      if (lowerText.includes("advances to")) {
+        return createPlayByPlayDetails(
+          text,
+          "The attacker won the exchange and pushed the puck one zone deeper.",
+          "Winning the exchange created a zone advance because the attack had room to keep moving toward the net.",
+          "An attacking exchange win normally advances the puck 1 zone. Once already at the deepest legal lane, the puck simply stays there."
+        );
+      }
+
+      if (lowerText.includes("keeps the puck in")) {
+        return createPlayByPlayDetails(
+          text,
+          "The attacker still won the exchange, but there was no further zone to gain.",
+          "The puck was already at the deepest playable lane for that side, so the win became a hold instead of another advance.",
+          "Exchange wins advance only while another legal zone exists. Otherwise the attacker keeps possession in place."
+        );
+      }
+
+      if (lowerText.includes("takes a shot") || lowerText.includes("shoots from close range") || lowerText.includes("force shot")) {
+        return createPlayByPlayDetails(
+          text,
+          "A shot has started and the defender now has to answer it with a save sequence.",
+          "The attacker reached a shot result, so the game converted the exchange into a goalie save test.",
+          "Shots create a save-chain requirement based on shot quality. If the defender cannot complete that save, the play becomes a goal or rebound."
+        );
+      }
+
+      if (lowerText === "rebound!") {
+        return createPlayByPlayDetails(
+          text,
+          "The shot was not fully dead, so a rebound sequence starts immediately.",
+          "The defense came up just short of a clean stop, or the rebound save was too weak to freeze the puck.",
+          "A rebound creates a second-chance shot flow. The attacker reveals a rebound card, and the defense must answer that rebound shot if it stays live."
+        );
+      }
+
+      if (lowerText.includes("makes the rebound save") || lowerText.includes("makes the save")) {
+        return createPlayByPlayDetails(
+          text,
+          "The defender froze the puck and reset play to a faceoff.",
+          "The save sequence met the current requirement, so the shot ended without a goal.",
+          "A completed save chain, or a successful rebound save, freezes the puck and produces a faceoff in the shot zone."
+        );
+      }
+
+      if (lowerText.includes("recovers the puck")) {
+        return createPlayByPlayDetails(
+          text,
+          "The defense ended the danger and came out with possession.",
+          "The rebound reveal or follow-up did not stay live, so the defender collected the loose puck.",
+          "If a rebound does not turn into a live rebound shot, the defense recovers possession near its net instead of facing another save."
+        );
+      }
+
+      if (lowerText.includes("scores the winner") || (lowerText.includes("wins!") && state.gameOver)) {
+        return createPlayByPlayDetails(
+          text,
+          "The scoring play ended the game.",
+          "That goal or final resolution put the opponent out of reach under the current game state.",
+          "The game ends as soon as the winning condition is met, including an overtime winner or the final score at the end of regulation."
+        );
+      }
+
+      if (lowerText.includes("scores!")) {
+        return createPlayByPlayDetails(
+          text,
+          "The shot got through and the game is resetting to center ice.",
+          "The defender could not complete the required save outcome, so the attack became a goal.",
+          "If the save chain fails, the shot becomes a goal. After a normal goal, play restarts with a center-ice faceoff."
+        );
+      }
+
+      if (lowerText.includes("wins!")) {
+        return createPlayByPlayDetails(
+          text,
+          "The game is over and a winner has been declared.",
+          "The current scoreline and game state resolved to a final winner.",
+          "Once the end-of-game condition is reached, the match stops immediately and no further chains or faceoffs are played."
+        );
+      }
+
+      if (lowerText.includes("begins. faceoff at center ice")) {
+        return createPlayByPlayDetails(
+          text,
+          "A new period has started and play is resetting to center.",
+          "The clock crossed into the next period, so the prototype reset the opening state for that frame.",
+          "Each new period starts with a center-ice faceoff and fresh period timing."
+        );
+      }
+
+      if (lowerText.includes("dumps the puck deep")) {
+        return createPlayByPlayDetails(
+          text,
+          "The attacker gave up the current exchange to send the puck deep.",
+          "Dump Hand is a relief option for a stuck attacker who wants field position instead of forcing a bad chain.",
+          "Dump Hand concedes the current exchange, moves the puck deep, and hands possession over after the dump result resolves."
+        );
+      }
+
+      if (type === "goal") {
+        return createPlayByPlayDetails(
+          text,
+          "The current shot sequence ended in a goal or final winning state.",
+          "Goals happen when the defender cannot finish the required save outcome before the shot sequence resolves."
+        );
+      }
+
+      if (type === "turnover") {
+        return createPlayByPlayDetails(
+          text,
+          "The previous chain or rule result put the puck on the other side's stick.",
+          "Turnovers happen when the defense wins the exchange, a recovery claims the puck, or a special rule like icing or dump resolution flips possession."
+        );
+      }
+
+      if (type === "shot") {
+        return createPlayByPlayDetails(
+          text,
+          "The attacker either created a shot or pushed the play into a more dangerous lane.",
+          "Shot states are the game’s scoring pressure moments: they either advance into a shot, rebound, save, or goal resolution."
+        );
+      }
+
+      return createPlayByPlayDetails(
+        text,
+        "The active game state was updated and play is continuing from that result.",
+        "The banner tracks the latest possession, faceoff, shot, or exchange outcome as the prototype resolves each rule step."
+      );
+    }
+
+    function setPlayByPlay(text, type = "contain", details = null) {
       state.playByPlayText = text;
       state.playByPlayType = type;
+      state.playByPlayDetails = details || buildPlayByPlayDetails(text, type);
+      state.playByPlayHelpOpen = false;
     }
 
     function clearDeckEvent() {
@@ -2457,12 +3340,16 @@
     }
 
     function buildDumpConfigLines() {
+      const cpuProfile = getCpuDifficultyProfile();
       return [
         `Suit Count: ${state.config.suitCount}`,
         `Max Card Value: ${state.config.maxValue}`,
         `Hand Size: ${state.config.handSize}`,
         `Wild Cards: ${state.config.wildCardCount}`,
         `CPU Speed %: ${state.config.cpuSpeedPercent}`,
+        `CPU Difficulty: ${cpuProfile.label}`,
+        `CPU Tuning: lookahead ${cpuProfile.attackLookaheadDepth}, follow-up ${cpuProfile.attackFollowUpWeight}, chain ${cpuProfile.chainLengthWeight}, empty-hand ${cpuProfile.emptyHandShotWeight}, zone push ${cpuProfile.zoneAdvanceWeight}, shot-zone ${cpuProfile.shotZoneAggression}, conserve ${cpuProfile.cardConservationWeight}, stabilize deny ${cpuProfile.avoidStabilizeWindowWeight}, faceoff ${cpuProfile.faceoffAggression}%, icing reluctance ${cpuProfile.icingReluctance}, momentum ${cpuProfile.momentumSpendAggression}, late risk ${cpuProfile.lateGameRiskAggression}, panic ${cpuProfile.defensivePanicThreshold}, D-zone ${cpuProfile.defensiveZoneDefenseTarget}+, goal-zone ${cpuProfile.goalZoneDefenseTarget}+, icing ${cpuProfile.icingDangerThreshold}+, dump ${cpuProfile.dumpThreshold}+`,
+        `Stabilize Sanding: ${getStabilizeSandingModeText(state.config.stabilizeSanding)}`,
         `Decks Per Period: ${state.config.decksPerPeriod}`,
         `Cross River Once: ${state.config.singleRiverCrossMode}`,
         `Momentum System: ${FEATURES.momentumSystem}`,
@@ -2513,6 +3400,7 @@
 
       return [
         { label: "Goals", human: humanStats.goals, cpu: cpuStats.goals },
+        { label: "Force Shot Goals", human: humanStats.forceShotGoals, cpu: cpuStats.forceShotGoals },
         { label: "Shots On Goal", human: humanStats.shotsOnGoal, cpu: cpuStats.shotsOnGoal },
         { label: "Saves Made", human: humanStats.savesMade, cpu: cpuStats.savesMade },
         { label: "Exchange Wins", human: humanStats.exchangeWins, cpu: cpuStats.exchangeWins },
@@ -2524,7 +3412,7 @@
         { label: "Cycles Used", human: humanStats.cyclesUsed, cpu: cpuStats.cyclesUsed },
         { label: "Force Shots", human: humanStats.forceShotsUsed, cpu: cpuStats.forceShotsUsed },
         { label: "Stabilize Saves", human: humanStats.stabilizeSuccesses, cpu: cpuStats.stabilizeSuccesses },
-        { label: "Rebounds Created", human: humanStats.reboundsCreated, cpu: cpuStats.reboundsCreated },
+        { label: "Rebounds", human: humanStats.reboundsCreated, cpu: cpuStats.reboundsCreated },
         { label: "Rebound Saves", human: humanStats.reboundSavesMade, cpu: cpuStats.reboundSavesMade },
         { label: "Defensive Recoveries", human: humanStats.defensiveRecoveries, cpu: cpuStats.defensiveRecoveries },
         { label: "Total Shot Value", human: humanStats.totalShotValue, cpu: cpuStats.totalShotValue },
@@ -2539,6 +3427,7 @@
       const humanPendingCount = options.humanPendingCount ?? getHumanPendingPlayCount();
       const humanShotLegalCount = options.humanShotLegalCount ?? (state.shotPending && state.currentTurn === "human" ? getLegalCardsForTurn("human").length : 0);
       const humanPitySaveDraw = options.humanPitySaveDraw ?? (state.shotPending && state.currentTurn === "human" && canUsePitySaveDraw("human", state.shotPending));
+      const stabilizeNeedText = getStabilizeSandingLabel() === "legal" ? "1 legal card" : `1 ${getStabilizeSandingLabel()} card`;
 
       if (state.gameOver) {
         items.push({ label: "Final", value: `Human ${state.humanScore} - ${state.cpuScore} CPU`, tone: "goal" });
@@ -2570,7 +3459,7 @@
       }
 
       if (state.stabilizePending) {
-        items.push({ label: "Need", value: "1 legal card", tone: "contain" });
+        items.push({ label: "Need", value: stabilizeNeedText, tone: "contain" });
         items.push({ label: "Fallback", value: "Draw 1 if none", tone: "period" });
         return items;
       }
@@ -2587,7 +3476,7 @@
           items.push({ label: "Need", value: "1 rebound save", tone: "shot" });
           items.push({ label: "Target", value: String(shot.reboundShotValue), tone: "shot" });
           if (state.currentTurn === "human" && humanShotLegalCount === 0) {
-            items.push({ label: "Fallback", value: "Desperation draw", tone: "period" });
+            items.push({ label: "Fallback", value: "Rebound draw", tone: "period" });
           }
           return items;
         }
@@ -2597,14 +3486,10 @@
         items.push({ label: "Save Needs", value: String(requiredLength), tone: "shot" });
         items.push({ label: "Progress", value: `${shot.savedCount}/${requiredLength}`, tone: "contain" });
         if (state.currentTurn === "human" && humanPitySaveDraw) {
-          items.push({ label: "Last Chance", value: "Pity draw live", tone: "puck" });
+          items.push({ label: "Last Chance", value: "Last-chance draw live", tone: "puck" });
         }
         return items;
       }
-
-      items.push({ label: "Attack", value: String(state.attackerChainCount), tone: state.attacker === "human" ? "human-side" : "cpu-side" });
-      items.push({ label: "Defense", value: String(state.defenderChainCount), tone: state.defender === "human" ? "human-side" : "cpu-side" });
-
       return items;
     }
 
@@ -2622,6 +3507,63 @@
           <span class="v">${item.value}</span>
         </div>
       `).join("");
+    }
+
+    function getExchangeMeterState() {
+      if (state.gameOver || state.faceoffPending || state.shotPending || !state.attacker || !state.defender) {
+        return null;
+      }
+
+      const humanCount = state.attacker === "human" ? state.attackerChainCount : state.defenderChainCount;
+      const cpuCount = state.attacker === "cpu" ? state.attackerChainCount : state.defenderChainCount;
+      const delta = humanCount - cpuCount;
+      const displayMagnitude = Math.abs(delta);
+      const slotOffset = delta === 0 ? 0 : Math.sign(delta) * Math.min(5, displayMagnitude);
+      const stabilizeThreat = state.defenderChainCount === state.attackerChainCount + 1;
+
+      return {
+        humanCount,
+        cpuCount,
+        delta,
+        displayMagnitude,
+        slot: slotOffset + 5,
+        leader: delta === 0 ? "neutral" : delta > 0 ? "human" : "cpu",
+        stabilizeThreat,
+        leftLabel: `Human ${state.attacker === "human" ? "attack" : "defense"}`,
+        rightLabel: `CPU ${state.attacker === "cpu" ? "attack" : "defense"}`
+      };
+    }
+
+    function renderExchangeMeter() {
+      const container = document.getElementById("exchangeMeter");
+      if (!container) {
+        return;
+      }
+
+      const exchange = getExchangeMeterState();
+      if (!exchange) {
+        container.hidden = true;
+        container.innerHTML = "";
+        return;
+      }
+
+      const stops = Array.from({ length: 11 }, (_, index) => `<span class="exchange-meter-stop${index === 5 ? " center" : ""}"></span>`).join("");
+      container.hidden = false;
+      container.setAttribute("aria-label", `Exchange meter: Human ${exchange.humanCount}, CPU ${exchange.cpuCount}`);
+      container.innerHTML = `
+        <div class="exchange-meter-head">
+          <span class="exchange-meter-side left human">${exchange.leftLabel}</span>
+          <span class="exchange-meter-center">0</span>
+          <span class="exchange-meter-side right cpu">${exchange.rightLabel}</span>
+        </div>
+        <div class="exchange-meter-track" title="Human ${exchange.humanCount} | CPU ${exchange.cpuCount}">
+          <div class="exchange-meter-rail">
+            ${stops}
+            <span class="exchange-meter-node ${exchange.leader}${exchange.stabilizeThreat ? " stabilize" : ""}" style="--exchange-slot:${exchange.slot};">${exchange.displayMagnitude}</span>
+          </div>
+          <span class="exchange-meter-center-label">0</span>
+        </div>
+      `;
     }
 
     function buildMatchSnapshotHtml() {
@@ -2676,7 +3618,7 @@
     }
 
     function buildDebugDumpText() {
-      const logLines = state.logMessages.length > 0 ? state.logMessages : ["(empty log)"];
+      const logLines = state.logMessages.length > 0 ? state.logMessages.map(getLogEntryText) : ["(empty log)"];
 
       return [
         "Hockey Card Prototype Debug Dump",
@@ -2696,6 +3638,23 @@
         "Action Log",
         ...logLines
       ].join("\n");
+    }
+
+    function getLogEntryText(entry) {
+      return typeof entry === "string" ? entry : entry?.text || "";
+    }
+
+    function cloneLogEntries(entries = []) {
+      return entries.map((entry) => (typeof entry === "string"
+        ? { text: entry, sequenceLead: false }
+        : { text: entry?.text || "", sequenceLead: Boolean(entry?.sequenceLead) }));
+    }
+
+    function addLog(message, options = {}) {
+      state.logMessages.push({
+        text: message,
+        sequenceLead: Boolean(options.sequenceLead)
+      });
     }
 
     function buildStatsDumpText() {
@@ -2863,6 +3822,10 @@
     function clearBurnSelection() {
       state.pendingBurnSelection = false;
       state.pendingCycleSelection = false;
+    }
+
+    function clearOverflowDiscardPending() {
+      state.pendingOverflowDiscard = null;
     }
 
     function clearStabilizePending() {
@@ -3173,11 +4136,20 @@
       }
       incrementPlayerStat(player, "cyclesUsed");
 
+      setEvent(`${lowerPlayerName(player)} cycles a card`, "contain");
+
+      if (player === "human") {
+        if (maybeHandleHandOverflow(player, { origin: "cycle", drawnCard })) {
+          return true;
+        }
+      } else {
+        maybeHandleHandOverflow(player, { origin: "cycle", drawnCard });
+      }
+
       if (resolvePendingPeriodBreak()) {
         return true;
       }
 
-      setEvent(`${lowerPlayerName(player)} cycles a card`, "contain");
       refreshComboWindow();
 
       const legalAfterCycle = getLegalCardsForTurn(player).length;
@@ -3330,7 +4302,7 @@
         activeBattleState: state.activeBattleState,
         comboImmunityActive: state.comboImmunityActive,
         recentPlayedCards: cloneRecentPlayedCards(state.recentPlayedCards),
-        logMessages: [...state.logMessages],
+        logMessages: cloneLogEntries(state.logMessages),
         eventText: state.eventText,
         eventType: state.eventType,
         playedCardIndex,
@@ -3353,7 +4325,7 @@
       state.activeBattleState = snapshot.activeBattleState;
       state.comboImmunityActive = snapshot.comboImmunityActive;
       state.recentPlayedCards = cloneRecentPlayedCards(snapshot.recentPlayedCards);
-      state.logMessages = [...snapshot.logMessages];
+      state.logMessages = cloneLogEntries(snapshot.logMessages);
       state.eventText = snapshot.eventText;
       state.eventType = snapshot.eventType;
       refreshComboWindow();
@@ -3459,13 +4431,102 @@
       return Math.min(max, Math.max(min, value));
     }
 
+    function sanitizeCpuDifficulty(rawValue) {
+      const normalized = String(rawValue ?? DEFAULT_CONFIG.cpuDifficulty).trim().toLowerCase();
+      if (normalized === "custom") {
+        return "custom";
+      }
+      if (CPU_DIFFICULTY_ALIASES[normalized]) {
+        return CPU_DIFFICULTY_ALIASES[normalized];
+      }
+      return CPU_DIFFICULTY_PRESETS[normalized] ? normalized : DEFAULT_CONFIG.cpuDifficulty;
+    }
+
+    function sanitizeStabilizeSanding(rawValue) {
+      const normalized = String(rawValue ?? DEFAULT_CONFIG.stabilizeSanding).trim().toLowerCase();
+      return ["default", "suit", "value"].includes(normalized) ? normalized : DEFAULT_CONFIG.stabilizeSanding;
+    }
+
+    function getStabilizeSandingModeText(mode = state.config.stabilizeSanding) {
+      const normalized = sanitizeStabilizeSanding(mode);
+      if (normalized === "suit") {
+        return "Suit";
+      }
+      if (normalized === "value") {
+        return "Numerical";
+      }
+      return "Default";
+    }
+
+    function getCpuPresetKey(difficulty = DEFAULT_CONFIG.cpuDifficulty) {
+      const normalized = sanitizeCpuDifficulty(difficulty);
+      return normalized === "custom" ? DEFAULT_CONFIG.cpuDifficulty : normalized;
+    }
+
+    function getCpuPresetConfigValues(difficulty = DEFAULT_CONFIG.cpuDifficulty) {
+      const preset = CPU_DIFFICULTY_PRESETS[getCpuPresetKey(difficulty)];
+      return {
+        cpuAttackLookaheadDepth: preset.attackLookaheadDepth,
+        cpuAttackFollowUpWeight: preset.attackFollowUpWeight,
+        cpuDefensiveZoneDefenseTarget: preset.defensiveZoneDefenseTarget,
+        cpuGoalZoneDefenseTarget: preset.goalZoneDefenseTarget,
+        cpuFaceoffNeutralBiasPercent: Math.round(preset.faceoffNeutralBias * 100),
+        cpuFaceoffDangerBiasPercent: Math.round(preset.faceoffDangerBias * 100),
+        cpuIcingDangerThreshold: preset.icingDangerThreshold,
+        cpuDumpThreshold: preset.dumpThreshold,
+        cpuChainLengthWeight: preset.chainLengthWeight,
+        cpuEmptyHandShotWeight: preset.emptyHandShotWeight,
+        cpuZoneAdvanceWeight: preset.zoneAdvanceWeight,
+        cpuShotZoneAggression: preset.shotZoneAggression,
+        cpuCardConservationWeight: preset.cardConservationWeight,
+        cpuAvoidStabilizeWindowWeight: preset.avoidStabilizeWindowWeight,
+        cpuFaceoffAggressionPercent: preset.faceoffAggression,
+        cpuIcingReluctance: preset.icingReluctance,
+        cpuMomentumSpendAggression: preset.momentumSpendAggression,
+        cpuLateGameRiskAggression: preset.lateGameRiskAggression,
+        cpuDefensivePanicThreshold: preset.defensivePanicThreshold
+      };
+    }
+
+    function applyCpuDifficultyPresetToConfig(config, difficulty) {
+      const normalized = sanitizeCpuDifficulty(difficulty);
+      return {
+        ...config,
+        cpuDifficulty: normalized,
+        ...getCpuPresetConfigValues(normalized)
+      };
+    }
+
     function sanitizeStoredConfig(rawConfig = {}) {
+      const cpuDifficulty = sanitizeCpuDifficulty(rawConfig.cpuDifficulty ?? DEFAULT_CONFIG.cpuDifficulty);
+      const presetConfig = getCpuPresetConfigValues(cpuDifficulty);
       return {
         suitCount: clamp(Number.parseInt(rawConfig.suitCount ?? DEFAULT_CONFIG.suitCount, 10), 2, 5),
         maxValue: clamp(Number.parseInt(rawConfig.maxValue ?? DEFAULT_CONFIG.maxValue, 10), 5, 10),
         handSize: clamp(Number.parseInt(rawConfig.handSize ?? DEFAULT_CONFIG.handSize, 10), 3, 10),
         wildCardCount: clamp(Number.parseInt(rawConfig.wildCardCount ?? DEFAULT_CONFIG.wildCardCount, 10), 0, 20),
         cpuSpeedPercent: clamp(Number.parseInt(rawConfig.cpuSpeedPercent ?? DEFAULT_CONFIG.cpuSpeedPercent, 10), 10, 200),
+        cpuDifficulty,
+        cpuAttackLookaheadDepth: clamp(Number.parseInt(rawConfig.cpuAttackLookaheadDepth ?? presetConfig.cpuAttackLookaheadDepth, 10), 0, 10),
+        cpuAttackFollowUpWeight: clamp(Number.parseInt(rawConfig.cpuAttackFollowUpWeight ?? presetConfig.cpuAttackFollowUpWeight, 10), 1, 16),
+        cpuDefensiveZoneDefenseTarget: clamp(Number.parseInt(rawConfig.cpuDefensiveZoneDefenseTarget ?? presetConfig.cpuDefensiveZoneDefenseTarget, 10), 1, 3),
+        cpuGoalZoneDefenseTarget: clamp(Number.parseInt(rawConfig.cpuGoalZoneDefenseTarget ?? presetConfig.cpuGoalZoneDefenseTarget, 10), 1, 4),
+        cpuFaceoffNeutralBiasPercent: clamp(Number.parseInt(rawConfig.cpuFaceoffNeutralBiasPercent ?? presetConfig.cpuFaceoffNeutralBiasPercent, 10), 20, 100),
+        cpuFaceoffDangerBiasPercent: clamp(Number.parseInt(rawConfig.cpuFaceoffDangerBiasPercent ?? presetConfig.cpuFaceoffDangerBiasPercent, 10), 20, 100),
+        cpuIcingDangerThreshold: clamp(Number.parseInt(rawConfig.cpuIcingDangerThreshold ?? presetConfig.cpuIcingDangerThreshold, 10), 2, 10),
+        cpuDumpThreshold: clamp(Number.parseInt(rawConfig.cpuDumpThreshold ?? presetConfig.cpuDumpThreshold, 10), 2, 10),
+        cpuChainLengthWeight: clamp(Number.parseInt(rawConfig.cpuChainLengthWeight ?? presetConfig.cpuChainLengthWeight, 10), 0, 16),
+        cpuEmptyHandShotWeight: clamp(Number.parseInt(rawConfig.cpuEmptyHandShotWeight ?? presetConfig.cpuEmptyHandShotWeight, 10), 0, 20),
+        cpuZoneAdvanceWeight: clamp(Number.parseInt(rawConfig.cpuZoneAdvanceWeight ?? presetConfig.cpuZoneAdvanceWeight, 10), 0, 12),
+        cpuShotZoneAggression: clamp(Number.parseInt(rawConfig.cpuShotZoneAggression ?? presetConfig.cpuShotZoneAggression, 10), 0, 12),
+        cpuCardConservationWeight: clamp(Number.parseInt(rawConfig.cpuCardConservationWeight ?? presetConfig.cpuCardConservationWeight, 10), 0, 12),
+        cpuAvoidStabilizeWindowWeight: clamp(Number.parseInt(rawConfig.cpuAvoidStabilizeWindowWeight ?? presetConfig.cpuAvoidStabilizeWindowWeight, 10), 0, 16),
+        cpuFaceoffAggressionPercent: clamp(Number.parseInt(rawConfig.cpuFaceoffAggressionPercent ?? presetConfig.cpuFaceoffAggressionPercent, 10), 0, 100),
+        cpuIcingReluctance: clamp(Number.parseInt(rawConfig.cpuIcingReluctance ?? presetConfig.cpuIcingReluctance, 10), 0, 12),
+        cpuMomentumSpendAggression: clamp(Number.parseInt(rawConfig.cpuMomentumSpendAggression ?? presetConfig.cpuMomentumSpendAggression, 10), 0, 12),
+        cpuLateGameRiskAggression: clamp(Number.parseInt(rawConfig.cpuLateGameRiskAggression ?? presetConfig.cpuLateGameRiskAggression, 10), 0, 12),
+        cpuDefensivePanicThreshold: clamp(Number.parseInt(rawConfig.cpuDefensivePanicThreshold ?? presetConfig.cpuDefensivePanicThreshold, 10), 0, 4),
+        stabilizeSanding: sanitizeStabilizeSanding(rawConfig.stabilizeSanding ?? DEFAULT_CONFIG.stabilizeSanding),
         singleRiverCrossMode: rawConfig.singleRiverCrossMode === true || rawConfig.singleRiverCrossMode === "on",
         decksPerPeriod: clamp(Number.parseInt(rawConfig.decksPerPeriod ?? DEFAULT_CONFIG.decksPerPeriod, 10), 1, 5)
       };
@@ -3547,6 +4608,27 @@
       const handSizeInput = document.getElementById("debugHandSize");
       const wildCountInput = document.getElementById("debugWildCount");
       const cpuSpeedInput = document.getElementById("debugCpuSpeed");
+      const cpuDifficultyInput = document.getElementById("debugCpuDifficulty");
+      const cpuAttackLookaheadInput = document.getElementById("debugCpuAttackLookahead");
+      const cpuAttackFollowUpInput = document.getElementById("debugCpuAttackFollowUp");
+      const cpuDefensiveTargetInput = document.getElementById("debugCpuDefensiveTarget");
+      const cpuGoalTargetInput = document.getElementById("debugCpuGoalTarget");
+      const cpuFaceoffNeutralInput = document.getElementById("debugCpuFaceoffNeutral");
+      const cpuFaceoffDangerInput = document.getElementById("debugCpuFaceoffDanger");
+      const cpuIcingThresholdInput = document.getElementById("debugCpuIcingThreshold");
+      const cpuDumpThresholdInput = document.getElementById("debugCpuDumpThreshold");
+      const cpuChainWeightInput = document.getElementById("debugCpuChainWeight");
+      const cpuEmptyHandShotInput = document.getElementById("debugCpuEmptyHandShot");
+      const cpuZoneAdvanceInput = document.getElementById("debugCpuZoneAdvance");
+      const cpuShotAggroInput = document.getElementById("debugCpuShotAggro");
+      const cpuConserveInput = document.getElementById("debugCpuConserve");
+      const cpuStabilizeDenyInput = document.getElementById("debugCpuStabilizeDeny");
+      const cpuFaceoffAggroInput = document.getElementById("debugCpuFaceoffAggro");
+      const cpuIcingReluctanceInput = document.getElementById("debugCpuIcingReluctance");
+      const cpuMomentumAggroInput = document.getElementById("debugCpuMomentumAggro");
+      const cpuLateRiskInput = document.getElementById("debugCpuLateRisk");
+      const cpuPanicThresholdInput = document.getElementById("debugCpuPanicThreshold");
+      const stabilizeSandingInput = document.getElementById("debugStabilizeSanding");
       const decksPerPeriodInput = document.getElementById("debugDecksPerPeriod");
       const riverModeInput = document.getElementById("debugRiverMode");
 
@@ -3556,6 +4638,27 @@
         handSize: clamp(Number.parseInt(handSizeInput?.value || String(DEFAULT_CONFIG.handSize), 10), 3, 10),
         wildCardCount: clamp(Number.parseInt(wildCountInput?.value || String(DEFAULT_CONFIG.wildCardCount), 10), 0, 20),
         cpuSpeedPercent: clamp(Number.parseInt(cpuSpeedInput?.value || String(DEFAULT_CONFIG.cpuSpeedPercent), 10), 10, 200),
+        cpuDifficulty: sanitizeCpuDifficulty(cpuDifficultyInput?.value || DEFAULT_CONFIG.cpuDifficulty),
+        cpuAttackLookaheadDepth: clamp(Number.parseInt(cpuAttackLookaheadInput?.value || String(DEFAULT_CONFIG.cpuAttackLookaheadDepth), 10), 0, 10),
+        cpuAttackFollowUpWeight: clamp(Number.parseInt(cpuAttackFollowUpInput?.value || String(DEFAULT_CONFIG.cpuAttackFollowUpWeight), 10), 1, 16),
+        cpuDefensiveZoneDefenseTarget: clamp(Number.parseInt(cpuDefensiveTargetInput?.value || String(DEFAULT_CONFIG.cpuDefensiveZoneDefenseTarget), 10), 1, 3),
+        cpuGoalZoneDefenseTarget: clamp(Number.parseInt(cpuGoalTargetInput?.value || String(DEFAULT_CONFIG.cpuGoalZoneDefenseTarget), 10), 1, 4),
+        cpuFaceoffNeutralBiasPercent: clamp(Number.parseInt(cpuFaceoffNeutralInput?.value || String(DEFAULT_CONFIG.cpuFaceoffNeutralBiasPercent), 10), 20, 100),
+        cpuFaceoffDangerBiasPercent: clamp(Number.parseInt(cpuFaceoffDangerInput?.value || String(DEFAULT_CONFIG.cpuFaceoffDangerBiasPercent), 10), 20, 100),
+        cpuIcingDangerThreshold: clamp(Number.parseInt(cpuIcingThresholdInput?.value || String(DEFAULT_CONFIG.cpuIcingDangerThreshold), 10), 2, 10),
+        cpuDumpThreshold: clamp(Number.parseInt(cpuDumpThresholdInput?.value || String(DEFAULT_CONFIG.cpuDumpThreshold), 10), 2, 10),
+        cpuChainLengthWeight: clamp(Number.parseInt(cpuChainWeightInput?.value || String(DEFAULT_CONFIG.cpuChainLengthWeight), 10), 0, 16),
+        cpuEmptyHandShotWeight: clamp(Number.parseInt(cpuEmptyHandShotInput?.value || String(DEFAULT_CONFIG.cpuEmptyHandShotWeight), 10), 0, 20),
+        cpuZoneAdvanceWeight: clamp(Number.parseInt(cpuZoneAdvanceInput?.value || String(DEFAULT_CONFIG.cpuZoneAdvanceWeight), 10), 0, 12),
+        cpuShotZoneAggression: clamp(Number.parseInt(cpuShotAggroInput?.value || String(DEFAULT_CONFIG.cpuShotZoneAggression), 10), 0, 12),
+        cpuCardConservationWeight: clamp(Number.parseInt(cpuConserveInput?.value || String(DEFAULT_CONFIG.cpuCardConservationWeight), 10), 0, 12),
+        cpuAvoidStabilizeWindowWeight: clamp(Number.parseInt(cpuStabilizeDenyInput?.value || String(DEFAULT_CONFIG.cpuAvoidStabilizeWindowWeight), 10), 0, 16),
+        cpuFaceoffAggressionPercent: clamp(Number.parseInt(cpuFaceoffAggroInput?.value || String(DEFAULT_CONFIG.cpuFaceoffAggressionPercent), 10), 0, 100),
+        cpuIcingReluctance: clamp(Number.parseInt(cpuIcingReluctanceInput?.value || String(DEFAULT_CONFIG.cpuIcingReluctance), 10), 0, 12),
+        cpuMomentumSpendAggression: clamp(Number.parseInt(cpuMomentumAggroInput?.value || String(DEFAULT_CONFIG.cpuMomentumSpendAggression), 10), 0, 12),
+        cpuLateGameRiskAggression: clamp(Number.parseInt(cpuLateRiskInput?.value || String(DEFAULT_CONFIG.cpuLateGameRiskAggression), 10), 0, 12),
+        cpuDefensivePanicThreshold: clamp(Number.parseInt(cpuPanicThresholdInput?.value || String(DEFAULT_CONFIG.cpuDefensivePanicThreshold), 10), 0, 4),
+        stabilizeSanding: sanitizeStabilizeSanding(stabilizeSandingInput?.value || DEFAULT_CONFIG.stabilizeSanding),
         decksPerPeriod: clamp(Number.parseInt(decksPerPeriodInput?.value || String(DEFAULT_CONFIG.decksPerPeriod), 10), 1, 5),
         singleRiverCrossMode: (riverModeInput?.value || "off") === "on"
       };
@@ -3575,6 +4678,27 @@
       const handSizeInput = document.getElementById("debugHandSize");
       const wildCountInput = document.getElementById("debugWildCount");
       const cpuSpeedInput = document.getElementById("debugCpuSpeed");
+      const cpuDifficultyInput = document.getElementById("debugCpuDifficulty");
+      const cpuAttackLookaheadInput = document.getElementById("debugCpuAttackLookahead");
+      const cpuAttackFollowUpInput = document.getElementById("debugCpuAttackFollowUp");
+      const cpuDefensiveTargetInput = document.getElementById("debugCpuDefensiveTarget");
+      const cpuGoalTargetInput = document.getElementById("debugCpuGoalTarget");
+      const cpuFaceoffNeutralInput = document.getElementById("debugCpuFaceoffNeutral");
+      const cpuFaceoffDangerInput = document.getElementById("debugCpuFaceoffDanger");
+      const cpuIcingThresholdInput = document.getElementById("debugCpuIcingThreshold");
+      const cpuDumpThresholdInput = document.getElementById("debugCpuDumpThreshold");
+      const cpuChainWeightInput = document.getElementById("debugCpuChainWeight");
+      const cpuEmptyHandShotInput = document.getElementById("debugCpuEmptyHandShot");
+      const cpuZoneAdvanceInput = document.getElementById("debugCpuZoneAdvance");
+      const cpuShotAggroInput = document.getElementById("debugCpuShotAggro");
+      const cpuConserveInput = document.getElementById("debugCpuConserve");
+      const cpuStabilizeDenyInput = document.getElementById("debugCpuStabilizeDeny");
+      const cpuFaceoffAggroInput = document.getElementById("debugCpuFaceoffAggro");
+      const cpuIcingReluctanceInput = document.getElementById("debugCpuIcingReluctance");
+      const cpuMomentumAggroInput = document.getElementById("debugCpuMomentumAggro");
+      const cpuLateRiskInput = document.getElementById("debugCpuLateRisk");
+      const cpuPanicThresholdInput = document.getElementById("debugCpuPanicThreshold");
+      const stabilizeSandingInput = document.getElementById("debugStabilizeSanding");
       const decksPerPeriodInput = document.getElementById("debugDecksPerPeriod");
       const riverModeInput = document.getElementById("debugRiverMode");
       const momentumSystemInput = document.getElementById("debugMomentumSystem");
@@ -3594,6 +4718,69 @@
       if (cpuSpeedInput) {
         cpuSpeedInput.value = String(config.cpuSpeedPercent);
       }
+      if (cpuDifficultyInput) {
+        cpuDifficultyInput.value = sanitizeCpuDifficulty(config.cpuDifficulty);
+      }
+      if (cpuAttackLookaheadInput) {
+        cpuAttackLookaheadInput.value = String(config.cpuAttackLookaheadDepth);
+      }
+      if (cpuAttackFollowUpInput) {
+        cpuAttackFollowUpInput.value = String(config.cpuAttackFollowUpWeight);
+      }
+      if (cpuDefensiveTargetInput) {
+        cpuDefensiveTargetInput.value = String(config.cpuDefensiveZoneDefenseTarget);
+      }
+      if (cpuGoalTargetInput) {
+        cpuGoalTargetInput.value = String(config.cpuGoalZoneDefenseTarget);
+      }
+      if (cpuFaceoffNeutralInput) {
+        cpuFaceoffNeutralInput.value = String(config.cpuFaceoffNeutralBiasPercent);
+      }
+      if (cpuFaceoffDangerInput) {
+        cpuFaceoffDangerInput.value = String(config.cpuFaceoffDangerBiasPercent);
+      }
+      if (cpuIcingThresholdInput) {
+        cpuIcingThresholdInput.value = String(config.cpuIcingDangerThreshold);
+      }
+      if (cpuDumpThresholdInput) {
+        cpuDumpThresholdInput.value = String(config.cpuDumpThreshold);
+      }
+      if (cpuChainWeightInput) {
+        cpuChainWeightInput.value = String(config.cpuChainLengthWeight);
+      }
+      if (cpuEmptyHandShotInput) {
+        cpuEmptyHandShotInput.value = String(config.cpuEmptyHandShotWeight);
+      }
+      if (cpuZoneAdvanceInput) {
+        cpuZoneAdvanceInput.value = String(config.cpuZoneAdvanceWeight);
+      }
+      if (cpuShotAggroInput) {
+        cpuShotAggroInput.value = String(config.cpuShotZoneAggression);
+      }
+      if (cpuConserveInput) {
+        cpuConserveInput.value = String(config.cpuCardConservationWeight);
+      }
+      if (cpuStabilizeDenyInput) {
+        cpuStabilizeDenyInput.value = String(config.cpuAvoidStabilizeWindowWeight);
+      }
+      if (cpuFaceoffAggroInput) {
+        cpuFaceoffAggroInput.value = String(config.cpuFaceoffAggressionPercent);
+      }
+      if (cpuIcingReluctanceInput) {
+        cpuIcingReluctanceInput.value = String(config.cpuIcingReluctance);
+      }
+      if (cpuMomentumAggroInput) {
+        cpuMomentumAggroInput.value = String(config.cpuMomentumSpendAggression);
+      }
+      if (cpuLateRiskInput) {
+        cpuLateRiskInput.value = String(config.cpuLateGameRiskAggression);
+      }
+      if (cpuPanicThresholdInput) {
+        cpuPanicThresholdInput.value = String(config.cpuDefensivePanicThreshold);
+      }
+      if (stabilizeSandingInput) {
+        stabilizeSandingInput.value = sanitizeStabilizeSanding(config.stabilizeSanding);
+      }
       if (decksPerPeriodInput) {
         decksPerPeriodInput.value = String(config.decksPerPeriod);
       }
@@ -3608,18 +4795,20 @@
     function refreshDebugPreview() {
       const config = getDraftConfigFromControls();
       const features = getDraftFeaturesFromControls();
+      const cpuProfile = getCpuDifficultyProfile(config);
       const preview = document.getElementById("debugPreview");
       const rulesPreview = document.getElementById("debugRulesPreview");
       const wildText = `${config.wildCardCount} wild card${config.wildCardCount === 1 ? "" : "s"}`;
       const riverText = config.singleRiverCrossMode ? "cross river once ON" : "cross river once OFF";
       const momentumText = features.momentumSystem ? "Momentum/Dump ON" : "Momentum/Dump OFF";
+      const stabilizeText = getStabilizeSandingModeText(config.stabilizeSanding);
       const deckSliceText = formatClockSeconds(getDeckSliceSeconds(config));
       const deckText = `${config.decksPerPeriod} deck${config.decksPerPeriod === 1 ? "" : "s"} per period (${deckSliceText} each)`;
       if (preview) {
-        preview.textContent = `Next game: ${config.suitCount} suits, values 1-${config.maxValue}, hand size ${config.handSize}, ${wildText}, deck ${getDeckSizeForConfig(config)} cards, ${deckText}, ${riverText}, ${momentumText}. CPU speed ${config.cpuSpeedPercent}% applies immediately.`;
+        preview.textContent = `Next game: ${config.suitCount} suits, values 1-${config.maxValue}, hand size ${config.handSize}, ${wildText}, deck ${getDeckSizeForConfig(config)} cards, ${deckText}, ${riverText}, ${momentumText}, stabilize ${stabilizeText}. CPU ${cpuProfile.label} at ${config.cpuSpeedPercent}% speed applies immediately.`;
       }
       if (rulesPreview) {
-        rulesPreview.textContent = `Next-game faceoffs: higher card wins and exact ties resolve randomly. Chain mode: ${config.singleRiverCrossMode ? "you may switch between value and suit matching once per pile run." : "value and suit matching may alternate freely."} Experimental feature flag: Momentum, Loose Puck, Burn, and Dump are ${features.momentumSystem ? "enabled" : "disabled"}.`;
+        rulesPreview.textContent = `CPU ${cpuProfile.label}: lookahead ${cpuProfile.attackLookaheadDepth}, follow-up ${cpuProfile.attackFollowUpWeight}, chain ${cpuProfile.chainLengthWeight}, empty-hand ${cpuProfile.emptyHandShotWeight}, zone push ${cpuProfile.zoneAdvanceWeight}, shot-zone ${cpuProfile.shotZoneAggression}, conserve ${cpuProfile.cardConservationWeight}, stabilize deny ${cpuProfile.avoidStabilizeWindowWeight}, faceoff ${cpuProfile.faceoffAggression}%, icing reluctance ${cpuProfile.icingReluctance}, momentum ${cpuProfile.momentumSpendAggression}, late risk ${cpuProfile.lateGameRiskAggression}, panic ${cpuProfile.defensivePanicThreshold}, D-zone ${cpuProfile.defensiveZoneDefenseTarget}+, goal-zone ${cpuProfile.goalZoneDefenseTarget}+. Chain mode: ${config.singleRiverCrossMode ? "you may switch between value and suit matching once per pile run." : "value and suit matching may alternate freely."}`;
       }
     }
 
@@ -3883,7 +5072,8 @@
       recordGoalForStats(
         shot.attackerPlayer,
         reboundGoal ? getGoalZoneIndex(shot.attackerPlayer) : shot.shotZoneIndex,
-        goalShotValue
+        goalShotValue,
+        shot.shotKind || "card"
       );
 
       addLog(reason || (reboundGoal
@@ -3954,13 +5144,17 @@
       if (player === "human") {
         const desperationCard = drawOneCard(player);
         if (!desperationCard) {
-          finishShotAsGoal(`${lowerPlayerName(player)} has no desperation save available. GOAL ${lowerPlayerName(shot.attackerPlayer)}.`);
+          finishShotAsGoal(`${lowerPlayerName(player)} has no rebound-save draw available. GOAL ${lowerPlayerName(shot.attackerPlayer)}.`);
           return true;
         }
 
-        addLog(`${lowerPlayerName(player)} draws desperation save ${cardToText(desperationCard)} into hand.`);
+        addLog(`${lowerPlayerName(player)} draws rebound-save card ${cardToText(desperationCard)} into hand.`);
         render();
         await animateDrawToHand(player, desperationCard, 320);
+
+        if (await maybeHandleHandOverflow(player, { origin: "reboundDraw", drawnCard: desperationCard })) {
+          return true;
+        }
 
         if (resolvePendingPeriodBreak()) {
           return true;
@@ -3972,12 +5166,12 @@
           const failedCard = playerHand(player).splice(drawnIndex, 1)[0];
           state.discardPile.push(failedCard);
           addLog(`${cardToText(failedCard)} does not match ${cardToText(state.activeCard)}.`);
-          finishShotAsGoal(`${lowerPlayerName(player)} cannot produce a legal desperation save. GOAL ${lowerPlayerName(shot.attackerPlayer)}.`);
+          finishShotAsGoal(`${lowerPlayerName(player)} cannot produce a legal rebound save. GOAL ${lowerPlayerName(shot.attackerPlayer)}.`);
           return true;
         }
 
         addLog(`Human may now stage ${cardToText(desperationCard)} as the rebound save.`);
-        logTurnDiagnostics(player, "Desperation draw.");
+        logTurnDiagnostics(player, "Rebound draw.");
         return true;
       }
 
@@ -3987,23 +5181,23 @@
       }
 
       if (!desperationCard) {
-        finishShotAsGoal(`${lowerPlayerName(player)} has no desperation save available. GOAL ${lowerPlayerName(shot.attackerPlayer)}.`);
+        finishShotAsGoal(`${lowerPlayerName(player)} has no rebound-save draw available. GOAL ${lowerPlayerName(shot.attackerPlayer)}.`);
         return true;
       }
 
-      addLog(`${lowerPlayerName(player)} reveals desperation save ${cardToText(desperationCard)}.`);
+      addLog(`${lowerPlayerName(player)} reveals rebound-save card ${cardToText(desperationCard)}.`, { sequenceLead: true });
       const matchDecision = getMatchDecision(desperationCard, state.activeCard, state.runMatchMode, state.runHasCrossedRiver);
       if (!matchDecision.legal) {
         state.discardPile.push(desperationCard);
         addLog(`${cardToText(desperationCard)} does not match ${cardToText(state.activeCard)}.`);
-        finishShotAsGoal(`${lowerPlayerName(player)} cannot produce a legal desperation save. GOAL ${lowerPlayerName(shot.attackerPlayer)}.`);
+        finishShotAsGoal(`${lowerPlayerName(player)} cannot produce a legal rebound save. GOAL ${lowerPlayerName(shot.attackerPlayer)}.`);
         return true;
       }
 
       shot.savedCards.push(desperationCard);
       shot.savedCount = 1;
       state.turnPlayCount = 1;
-      addLog(`${lowerPlayerName(player)} uses ${cardToText(desperationCard)} as the desperation save.`);
+      addLog(`${lowerPlayerName(player)} uses ${cardToText(desperationCard)} as the rebound save.`);
       recordShotSequencePlay(player, desperationCard, matchDecision);
       resolveReboundSaveResult(player, desperationCard);
       return true;
@@ -4020,10 +5214,10 @@
         return true;
       }
 
-      addLog(`Rebound ${shot.reboundCount}: ${lowerPlayerName(shot.attackerPlayer)} reveals ${cardToText(reboundCard)}.`);
+      addLog(`Rebound ${shot.reboundCount}: ${lowerPlayerName(shot.attackerPlayer)} reveals ${cardToText(reboundCard)}.`, { sequenceLead: true });
       const matchDecision = getMatchDecision(reboundCard, state.activeCard, state.runMatchMode, state.runHasCrossedRiver);
       if (!matchDecision.legal) {
-        addLog(`${cardToText(reboundCard)} does not match ${cardToText(state.activeCard)}. ${lowerPlayerName(shot.defenderPlayer)} recovers possession.`);
+        addLog(`${cardToText(reboundCard)} does not match the active card ${cardToText(state.activeCard)}, so no rebound shot is created. ${lowerPlayerName(shot.defenderPlayer)} recovers possession.`);
         finishShotWithRecovery(reboundCard, `${lowerPlayerName(shot.defenderPlayer)} recovers the loose puck in ${zoneLabel(getHomeGoalZoneIndex(shot.defenderPlayer))}.`);
         return true;
       }
@@ -4033,7 +5227,6 @@
       shot.phase = "reboundSave";
       shot.savedCount = 0;
       shot.phaseRequiredLength = 1;
-      incrementPlayerStat(shot.attackerPlayer, "reboundsCreated");
       recordShotForStats(shot.attackerPlayer, shot.reboundShotValue, getGoalZoneIndex(shot.attackerPlayer));
 
       addLog(`${lowerPlayerName(shot.attackerPlayer)} plays ${cardToText(reboundCard)} immediately as a rebound shot. Rebound value ${shot.reboundShotValue}.`);
@@ -4074,6 +5267,7 @@
       shot.savedCount = 0;
       shot.phaseRequiredLength = 1;
       resetRunMatchState();
+      incrementPlayerStat(shot.attackerPlayer, "reboundsCreated");
 
       setEvent("Rebound", "shot");
       showDeckEvent("Rebound", "shot", 1200);
@@ -4111,11 +5305,19 @@
       shot.pitySaveDrawUsed = true;
       const drawnCard = drawOneCard(player);
       if (drawnCard) {
-        addLog(`${lowerPlayerName(player)} gets a 1-card pity draw for the last save chance: ${cardToText(drawnCard)}.`);
+        addLog(`${lowerPlayerName(player)} gets a 1-card last-chance save draw: ${cardToText(drawnCard)}.`);
         render();
         await animateDrawToHand(player, drawnCard, options.drawDuration ?? (player === "cpu" ? getCpuSimDuration(460, 140) : 320));
+
+        if (player === "human") {
+          if (await maybeHandleHandOverflow(player, { origin: "lastChanceSaveDraw", drawnCard })) {
+            return true;
+          }
+        } else {
+          await maybeHandleHandOverflow(player, { origin: "lastChanceSaveDraw", drawnCard });
+        }
       } else {
-        addLog(`${lowerPlayerName(player)} has no pity draw available. Deck is empty.`);
+        addLog(`${lowerPlayerName(player)} has no last-chance save draw available. Deck is empty.`);
       }
 
       if (resolvePendingPeriodBreak()) {
@@ -4124,7 +5326,7 @@
 
       const legal = getLegalCardsForTurn(player);
       if (!drawnCard || legal.length === 0) {
-        addLog(`${lowerPlayerName(player)} cannot turn the pity draw into a save.`);
+        addLog(`${lowerPlayerName(player)} cannot turn the last-chance save draw into a save.`);
         resolveNormalShotSaveAttempt();
         return true;
       }
@@ -4195,7 +5397,7 @@
       state.turnPlayCount = shot.savedCount;
 
       if (isReboundSavePhase(shot)) {
-        addLog(`${lowerPlayerName(player)} plays rebound save ${cardToText(card)} against rebound value ${shot.reboundShotValue}.`);
+        addLog(`${lowerPlayerName(player)} plays rebound save ${cardToText(card)} against rebound value ${shot.reboundShotValue}.`, { sequenceLead: true });
         recordShotSequencePlay(player, card, matchDecision);
         setEvent("Rebound save", "contain");
         showDeckEvent(`Rebound Save\n${card.value} vs ${shot.reboundShotValue}`, "contain", 1400);
@@ -4203,7 +5405,7 @@
         return true;
       }
 
-      addLog(`${lowerPlayerName(player)} plays save card ${shot.savedCount}/${getShotCurrentRequiredLength(shot)}: ${cardToText(card)}.`);
+      addLog(`${lowerPlayerName(player)} plays save card ${shot.savedCount}/${getShotCurrentRequiredLength(shot)}: ${cardToText(card)}.`, { sequenceLead: shot.savedCount === 1 });
       recordShotSequencePlay(player, card, matchDecision);
       setEvent(`Save chain ${shot.savedCount}/${getShotCurrentRequiredLength(shot)}`, "contain");
 
@@ -4273,6 +5475,223 @@
 
       hand.push(card);
       return card;
+    }
+
+    function chooseCpuOverflowDiscardIndex(player, drawnCard = null) {
+      const hand = playerHand(player);
+      const drawnIndex = hand.length - 1;
+      const legalForTurn = new Set(getLegalCardsForTurn(player));
+      let bestIndex = 0;
+      let bestScore = Number.POSITIVE_INFINITY;
+
+      hand.forEach((card, index) => {
+        let score = card.value * 10;
+        if (legalForTurn.has(index)) {
+          score += 80;
+        }
+        if (index === drawnIndex) {
+          score += drawnCard && legalForTurn.has(index) ? 160 : 8;
+        }
+        if (state.activeCard && card.value > state.activeCard.value) {
+          score += 4;
+        }
+
+        if (score < bestScore) {
+          bestScore = score;
+          bestIndex = index;
+        }
+      });
+
+      return bestIndex;
+    }
+
+    async function resolveCannotPlayAfterDraw(player, drawnCard, options = {}) {
+      const legal = getLegalCardsForTurn(player);
+      const drawnStillInHand = Boolean(drawnCard && playerHand(player).includes(drawnCard));
+
+      if (player === "human" && legal.length > 0) {
+        addLog(options.fromOverflow
+          ? "Human now has a legal card after trimming back to the hand limit. Choose it manually if you want to use it."
+          : `Human drew ${cardToText(drawnCard)}. It is playable; choose it manually if you want to use it.`);
+        logTurnDiagnostics(player, "Draw result.");
+        return true;
+      }
+
+      if (player === "cpu" && await tryPlayDrawnCard(player, drawnCard)) {
+        return true;
+      }
+
+      if (drawnCard && drawnStillInHand) {
+        addLog(`${lowerPlayerName(player)} still cannot play the drawn ${cardToText(drawnCard)} on ${cardToText(state.activeCard)}.`);
+      } else if (drawnCard) {
+        addLog(`${lowerPlayerName(player)} still cannot play after trimming back to the hand limit.`);
+      }
+
+      clearComboWindow();
+      state.cpuPreviewIndex = null;
+
+      if (state.stabilizePending) {
+        const pending = state.stabilizePending;
+        addLog(`${lowerPlayerName(player)} cannot complete the Stabilize attempt${drawnCard ? " after the draw" : ""}.`);
+        completeTurnoverToDefender(
+          `${lowerPlayerName(pending.defenderPlayer)} wins the exchange ${pending.defenderCount}-${pending.attackerCount}. Turnover stands after the failed Stabilize attempt.`,
+          pending.defenderCount - pending.attackerCount,
+          {
+            why: drawnCard
+              ? (drawnStillInHand
+                ? `${player === "human" ? "Human" : "CPU"} drew ${cardToText(drawnCard)} but still could not complete the Stabilize reply to ${cardToText(state.activeCard)}.`
+                : `${player === "human" ? "Human" : "CPU"} still could not complete the Stabilize reply after drawing and trimming back to the hand limit.`)
+              : `${player === "human" ? "Human" : "CPU"} could not draw because the deck was empty, so the Stabilize attempt failed on ${cardToText(state.activeCard)}.`
+          }
+        );
+        return true;
+      }
+
+      if (state.roleOfCurrentTurn === "attacker") {
+        addLog(`Turn ends because ${lowerPlayerName(player)} has no legal attacker play ${drawnCard ? "after drawing" : "and the deck is empty"}.`);
+        addLog(`${lowerPlayerName(player)} ${drawnCard ? "ends the attack chain after the draw" : "cannot draw and ends the attack chain"} at ${state.attackerChainCount}.`);
+        setEvent("Attack chain ends", "contain");
+        passAttackTurn(
+          drawnCard
+            ? (drawnStillInHand
+              ? `${player === "human" ? "Human" : "CPU"} drew ${cardToText(drawnCard)} but still had no legal attacker play on ${cardToText(state.activeCard)}.`
+              : `${player === "human" ? "Human" : "CPU"} still had no legal attacker play after drawing and trimming back to the hand limit.`)
+            : `${player === "human" ? "Human" : "CPU"} could not draw because the deck was empty, so the attack chain had to end on ${cardToText(state.activeCard)}.`
+        );
+        return true;
+      }
+
+      addLog(`Turn ends because ${lowerPlayerName(player)} has no legal defense play ${drawnCard ? "after drawing" : "and the deck is empty"}.`);
+      addLog(`${lowerPlayerName(player)} ${drawnCard ? "cannot continue the defense after the draw" : "cannot draw and cannot continue the defense"}.`);
+      resolveExchange(state.attacker, `${lowerPlayerName(state.attacker)} wins the exchange ${state.attackerChainCount}-${state.defenderChainCount}.`, {
+        why: drawnCard
+          ? (drawnStillInHand
+            ? `${player === "human" ? "Human" : "CPU"} drew ${cardToText(drawnCard)} but still could not match ${cardToText(state.activeCard)} on defense.`
+            : `${player === "human" ? "Human" : "CPU"} still could not produce a legal defense card after drawing and trimming back to the hand limit.`)
+          : `${player === "human" ? "Human" : "CPU"} could not draw because the deck was empty, so there was no legal defense reply to ${cardToText(state.activeCard)}.`
+      });
+      return true;
+    }
+
+    async function continueAfterOverflowDiscard(pending) {
+      if (!pending) {
+        return false;
+      }
+
+      if (resolvePendingPeriodBreak()) {
+        return true;
+      }
+
+      if (pending.origin === "cannotPlay") {
+        return await resolveCannotPlayAfterDraw(pending.player, pending.drawnCard, { fromOverflow: true });
+      }
+
+      if (pending.origin === "cycle") {
+        refreshComboWindow();
+
+        const legalAfterCycle = getLegalCardsForTurn(pending.player).length;
+        if (legalAfterCycle > 0) {
+          addLog(`${lowerPlayerName(pending.player)} may now start the attack normally.`);
+        } else if (canPlayerDumpAndChase(pending.player)) {
+          addLog(`${lowerPlayerName(pending.player)} is still stuck after the Cycle and may draw or Dump Hand.`);
+        } else {
+          addLog(`${lowerPlayerName(pending.player)} is still stuck after the Cycle.`);
+        }
+        return true;
+      }
+
+      if (pending.origin === "lastChanceSaveDraw") {
+        const legal = getLegalCardsForTurn(pending.player);
+        if (legal.length === 0) {
+          addLog(`${lowerPlayerName(pending.player)} cannot turn the last-chance save draw into a save.`);
+          resolveNormalShotSaveAttempt();
+          return true;
+        }
+
+        addLog("Human may now use 1 legal card from hand as the last save card.");
+        return true;
+      }
+
+      if (pending.origin === "reboundDraw") {
+        const shot = state.shotPending;
+        const legal = getLegalCardsForTurn(pending.player);
+        if (!shot || !isReboundSavePhase(shot) || pending.player !== shot.defenderPlayer) {
+          return false;
+        }
+
+        if (legal.length === 0) {
+          finishShotAsGoal(`${lowerPlayerName(pending.player)} cannot produce a legal rebound save. GOAL ${lowerPlayerName(shot.attackerPlayer)}.`);
+          return true;
+        }
+
+        addLog("Human may now stage 1 legal rebound save from hand.");
+        logTurnDiagnostics(pending.player, "Rebound draw.");
+        return true;
+      }
+
+      return false;
+    }
+
+    function maybeHandleHandOverflow(player, options = {}) {
+      const overflowCount = getHandOverflowCount(player);
+      if (overflowCount <= 0) {
+        return false;
+      }
+
+      const hand = playerHand(player);
+      const handCap = getHandCap();
+      const drawnCard = options.drawnCard ?? hand[hand.length - 1] ?? null;
+
+      if (player === "cpu") {
+        while (getHandOverflowCount(player) > 0) {
+          const discardIndex = chooseCpuOverflowDiscardIndex(player, drawnCard);
+          const discardedCard = hand.splice(discardIndex, 1)[0];
+          if (!discardedCard) {
+            break;
+          }
+          state.discardPile.push(discardedCard);
+          addLog(`CPU is over the hand limit of ${handCap} and discards ${cardToText(discardedCard)}.`);
+        }
+        return false;
+      }
+
+      state.pendingOverflowDiscard = {
+        player,
+        origin: options.origin || "draw",
+        autoRunCpu: Boolean(options.autoRunCpu),
+        handCap,
+        drawnCard
+      };
+      addLog(`Human is over the hand limit of ${handCap}. Choose 1 card to discard before play continues.`);
+      return true;
+    }
+
+    async function discardOverflowCard(player, cardIndex) {
+      const pending = state.pendingOverflowDiscard;
+      if (!pending || pending.player !== player) {
+        return false;
+      }
+
+      const hand = playerHand(player);
+      if (cardIndex < 0 || cardIndex >= hand.length) {
+        addLog(`Ignored: invalid hand-limit discard for ${lowerPlayerName(player)}.`);
+        return false;
+      }
+
+      const discardedCard = hand.splice(cardIndex, 1)[0];
+      state.discardPile.push(discardedCard);
+      clearOverflowDiscardPending();
+      addLog(`${player === "human" ? "Human" : "CPU"} discards ${cardToText(discardedCard)} to return to the hand limit of ${pending.handCap}.`);
+
+      await continueAfterOverflowDiscard(pending);
+      render();
+
+      if (pending.autoRunCpu && state.currentTurn === "cpu" && !state.cpuBusy) {
+        runCpuAuto();
+        render();
+      }
+
+      return true;
     }
 
     function getDeckGhostRect(sourceElement) {
@@ -4489,7 +5908,7 @@
 
       if (state.roleOfCurrentTurn === "attacker") {
         addLog("Turn ends because Human submits the attack chain.");
-        passAttackTurn();
+        passAttackTurn(`Human ended the attack chain voluntarily after ${pendingCount} card${pendingCount === 1 ? "" : "s"}.`);
       } else {
         addLog("Turn ends because Human submits the defense chain.");
         if (state.defenderChainCount > state.attackerChainCount) {
@@ -4562,6 +5981,44 @@
       return { legal: false, appliedType: null, nextMode: currentMode, nextHasCrossed: hasCrossed, crossedRiver: false, reason: `river already crossed; run is locked to ${currentMode} matching`, matchTypes };
     }
 
+    function getStabilizeSandingLabel(mode = state.config.stabilizeSanding) {
+      const normalized = sanitizeStabilizeSanding(mode);
+      if (normalized === "suit") {
+        return "same-suit";
+      }
+      if (normalized === "value") {
+        return "same-number";
+      }
+      return "legal";
+    }
+
+    function getStabilizeDecision(card, activeCard, config = state.config) {
+      const sandingMode = sanitizeStabilizeSanding(config?.stabilizeSanding);
+      if (sandingMode === "default") {
+        return getMatchDecision(card, activeCard, state.runMatchMode, state.runHasCrossedRiver, config);
+      }
+
+      const matchTypes = getAvailableMatchTypes(card, activeCard);
+      if (matchTypes.includes("wild")) {
+        return { legal: true, appliedType: "wild", nextMode: null, nextHasCrossed: false, crossedRiver: false, reason: "uses a wild bridge for Stabilize", matchTypes };
+      }
+
+      const requiredType = sandingMode === "suit" ? "suit" : "value";
+      if (matchTypes.includes(requiredType)) {
+        return { legal: true, appliedType: requiredType, nextMode: null, nextHasCrossed: false, crossedRiver: false, reason: `Stabilize sanding requires ${requiredType === "suit" ? "a suit match" : "a number match"}`, matchTypes };
+      }
+
+      return {
+        legal: false,
+        appliedType: null,
+        nextMode: null,
+        nextHasCrossed: false,
+        crossedRiver: false,
+        reason: sandingMode === "suit" ? "Stabilize sanding requires the same suit" : "Stabilize sanding requires the same number",
+        matchTypes
+      };
+    }
+
     function describeMatchDecision(decision) {
       if (!decision || !decision.legal) {
         return decision?.reason || "illegal match";
@@ -4619,6 +6076,16 @@
 
       const hand = playerHand(player);
 
+      if (state.stabilizePending) {
+        const legalIndexes = [];
+        for (let i = 0; i < hand.length; i += 1) {
+          if (getStabilizeDecision(hand[i], state.activeCard).legal) {
+            legalIndexes.push(i);
+          }
+        }
+        return legalIndexes;
+      }
+
       if (!state.activeCard) {
         return hand.map((_, index) => index);
       }
@@ -4635,7 +6102,7 @@
       if (state.shotPending) {
         const shot = state.shotPending;
         if (isReboundRevealPhase(shot)) {
-          addLog(`${label} ${lowerPlayerName(player)} rebound reveal turn. Must reveal 1 rebound card from the deck.`);
+          addLog(`${label} ${lowerPlayerName(player)} rebound reveal turn. Must reveal 1 rebound card from the deck that still matches ${cardToText(state.activeCard)}.`);
         } else if (isReboundSavePhase(shot)) {
           addLog(`${label} ${lowerPlayerName(player)} rebound save turn. Must answer ${cardToText(state.activeCard)} with 1 legal save card against rebound value ${shot.reboundShotValue}. Hand: ${cardsToText(hand)}.`);
         } else {
@@ -4738,6 +6205,17 @@
 
       setEvent("Special turnover", "turnover");
       showDeckEvent("TURNOVER", "turnover", 1100);
+      setPlayByPlay(
+        `${lowerPlayerName(state.attacker)} forces a special turnover.`,
+        previousZone !== state.zoneIndex ? "shot" : "turnover",
+        createPlayByPlayDetails(
+          previousZone !== state.zoneIndex
+            ? `${lowerPlayerName(state.attacker)} won immediately because the defender ran out of cards and auto-advanced the puck.`
+            : `${lowerPlayerName(state.attacker)} won immediately because the defender ran out of cards.`,
+          `${winner === "human" ? "Human" : "CPU"} emptied the hand on defense, so possession flipped without needing the normal exchange finish.`,
+          `If the defender runs out of cards during the defense, the attacker gets a special turnover. Outside the shot zone, that result also auto-advances the puck.`
+        )
+      );
       refillHands();
       if (resolvePendingPeriodBreak()) {
         return;
@@ -4751,6 +6229,7 @@
       clearHumanPendingTurn();
       clearBurnSelection();
       clearStabilizePending();
+      clearPendingEncounterContext();
       resetExchangeCounts();
       resetRunMatchState();
       clearShotPending();
@@ -4760,11 +6239,12 @@
       triggerPhaseFlash(state.attacker === "human" ? "human" : "cpu");
     }
 
-    function passAttackTurn() {
+    function passAttackTurn(whyText = "") {
       clearComboWindow();
       clearHumanPendingTurn();
       clearBurnSelection();
       clearStabilizePending();
+      setPendingEncounterContext(whyText);
       state.defenderChainCount = 0;
       resetRunMatchState();
       state.activeBattleState = "defense";
@@ -4796,14 +6276,25 @@
       };
       setCurrentTurn(pendingAttacker, "stabilize");
       addLog(`${lowerPlayerName(pendingDefender)} edges the exchange ${state.defenderChainCount}-${state.attackerChainCount}, but only by 1 card.`);
-      addLog(`${lowerPlayerName(pendingAttacker)} gets one Stabilize attempt: play 1 legal card, or draw 1 if none.`);
+      addLog(`${lowerPlayerName(pendingAttacker)} gets one Stabilize attempt: play ${getStabilizeSandingLabel() === "legal" ? "1 legal card" : `1 ${getStabilizeSandingLabel()} card`}, or draw 1 if none.`);
       setEvent("Stabilize attempt", "contain");
       showDeckEvent("STABILIZE", "contain", 1100);
-      setPlayByPlay(`${lowerPlayerName(pendingAttacker)} gets a chance to stabilize.`, "contain");
+      setPlayByPlay(
+        `${lowerPlayerName(pendingAttacker)} gets a chance to stabilize.`,
+        "contain",
+        createPlayByPlayDetails(
+          `${lowerPlayerName(pendingAttacker)} gets one chance to deny the turnover.`,
+          joinExplanationParts(
+            state.pendingEncounterContext?.why,
+            `${lowerPlayerName(pendingDefender)} leads the exchange ${state.defenderChainCount}-${state.attackerChainCount}, which is exactly the 1-card Stabilize window.`
+          ),
+          getStabilizeRuleSummary()
+        )
+      );
       logTurnDiagnostics(state.currentTurn, "Stabilize attempt.");
     }
 
-    function completeTurnoverToDefender(reason, exchangeMargin = Math.abs(state.attackerChainCount - state.defenderChainCount)) {
+    function completeTurnoverToDefender(reason, exchangeMargin = Math.abs(state.attackerChainCount - state.defenderChainCount), outcomeContext = null) {
       const turnoverWinner = state.defender;
       if (!turnoverWinner) {
         return;
@@ -4822,7 +6313,20 @@
 
       setEvent("Turnover", "turnover");
       showDeckEvent("TURNOVER", "turnover", 1100);
-      setPlayByPlay(`${lowerPlayerName(turnoverWinner)} forces a turnover.`, "turnover");
+      setPlayByPlay(
+        `${lowerPlayerName(turnoverWinner)} forces a turnover.`,
+        "turnover",
+        createPlayByPlayDetails(
+          `${lowerPlayerName(turnoverWinner)} wins the exchange on defense and takes possession.`,
+          joinExplanationParts(
+            outcomeContext?.why || state.pendingEncounterContext?.why,
+            reason || `${lowerPlayerName(turnoverWinner)} finished ahead ${state.defenderChainCount}-${state.attackerChainCount} on defense.`
+          ),
+          exchangeMargin === 1
+            ? `A 1-card defensive edge grants the attacker one Stabilize try first. Once that try fails or cannot be used, the turnover stands.`
+            : `When the defender finishes ahead in the exchange, possession flips immediately.`
+        )
+      );
       startAttackerTurn();
       logTurnDiagnostics(state.currentTurn);
     }
@@ -4840,14 +6344,25 @@
       addLog(`${lowerPlayerName(player)} keeps possession in ${zoneLabel(state.zoneIndex)}. No zone advance this exchange.`);
       setEvent("Stabilized / No Turnover", "contain");
       showDeckEvent("STABLE", "contain", 1100);
-      setPlayByPlay(`${lowerPlayerName(player)} stabilizes and keeps the puck.`, "contain");
+      setPlayByPlay(
+        `${lowerPlayerName(player)} stabilizes and keeps the puck.`,
+        "contain",
+        createPlayByPlayDetails(
+          `${lowerPlayerName(player)} denied the turnover and kept possession.`,
+          joinExplanationParts(
+            state.pendingEncounterContext?.why,
+            `${lowerPlayerName(player)} answered with ${cardToText(card)} and met the Stabilize requirement.`
+          ),
+          getStabilizeRuleSummary()
+        )
+      );
       awardMomentumForSuccessfulStabilize(player);
       startAttackerTurn();
       logTurnDiagnostics(state.currentTurn, "Stabilized.");
       return true;
     }
 
-    function resolveExchange(winner, reason) {
+    function resolveExchange(winner, reason, outcomeContext = null) {
       clearComboWindow();
       state.activeBattleState = "none";
       state.comboImmunityActive = false;
@@ -4899,9 +6414,31 @@
         awardMomentumForExchangeWin(winner, exchangeMargin);
 
         setEvent(attackerAdvances ? "Exchange Win (+1 Zone)" : "Exchange Hold / No Advance", attackerAdvances ? "shot" : "contain");
-        setPlayByPlay(attackerAdvances
-          ? `${lowerPlayerName(state.attacker)} advances to ${getPlayByPlayZoneText(state.attacker, state.zoneIndex)}.`
-          : `${lowerPlayerName(state.attacker)} keeps the puck in ${getPlayByPlayZoneText(state.attacker, state.zoneIndex)}.`, attackerAdvances ? "shot" : "contain");
+        setPlayByPlay(
+          attackerAdvances
+            ? `${lowerPlayerName(state.attacker)} advances to ${getPlayByPlayZoneText(state.attacker, state.zoneIndex)}.`
+            : `${lowerPlayerName(state.attacker)} keeps the puck in ${getPlayByPlayZoneText(state.attacker, state.zoneIndex)}.`,
+          attackerAdvances ? "shot" : "contain",
+          createPlayByPlayDetails(
+            attackerAdvances
+              ? (previousZone !== state.zoneIndex
+                ? `${lowerPlayerName(state.attacker)} won the exchange and moved the puck to ${getPlayByPlayZoneText(state.attacker, state.zoneIndex)}.`
+                : `${lowerPlayerName(state.attacker)} won the exchange at the deepest zone and kept the puck there.`)
+              : `${lowerPlayerName(state.attacker)} held the exchange and kept the puck in ${getPlayByPlayZoneText(state.attacker, state.zoneIndex)}.`,
+            joinExplanationParts(
+              outcomeContext?.why || state.pendingEncounterContext?.why,
+              reason || `${lowerPlayerName(state.attacker)} wins the exchange ${state.attackerChainCount}-${state.defenderChainCount}.`,
+              attackerAdvances
+                ? (previousZone === state.zoneIndex ? `${lowerPlayerName(state.attacker)} was already at the deepest zone, so the win stayed there.` : "")
+                : (state.attackerChainCount === state.defenderChainCount ? `Played-card ties do not grant a zone advance.` : "")
+            ),
+            attackerAdvances
+              ? (previousZone !== state.zoneIndex
+                ? `When the attacker wins the exchange, the puck advances 1 zone.`
+                : `Winning the exchange still keeps possession, but there is no further zone to gain at the deepest end of the ice.`)
+              : `If the attacker only holds the exchange without beating the defense, possession stays in place instead of advancing.`
+          )
+        );
         startAttackerTurn();
         logTurnDiagnostics(state.currentTurn);
         return;
@@ -4927,7 +6464,7 @@
 
       if (state.roleOfCurrentTurn === "attacker") {
         addLog(`${lowerPlayerName(player)} ends the attack chain at ${state.attackerChainCount} card${state.attackerChainCount === 1 ? "" : "s"}.`);
-        passAttackTurn();
+        passAttackTurn(`${player === "human" ? "Human" : "CPU"} ended the attack chain voluntarily at ${state.attackerChainCount} card${state.attackerChainCount === 1 ? "" : "s"}.`);
         return;
       }
 
@@ -5000,6 +6537,18 @@
       return player === "human" ? state.humanHand : state.cpuHand;
     }
 
+    function getHandCap(config = state.config) {
+      return config.handSize + 3;
+    }
+
+    function getHandOverflowCount(player) {
+      return Math.max(0, playerHand(player).length - getHandCap());
+    }
+
+    function hasPendingOverflowDiscard(player = null) {
+      return player ? state.pendingOverflowDiscard?.player === player : Boolean(state.pendingOverflowDiscard);
+    }
+
     function compareFaceoffCards(humanCard, cpuCard) {
       return getFaceoffComparisonDetails(humanCard, cpuCard).winner;
     }
@@ -5061,38 +6610,11 @@
     }
 
     function chooseCpuIcingRevealIndex() {
-      const indexes = state.cpuHand.map((_, index) => index);
-      if (indexes.length === 0) {
-        return null;
-      }
-
-      const ordered = [...indexes].sort((left, right) => {
-        const valueDiff = state.cpuHand[left].value - state.cpuHand[right].value;
-        if (valueDiff !== 0) {
-          return valueDiff;
-        }
-        return left - right;
-      });
-      return ordered[Math.floor(ordered.length / 2)];
+      return chooseCpuFaceoffLeadIndex({ faceoffMode: "icing", zoneIndex: state.zoneIndex });
     }
 
     function chooseCpuIcingResponseIndex(humanCard) {
-      const cpuIndexes = state.cpuHand.map((_, index) => index);
-      if (cpuIndexes.length === 0) {
-        return null;
-      }
-
-      const winningIndexes = cpuIndexes.filter((index) => getFaceoffComparisonPreview(humanCard, state.cpuHand[index]).winner === "cpu");
-      if (winningIndexes.length > 0) {
-        return chooseLowestValueIndex(state.cpuHand, winningIndexes);
-      }
-
-      const tyingIndexes = cpuIndexes.filter((index) => getFaceoffComparisonPreview(humanCard, state.cpuHand[index]).winner === null);
-      if (tyingIndexes.length > 0) {
-        return chooseLowestValueIndex(state.cpuHand, tyingIndexes);
-      }
-
-      return chooseLowestValueIndex(state.cpuHand, cpuIndexes);
+      return chooseCpuFaceoffResponseIndex(humanCard, { faceoffMode: "icing", zoneIndex: state.zoneIndex });
     }
 
     function revealCpuIcingFaceoffLeadCard() {
@@ -5110,7 +6632,7 @@
       state.activeCard = cpuCard;
       state.currentTurn = "human";
       state.roleOfCurrentTurn = "faceoff";
-      addLog(`CPU reveals ${cardToText(cpuCard)} first for the Icing Faceoff. Human choose a response card.`);
+      addLog(`CPU reveals ${cardToText(cpuCard)} first for the Icing Faceoff. Human choose a response card.`, { sequenceLead: true });
       setEvent(`Icing Faceoff: CPU reveals ${cardToText(cpuCard)}`, "contain");
       return true;
     }
@@ -5215,6 +6737,11 @@
     }
 
     async function commitHumanCardPlay(cardIndex) {
+      if (hasPendingOverflowDiscard("human")) {
+        await discardOverflowCard("human", cardIndex);
+        return;
+      }
+
       if (state.pendingBurnSelection) {
         burnMomentumCard("human", cardIndex);
         render();
@@ -5246,6 +6773,11 @@
     }
 
     async function animateAndCommitHumanPlay(cardIndex, sourceElement) {
+      if (hasPendingOverflowDiscard("human")) {
+        await commitHumanCardPlay(cardIndex);
+        return;
+      }
+
       if (humanMoveRequiresSubmitConfirmation()) {
         if (state.humanSpecialSelectionIndex === cardIndex) {
           await commitHumanCardPlay(cardIndex);
@@ -5269,7 +6801,7 @@
     }
 
     function startHumanCardDrag(event, cardIndex, card, isLegal) {
-      if (!isLegal || state.cpuBusy) {
+      if (!isLegal || state.cpuBusy || hasPendingOverflowDiscard("human")) {
         return;
       }
 
@@ -5466,11 +6998,15 @@
           return;
         }
         cpuCard = state.cpuHand.splice(cpuIndex, 1)[0];
-        addLog(`Icing Faceoff: Human reveals ${cardToText(humanCard)} first. CPU answers with ${cardToText(cpuCard)}.`);
+        addLog(`Icing Faceoff: Human reveals ${cardToText(humanCard)} first. CPU answers with ${cardToText(cpuCard)}.`, { sequenceLead: true });
       } else {
-        const cpuIndex = chooseRandomFrom(cpuIndexes);
+        const cpuIndex = chooseCpuFaceoffResponseIndex(humanCard, { faceoffMode, zoneIndex: state.zoneIndex });
+        if (cpuIndex === null || cpuIndex === undefined || cpuIndex < 0 || cpuIndex >= state.cpuHand.length) {
+          addLog("CPU has no reply for the faceoff.");
+          return;
+        }
         cpuCard = state.cpuHand.splice(cpuIndex, 1)[0];
-        addLog(`Faceoff: Human ${cardToText(humanCard)} vs CPU ${cardToText(cpuCard)}.`);
+        addLog(`Faceoff: Human ${cardToText(humanCard)} vs CPU ${cardToText(cpuCard)}.`, { sequenceLead: true });
       }
 
       state.discardPile.push(humanCard, cpuCard);
@@ -5738,7 +7274,7 @@
 
       resetRunMatchState();
 
-      addLog(options.logLine || `${lowerPlayerName(attackerPlayer)} empties hand in ${closeShot ? "close" : "far"} shot range. Shot quality ${shotValue}.`);
+      addLog(options.logLine || `${lowerPlayerName(attackerPlayer)} empties hand in ${closeShot ? "close" : "far"} shot range. Shot quality ${shotValue}.`, { sequenceLead: true });
       if (closeShot && !hasShotValueOverride) {
         addLog(`Close-range bonus applies: ${shotCard.value} becomes ${shotValue}.`);
       }
@@ -5800,45 +7336,19 @@
         }
       }
 
+      if (player === "human") {
+        if (maybeHandleHandOverflow(player, { origin: "cannotPlay", drawnCard, autoRunCpu: true })) {
+          return;
+        }
+      } else {
+        maybeHandleHandOverflow(player, { origin: "cannotPlay", drawnCard });
+      }
+
       if (resolvePendingPeriodBreak()) {
         return;
       }
 
-      if (player === "human" && drawnCard && isNewestDrawnCardPlayable(player)) {
-        addLog(`Human drew ${cardToText(drawnCard)}. It is playable; choose it manually if you want to use it.`);
-        logTurnDiagnostics(player, "Draw result.");
-        return;
-      }
-
-      if (player === "cpu" && await tryPlayDrawnCard(player, drawnCard)) {
-        return;
-      }
-
-      if (drawnCard) {
-        addLog(`${lowerPlayerName(player)} still cannot play the drawn ${cardToText(drawnCard)} on ${cardToText(state.activeCard)}.`);
-      }
-
-      clearComboWindow();
-      state.cpuPreviewIndex = null;
-
-      if (state.stabilizePending) {
-        const pending = state.stabilizePending;
-        addLog(`${lowerPlayerName(player)} cannot complete the Stabilize attempt${drawnCard ? " after the draw" : ""}.`);
-        completeTurnoverToDefender(`${lowerPlayerName(pending.defenderPlayer)} wins the exchange ${pending.defenderCount}-${pending.attackerCount}. Turnover stands after the failed Stabilize attempt.`, pending.defenderCount - pending.attackerCount);
-        return;
-      }
-
-      if (state.roleOfCurrentTurn === "attacker") {
-        addLog(`Turn ends because ${lowerPlayerName(player)} has no legal attacker play ${drawnCard ? "after drawing" : "and the deck is empty"}.`);
-        addLog(`${lowerPlayerName(player)} ${drawnCard ? "ends the attack chain after the draw" : "cannot draw and ends the attack chain"} at ${state.attackerChainCount}.`);
-        setEvent("Attack chain ends", "contain");
-        passAttackTurn();
-        return;
-      }
-
-      addLog(`Turn ends because ${lowerPlayerName(player)} has no legal defense play ${drawnCard ? "after drawing" : "and the deck is empty"}.`);
-      addLog(`${lowerPlayerName(player)} ${drawnCard ? "cannot continue the defense after the draw" : "cannot draw and cannot continue the defense"}.`);
-      resolveExchange(state.attacker, `${lowerPlayerName(state.attacker)} wins the exchange ${state.attackerChainCount}-${state.defenderChainCount}.`);
+      await resolveCannotPlayAfterDraw(player, drawnCard);
     }
 
     function checkHandEmpty(player, lastPlayedCard) {
@@ -5895,7 +7405,9 @@
       const stabilizePlay = Boolean(state.stabilizePending);
       const isOpeningAttackPlay = state.roleOfCurrentTurn === "attacker" && state.attackerChainCount === 0;
       const previousActiveCard = state.activeCard;
-      const matchDecision = getMatchDecision(card, previousActiveCard);
+      const matchDecision = stabilizePlay
+        ? getStabilizeDecision(card, previousActiveCard)
+        : getMatchDecision(card, previousActiveCard);
       const matchType = matchDecision.legal ? matchDecision.appliedType : "illegal";
       const legalForTurn = getLegalCardsForTurn(player);
 
@@ -5917,12 +7429,12 @@
         addLog(`Match debug: ${describeMatchDecision(matchDecision)}.`);
 
       if (stabilizePlay) {
-        addLog(`${lowerPlayerName(player)} makes the Stabilize play with ${cardToText(card)}.`);
+        addLog(`${lowerPlayerName(player)} makes the Stabilize play with ${cardToText(card)}.`, { sequenceLead: true });
       } else if (state.roleOfCurrentTurn === "attacker") {
         state.attackerChainCount += 1;
         syncTurnPlayCount();
         if (isOpeningAttackPlay) {
-          addLog(`${lowerPlayerName(player)} opens the attack with ${cardToText(card)}.`);
+          addLog(`${lowerPlayerName(player)} opens the attack with ${cardToText(card)}.`, { sequenceLead: true });
         } else {
           addLog(`${lowerPlayerName(player)} continues the attack with ${cardToText(card)}.`);
         }
@@ -5930,7 +7442,7 @@
       } else {
         state.defenderChainCount += 1;
         syncTurnPlayCount();
-        addLog(`${lowerPlayerName(player)} answers with ${cardToText(card)}.`);
+        addLog(`${lowerPlayerName(player)} answers with ${cardToText(card)}.`, { sequenceLead: state.defenderChainCount === 1 });
         setEvent(`${lowerPlayerName(player)} defense chain ${state.defenderChainCount}`, "contain");
       }
 
@@ -5962,7 +7474,7 @@
 
       if (state.roleOfCurrentTurn === "attacker") {
         addLog(`Turn ends because ${lowerPlayerName(player)} has no further legal attack plays in this chain.`);
-        passAttackTurn();
+        passAttackTurn(`${player === "human" ? "Human" : "CPU"} had no further legal attack plays in the chain after ${cardToText(card)}.`);
         return true;
       }
 
@@ -6004,6 +7516,382 @@
       return best;
     }
 
+    function getCpuDifficultyProfile(config = state.config) {
+      const difficulty = sanitizeCpuDifficulty(config?.cpuDifficulty ?? DEFAULT_CONFIG.cpuDifficulty);
+      const preset = CPU_DIFFICULTY_PRESETS[getCpuPresetKey(difficulty)];
+      return {
+        ...preset,
+        label: difficulty === "custom" ? "Custom" : preset.label,
+        attackLookaheadDepth: clamp(Number.parseInt(config?.cpuAttackLookaheadDepth ?? preset.attackLookaheadDepth, 10), 0, 10),
+        attackFollowUpWeight: clamp(Number.parseInt(config?.cpuAttackFollowUpWeight ?? preset.attackFollowUpWeight, 10), 1, 16),
+        defensiveZoneDefenseTarget: clamp(Number.parseInt(config?.cpuDefensiveZoneDefenseTarget ?? preset.defensiveZoneDefenseTarget, 10), 1, 3),
+        goalZoneDefenseTarget: clamp(Number.parseInt(config?.cpuGoalZoneDefenseTarget ?? preset.goalZoneDefenseTarget, 10), 1, 4),
+        faceoffNeutralBias: clamp(Number.parseInt(config?.cpuFaceoffNeutralBiasPercent ?? Math.round(preset.faceoffNeutralBias * 100), 10) / 100, 0.2, 1),
+        faceoffDangerBias: clamp(Number.parseInt(config?.cpuFaceoffDangerBiasPercent ?? Math.round(preset.faceoffDangerBias * 100), 10) / 100, 0.2, 1),
+        icingDangerThreshold: clamp(Number.parseInt(config?.cpuIcingDangerThreshold ?? preset.icingDangerThreshold, 10), 2, 10),
+        dumpThreshold: clamp(Number.parseInt(config?.cpuDumpThreshold ?? preset.dumpThreshold, 10), 2, 10),
+        chainLengthWeight: clamp(Number.parseInt(config?.cpuChainLengthWeight ?? preset.chainLengthWeight, 10), 0, 16),
+        emptyHandShotWeight: clamp(Number.parseInt(config?.cpuEmptyHandShotWeight ?? preset.emptyHandShotWeight, 10), 0, 20),
+        zoneAdvanceWeight: clamp(Number.parseInt(config?.cpuZoneAdvanceWeight ?? preset.zoneAdvanceWeight, 10), 0, 12),
+        shotZoneAggression: clamp(Number.parseInt(config?.cpuShotZoneAggression ?? preset.shotZoneAggression, 10), 0, 12),
+        cardConservationWeight: clamp(Number.parseInt(config?.cpuCardConservationWeight ?? preset.cardConservationWeight, 10), 0, 12),
+        avoidStabilizeWindowWeight: clamp(Number.parseInt(config?.cpuAvoidStabilizeWindowWeight ?? preset.avoidStabilizeWindowWeight, 10), 0, 16),
+        faceoffAggression: clamp(Number.parseInt(config?.cpuFaceoffAggressionPercent ?? preset.faceoffAggression, 10), 0, 100),
+        icingReluctance: clamp(Number.parseInt(config?.cpuIcingReluctance ?? preset.icingReluctance, 10), 0, 12),
+        momentumSpendAggression: clamp(Number.parseInt(config?.cpuMomentumSpendAggression ?? preset.momentumSpendAggression, 10), 0, 12),
+        lateGameRiskAggression: clamp(Number.parseInt(config?.cpuLateGameRiskAggression ?? preset.lateGameRiskAggression, 10), 0, 12),
+        defensivePanicThreshold: clamp(Number.parseInt(config?.cpuDefensivePanicThreshold ?? preset.defensivePanicThreshold, 10), 0, 4)
+      };
+    }
+
+    function getCpuPanicWindow(profile = getCpuDifficultyProfile()) {
+      return Math.max(profile.shortHandThreat, profile.defensivePanicThreshold);
+    }
+
+    function getRegulationSecondsRemaining() {
+      if (state.periodNumber > REGULATION_PERIOD_COUNT) {
+        return 0;
+      }
+
+      return (((REGULATION_PERIOD_COUNT - state.periodNumber) * PERIOD_SECONDS) + state.periodClockSeconds);
+    }
+
+    function isCpuDangerZone(zoneIndex = state.zoneIndex) {
+      return zoneIndex === getDefensiveZoneIndex("cpu") || zoneIndex === getGoalZoneIndex("cpu");
+    }
+
+    function getCpuDefenseMarginTarget(profile = getCpuDifficultyProfile(), zoneIndex = state.zoneIndex) {
+      let target = profile.neutralDefenseTarget;
+
+      if (zoneIndex === getGoalZoneIndex("cpu")) {
+        target = profile.goalZoneDefenseTarget;
+      } else if (zoneIndex === getDefensiveZoneIndex("cpu")) {
+        target = profile.defensiveZoneDefenseTarget;
+      }
+
+      const latePressure = getRegulationSecondsRemaining() <= profile.lateGamePressureSeconds && state.cpuScore <= state.humanScore;
+      const shortHandPressure = state.humanHand.length <= getCpuPanicWindow(profile) && state.defenderChainCount >= state.attackerChainCount;
+
+      if (isCpuDangerZone(zoneIndex) && profile.avoidStabilizeWindowWeight >= 6) {
+        target = Math.max(target, 2);
+      }
+      if (zoneIndex === getGoalZoneIndex("cpu") && profile.avoidStabilizeWindowWeight >= 10) {
+        target = Math.max(target, 3);
+      }
+      if (latePressure || shortHandPressure) {
+        target = Math.max(target, zoneIndex === getGoalZoneIndex("cpu") ? 2 : 1);
+      }
+
+      return clamp(target, 1, 4);
+    }
+
+    function getCpuFaceoffPressure(profile = getCpuDifficultyProfile(), zoneIndex = state.zoneIndex, faceoffMode = state.faceoffMode) {
+      let pressure = Math.max(profile.faceoffNeutralBias, profile.faceoffAggression / 100);
+
+      if (zoneIndex === getGoalZoneIndex("cpu")) {
+        pressure = Math.min(1, Math.max(profile.faceoffDangerBias, (profile.faceoffAggression + 12) / 100) + 0.06);
+      } else if (zoneIndex === getDefensiveZoneIndex("cpu")) {
+        pressure = Math.max(profile.faceoffDangerBias, (profile.faceoffAggression + 6) / 100);
+      } else if (isShotZone("cpu", zoneIndex)) {
+        pressure = Math.max(profile.faceoffOffenseBias, (profile.faceoffAggression - 10) / 100);
+      }
+
+      if (faceoffMode === "icing") {
+        pressure = Math.min(1, pressure + 0.08);
+      }
+
+      if (state.cpuScore < state.humanScore && getRegulationSecondsRemaining() <= profile.lateGamePressureSeconds) {
+        pressure = Math.min(1, pressure + (0.03 + (profile.lateGameRiskAggression * 0.01)));
+      }
+
+      if (isCpuDangerZone(zoneIndex) && state.humanHand.length <= getCpuPanicWindow(profile)) {
+        pressure = Math.min(1, pressure + 0.05);
+      }
+
+      return clamp(pressure, 0.2, 1);
+    }
+
+    function getLongestPlayableContinuationLength(hand, activeCard, currentMode, hasCrossed, maxDepth = hand.length) {
+      if (!hand || hand.length === 0 || maxDepth <= 0) {
+        return 0;
+      }
+
+      const used = new Array(hand.length).fill(false);
+      let bestLength = 0;
+
+      function search(prevCard, mode, crossed, depth) {
+        if (depth > bestLength) {
+          bestLength = depth;
+        }
+
+        if (depth >= maxDepth) {
+          return;
+        }
+
+        for (let i = 0; i < hand.length; i += 1) {
+          if (used[i]) {
+            continue;
+          }
+
+          const decision = getMatchDecision(hand[i], prevCard, mode, crossed);
+          if (!decision.legal) {
+            continue;
+          }
+
+          used[i] = true;
+          search(hand[i], decision.nextMode, decision.nextHasCrossed, depth + 1);
+          used[i] = false;
+        }
+      }
+
+      search(activeCard, currentMode, hasCrossed, 0);
+      return bestLength;
+    }
+
+    function getProjectedCpuPlayState(cardIndex, lookaheadDepth) {
+      const hand = state.cpuHand;
+      const card = hand[cardIndex];
+      if (!card) {
+        return null;
+      }
+
+      const decision = getMatchDecision(card, state.activeCard, state.runMatchMode, state.runHasCrossedRiver);
+      if (!decision.legal) {
+        return null;
+      }
+
+      const remainingHand = hand.filter((_, index) => index !== cardIndex);
+      const legalAfter = getLegalCards(remainingHand, card, decision.nextMode, decision.nextHasCrossed).length;
+      const continuationLength = getLongestPlayableContinuationLength(remainingHand, card, decision.nextMode, decision.nextHasCrossed, lookaheadDepth);
+
+      return {
+        cardIndex,
+        card,
+        decision,
+        remainingHand,
+        legalAfter,
+        continuationLength
+      };
+    }
+
+    function scoreCpuAttackPlay(cardIndex, profile = getCpuDifficultyProfile()) {
+      const projected = getProjectedCpuPlayState(cardIndex, profile.attackLookaheadDepth);
+      if (!projected) {
+        return null;
+      }
+
+      const shotZone = isShotZone("cpu");
+      const offensivePush = shotZone || isFarOffensiveZone("cpu") || isCloseOffensiveZone("cpu");
+      const trailing = state.cpuScore < state.humanScore;
+      const latePressure = getRegulationSecondsRemaining() <= profile.lateGamePressureSeconds || state.periodNumber > REGULATION_PERIOD_COUNT;
+      const lateRiskBoost = (trailing ? 1 : 0) + (latePressure ? 0.7 : 0);
+
+      let score = 0;
+      score += projected.legalAfter * profile.attackFollowUpWeight;
+      score += projected.continuationLength * (profile.attackChainWeight + (profile.chainLengthWeight * 0.7));
+
+      if (!shotZone) {
+        score += Math.min(4, projected.continuationLength + projected.legalAfter) * (profile.zoneAdvanceWeight * (offensivePush ? 0.4 : 0.25));
+      }
+
+      if (projected.remainingHand.length === 0) {
+        score += profile.attackEmptyHandBonus + (profile.emptyHandShotWeight * (shotZone ? 1.4 : offensivePush ? 1 : 0.6));
+      }
+
+      if (shotZone) {
+        score += projected.card.value * (profile.attackOffenseValueWeight + (profile.shotZoneAggression * 0.18) + (lateRiskBoost * profile.lateGameRiskAggression * 0.05));
+      } else if (offensivePush) {
+        score += projected.card.value * ((profile.attackOffenseValueWeight * 0.7) + (profile.zoneAdvanceWeight * 0.14) + (lateRiskBoost * profile.lateGameRiskAggression * 0.04));
+      } else if (trailing || latePressure) {
+        score += projected.card.value * (profile.attackComebackValueWeight + (profile.zoneAdvanceWeight * 0.08) + (profile.lateGameRiskAggression * 0.08));
+      } else {
+        score += projected.card.value * 0.3;
+        score -= projected.card.value * (profile.attackConserveWeight + (profile.cardConservationWeight * 0.08));
+      }
+
+      if (state.activeCard === null && projected.legalAfter > 0) {
+        score += 1 + (profile.zoneAdvanceWeight * 0.25);
+      }
+
+      if (projected.remainingHand.length <= 1 && offensivePush) {
+        score += profile.emptyHandShotWeight * 0.55;
+      }
+
+      if (!offensivePush && projected.legalAfter === 0 && projected.continuationLength === 0) {
+        score -= 3 + (profile.cardConservationWeight * 0.35);
+      }
+
+      return {
+        index: cardIndex,
+        card: projected.card,
+        score,
+        reason: `attack chain ${projected.continuationLength + 1}, ${projected.legalAfter} follow-up${projected.legalAfter === 1 ? "" : "s"}`
+      };
+    }
+
+    function scoreCpuDefensePlay(cardIndex, profile = getCpuDifficultyProfile()) {
+      const projected = getProjectedCpuPlayState(cardIndex, profile.defenseLookaheadDepth);
+      if (!projected) {
+        return null;
+      }
+
+      const dangerZone = isCpuDangerZone();
+      const targetMargin = getCpuDefenseMarginTarget(profile);
+      const projectedMargin = (state.defenderChainCount + 1) - state.attackerChainCount;
+      const opponentDanger = state.humanHand.length <= getCpuPanicWindow(profile);
+      const latePressure = getRegulationSecondsRemaining() <= profile.lateGamePressureSeconds && state.cpuScore <= state.humanScore;
+      let score = projectedMargin * profile.defenseMarginWeight;
+
+      score += projected.continuationLength * (dangerZone ? profile.dangerDefenseFollowUpWeight : profile.defenseFollowUpWeight);
+      score += projected.legalAfter * (dangerZone ? Math.round(profile.dangerDefenseFollowUpWeight / 2) : Math.round(profile.defenseFollowUpWeight / 2));
+
+      if (projectedMargin >= targetMargin) {
+        score += (dangerZone ? 10 : 6) + profile.avoidStabilizeWindowWeight;
+      }
+
+      if ((dangerZone || opponentDanger || latePressure) && projectedMargin === 1) {
+        const stabilizePenalty = profile.defenseStabilizePenalty + (profile.avoidStabilizeWindowWeight * (dangerZone ? 1.5 : 0.75));
+        score -= projected.legalAfter > 0 ? stabilizePenalty : Math.round(stabilizePenalty * 0.6);
+      }
+
+      if (opponentDanger) {
+        score += projectedMargin >= targetMargin ? 5 + (profile.defensivePanicThreshold * 2) : 2 + profile.defensivePanicThreshold;
+      }
+
+      if (latePressure) {
+        score += projectedMargin >= targetMargin ? 2 + (profile.lateGameRiskAggression * 0.8) : 1 + (profile.lateGameRiskAggression * 0.4);
+      }
+
+      if (projected.remainingHand.length === 0 && projectedMargin < targetMargin) {
+        score -= 10 + profile.avoidStabilizeWindowWeight;
+      }
+
+      const conservePenalty = dangerZone || opponentDanger
+        ? Math.max(0.08, (profile.defenseConserveWeight + (profile.cardConservationWeight * 0.05)) / 3)
+        : profile.defenseConserveWeight + (profile.cardConservationWeight * 0.06);
+      score -= projected.card.value * conservePenalty;
+
+      return {
+        index: cardIndex,
+        card: projected.card,
+        score,
+        reason: `defense edge ${projectedMargin}, target ${targetMargin}+, ${projected.legalAfter} follow-up${projected.legalAfter === 1 ? "" : "s"}`
+      };
+    }
+
+    function getCpuCardChoice() {
+      if (state.currentTurn !== "cpu") {
+        return null;
+      }
+
+      const legal = getLegalCardsForTurn("cpu");
+      if (legal.length === 0) {
+        return null;
+      }
+
+      const profile = getCpuDifficultyProfile();
+      const evaluations = legal
+        .map((index) => state.roleOfCurrentTurn === "defender"
+          ? scoreCpuDefensePlay(index, profile)
+          : scoreCpuAttackPlay(index, profile))
+        .filter(Boolean);
+
+      if (evaluations.length === 0) {
+        return null;
+      }
+
+      evaluations.sort((left, right) => {
+        if (right.score !== left.score) {
+          return right.score - left.score;
+        }
+
+        if (state.roleOfCurrentTurn === "defender") {
+          if (left.card.value !== right.card.value) {
+            return left.card.value - right.card.value;
+          }
+        } else if (left.card.value !== right.card.value) {
+          const conservativeAttack = profile.cardConservationWeight >= profile.shotZoneAggression + 2;
+          return conservativeAttack ? left.card.value - right.card.value : right.card.value - left.card.value;
+        }
+
+        return left.index - right.index;
+      });
+
+      return evaluations[0];
+    }
+
+    function chooseCpuFaceoffLeadIndex(options = {}) {
+      const indexes = state.cpuHand.map((_, index) => index);
+      if (indexes.length === 0) {
+        return null;
+      }
+
+      const profile = getCpuDifficultyProfile();
+      const pressure = getCpuFaceoffPressure(profile, options.zoneIndex ?? state.zoneIndex, options.faceoffMode ?? state.faceoffMode);
+      const ordered = [...indexes].sort((left, right) => {
+        const valueDiff = state.cpuHand[right].value - state.cpuHand[left].value;
+        if (valueDiff !== 0) {
+          return valueDiff;
+        }
+        return left - right;
+      });
+      const conservationBias = clamp(profile.cardConservationWeight / 18, 0, 0.5);
+      const slot = clamp(Math.round((ordered.length - 1) * (1 - pressure) * (0.65 + conservationBias)), 0, ordered.length - 1);
+      return ordered[slot];
+    }
+
+    function chooseCpuFaceoffResponseIndex(humanCard, options = {}) {
+      const cpuIndexes = state.cpuHand.map((_, index) => index);
+      if (cpuIndexes.length === 0) {
+        return null;
+      }
+
+      const profile = getCpuDifficultyProfile();
+      const zoneIndex = options.zoneIndex ?? state.zoneIndex;
+      const pressure = getCpuFaceoffPressure(profile, zoneIndex, options.faceoffMode ?? state.faceoffMode);
+      const winningIndexes = cpuIndexes.filter((index) => getFaceoffComparisonPreview(humanCard, state.cpuHand[index]).winner === "cpu");
+      if (winningIndexes.length > 0) {
+        const mustOverpower = pressure >= 0.96 && isCpuDangerZone(zoneIndex) && humanCard.value >= state.config.maxValue - 1;
+        return mustOverpower ? chooseHighestValueIndex(state.cpuHand, winningIndexes) : chooseLowestValueIndex(state.cpuHand, winningIndexes);
+      }
+
+      const tyingIndexes = cpuIndexes.filter((index) => getFaceoffComparisonPreview(humanCard, state.cpuHand[index]).winner === null);
+      if (tyingIndexes.length > 0) {
+        return pressure >= 0.9 && profile.faceoffAggression < 70 ? chooseHighestValueIndex(state.cpuHand, tyingIndexes) : chooseLowestValueIndex(state.cpuHand, tyingIndexes);
+      }
+
+      return pressure >= 0.78 && profile.faceoffAggression < 70 ? chooseHighestValueIndex(state.cpuHand, cpuIndexes) : chooseLowestValueIndex(state.cpuHand, cpuIndexes);
+    }
+
+    function cpuShouldEndDefenseChain(legalIndexes = getLegalCardsForTurn("cpu")) {
+      if (state.roleOfCurrentTurn !== "defender" || !currentTurnCanPass() || state.defenderChainCount <= state.attackerChainCount) {
+        return false;
+      }
+
+      const profile = getCpuDifficultyProfile();
+      const currentMargin = state.defenderChainCount - state.attackerChainCount;
+      const targetMargin = getCpuDefenseMarginTarget(profile);
+      if (currentMargin < targetMargin && legalIndexes.length > 0) {
+        return false;
+      }
+
+      return true;
+    }
+
+    function getCpuDefenseEndReason(legalIndexes = getLegalCardsForTurn("cpu")) {
+      const profile = getCpuDifficultyProfile();
+      const currentMargin = state.defenderChainCount - state.attackerChainCount;
+      const targetMargin = getCpuDefenseMarginTarget(profile);
+      if (currentMargin >= targetMargin) {
+        return `CPU ends the defense chain with a ${currentMargin}-card edge to deny Stabilize.`;
+      }
+      return `CPU ends the defense chain because it leads ${currentMargin}, but has no legal way to push past the Stabilize window.`;
+    }
+
+    function getCpuBestHandValue() {
+      return state.cpuHand.reduce((best, card) => Math.max(best, card?.value || 0), 0);
+    }
+
     function sleep(ms) {
       return new Promise((resolve) => {
         setTimeout(resolve, ms);
@@ -6017,54 +7905,11 @@
     }
 
     function cpuChooseCardIndex() {
-      const hand = state.cpuHand;
-
-      if (state.currentTurn !== "cpu") {
-        return null;
-      }
-
-      if (!state.activeCard && state.roleOfCurrentTurn === "attacker" && state.attackerChainCount === 0) {
-        const allIndexes = hand.map((_, i) => i);
-        if (allIndexes.length === 0) {
-          return null;
-        }
-        if (isShotZone("cpu") || hand.length === 1) {
-          return chooseHighestValueIndex(hand, allIndexes);
-        }
-        return chooseLowestValueIndex(hand, allIndexes);
-      }
-
-      const legal = getLegalCardsForTurn("cpu");
-      if (legal.length === 0) {
-        return null;
-      }
-
-      if (state.roleOfCurrentTurn === "defender") {
-        return chooseLowestValueIndex(hand, legal);
-      }
-
-      if (isShotZone("cpu") || state.cpuHand.length === 1) {
-        return chooseHighestValueIndex(hand, legal);
-      }
-
-      if (isFarOffensiveZone("cpu") || isCloseOffensiveZone("cpu")) {
-        return chooseHighestValueIndex(hand, legal);
-      }
-
-      return chooseLowestValueIndex(hand, legal);
+      return getCpuCardChoice()?.index ?? null;
     }
 
     function getCpuChoiceReason(hand) {
-      if (state.roleOfCurrentTurn === "defender") {
-        return "lowest legal defense";
-      }
-      if (isShotZone("cpu") || hand.length === 1) {
-        return "highest legal attack";
-      }
-      if (isFarOffensiveZone("cpu") || isCloseOffensiveZone("cpu")) {
-        return "highest legal attack in offensive zone";
-      }
-      return "lowest legal attack to conserve stronger cards";
+      return getCpuCardChoice()?.reason || "best legal line";
     }
 
     function getBurnFollowUpCount(hand, burnIndex) {
@@ -6120,6 +7965,25 @@
         return false;
       }
 
+      const profile = getCpuDifficultyProfile();
+      if (legalIndexes.length === 0) {
+        return true;
+      }
+
+      if (profile.momentumSpendAggression < 6 || state.roleOfCurrentTurn !== "attacker") {
+        return false;
+      }
+
+      const bestCurrentLegalValue = legalIndexes.reduce((best, idx) => Math.max(best, state.cpuHand[idx].value), 0);
+      const activeValue = state.activeCard?.value ?? bestCurrentLegalValue;
+      const lowValueThreshold = Math.max(2, Math.ceil(state.config.maxValue / 2));
+      const lowValueCount = state.cpuHand.filter((card) => card.value <= lowValueThreshold).length;
+      const weakCurrentLine = legalIndexes.length <= 1 && bestCurrentLegalValue <= activeValue;
+
+      if (weakCurrentLine && lowValueCount >= Math.ceil(state.cpuHand.length / 2) && !isShotZone("cpu")) {
+        return true;
+      }
+
       return legalIndexes.length === 0;
     }
 
@@ -6128,21 +7992,27 @@
         return false;
       }
 
+      const profile = getCpuDifficultyProfile();
       const handSize = getPowerShotValue("cpu");
       if (handSize < 2) {
         return false;
       }
 
+      const aggression = profile.momentumSpendAggression + ((state.cpuScore < state.humanScore || getRegulationSecondsRemaining() <= profile.lateGamePressureSeconds) ? Math.ceil(profile.lateGameRiskAggression / 3) : 0);
+      if (aggression < 3) {
+        return false;
+      }
+
       const shotPressure = requiredSaveLengthFromShotValue(handSize);
       if (legalIndexes.length === 0) {
-        return shotPressure >= 2;
+        return shotPressure >= (aggression >= 8 ? 1 : 2);
       }
 
       if (isCloseOffensiveZone("cpu")) {
-        return handSize >= Math.max(4, state.config.handSize - 1) || (shotPressure >= 3 && legalIndexes.length <= 1);
+        return handSize >= (aggression >= 8 ? 3 : Math.max(4, state.config.handSize - 1)) || (shotPressure >= (aggression >= 8 ? 2 : 3) && legalIndexes.length <= 1);
       }
 
-      return handSize >= state.config.handSize && legalIndexes.length <= 1 && shotPressure >= 3;
+      return handSize >= state.config.handSize && legalIndexes.length <= (aggression >= 8 ? 2 : 1) && shotPressure >= (aggression >= 9 ? 2 : 3);
     }
 
     function cpuShouldDumpAndChase() {
@@ -6150,76 +8020,54 @@
         return false;
       }
 
-      if (state.deck.length === 0) {
-        return true;
-      }
+      const profile = getCpuDifficultyProfile();
 
       const hand = state.cpuHand;
       const lowValueThreshold = Math.max(2, Math.ceil(state.config.maxValue / 2));
       const lowValueCount = hand.filter((card) => card.value <= lowValueThreshold).length;
       const mostlyLowValue = lowValueCount >= Math.ceil(hand.length / 2);
       const veryWeakHand = lowValueCount >= Math.max(3, hand.length - 1);
-      const shortHand = hand.length <= Math.max(2, Math.ceil(state.config.handSize / 2));
-      const unusedMomentum = getMomentum("cpu");
-      const deckLow = state.deck.length <= Math.max(6, state.config.handSize * 2);
       const scoreDiff = state.cpuScore - state.humanScore;
-      const regulationSecondsRemaining = state.periodNumber > REGULATION_PERIOD_COUNT
-        ? 0
-        : (((REGULATION_PERIOD_COUNT - state.periodNumber) * PERIOD_SECONDS) + state.periodClockSeconds);
-      const lateGame = state.periodNumber > REGULATION_PERIOD_COUNT || regulationSecondsRemaining <= 300;
-      const veryLateGame = state.periodNumber > REGULATION_PERIOD_COUNT || regulationSecondsRemaining <= 120;
-      const comebackPressure = state.periodNumber > REGULATION_PERIOD_COUNT || regulationSecondsRemaining <= 480;
-      const desperateOffensivePush = scoreDiff < 0 && comebackPressure && isShotZone("cpu");
+      const regulationSecondsRemaining = getRegulationSecondsRemaining();
+      let dumpScore = 0;
 
-      if (desperateOffensivePush && hand.length <= 1) {
-        return false;
-      }
-
-      let dumpBias = 0.34;
       if (isCloseOffensiveZone("cpu")) {
-        dumpBias += 0.12;
+        dumpScore += 3;
       } else if (isFarOffensiveZone("cpu")) {
-        dumpBias += 0.05;
+        dumpScore += 2;
       }
 
       if (mostlyLowValue) {
-        dumpBias += 0.14;
+        dumpScore += 2;
       }
       if (veryWeakHand) {
-        dumpBias += 0.12;
+        dumpScore += 3;
       }
-      if (shortHand) {
-        dumpBias += 0.08;
+      if (state.deck.length > Math.max(8, state.config.handSize * 2)) {
+        dumpScore += 1;
       }
-      if (deckLow) {
-        dumpBias += 0.08;
+      if (scoreDiff > 0 && regulationSecondsRemaining <= 300) {
+        dumpScore += 2;
       }
-      if (unusedMomentum > 0) {
-        dumpBias -= 0.08;
+      if (scoreDiff < 0) {
+        dumpScore -= 2;
       }
-
-      if (scoreDiff >= 2 && lateGame) {
-        dumpBias += 0.18;
-      } else if (scoreDiff > 0 && veryLateGame) {
-        dumpBias += 0.1;
+      if (regulationSecondsRemaining <= 180 && scoreDiff <= 0) {
+        dumpScore -= 2;
       }
-
-      if (scoreDiff <= -2) {
-        dumpBias -= 0.18;
-      } else if (scoreDiff < 0 && lateGame) {
-        dumpBias -= 0.14;
-      }
-
-      if (desperateOffensivePush) {
-        dumpBias -= hand.length <= 2 ? 0.28 : 0.18;
-      }
-
       if (state.periodNumber > REGULATION_PERIOD_COUNT) {
-        dumpBias -= 0.16;
+        dumpScore -= 2;
+      }
+      if (FEATURES.momentumSystem && getMomentum("cpu") > 0) {
+        dumpScore -= 1 + Math.round(profile.momentumSpendAggression / 5);
       }
 
-      const dumpChance = clamp(dumpBias, 0.15, 0.82);
-      return Math.random() < dumpChance;
+      dumpScore += Math.round(profile.cardConservationWeight / 4);
+      dumpScore -= Math.round(profile.shotZoneAggression / 6);
+      dumpScore -= Math.round(profile.zoneAdvanceWeight / 7);
+
+      const effectiveDumpThreshold = Math.max(2, profile.dumpThreshold + Math.round((profile.momentumSpendAggression - profile.cardConservationWeight) / 6));
+      return dumpScore >= effectiveDumpThreshold;
     }
 
     function cpuShouldIcePuck(legalIndexes = getLegalCardsForTurn("cpu")) {
@@ -6231,19 +8079,46 @@
         return false;
       }
 
-      const hand = state.cpuHand;
-      const lowValueThreshold = Math.max(2, Math.ceil(state.config.maxValue / 2));
-      const lowValueCount = hand.filter((card) => card.value <= lowValueThreshold).length;
-      const weakHand = hand.length <= 2 || lowValueCount >= Math.ceil(hand.length / 2);
-      const shortHand = hand.length <= Math.max(2, Math.ceil(state.config.handSize / 2));
-      const opponentShortHand = state.humanHand.length <= 2;
-      const opponentHighMomentum = FEATURES.momentumSystem && getMomentum("human") >= 2;
+      const profile = getCpuDifficultyProfile();
+      const panicWindow = getCpuPanicWindow(profile);
+      let dangerScore = 0;
 
-      return opponentShortHand || opponentHighMomentum || weakHand || shortHand;
+      if (isShotZone("human", state.zoneIndex)) {
+        dangerScore += 3;
+      }
+      if (state.humanHand.length <= panicWindow) {
+        dangerScore += 2;
+      }
+      if (state.humanHand.length <= 1) {
+        dangerScore += 1;
+      }
+      if (FEATURES.momentumSystem && getMomentum("human") >= 2) {
+        dangerScore += 1;
+      }
+      if (state.deck.length === 0) {
+        dangerScore += 1;
+      }
+      if (state.cpuScore > state.humanScore && getRegulationSecondsRemaining() <= 180) {
+        dangerScore += 1;
+      }
+      if (state.cpuScore < state.humanScore) {
+        dangerScore -= 1 + Math.floor(profile.lateGameRiskAggression / 5);
+      }
+      if (getCpuBestHandValue() >= state.config.maxValue - 1) {
+        dangerScore += 1;
+      }
+
+      const effectiveIcingThreshold = Math.max(2, profile.icingDangerThreshold + Math.round(profile.icingReluctance / 3));
+      return dangerScore >= effectiveIcingThreshold;
     }
 
     function cpuShouldBurnMomentum(legalIndexes = getLegalCardsForTurn("cpu")) {
       if (!FEATURES.momentumSystem || !canPlayerUseBurn("cpu")) {
+        return false;
+      }
+
+      const profile = getCpuDifficultyProfile();
+      if (profile.momentumSpendAggression <= 1) {
         return false;
       }
 
@@ -6259,7 +8134,7 @@
         if (canDump && burnFollowUpCount === 0) {
           return false;
         }
-        return burnFollowUpCount > 0 || !canDump;
+        return profile.momentumSpendAggression >= 3 && (burnFollowUpCount > 0 || !canDump);
       }
 
       const hand = state.cpuHand;
@@ -6270,7 +8145,8 @@
       const bestCurrentLegalValue = legalIndexes.reduce((best, idx) => Math.max(best, hand[idx].value), 0);
       const legalLooksWeak = legalIndexes.length <= 1 || bestCurrentLegalValue <= activeValue;
       const burnImprovesOptions = burnFollowUpCount > legalIndexes.length;
-      return mostlyLowValue && burnFollowUpCount > 0 && (legalLooksWeak || burnImprovesOptions);
+      const aggressionGate = profile.momentumSpendAggression + ((state.cpuScore < state.humanScore || getRegulationSecondsRemaining() <= profile.lateGamePressureSeconds) ? 1 : 0);
+      return aggressionGate >= 4 && mostlyLowValue && burnFollowUpCount > 0 && (legalLooksWeak || burnImprovesOptions || (aggressionGate >= 8 && state.roleOfCurrentTurn === "attacker"));
     }
 
     async function cpuTakeTurn() {
@@ -6347,9 +8223,9 @@
         }
       }
 
-      if (state.roleOfCurrentTurn === "defender" && currentTurnCanPass() && state.defenderChainCount > state.attackerChainCount) {
+      if (cpuShouldEndDefenseChain(legal)) {
         showCpuNotice("TAKES PUCK", "info");
-        addLog("CPU ends the defense chain because it already leads the exchange; no draw is required.");
+        addLog(getCpuDefenseEndReason(legal));
         endComboByChoice("cpu");
         return true;
       }
@@ -6381,14 +8257,15 @@
         return true;
       }
 
-      const idx = cpuChooseCardIndex();
+      const choice = getCpuCardChoice();
+      const idx = choice?.index;
       if (idx === null || idx === undefined) {
         endComboByChoice("cpu");
         return true;
       }
 
       addLog(`CPU debug: active card ${state.activeCard ? cardToText(state.activeCard) : "Any Card"}; legal plays ${cardsAtIndexesToText(state.cpuHand, legal)}.`);
-      addLog(`CPU selects ${cardToText(state.cpuHand[idx])} from hand (${getCpuChoiceReason(state.cpuHand)}).`);
+      addLog(`CPU selects ${cardToText(state.cpuHand[idx])} from hand (${choice?.reason || getCpuChoiceReason(state.cpuHand)}).`);
 
       state.cpuPreviewIndex = idx;
       render();
@@ -6558,11 +8435,13 @@
       const humanInteractionBlocked = state.cpuBusy;
       const isHumanTurn = owner === "human" && !humanInteractionBlocked && (state.faceoffPending || state.currentTurn === "human");
       const humanSpecialSelectionIndex = owner === "human" && humanMoveRequiresSubmitConfirmation() ? state.humanSpecialSelectionIndex : null;
+      const overflowDiscardActive = owner === "human" && hasPendingOverflowDiscard("human");
       const pendingMomentumAction = owner === "human" && state.currentTurn === "human" && !state.faceoffPending && !state.shotPending
+        && !overflowDiscardActive
         ? getPendingMomentumAction()
         : null;
       const legal = owner === "human"
-        ? new Set(pendingMomentumAction ? hand.map((_, index) => index) : state.faceoffPending ? hand.map((_, index) => index) : getLegalCardsForTurn("human"))
+        ? new Set(overflowDiscardActive ? hand.map((_, index) => index) : pendingMomentumAction ? hand.map((_, index) => index) : state.faceoffPending ? hand.map((_, index) => index) : getLegalCardsForTurn("human"))
         : null;
       const isComboTurn = state.comboWindow && state.comboPlayer === owner;
       const shouldShowCpuCards = owner !== "cpu" || state.showCpuCards;
@@ -6589,14 +8468,16 @@
           if (isComboTurn && isLegal) {
             btn.classList.add("combo-legal");
           }
-          if (isLegal) {
+          if (isLegal && !overflowDiscardActive) {
             btn.classList.add("draggable-card");
           }
           if (i === humanSpecialSelectionIndex) {
             btn.classList.add("special-selected");
           }
           btn.disabled = !isHumanTurn || !isLegal;
-          if (state.faceoffPending) {
+          if (overflowDiscardActive) {
+            btn.title = isLegal ? "Discard this card to return to the hand limit" : "Choose a card to discard";
+          } else if (state.faceoffPending) {
             const faceoffName = getFaceoffUiLabel().toLowerCase();
             btn.title = isLegal
               ? `Play this card for the ${faceoffName}. It resolves immediately.`
@@ -6655,10 +8536,13 @@
       logFeed.innerHTML = "";
 
       const recent = state.logMessages.slice(-120);
-      for (const msg of recent) {
+      for (const entry of recent) {
         const p = document.createElement("p");
         p.className = "log-line";
-        p.textContent = msg;
+        if (entry && typeof entry === "object" && entry.sequenceLead) {
+          p.classList.add("sequence-lead");
+        }
+        p.textContent = getLogEntryText(entry);
         logFeed.appendChild(p);
       }
 
@@ -6773,11 +8657,11 @@
 
         const head = document.createElement("div");
         head.className = "goal-log-head";
-        head.innerHTML = `<span>${lowerPlayerName(entry.player)} goal</span><span>${entry.periodLabel} ${entry.clockText}</span>`;
+        head.innerHTML = `<span>${lowerPlayerName(entry.player)} ${entry.shotKind === "powerShot" ? "Force Shot goal" : "goal"}</span><span>${entry.periodLabel} ${entry.clockText}</span>`;
 
         const meta = document.createElement("div");
         meta.className = "goal-log-meta";
-        meta.textContent = `${entry.zoneLabel} | Shot ${entry.shotValue} | Human ${entry.humanScore} - ${entry.cpuScore} CPU`;
+        meta.textContent = `${entry.zoneLabel} | ${entry.shotKind === "powerShot" ? "Force Shot | " : ""}Shot ${entry.shotValue} | Human ${entry.humanScore} - ${entry.cpuScore} CPU`;
 
         item.appendChild(head);
         item.appendChild(meta);
@@ -6930,16 +8814,19 @@
       const humanShotLegalCount = state.shotPending && state.currentTurn === "human" ? getLegalCardsForTurn("human").length : 0;
       const humanPitySaveDraw = state.shotPending && state.currentTurn === "human" && canUsePitySaveDraw("human", state.shotPending);
       zoneTrack.classList.toggle("puck-battle", puckBattleActive);
-      if (state.pendingBurnSelection) {
+      if (hasPendingOverflowDiscard("human")) {
+        comboHint.textContent = `Human is over the hand limit of ${state.pendingOverflowDiscard.handCap}. Choose exactly 1 card to discard before play continues.`;
+      } else if (state.pendingBurnSelection) {
         comboHint.textContent = "Burn is active. Choose exactly 1 Human card to discard out of hand.";
       } else if (state.pendingCycleSelection) {
         comboHint.textContent = "Cycle is active. Choose exactly 1 Human card to discard and redraw.";
       } else if (state.stabilizePending && state.currentTurn === "human") {
+        const stabilizeNeedText = getStabilizeSandingLabel() === "legal" ? "1 legal card" : `1 ${getStabilizeSandingLabel()} card`;
         comboHint.textContent = selectedHumanCard
           ? `Human staged ${cardToText(selectedHumanCard)} for Stabilize. Tap Deck, tap the pile, or press Submit to confirm; Undo clears it.`
-          : "Human gets 1 Stabilize attempt: stage 1 legal card, then tap Deck, tap the pile, or press Submit; draw 1 if none.";
+          : `Human gets 1 Stabilize attempt: stage ${stabilizeNeedText}, then tap Deck, tap the pile, or press Submit; draw 1 if none.`;
       } else if (state.stabilizePending) {
-        comboHint.textContent = `${lowerPlayerName(state.currentTurn)} gets 1 Stabilize attempt to deny the turnover.`;
+        comboHint.textContent = `${lowerPlayerName(state.currentTurn)} gets 1 Stabilize attempt to deny the turnover with ${getStabilizeSandingLabel() === "legal" ? "any normal legal match" : `a ${getStabilizeSandingLabel()} card`}.`;
       } else if (state.currentTurn === "human" && humanPendingCount > 0 && !state.faceoffPending && !state.shotPending) {
         const suffix = humanPendingCount === 1 ? "card" : "cards";
         comboHint.textContent = canStartOrContinueCombo("human", state.activeCard)
@@ -6958,26 +8845,26 @@
       } else if (state.shotPending) {
         comboHint.textContent = state.currentTurn !== "human"
           ? (isReboundRevealPhase(state.shotPending)
-            ? `${lowerPlayerName(state.currentTurn)} is revealing the rebound card.`
+            ? `${lowerPlayerName(state.currentTurn)} is revealing a rebound card that must still match the active card.`
             : canUsePitySaveDraw(state.currentTurn, state.shotPending)
-              ? `${lowerPlayerName(state.currentTurn)} gets a 1-card pity draw for the last save chance.`
+              ? `${lowerPlayerName(state.currentTurn)} gets a 1-card last-chance save draw.`
               : `${lowerPlayerName(state.currentTurn)} is resolving the ${shotPhaseLabel}.`)
           : humanPendingCount > 0 && !isReboundSavePhase(state.shotPending)
             ? (humanPitySaveDraw
-              ? `Human has ${humanPendingCount} staged save card${humanPendingCount === 1 ? "" : "s"}. Tap Deck, tap the pile, or press Submit to take the pity draw, or Undo to pull one back.`
+              ? `Human has ${humanPendingCount} staged save card${humanPendingCount === 1 ? "" : "s"}. Tap Deck, tap the pile, or press Submit to take the last-chance save draw, or Undo to pull one back.`
               : humanShotLegalCount > 0
                 ? `Human has ${humanPendingCount} staged save card${humanPendingCount === 1 ? "" : "s"}. Play more, Undo, or tap Deck, tap the pile, or press Submit to resolve the save chain.`
                 : `Human has ${humanPendingCount} staged save card${humanPendingCount === 1 ? "" : "s"}. Undo, or tap Deck, tap the pile, or press Submit to resolve the save chain.`)
           : selectedHumanCard
             ? `Human staged ${cardToText(selectedHumanCard)} for the ${isReboundSavePhase(state.shotPending) ? "rebound save" : "save chain"}. Tap Deck, tap the pile, or press Submit to confirm; Undo clears it.`
           : humanPitySaveDraw
-            ? "Human has no legal save card. Tap Deck for a 1-card pity draw."
+            ? "Human has no legal save card. Tap Deck for a 1-card last-chance save draw."
           : isReboundRevealPhase(state.shotPending)
-            ? `Rebound ${state.shotPending.reboundCount}: tap Deck to reveal and play the rebound card.`
+            ? `Rebound ${state.shotPending.reboundCount}: tap Deck to reveal 1 rebound card. It must still match the active card to become a rebound shot.`
           : isReboundSavePhase(state.shotPending)
             ? (humanShotLegalCount > 0
               ? `Human must play 1 legal rebound save. If its value is below ${state.shotPending.reboundShotValue}, another rebound occurs. Press Concede to allow the goal.`
-              : "Human has no legal rebound save in hand. Press Desperation to draw 1 top-deck save card into hand.")
+              : "Human has no legal rebound save in hand. Press Rebound Draw to draw 1 top-deck rebound-save card into hand.")
             : `Human must build a ${state.shotPending.requiredLength}-card save chain. Press End Save to resolve freeze, rebound, or goal from the current save count.`;
       } else if (state.currentTurn === "human" && canPlayerIcePuck("human")) {
         comboHint.textContent = "Human is stuck in the defensive zone. Draw normally, or use Ice Puck to reset both hands and force an Icing Faceoff.";
@@ -7011,15 +8898,34 @@
         humanShotLegalCount,
         humanPitySaveDraw
       });
+      renderExchangeMeter();
 
       const eventBanner = document.getElementById("eventBanner");
       eventBanner.className = `event-banner ${state.eventType || "contain"} ${getPresentationIntensity(state.eventType, state.eventText, "event")}`;
       eventBanner.textContent = state.eventText || "";
 
       const playByPlayBanner = document.getElementById("playByPlayBanner");
+      const playByPlayHelpBtn = document.getElementById("playByPlayHelpBtn");
+      const playByPlayHelpModal = document.getElementById("playByPlayHelpModal");
       if (playByPlayBanner) {
         playByPlayBanner.className = `event-banner play-by-play-banner ${state.playByPlayType || "contain"} ${getPresentationIntensity(state.playByPlayType, state.playByPlayText, "play")}`;
         playByPlayBanner.textContent = state.playByPlayText || "Opening faceoff.";
+      }
+      if (playByPlayHelpBtn) {
+        const hasPlayByPlayDetails = Boolean(state.playByPlayDetails?.what && state.playByPlayDetails?.why && state.playByPlayDetails?.rule);
+        playByPlayHelpBtn.hidden = !hasPlayByPlayDetails;
+        playByPlayHelpBtn.disabled = !hasPlayByPlayDetails;
+        playByPlayHelpBtn.title = hasPlayByPlayDetails ? "Explain the latest play-by-play banner" : "No play explanation is available";
+        playByPlayHelpBtn.setAttribute("aria-expanded", hasPlayByPlayDetails && state.playByPlayHelpOpen ? "true" : "false");
+      }
+      if (playByPlayHelpModal) {
+        const showPlayByPlayHelp = Boolean(state.playByPlayHelpOpen && state.playByPlayDetails);
+        playByPlayHelpModal.hidden = !showPlayByPlayHelp;
+        if (showPlayByPlayHelp) {
+          document.getElementById("playByPlayHelpWhat").textContent = state.playByPlayDetails.what;
+          document.getElementById("playByPlayHelpWhy").textContent = state.playByPlayDetails.why;
+          document.getElementById("playByPlayHelpRule").textContent = state.playByPlayDetails.rule;
+        }
       }
 
       const deckEventToast = document.getElementById("deckEventToast");
@@ -7087,8 +8993,9 @@
       const canHumanAct = state.currentTurn === "human" && !state.cpuBusy;
       const legal = canHumanAct ? getLegalCardsForTurn("human") : [];
       const humanCanPass = canHumanAct && currentTurnCanPass();
-      const pendingMomentumAction = canHumanAct ? getPendingMomentumAction() : null;
-      const momentumSelectionActive = Boolean(pendingMomentumAction);
+      const overflowSelectionActive = canHumanAct && hasPendingOverflowDiscard("human");
+      const pendingMomentumAction = canHumanAct && !overflowSelectionActive ? getPendingMomentumAction() : null;
+      const momentumSelectionActive = overflowSelectionActive || Boolean(pendingMomentumAction);
       const cycleSelectionActive = pendingMomentumAction === "cycle";
       const burnSelectionActive = pendingMomentumAction === "burn";
       const humanCanCycle = canHumanAct && !hasHumanPendingTurn() && canPlayerUseCycle("human");
@@ -7118,9 +9025,9 @@
         : isReboundRevealPhase(state.shotPending)
           ? "Reveal"
         : isReboundSavePhase(state.shotPending)
-          ? (state.currentTurn === "human" && humanShotLegalCount === 0 ? "Desperation" : "Concede")
+          ? (state.currentTurn === "human" && humanShotLegalCount === 0 ? "Rebound Draw" : "Concede")
           : humanCanUsePitySaveDraw
-            ? "Pity Draw"
+            ? "Last Chance"
           : "End Save";
       if (humanMomentumActions) {
         humanMomentumActions.hidden = !showCycleMomentumBtn && !showBurnMomentumBtn && !showPowerShotBtn && !showIcePuckBtn && !showDumpChaseBtn;
@@ -7137,16 +9044,18 @@
         ? "Choose a faceoff card"
         : !canHumanAct
         ? "CPU turn"
+        : overflowSelectionActive
+          ? "Choose a hand-limit discard first"
         : burnSelectionActive
           ? "Choose a Burn card or cancel Burn"
         : cycleSelectionActive
           ? "Choose a Cycle card or cancel Cycle"
         : state.shotPending
           ? (isReboundRevealPhase(state.shotPending)
-            ? "Reveal and play 1 rebound card from the top of the deck"
+            ? "Reveal 1 rebound card from the top of the deck and play it immediately if it still matches"
             : isReboundSavePhase(state.shotPending)
             ? (state.currentTurn === "human" && humanShotLegalCount === 0
-              ? "Draw 1 top-deck desperation save card into hand"
+              ? "Draw 1 top-deck rebound-save card into hand"
               : "Allow the rebound to become a goal")
             : humanCanUsePitySaveDraw
               ? "Draw 1 last-chance save card from the deck"
@@ -7163,9 +9072,11 @@
 
           deckDrawAction.textContent = deckActionText;
 
-      doneComboBtn.disabled = state.faceoffPending || state.shotPending || !humanCanPass || humanPendingCount > 0;
+      doneComboBtn.disabled = overflowSelectionActive || state.faceoffPending || state.shotPending || !humanCanPass || humanPendingCount > 0;
       doneComboBtn.title = state.faceoffPending
         ? "No chain during a faceoff"
+        : overflowSelectionActive
+          ? "Choose a hand-limit discard first"
         : humanPendingCount > 0
           ? "Confirm or Undo staged human cards first"
         : doneComboBtn.disabled
@@ -7177,9 +9088,11 @@
               : "End the defense chain and resolve the exchange";
 
       if (undoTurnBtn) {
-        undoTurnBtn.disabled = humanHasSpecialPendingSelection ? false : state.faceoffPending || (state.shotPending && isReboundSavePhase(state.shotPending)) || state.stabilizePending || !canHumanAct || humanPendingCount === 0;
+        undoTurnBtn.disabled = overflowSelectionActive || (humanHasSpecialPendingSelection ? false : state.faceoffPending || (state.shotPending && isReboundSavePhase(state.shotPending)) || state.stabilizePending || !canHumanAct || humanPendingCount === 0);
         undoTurnBtn.title = humanHasSpecialPendingSelection
           ? "Clear the staged card before confirming"
+          : overflowSelectionActive
+            ? "Choose a hand-limit discard first"
           : humanPendingCount > 0
             ? "Undo the last staged human play"
             : humanMoveRequiresSubmitConfirmation()
@@ -7188,11 +9101,13 @@
       }
 
       if (submitTurnBtn) {
-        submitTurnBtn.disabled = humanHasSpecialPendingSelection ? false : state.faceoffPending || (state.shotPending && isReboundSavePhase(state.shotPending)) || state.stabilizePending || !canHumanAct || humanPendingCount === 0;
+        submitTurnBtn.disabled = overflowSelectionActive || (humanHasSpecialPendingSelection ? false : state.faceoffPending || (state.shotPending && isReboundSavePhase(state.shotPending)) || state.stabilizePending || !canHumanAct || humanPendingCount === 0);
         submitTurnBtn.title = humanHasSpecialPendingSelection
           ? (humanSpecialSelectionMode === "reboundSave"
             ? "Confirm the staged rebound save"
             : "Confirm the staged Stabilize card")
+          : overflowSelectionActive
+            ? "Choose a hand-limit discard first"
           : humanPendingCount > 0
             ? (state.shotPending
               ? "Resolve the staged save chain"
@@ -7203,9 +9118,11 @@
       }
 
       if (cycleMomentumBtn) {
-        cycleMomentumBtn.disabled = !FEATURES.momentumSystem || state.faceoffPending || state.shotPending || hasHumanPendingTurn() || burnSelectionActive || (!cycleSelectionActive && !humanCanCycle);
+        cycleMomentumBtn.disabled = overflowSelectionActive || !FEATURES.momentumSystem || state.faceoffPending || state.shotPending || hasHumanPendingTurn() || burnSelectionActive || (!cycleSelectionActive && !humanCanCycle);
         cycleMomentumBtn.hidden = !showCycleMomentumBtn;
-        cycleMomentumBtn.title = cycleSelectionActive
+        cycleMomentumBtn.title = overflowSelectionActive
+          ? "Choose a hand-limit discard first"
+          : cycleSelectionActive
           ? "Click again to cancel Cycle selection"
           : humanCanCycle
             ? "Spend 1 Momentum, then choose 1 card to discard and draw 1"
@@ -7213,9 +9130,11 @@
       }
 
       if (burnMomentumBtn) {
-        burnMomentumBtn.disabled = !FEATURES.momentumSystem || state.faceoffPending || state.shotPending || hasHumanPendingTurn() || cycleSelectionActive || (!burnSelectionActive && !humanCanBurn);
+        burnMomentumBtn.disabled = overflowSelectionActive || !FEATURES.momentumSystem || state.faceoffPending || state.shotPending || hasHumanPendingTurn() || cycleSelectionActive || (!burnSelectionActive && !humanCanBurn);
         burnMomentumBtn.hidden = !showBurnMomentumBtn;
-        burnMomentumBtn.title = burnSelectionActive
+        burnMomentumBtn.title = overflowSelectionActive
+          ? "Choose a hand-limit discard first"
+          : burnSelectionActive
           ? "Click again to cancel Burn selection"
           : humanCanBurn
             ? "Spend 2 Momentum, then choose 1 card to Burn out of hand"
@@ -7223,25 +9142,31 @@
       }
 
       if (powerShotBtn) {
-        powerShotBtn.disabled = !FEATURES.momentumSystem || state.faceoffPending || state.shotPending || hasHumanPendingTurn() || momentumSelectionActive || !humanCanPowerShot;
+        powerShotBtn.disabled = overflowSelectionActive || !FEATURES.momentumSystem || state.faceoffPending || state.shotPending || hasHumanPendingTurn() || momentumSelectionActive || !humanCanPowerShot;
         powerShotBtn.hidden = !showPowerShotBtn;
-        powerShotBtn.title = humanCanPowerShot
-          ? "Spend 3 Momentum to take an immediate Force Shot. Shot quality equals cards in hand"
+        powerShotBtn.title = overflowSelectionActive
+          ? "Choose a hand-limit discard first"
+          : humanCanPowerShot
+          ? "Spend 3 Momentum to take an immediate Force Shot. Shot quality equals cards in hand, but the save still answers the active card"
           : "Force Shot is only available to the Human attacker at the start of the turn in a shot zone with 3 Momentum";
       }
 
       if (icePuckBtn) {
-        icePuckBtn.disabled = momentumSelectionActive || !humanCanIce;
+        icePuckBtn.disabled = overflowSelectionActive || momentumSelectionActive || !humanCanIce;
         icePuckBtn.hidden = !showIcePuckBtn;
-        icePuckBtn.title = humanCanIce
+        icePuckBtn.title = overflowSelectionActive
+          ? "Choose a hand-limit discard first"
+          : humanCanIce
           ? "Trim Momentum by 1 for each side, refill both hands, and force an Icing Faceoff in your defensive zone"
           : "Icing is only available to a stuck attacker in their own defensive zone";
       }
 
       if (dumpChaseBtn) {
-        dumpChaseBtn.disabled = !FEATURES.momentumSystem || momentumSelectionActive || !humanCanDump;
+        dumpChaseBtn.disabled = overflowSelectionActive || !FEATURES.momentumSystem || momentumSelectionActive || !humanCanDump;
         dumpChaseBtn.hidden = !showDumpChaseBtn;
-        dumpChaseBtn.title = humanCanDump
+        dumpChaseBtn.title = overflowSelectionActive
+          ? "Choose a hand-limit discard first"
+          : humanCanDump
           ? "Dump the puck deep to the far zone and concede the current exchange"
           : "Dump Hand is only available to a stuck Human attacker on the opponent's side of the ice";
       }
@@ -7262,6 +9187,12 @@
     async function onHumanCannotPlay() {
       if (state.currentTurn === "human" && !state.cpuBusy && ((hasHumanSpecialSelection() && humanMoveRequiresSubmitConfirmation()) || hasHumanPendingTurn())) {
         await submitHumanTurn();
+        return;
+      }
+
+      if (hasPendingOverflowDiscard("human")) {
+        addLog("Human is over the hand limit. Choose a discard before drawing again.");
+        render();
         return;
       }
 
@@ -7359,9 +9290,10 @@
       clearFaceoffState();
       state.pendingBurnSelection = false;
       state.pendingCycleSelection = false;
+      state.pendingOverflowDiscard = null;
       state.stabilizePending = null;
-      state.playByPlayText = "Opening faceoff.";
-      state.playByPlayType = "contain";
+      state.pendingEncounterContext = null;
+      setPlayByPlay("Opening faceoff.", "contain");
       state.logMessages = [];
       state.humanMomentum = 0;
       state.cpuMomentum = 0;
@@ -7384,7 +9316,7 @@
       state.roleOfCurrentTurn = "faceoff";
 
       addLog("New game started.");
-      addLog(`Config: ${state.config.suitCount} suits, values 1-${state.config.maxValue}, hand size ${state.config.handSize}, wild ${state.config.wildCardCount}, CPU speed ${state.config.cpuSpeedPercent}%, ${state.config.decksPerPeriod} deck${state.config.decksPerPeriod === 1 ? "" : "s"} per period, cross river once ${state.config.singleRiverCrossMode ? "on" : "off"}.`);
+      addLog(`Config: ${state.config.suitCount} suits, values 1-${state.config.maxValue}, hand size ${state.config.handSize}, wild ${state.config.wildCardCount}, CPU ${getCpuDifficultyProfile().label.toLowerCase()} at ${state.config.cpuSpeedPercent}% speed, ${state.config.decksPerPeriod} deck${state.config.decksPerPeriod === 1 ? "" : "s"} per period, cross river once ${state.config.singleRiverCrossMode ? "on" : "off"}, stabilize ${getStabilizeSandingModeText(state.config.stabilizeSanding)}.`);
       startFaceoff(CENTER_ICE, "Opening faceoff at center ice.", { refillConsumesClock: false });
 
       render();
@@ -7393,6 +9325,31 @@
     function setupEvents() {
       document.getElementById("newGameBtn").addEventListener("click", () => {
         newGame();
+      });
+
+      document.getElementById("playByPlayHelpBtn")?.addEventListener("click", () => {
+        if (!state.playByPlayDetails) {
+          return;
+        }
+        state.playByPlayHelpOpen = !state.playByPlayHelpOpen;
+        render();
+      });
+
+      document.getElementById("playByPlayHelpDismissBtn")?.addEventListener("click", () => {
+        state.playByPlayHelpOpen = false;
+        render();
+      });
+
+      document.getElementById("playByPlayHelpBackdrop")?.addEventListener("click", () => {
+        state.playByPlayHelpOpen = false;
+        render();
+      });
+
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && state.playByPlayHelpOpen) {
+          state.playByPlayHelpOpen = false;
+          render();
+        }
       });
 
       document.getElementById("cannotPlayBtn").addEventListener("click", () => {
@@ -7512,7 +9469,52 @@
         render();
       });
 
-      ["debugSuitCount", "debugMaxValue", "debugHandSize", "debugWildCount", "debugCpuSpeed", "debugDecksPerPeriod", "debugRiverMode", "debugMomentumSystem"].forEach((id) => {
+      const cpuDifficultyInput = document.getElementById("debugCpuDifficulty");
+      const cpuTuningIds = [
+        "debugCpuAttackLookahead",
+        "debugCpuAttackFollowUp",
+        "debugCpuDefensiveTarget",
+        "debugCpuGoalTarget",
+        "debugCpuFaceoffNeutral",
+        "debugCpuFaceoffDanger",
+        "debugCpuIcingThreshold",
+        "debugCpuDumpThreshold",
+        "debugCpuChainWeight",
+        "debugCpuEmptyHandShot",
+        "debugCpuZoneAdvance",
+        "debugCpuShotAggro",
+        "debugCpuConserve",
+        "debugCpuStabilizeDeny",
+        "debugCpuFaceoffAggro",
+        "debugCpuIcingReluctance",
+        "debugCpuMomentumAggro",
+        "debugCpuLateRisk",
+        "debugCpuPanicThreshold"
+      ];
+
+      cpuDifficultyInput?.addEventListener("input", () => {
+        const selectedDifficulty = sanitizeCpuDifficulty(cpuDifficultyInput.value);
+        let nextConfig = getDraftConfigFromControls();
+        if (selectedDifficulty !== "custom") {
+          nextConfig = applyCpuDifficultyPresetToConfig(nextConfig, selectedDifficulty);
+          syncDebugControlsFromConfig(nextConfig);
+        }
+        state.config = { ...state.config, ...nextConfig };
+        refreshDebugPreview();
+      });
+
+      cpuTuningIds.forEach((id) => {
+        const element = document.getElementById(id);
+        element?.addEventListener("input", () => {
+          if (cpuDifficultyInput && cpuDifficultyInput.value !== "custom") {
+            cpuDifficultyInput.value = "custom";
+          }
+          state.config = { ...state.config, ...getDraftConfigFromControls() };
+          refreshDebugPreview();
+        });
+      });
+
+      ["debugSuitCount", "debugMaxValue", "debugHandSize", "debugWildCount", "debugCpuSpeed", "debugDecksPerPeriod", "debugRiverMode", "debugMomentumSystem", "debugStabilizeSanding"].forEach((id) => {
         const element = document.getElementById(id);
         element?.addEventListener("input", () => {
           if (id === "debugCpuSpeed") {
