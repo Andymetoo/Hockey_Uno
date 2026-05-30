@@ -28,6 +28,33 @@
       --play-card-pad-top: 24px;
       --play-card-pad-bottom: 20px;
       --play-card-banner-height: 14px;
+
+      /* Team colors */
+      --team-edmonton: #003B73;
+      --team-calgary: #C8102E;
+      --team-losangeles: #111111;
+      --team-vancouver: #006A4E;
+      --team-chicago: #CF0A2C;
+      --team-vegas: #85714D;
+      --team-colorado: #6F263D;
+      --team-dallas: #006847;
+      --team-newyork: #0038A8;
+      --team-boston: #8A6F00;
+      --team-carolina: #CC0000;
+      --team-toronto: #00205B;
+      --team-montreal: #AF1E2D;
+      --team-florida: #041E42;
+      --team-pittsburgh: #6B4F00;
+      --team-detroit: #CE1126;
+
+      --side-human-color: #d44949;
+      --side-human-rgb: 212, 73, 73;
+      --side-human-soft: #fff1f1;
+      --side-human-strong: #8f1d1d;
+      --side-cpu-color: #5a8ddd;
+      --side-cpu-rgb: 90, 141, 221;
+      --side-cpu-soft: #eef5ff;
+      --side-cpu-strong: #21497a;
     }
 
     * {
@@ -114,11 +141,11 @@
     }
 
     .zone-track.human-control {
-      box-shadow: 0 0 0 3px rgba(214, 63, 63, 0.12);
+      box-shadow: 0 0 0 3px rgba(var(--side-human-rgb), 0.12);
     }
 
     .zone-track.cpu-control {
-      box-shadow: 0 0 0 3px rgba(47, 111, 228, 0.12);
+      box-shadow: 0 0 0 3px rgba(var(--side-cpu-rgb), 0.12);
     }
 
     .zone-track.shot-pressure {
@@ -191,13 +218,13 @@
     }
 
     .momentum-dot.filled.human {
-      background: #ef2323;
-      box-shadow: 0 0 0 1px rgba(177, 18, 18, 0.28);
+      background: var(--side-human-color);
+      box-shadow: 0 0 0 1px rgba(var(--side-human-rgb), 0.28);
     }
 
     .momentum-dot.filled.cpu {
-      background: #4a1fcb;
-      box-shadow: 0 0 0 1px rgba(49, 18, 136, 0.3);
+      background: var(--side-cpu-color);
+      box-shadow: 0 0 0 1px rgba(var(--side-cpu-rgb), 0.3);
     }
 
     .hands-rink-row {
@@ -274,13 +301,38 @@
     }
 
     .zone.active.human-control {
-      background: linear-gradient(180deg, #fff0f0 0%, #ffe0e0 100%);
-      color: #8a2020;
+      background: linear-gradient(180deg, rgba(var(--side-human-rgb), 0.08) 0%, rgba(var(--side-human-rgb), 0.18) 100%);
+      color: var(--side-human-strong);
     }
 
     .zone.active.cpu-control {
-      background: linear-gradient(180deg, #eef5ff 0%, #dfeaff 100%);
-      color: #21497a;
+      background: linear-gradient(180deg, rgba(var(--side-cpu-rgb), 0.08) 0%, rgba(var(--side-cpu-rgb), 0.18) 100%);
+      color: var(--side-cpu-strong);
+    }
+
+    .team-setup-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .team-setup-field {
+      display: grid;
+      gap: 5px;
+      min-width: 0;
+    }
+
+    .team-setup-field span {
+      font-size: 0.74rem;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .team-setup-field select {
+      width: 100%;
     }
 
     .zone.active.faceoff-focus {
@@ -307,6 +359,45 @@
       line-height: 1;
       pointer-events: none;
       z-index: 2;
+    }
+
+    .zone-track-puck {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      z-index: 3;
+      font-size: 1.05rem;
+      line-height: 1;
+      pointer-events: none;
+      transform: translate(-50%, -50%);
+      transition: left 240ms cubic-bezier(0.22, 0.61, 0.36, 1), transform 180ms ease, filter 180ms ease, opacity 180ms ease;
+      filter: drop-shadow(0 2px 4px rgba(17, 24, 39, 0.18));
+      opacity: 0;
+    }
+
+    .zone-track-puck.show {
+      opacity: 1;
+    }
+
+    .zone-track-puck.faceoff {
+      transform: translate(-50%, -50%) scale(1.04);
+    }
+
+    .zone-track-puck.human,
+    .zone-track-puck.cpu {
+      animation: zoneTrackPuckHop 240ms ease;
+    }
+
+    @keyframes zoneTrackPuckHop {
+      0% {
+        transform: translate(-50%, -50%) scale(0.94);
+      }
+      45% {
+        transform: translate(-50%, calc(-50% - 4px)) scale(1.08);
+      }
+      100% {
+        transform: translate(-50%, -50%) scale(1);
+      }
     }
 
     .controls {
@@ -373,13 +464,23 @@
     }
 
     .hand-notice.info {
-      background: rgba(47, 111, 228, 0.92);
+      background: rgba(var(--side-cpu-rgb), 0.92);
     }
 
     .hand-panel.possession {
-      border-color: #c42a2a;
-      box-shadow: 0 0 0 2px #f7c2c2 inset;
-      background: #fff6f6;
+      box-shadow: 0 0 0 2px rgba(28, 36, 48, 0.04) inset;
+    }
+
+    #humanPanel.possession {
+      border-color: rgba(var(--side-human-rgb), 0.56);
+      box-shadow: 0 0 0 2px rgba(var(--side-human-rgb), 0.18) inset;
+      background: rgba(var(--side-human-rgb), 0.06);
+    }
+
+    #cpuPanel.possession {
+      border-color: rgba(var(--side-cpu-rgb), 0.56);
+      box-shadow: 0 0 0 2px rgba(var(--side-cpu-rgb), 0.18) inset;
+      background: rgba(var(--side-cpu-rgb), 0.06);
     }
 
     .active-middle {
@@ -400,6 +501,16 @@
     .active-middle.possession {
       border-color: #d16d6d;
       background: #fff2f2;
+    }
+
+    .active-middle.human-possession {
+      border-color: rgba(var(--side-human-rgb), 0.4);
+      background: rgba(var(--side-human-rgb), 0.05);
+    }
+
+    .active-middle.cpu-possession {
+      border-color: rgba(var(--side-cpu-rgb), 0.4);
+      background: rgba(var(--side-cpu-rgb), 0.05);
     }
 
     .active-middle.drop-ready {
@@ -436,32 +547,51 @@
 
     @keyframes phaseFlashHuman {
       0% {
-        background: #fff2f2;
-        box-shadow: 0 0 0 0 rgba(214, 63, 63, 0.28) inset;
+        background: rgba(var(--side-human-rgb), 0.05);
+        box-shadow: 0 0 0 0 rgba(var(--side-human-rgb), 0.28) inset;
       }
       40% {
-        background: #ffdedd;
-        box-shadow: 0 0 0 999px rgba(214, 63, 63, 0.1) inset;
+        background: rgba(var(--side-human-rgb), 0.18);
+        box-shadow: 0 0 0 999px rgba(var(--side-human-rgb), 0.1) inset;
       }
       100% {
-        background: #fff2f2;
-        box-shadow: 0 0 0 0 rgba(214, 63, 63, 0) inset;
+        background: rgba(var(--side-human-rgb), 0.05);
+        box-shadow: 0 0 0 0 rgba(var(--side-human-rgb), 0) inset;
       }
     }
 
     @keyframes phaseFlashCpu {
       0% {
-        background: #f3f8ff;
-        box-shadow: 0 0 0 0 rgba(47, 111, 228, 0.24) inset;
+        background: rgba(var(--side-cpu-rgb), 0.05);
+        box-shadow: 0 0 0 0 rgba(var(--side-cpu-rgb), 0.24) inset;
       }
       40% {
-        background: #deebff;
-        box-shadow: 0 0 0 999px rgba(47, 111, 228, 0.09) inset;
+        background: rgba(var(--side-cpu-rgb), 0.18);
+        box-shadow: 0 0 0 999px rgba(var(--side-cpu-rgb), 0.09) inset;
       }
       100% {
-        background: #f3f8ff;
-        box-shadow: 0 0 0 0 rgba(47, 111, 228, 0) inset;
+        background: rgba(var(--side-cpu-rgb), 0.05);
+        box-shadow: 0 0 0 0 rgba(var(--side-cpu-rgb), 0) inset;
       }
+    }
+
+    .side-text.human,
+    .score-side.human {
+      color: var(--side-human-color);
+    }
+
+    .side-text.cpu,
+    .score-side.cpu {
+      color: var(--side-cpu-color);
+    }
+
+    .score-side {
+      font-weight: 800;
+    }
+
+    .score-aux {
+      color: var(--muted);
+      font-weight: 600;
     }
 
     @keyframes phaseFlashNeutral {
@@ -905,15 +1035,15 @@
     }
 
     .state-readout-chip.human-side {
-      border-color: #7ac39a;
-      background: #edf9f2;
-      color: #1a5a34;
+      border-color: rgba(var(--side-human-rgb), 0.34);
+      background: rgba(var(--side-human-rgb), 0.08);
+      color: var(--side-human-strong);
     }
 
     .state-readout-chip.cpu-side {
-      border-color: #8fb5e8;
-      background: #eef5ff;
-      color: #21497a;
+      border-color: rgba(var(--side-cpu-rgb), 0.34);
+      background: rgba(var(--side-cpu-rgb), 0.08);
+      color: var(--side-cpu-strong);
     }
 
     .exchange-meter {
@@ -952,11 +1082,30 @@
     }
 
     .exchange-meter-side.human {
-      color: #a82d2d;
+      color: var(--side-human-color);
     }
 
     .exchange-meter-side.cpu {
-      color: #315e9d;
+      color: var(--side-cpu-color);
+    }
+
+    .exchange-meter-side {
+      padding: 2px 8px;
+      border-radius: 999px;
+      transition: background-color 180ms ease, box-shadow 180ms ease, transform 180ms ease, color 180ms ease;
+    }
+
+    .exchange-meter-side.active-turn {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(28, 36, 48, 0.16);
+    }
+
+    .exchange-meter-side.human.active-turn {
+      background: rgba(var(--side-human-rgb), 0.12);
+    }
+
+    .exchange-meter-side.cpu.active-turn {
+      background: rgba(var(--side-cpu-rgb), 0.12);
     }
 
     .exchange-meter-center {
@@ -968,6 +1117,7 @@
       width: 100%;
       margin: 0 auto;
       padding: 4px 12px 18px;
+      overflow: visible;
     }
 
     .exchange-meter-rail {
@@ -987,7 +1137,7 @@
       height: 4px;
       transform: translateY(-50%);
       border-radius: 999px;
-      background: linear-gradient(90deg, rgba(212, 73, 73, 0.42) 0%, rgba(209, 218, 232, 0.84) 50%, rgba(90, 141, 221, 0.42) 100%);
+      background: linear-gradient(90deg, rgba(var(--side-human-rgb), 0.42) 0%, rgba(209, 218, 232, 0.84) 50%, rgba(var(--side-cpu-rgb), 0.42) 100%);
       box-shadow: inset 0 0 0 1px rgba(42, 52, 68, 0.12);
     }
 
@@ -1006,6 +1156,13 @@
     .exchange-meter-stop.center {
       transform: scale(1.12);
       background: #f4f7fc;
+    }
+
+    .exchange-meter-stop.stabilize-focus {
+      border-color: #d7b11e;
+      background: #fff6cf;
+      box-shadow: 0 0 0 4px rgba(215, 177, 30, 0.12);
+      animation: exchangeMeterStabilizeStopPulse 1s ease-in-out infinite;
     }
 
     .exchange-meter-center-label {
@@ -1042,16 +1199,24 @@
       transition: left 180ms ease, background-color 180ms ease, border-color 180ms ease, color 180ms ease;
     }
 
+    .exchange-meter-node.pulse {
+      animation: exchangeMeterSettlePulse 1s ease both;
+    }
+
+    .exchange-meter-node.settled {
+      box-shadow: 0 10px 20px rgba(28, 36, 48, 0.18);
+    }
+
     .exchange-meter-node.human {
-      border-color: #d44949;
-      background: #fff1f1;
-      color: #8f1d1d;
+      border-color: var(--side-human-color);
+      background: rgba(var(--side-human-rgb), 0.08);
+      color: var(--side-human-strong);
     }
 
     .exchange-meter-node.cpu {
-      border-color: #5a8ddd;
-      background: #eef5ff;
-      color: #21497a;
+      border-color: var(--side-cpu-color);
+      background: rgba(var(--side-cpu-rgb), 0.08);
+      color: var(--side-cpu-strong);
     }
 
     .exchange-meter-node.neutral {
@@ -1065,6 +1230,131 @@
       background: #fff6cf;
       color: #7a5900;
       box-shadow: 0 8px 18px rgba(215, 177, 30, 0.24);
+    }
+
+    .exchange-meter-node.stabilize-pending {
+      animation: exchangeMeterStabilizeNodePulse 1s ease-in-out infinite;
+    }
+
+    .exchange-meter-cpu-hand {
+      position: absolute;
+      right: 12px;
+      bottom: 1px;
+      z-index: 1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 4px;
+      min-height: 12px;
+      max-width: calc(50% - 18px);
+      pointer-events: none;
+    }
+
+    .exchange-meter-cpu-slot {
+      width: 14px;
+      height: 12px;
+      border-radius: 3px;
+      border: 2px solid #4d2bc3;
+      background: rgba(255, 255, 255, 0.92);
+      box-shadow: inset 0 0 0 1px rgba(77, 43, 195, 0.08);
+      flex: 0 0 auto;
+    }
+
+    .exchange-meter-cpu-hand.empty .exchange-meter-cpu-slot {
+      opacity: 0;
+    }
+
+    .exchange-meter-cpu-empty-flash {
+      position: absolute;
+      right: -1px;
+      top: 50%;
+      transform: translateY(-50%) scale(0.72);
+      font-size: 0.9rem;
+      font-weight: 900;
+      line-height: 1;
+      color: #d33434;
+      opacity: 0;
+      text-shadow: 0 2px 6px rgba(211, 52, 52, 0.22);
+    }
+
+    .exchange-meter-cpu-hand.flash-empty .exchange-meter-cpu-empty-flash {
+      animation: exchangeMeterCpuEmptyFlash 700ms ease both;
+    }
+
+    @keyframes exchangeMeterSettlePulse {
+      0% {
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 1;
+      }
+      16% {
+        transform: translate(-50%, -50%) scale(1.24);
+        opacity: 1;
+      }
+      34% {
+        transform: translate(-50%, -50%) scale(0.96);
+        opacity: 0.76;
+      }
+      54% {
+        transform: translate(-50%, -50%) scale(1.16);
+        opacity: 1;
+      }
+      76% {
+        transform: translate(-50%, -50%) scale(1.02);
+        opacity: 0.92;
+      }
+      100% {
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 1;
+      }
+    }
+
+    @keyframes exchangeMeterStabilizeNodePulse {
+      0% {
+        transform: translate(-50%, -50%) scale(1);
+        box-shadow: 0 8px 18px rgba(215, 177, 30, 0.22);
+      }
+      50% {
+        transform: translate(-50%, -50%) scale(1.1);
+        box-shadow: 0 0 0 8px rgba(215, 177, 30, 0.14), 0 12px 24px rgba(215, 177, 30, 0.28);
+      }
+      100% {
+        transform: translate(-50%, -50%) scale(1);
+        box-shadow: 0 8px 18px rgba(215, 177, 30, 0.22);
+      }
+    }
+
+    @keyframes exchangeMeterStabilizeStopPulse {
+      0% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(215, 177, 30, 0.16);
+      }
+      50% {
+        transform: scale(1.2);
+        box-shadow: 0 0 0 5px rgba(215, 177, 30, 0.08);
+      }
+      100% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(215, 177, 30, 0);
+      }
+    }
+
+    @keyframes exchangeMeterCpuEmptyFlash {
+      0% {
+        opacity: 0;
+        transform: translateY(-50%) scale(0.68);
+      }
+      22% {
+        opacity: 1;
+        transform: translateY(-50%) scale(1.08);
+      }
+      58% {
+        opacity: 1;
+        transform: translateY(-50%) scale(0.96);
+      }
+      100% {
+        opacity: 0;
+        transform: translateY(-50%) scale(1.14);
+      }
     }
 
     .active-status-chip {
@@ -1143,13 +1433,13 @@
     }
 
     .goal-log-entry.human {
-      border-color: rgba(188, 62, 62, 0.35);
-      background: #fff5f5;
+      border-color: rgba(var(--side-human-rgb), 0.35);
+      background: rgba(var(--side-human-rgb), 0.06);
     }
 
     .goal-log-entry.cpu {
-      border-color: rgba(51, 92, 177, 0.32);
-      background: #f4f8ff;
+      border-color: rgba(var(--side-cpu-rgb), 0.32);
+      background: rgba(var(--side-cpu-rgb), 0.06);
     }
 
     .goal-log-head {
@@ -1173,6 +1463,10 @@
     }
 
     @media (max-width: 860px) {
+      .team-setup-grid {
+        grid-template-columns: 1fr;
+      }
+
       .active-status-row {
         grid-template-columns: 1fr;
       }
@@ -1584,7 +1878,7 @@
       overflow: hidden;
     }
 
-    .debug-config summary {
+    .debug-config > summary {
       cursor: pointer;
       padding: 9px 11px;
       font-size: 0.9rem;
@@ -1592,7 +1886,7 @@
       user-select: none;
     }
 
-    .debug-config[open] summary {
+    .debug-config[open] > summary {
       border-bottom: 1px solid var(--border);
       background: #f4f8ff;
     }
@@ -1637,6 +1931,33 @@
       margin: 0;
       color: var(--muted);
       font-size: 0.84rem;
+    }
+
+    .debug-subsection {
+      grid-column: 1 / -1;
+      border: 1px solid #d9e3f1;
+      border-radius: 10px;
+      background: #f7faff;
+      overflow: hidden;
+    }
+
+    .debug-subsection > summary {
+      cursor: pointer;
+      padding: 8px 10px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: #21497a;
+      user-select: none;
+      letter-spacing: 0.02em;
+    }
+
+    .debug-subsection[open] > summary {
+      border-bottom: 1px solid #d9e3f1;
+      background: #eef5ff;
+    }
+
+    .debug-subsection-body {
+      padding: 10px;
     }
 
     .log {
@@ -2110,6 +2431,25 @@
         font-size: 0.74rem;
       }
 
+      .exchange-meter-cpu-hand {
+        right: 4px;
+        bottom: 0;
+        gap: 3px;
+        min-height: 10px;
+        max-width: calc(50% - 10px);
+      }
+
+      .exchange-meter-cpu-slot {
+        width: 10px;
+        height: 8px;
+        border-width: 1.5px;
+        border-radius: 2px;
+      }
+
+      .exchange-meter-cpu-empty-flash {
+        font-size: 0.72rem;
+      }
+
       .exchange-meter-center-label {
         font-size: 0.62rem;
       }
@@ -2168,10 +2508,20 @@
         <div class="kv"><span class="k">Current Turn</span><span class="v" id="turnLabel"></span></div>
         <div class="kv"><span class="k">Deck Count</span><span class="v" id="deckCountLabel"></span></div>
       </div>
+      <div class="team-setup-grid">
+        <label class="team-setup-field">
+          <span>P1 (Human)</span>
+          <select id="debugHumanTeam"></select>
+        </label>
+        <label class="team-setup-field">
+          <span>P2 (CPU)</span>
+          <select id="debugCpuTeam"></select>
+        </label>
+      </div>
       <div class="controls">
         <button id="newGameBtn">New Game</button>
-        <button id="cpuStepBtn">CPU Step / Auto Continue</button>
-        <label class="toggle-label"><input id="showCpuCardsCheckbox" type="checkbox" />Show CPU cards</label>
+        <button id="cpuStepBtn">P2 Step / Auto Continue</button>
+        <label class="toggle-label"><input id="showCpuCardsCheckbox" type="checkbox" /><span id="showCpuCardsLabelText">Show P2 cards</span></label>
       </div>
       <details class="debug-config">
         <summary>Debug Setup</summary>
@@ -2212,82 +2562,89 @@
                 <option value="custom">Custom</option>
               </select>
             </label>
-            <label class="debug-field">
-              <span>CPU Attack Lookahead</span>
-              <input id="debugCpuAttackLookahead" type="number" min="0" max="10" step="1" value="1" />
-            </label>
-            <label class="debug-field">
-              <span>CPU Follow-Up Bias</span>
-              <input id="debugCpuAttackFollowUp" type="number" min="1" max="16" step="1" value="5" />
-            </label>
-            <label class="debug-field">
-              <span>CPU D-Zone Edge</span>
-              <input id="debugCpuDefensiveTarget" type="number" min="1" max="3" step="1" value="2" />
-            </label>
-            <label class="debug-field">
-              <span>CPU Goal-Zone Edge</span>
-              <input id="debugCpuGoalTarget" type="number" min="1" max="4" step="1" value="2" />
-            </label>
-            <label class="debug-field">
-              <span>CPU Neutral Faceoff %</span>
-              <input id="debugCpuFaceoffNeutral" type="number" min="20" max="100" step="1" value="68" />
-            </label>
-            <label class="debug-field">
-              <span>CPU End-Zone Faceoff %</span>
-              <input id="debugCpuFaceoffDanger" type="number" min="20" max="100" step="1" value="80" />
-            </label>
-            <label class="debug-field">
-              <span>CPU Icing Threshold</span>
-              <input id="debugCpuIcingThreshold" type="number" min="2" max="10" step="1" value="6" />
-            </label>
-            <label class="debug-field">
-              <span>CPU Dump Threshold</span>
-              <input id="debugCpuDumpThreshold" type="number" min="2" max="10" step="1" value="7" />
-            </label>
-            <label class="debug-field">
-              <span>CPU Chain Weight</span>
-              <input id="debugCpuChainWeight" type="number" min="0" max="16" step="1" value="5" />
-            </label>
-            <label class="debug-field">
-              <span>CPU Empty-Hand Shot</span>
-              <input id="debugCpuEmptyHandShot" type="number" min="0" max="20" step="1" value="6" />
-            </label>
-            <label class="debug-field">
-              <span>CPU Zone Advance</span>
-              <input id="debugCpuZoneAdvance" type="number" min="0" max="12" step="1" value="5" />
-            </label>
-            <label class="debug-field">
-              <span>CPU Shot-Zone Aggro</span>
-              <input id="debugCpuShotAggro" type="number" min="0" max="12" step="1" value="5" />
-            </label>
-            <label class="debug-field">
-              <span>CPU Card Conservation</span>
-              <input id="debugCpuConserve" type="number" min="0" max="12" step="1" value="5" />
-            </label>
-            <label class="debug-field">
-              <span>CPU Stabilize Denial</span>
-              <input id="debugCpuStabilizeDeny" type="number" min="0" max="16" step="1" value="5" />
-            </label>
-            <label class="debug-field">
-              <span>CPU Faceoff Aggro %</span>
-              <input id="debugCpuFaceoffAggro" type="number" min="0" max="100" step="1" value="58" />
-            </label>
-            <label class="debug-field">
-              <span>CPU Icing Reluctance</span>
-              <input id="debugCpuIcingReluctance" type="number" min="0" max="12" step="1" value="5" />
-            </label>
-            <label class="debug-field">
-              <span>CPU Momentum Aggro</span>
-              <input id="debugCpuMomentumAggro" type="number" min="0" max="12" step="1" value="4" />
-            </label>
-            <label class="debug-field">
-              <span>CPU Late-Game Risk</span>
-              <input id="debugCpuLateRisk" type="number" min="0" max="12" step="1" value="4" />
-            </label>
-            <label class="debug-field">
-              <span>CPU Panic Threshold</span>
-              <input id="debugCpuPanicThreshold" type="number" min="0" max="4" step="1" value="2" />
-            </label>
+            <details class="debug-subsection debug-cpu-tuning">
+              <summary>CPU Tuning Overrides</summary>
+              <div class="debug-subsection-body">
+                <div class="debug-grid">
+                  <label class="debug-field">
+                    <span>CPU Attack Lookahead</span>
+                    <input id="debugCpuAttackLookahead" type="number" min="0" max="10" step="1" value="1" />
+                  </label>
+                  <label class="debug-field">
+                    <span>CPU Follow-Up Bias</span>
+                    <input id="debugCpuAttackFollowUp" type="number" min="1" max="16" step="1" value="5" />
+                  </label>
+                  <label class="debug-field">
+                    <span>CPU D-Zone Edge</span>
+                    <input id="debugCpuDefensiveTarget" type="number" min="1" max="3" step="1" value="2" />
+                  </label>
+                  <label class="debug-field">
+                    <span>CPU Goal-Zone Edge</span>
+                    <input id="debugCpuGoalTarget" type="number" min="1" max="4" step="1" value="2" />
+                  </label>
+                  <label class="debug-field">
+                    <span>CPU Neutral Faceoff %</span>
+                    <input id="debugCpuFaceoffNeutral" type="number" min="20" max="100" step="1" value="68" />
+                  </label>
+                  <label class="debug-field">
+                    <span>CPU End-Zone Faceoff %</span>
+                    <input id="debugCpuFaceoffDanger" type="number" min="20" max="100" step="1" value="80" />
+                  </label>
+                  <label class="debug-field">
+                    <span>CPU Icing Threshold</span>
+                    <input id="debugCpuIcingThreshold" type="number" min="2" max="10" step="1" value="6" />
+                  </label>
+                  <label class="debug-field">
+                    <span>CPU Dump Threshold</span>
+                    <input id="debugCpuDumpThreshold" type="number" min="2" max="10" step="1" value="7" />
+                  </label>
+                  <label class="debug-field">
+                    <span>CPU Chain Weight</span>
+                    <input id="debugCpuChainWeight" type="number" min="0" max="16" step="1" value="5" />
+                  </label>
+                  <label class="debug-field">
+                    <span>CPU Empty-Hand Shot</span>
+                    <input id="debugCpuEmptyHandShot" type="number" min="0" max="20" step="1" value="6" />
+                  </label>
+                  <label class="debug-field">
+                    <span>CPU Zone Advance</span>
+                    <input id="debugCpuZoneAdvance" type="number" min="0" max="12" step="1" value="5" />
+                  </label>
+                  <label class="debug-field">
+                    <span>CPU Shot-Zone Aggro</span>
+                    <input id="debugCpuShotAggro" type="number" min="0" max="12" step="1" value="5" />
+                  </label>
+                  <label class="debug-field">
+                    <span>CPU Card Conservation</span>
+                    <input id="debugCpuConserve" type="number" min="0" max="12" step="1" value="5" />
+                  </label>
+                  <label class="debug-field">
+                    <span>CPU Stabilize Denial</span>
+                    <input id="debugCpuStabilizeDeny" type="number" min="0" max="16" step="1" value="5" />
+                  </label>
+                  <label class="debug-field">
+                    <span>CPU Faceoff Aggro %</span>
+                    <input id="debugCpuFaceoffAggro" type="number" min="0" max="100" step="1" value="58" />
+                  </label>
+                  <label class="debug-field">
+                    <span>CPU Icing Reluctance</span>
+                    <input id="debugCpuIcingReluctance" type="number" min="0" max="12" step="1" value="5" />
+                  </label>
+                  <label class="debug-field">
+                    <span>CPU Momentum Aggro</span>
+                    <input id="debugCpuMomentumAggro" type="number" min="0" max="12" step="1" value="4" />
+                  </label>
+                  <label class="debug-field">
+                    <span>CPU Late-Game Risk</span>
+                    <input id="debugCpuLateRisk" type="number" min="0" max="12" step="1" value="4" />
+                  </label>
+                  <label class="debug-field">
+                    <span>CPU Panic Threshold</span>
+                    <input id="debugCpuPanicThreshold" type="number" min="0" max="4" step="1" value="2" />
+                  </label>
+                </div>
+              </div>
+            </details>
             <label class="debug-field">
               <span>Decks Per Period</span>
               <input id="debugDecksPerPeriod" type="number" min="1" max="5" step="1" value="3" />
@@ -2320,20 +2677,20 @@
           </div>
           <p class="debug-preview" id="debugPreview"></p>
           <p class="debug-preview" id="debugRulesPreview"></p>
-          <p class="hint">Suit, value, hand size, wild-card settings, feature flags, and Stabilize sanding apply on New Game. CPU speed, difficulty, and CPU AI knobs apply immediately.</p>
+          <p class="hint">Suit, value, hand size, wild-card settings, feature flags, and Stabilize sanding apply on New Game. AI speed, difficulty, and AI tuning knobs apply immediately.</p>
         </div>
       </details>
       <div class="legend" id="legendList"></div>
-      <p class="hint">Use the checkbox to show or hide the CPU hand. CPU still plays automatically on its turn.</p>
+      <p class="hint" id="cpuHandVisibilityHint">Use the checkbox to show or hide the P2 hand. P2 still plays automatically on its turn.</p>
     </section>
 
     <section class="panel hands">
       <div class="hands-rink-row">
         <div class="hands-rink-stack">
           <div id="momentumTracker" class="momentum-track">
-            <div id="humanMomentumDots" class="momentum-side human" aria-label="Human momentum"></div>
+            <div id="humanMomentumDots" class="momentum-side human" aria-label="P1 momentum"></div>
             <div class="rink-clock-chip"><span class="k">Clock</span><span class="v" id="gameClockLabel"></span></div>
-            <div id="cpuMomentumDots" class="momentum-side cpu" aria-label="CPU momentum"></div>
+            <div id="cpuMomentumDots" class="momentum-side cpu" aria-label="P2 momentum"></div>
           </div>
           <div class="zone-track" id="zoneTrack"></div>
           <div class="play-by-play-row">
@@ -2345,7 +2702,7 @@
       <div id="exchangeMeter" class="exchange-meter" hidden aria-live="polite"></div>
       <div class="panel hand-panel" id="humanPanel">
         <div class="hand-panel-header">
-          <h3>Human Hand</h3>
+          <h3 id="humanHandTitle">P1 Hand</h3>
           <div id="humanMomentumActions" class="hand-panel-actions" hidden>
             <button id="cycleMomentumBtn" class="hand-panel-btn" type="button" disabled><span class="btn-label-full">Cycle (Cost: 1)</span><span class="btn-label-short">Cycle 1</span></button>
             <button id="burnMomentumBtn" class="hand-panel-btn" type="button" disabled><span class="btn-label-full">Burn (Cost: 2)</span><span class="btn-label-short">Burn 2</span></button>
@@ -2388,7 +2745,7 @@
         <div id="eventBanner" class="event-banner contain"></div>
       </div>
       <div class="panel hand-panel" id="cpuPanel">
-        <h3>CPU Hand</h3>
+        <h3 id="cpuHandTitle">P2 Hand</h3>
         <div id="cpuNotice" class="hand-notice danger" hidden>CANNOT PLAY</div>
         <div id="cpuHand" class="cards"></div>
       </div>
@@ -2483,6 +2840,8 @@
       cpuMomentumSpendAggression: 4,
       cpuLateGameRiskAggression: 4,
       cpuDefensivePanicThreshold: 2,
+      humanTeam: "human",
+      cpuTeam: "cpu",
       stabilizeSanding: "default",
       singleRiverCrossMode: false,
       decksPerPeriod: 3
@@ -2643,6 +3002,34 @@
       hard: "allstar",
       pro: "allstar"
     };
+    const PLAYER_ROLE_LABELS = {
+      human: "Human",
+      cpu: "CPU"
+    };
+    const TEAM_RANDOM_SELECTION = "random";
+    const TEAM_CATALOG = [
+      { key: "edmonton", city: "Edmonton", shortName: "EDM", conference: "West", color: "#003B73" },
+      { key: "calgary", city: "Calgary", shortName: "CGY", conference: "West", color: "#C8102E" },
+      { key: "losangeles", city: "Los Angeles", shortName: "LAK", conference: "West", color: "#111111" },
+      { key: "vancouver", city: "Vancouver", shortName: "VAN", conference: "West", color: "#006A4E" },
+      { key: "chicago", city: "Chicago", shortName: "CHI", conference: "West", color: "#CF0A2C" },
+      { key: "vegas", city: "Vegas", shortName: "VGK", conference: "West", color: "#85714D" },
+      { key: "colorado", city: "Colorado", shortName: "COL", conference: "West", color: "#6F263D" },
+      { key: "dallas", city: "Dallas", shortName: "DAL", conference: "West", color: "#006847" },
+      { key: "newyork", city: "New York", shortName: "NYR", conference: "East", color: "#0038A8" },
+      { key: "boston", city: "Boston", shortName: "BOS", conference: "East", color: "#8A6F00" },
+      { key: "carolina", city: "Carolina", shortName: "CAR", conference: "East", color: "#CC0000" },
+      { key: "toronto", city: "Toronto", shortName: "TOR", conference: "East", color: "#00205B" },
+      { key: "montreal", city: "Montreal", shortName: "MTL", conference: "East", color: "#AF1E2D" },
+      { key: "florida", city: "Florida", shortName: "FLA", conference: "East", color: "#041E42" },
+      { key: "pittsburgh", city: "Pittsburgh", shortName: "PIT", conference: "East", color: "#6B4F00" },
+      { key: "detroit", city: "Detroit", shortName: "DET", conference: "East", color: "#CE1126" }
+    ];
+    const TEAM_BY_KEY = Object.fromEntries(TEAM_CATALOG.map((team) => [team.key, team]));
+    const DEFAULT_PLAYER_THEME = {
+      human: { color: "#d44949" },
+      cpu: { color: "#5a8ddd" }
+    };
     const CPU_SPEED_BASELINE_PERCENT = 100;
     const REGULATION_PERIOD_COUNT = 3;
     const PERIOD_MINUTES = 20;
@@ -2680,6 +3067,10 @@
       cpuBusy: false,
       shotPending: null,
       config: { ...DEFAULT_CONFIG },
+      playerTeams: {
+        human: null,
+        cpu: null
+      },
       showCpuCards: false,
       faceoffPending: false,
       faceoffMode: "standard",
@@ -2694,6 +3085,11 @@
       playByPlayDetails: null,
       playByPlayHelpOpen: false,
       pendingEncounterContext: null,
+      exchangeMeterPulseKey: "",
+      exchangeMeterPulseUntil: 0,
+      exchangeMeterSnapshot: null,
+      exchangeMeterLastCpuHandCount: 0,
+      exchangeMeterCpuHandFlashUntil: 0,
       lastShot: null,
       recentPlayedCards: [],
       cpuNotice: null,
@@ -2729,6 +3125,7 @@
     let phaseFlashTimeoutId = null;
     let cpuNoticeTimeoutId = null;
     let deckEventTimeoutId = null;
+    let exchangeMeterPulseTimeoutId = null;
 
     // ---------------------------
     // Utility and setup functions
@@ -2891,8 +3288,8 @@
       state.eventType = type;
     }
 
-    function createPlayByPlayDetails(what, why, rule) {
-      return { what, why, rule };
+    function createPlayByPlayDetails(what, why, rule, ruleExtra = "") {
+      return { what, why, rule: joinExplanationParts(rule, ruleExtra) };
     }
 
     function joinExplanationParts(...parts) {
@@ -2900,6 +3297,22 @@
         .map((part) => typeof part === "string" ? part.trim() : "")
         .filter(Boolean)
         .join(" ");
+    }
+
+    function formatShotRuleRange(start, end, openEnded = false) {
+      if (openEnded) {
+        return `${start}+`;
+      }
+      return start === end ? String(start) : `${start}-${end}`;
+    }
+
+    function getShotPowerTableSummary() {
+      const saveTierSpan = Math.max(1, Math.ceil((state.config.maxValue || DEFAULT_CONFIG.maxValue) / 3));
+      const oneSaveMax = saveTierSpan;
+      const twoSaveMin = oneSaveMax + 1;
+      const twoSaveMax = saveTierSpan * 2;
+      const threeSaveMin = twoSaveMax + 1;
+      return `Close-range shots get +1 shot power before the save table is checked. Save table: ${formatShotRuleRange(1, oneSaveMax)} needs 1 save card, ${formatShotRuleRange(twoSaveMin, twoSaveMax)} needs 2 save cards, ${formatShotRuleRange(threeSaveMin, threeSaveMin, true)} needs 3 save cards.`;
     }
 
     function setPendingEncounterContext(whyText = "") {
@@ -3009,7 +3422,8 @@
           text,
           "A shot has started and the defender now has to answer it with a save sequence.",
           "The attacker reached a shot result, so the game converted the exchange into a goalie save test.",
-          "Shots create a save-chain requirement based on shot quality. If the defender cannot complete that save, the play becomes a goal or rebound."
+          "Shots create a save-chain requirement based on shot quality. Exact coverage freezes the puck, 1 extra legal save card becomes a Controlled Save, 1 short creates a rebound, and 2 or more short is a goal.",
+          getShotPowerTableSummary()
         );
       }
 
@@ -3017,8 +3431,17 @@
         return createPlayByPlayDetails(
           text,
           "The shot was not fully dead, so a rebound sequence starts immediately.",
-          "The defense came up just short of a clean stop, or the rebound save was too weak to freeze the puck.",
+          "The defense finished exactly 1 card short of a normal save chain, or the rebound save was too weak to freeze the puck.",
           "A rebound creates a second-chance shot flow. The attacker reveals a rebound card, and the defense must answer that rebound shot if it stays live."
+        );
+      }
+
+      if (lowerText.includes("makes a controlled save")) {
+        return createPlayByPlayDetails(
+          text,
+          "The defender stopped the shot and immediately kept possession.",
+          "The save chain beat the exact requirement by at least 1 extra legal save card, so the puck stayed with the defending team.",
+          getNormalSaveRuleSummary()
         );
       }
 
@@ -3026,8 +3449,13 @@
         return createPlayByPlayDetails(
           text,
           "The defender froze the puck and reset play to a faceoff.",
-          "The save sequence met the current requirement, so the shot ended without a goal.",
-          "A completed save chain, or a successful rebound save, freezes the puck and produces a faceoff in the shot zone."
+          lowerText.includes("rebound save")
+            ? "The goalie answered the rebound shot cleanly, so play stopped dead."
+            : "The save sequence hit the exact requirement without an extra control card, so the shot ended with a frozen puck.",
+          lowerText.includes("rebound save")
+            ? "A successful rebound save always freezes the puck and produces a faceoff in the shot zone."
+            : getNormalSaveRuleSummary(),
+          lowerText.includes("rebound save") ? getShotPowerTableSummary() : ""
         );
       }
 
@@ -3040,12 +3468,13 @@
         );
       }
 
-      if (lowerText.includes("scores the winner") || (lowerText.includes("wins!") && state.gameOver)) {
+      if (lowerText.includes("scores the winner")) {
         return createPlayByPlayDetails(
           text,
           "The scoring play ended the game.",
           "That goal or final resolution put the opponent out of reach under the current game state.",
-          "The game ends as soon as the winning condition is met, including an overtime winner or the final score at the end of regulation."
+          "The game ends as soon as the winning condition is met, including an overtime winner or the final score at the end of regulation.",
+          getShotPowerTableSummary()
         );
       }
 
@@ -3053,8 +3482,9 @@
         return createPlayByPlayDetails(
           text,
           "The shot got through and the game is resetting to center ice.",
-          "The defender could not complete the required save outcome, so the attack became a goal.",
-          "If the save chain fails, the shot becomes a goal. After a normal goal, play restarts with a center-ice faceoff."
+          "The defender finished too far short of the save requirement, or failed the rebound save, so the attack became a goal.",
+          "On a normal shot, finishing 2 or more save cards short becomes a goal. A failed rebound save also becomes a goal. After a normal goal, play restarts with a center-ice faceoff.",
+          getShotPowerTableSummary()
         );
       }
 
@@ -3327,21 +3757,24 @@
       state.pendingPeriodBreak = { endedLabel };
     }
 
-    function handleGoalAfterScore(attackerPlayer) {
+    function handleGoalAfterScore(attackerPlayer, playByPlayDetails = null) {
       if (isSuddenDeathOvertime()) {
         addLog(`${getPeriodLabel()} ends on the winning goal.`);
-        setPlayByPlay(`${lowerPlayerName(attackerPlayer)} scores the winner!`, "goal");
+        setPlayByPlay(`${lowerPlayerName(attackerPlayer)} scores the winner!`, "goal", playByPlayDetails);
         endGame(attackerPlayer, `${lowerPlayerName(attackerPlayer)} wins in ${getPeriodLabel()} ${state.humanScore}-${state.cpuScore}.`);
         return;
       }
 
       startFaceoff(CENTER_ICE, "Goal scored. Center-ice faceoff.");
-      setPlayByPlay(`${lowerPlayerName(attackerPlayer)} scores! Center-ice faceoff.`, "goal");
+      setPlayByPlay(`${lowerPlayerName(attackerPlayer)} scores! Center-ice faceoff.`, "goal", playByPlayDetails);
     }
 
     function buildDumpConfigLines() {
       const cpuProfile = getCpuDifficultyProfile();
       return [
+        `P1 Team Selection: ${getTeamSelectionPreviewLabel(state.config.humanTeam, "human")}`,
+        `P2 Team Selection: ${getTeamSelectionPreviewLabel(state.config.cpuTeam, "cpu")}`,
+        `Current Matchup: ${getMatchupText({ debug: true })}`,
         `Suit Count: ${state.config.suitCount}`,
         `Max Card Value: ${state.config.maxValue}`,
         `Hand Size: ${state.config.handSize}`,
@@ -3353,13 +3786,13 @@
         `Decks Per Period: ${state.config.decksPerPeriod}`,
         `Cross River Once: ${state.config.singleRiverCrossMode}`,
         `Momentum System: ${FEATURES.momentumSystem}`,
-        `Show CPU Cards: ${state.showCpuCards}`
+        `Show ${getPlayerDebugName("cpu")} Cards: ${state.showCpuCards}`
       ];
     }
 
     function buildDumpStateLines() {
       return [
-        `Score: (${state.humanHand.length}) Human ${state.humanScore} - ${state.cpuScore} CPU (${state.cpuHand.length})`,
+        `Score: ${getScoreText({ debug: true, includeHandCounts: true })}`,
         `Period: ${getPeriodLabel()}`,
         `Clock: ${formatGameClock()}`,
         `Game Over: ${state.gameOver}`,
@@ -3430,7 +3863,7 @@
       const stabilizeNeedText = getStabilizeSandingLabel() === "legal" ? "1 legal card" : `1 ${getStabilizeSandingLabel()} card`;
 
       if (state.gameOver) {
-        items.push({ label: "Final", value: `Human ${state.humanScore} - ${state.cpuScore} CPU`, tone: "goal" });
+        items.push({ label: "Final", value: getScoreText(), tone: "goal" });
         items.push({ label: "Winner", value: lowerPlayerName(state.gameWinner), tone: "goal" });
         items.push({ label: "Ended", value: `${getPeriodLabel()} ${formatGameClock()}`, tone: "period" });
         return items;
@@ -3529,9 +3962,72 @@
         slot: slotOffset + 5,
         leader: delta === 0 ? "neutral" : delta > 0 ? "human" : "cpu",
         stabilizeThreat,
-        leftLabel: `Human ${state.attacker === "human" ? "attack" : "defense"}`,
-        rightLabel: `CPU ${state.attacker === "cpu" ? "attack" : "defense"}`
+        leftLabel: `${getPlayerDisplayName("human")} ${state.attacker === "human" ? "attack" : "defense"}`,
+        rightLabel: `${getPlayerDisplayName("cpu")} ${state.attacker === "cpu" ? "attack" : "defense"}`
       };
+    }
+
+    function getExchangeMeterPulseKey(exchange) {
+      if (!exchange) {
+        return "";
+      }
+
+      return [
+        state.attacker || "",
+        state.defender || "",
+        exchange.humanCount,
+        exchange.cpuCount,
+        exchange.slot,
+        exchange.leader,
+        exchange.stabilizeThreat ? 1 : 0
+      ].join("|");
+    }
+
+    function clearExchangeMeterPulseTimer() {
+      if (exchangeMeterPulseTimeoutId) {
+        clearTimeout(exchangeMeterPulseTimeoutId);
+        exchangeMeterPulseTimeoutId = null;
+      }
+    }
+
+    function scheduleExchangeMeterRefresh() {
+      clearExchangeMeterPulseTimer();
+      const nextExpiry = Math.max(state.exchangeMeterPulseUntil || 0, state.exchangeMeterCpuHandFlashUntil || 0);
+      if (nextExpiry <= Date.now()) {
+        return;
+      }
+
+      exchangeMeterPulseTimeoutId = setTimeout(() => {
+        exchangeMeterPulseTimeoutId = null;
+        render();
+      }, Math.max(0, nextExpiry - Date.now()) + 34);
+    }
+
+    function noteExchangeMeterSnapshot(exchange) {
+      if (!exchange) {
+        return;
+      }
+
+      const nextKey = getExchangeMeterPulseKey(exchange);
+      if (nextKey !== state.exchangeMeterPulseKey) {
+        state.exchangeMeterPulseKey = nextKey;
+        if (exchange.humanCount > 0 || exchange.cpuCount > 0) {
+          state.exchangeMeterPulseUntil = Date.now() + 1000;
+        }
+      }
+
+      state.exchangeMeterSnapshot = { ...exchange };
+      scheduleExchangeMeterRefresh();
+    }
+
+    function trackExchangeMeterCpuHandFlash() {
+      const cpuHandCount = state.cpuHand.length;
+      if (state.exchangeMeterLastCpuHandCount > 0 && cpuHandCount === 0) {
+        state.exchangeMeterCpuHandFlashUntil = Date.now() + 700;
+        scheduleExchangeMeterRefresh();
+      }
+      state.exchangeMeterLastCpuHandCount = cpuHandCount;
+      return cpuHandCount;
     }
 
     function renderExchangeMeter() {
@@ -3540,26 +4036,48 @@
         return;
       }
 
-      const exchange = getExchangeMeterState();
+      const now = Date.now();
+      const cpuHandCount = trackExchangeMeterCpuHandFlash();
+      const liveExchange = getExchangeMeterState();
+      if (liveExchange) {
+        noteExchangeMeterSnapshot(liveExchange);
+      }
+
+      const heldExchange = !liveExchange && state.exchangeMeterSnapshot && state.exchangeMeterPulseUntil > now
+        ? { ...state.exchangeMeterSnapshot }
+        : null;
+      const exchange = liveExchange || heldExchange;
       if (!exchange) {
+        if (state.exchangeMeterPulseUntil <= now) {
+          state.exchangeMeterPulseKey = "";
+          state.exchangeMeterSnapshot = null;
+        }
         container.hidden = true;
         container.innerHTML = "";
         return;
       }
 
-      const stops = Array.from({ length: 11 }, (_, index) => `<span class="exchange-meter-stop${index === 5 ? " center" : ""}"></span>`).join("");
+      const stabilizePending = Boolean(state.stabilizePending);
+      const pulseActive = state.exchangeMeterPulseUntil > now && (exchange.humanCount > 0 || exchange.cpuCount > 0);
+      const cpuHandFlashActive = state.exchangeMeterCpuHandFlashUntil > now;
+      const stops = Array.from({ length: 11 }, (_, index) => `<span class="exchange-meter-stop${index === 5 ? " center" : ""}${stabilizePending && index === exchange.slot ? " stabilize-focus" : ""}"></span>`).join("");
+      const cpuHandSlots = Array.from({ length: cpuHandCount }, () => '<span class="exchange-meter-cpu-slot"></span>').join("");
       container.hidden = false;
-      container.setAttribute("aria-label", `Exchange meter: Human ${exchange.humanCount}, CPU ${exchange.cpuCount}`);
+      container.setAttribute("aria-label", `Exchange meter: ${getPlayerDisplayName("human")} ${exchange.humanCount}, ${getPlayerDisplayName("cpu")} ${exchange.cpuCount}, ${getPlayerDisplayName("cpu")} hand ${cpuHandCount}`);
       container.innerHTML = `
         <div class="exchange-meter-head">
-          <span class="exchange-meter-side left human">${exchange.leftLabel}</span>
+          <span class="exchange-meter-side left human${state.currentTurn === "human" ? " active-turn" : ""}">${exchange.leftLabel}</span>
           <span class="exchange-meter-center">0</span>
-          <span class="exchange-meter-side right cpu">${exchange.rightLabel}</span>
+          <span class="exchange-meter-side right cpu${state.currentTurn === "cpu" ? " active-turn" : ""}">${exchange.rightLabel}</span>
         </div>
-        <div class="exchange-meter-track" title="Human ${exchange.humanCount} | CPU ${exchange.cpuCount}">
+        <div class="exchange-meter-track" title="${getPlayerDisplayName("human")} ${exchange.humanCount} | ${getPlayerDisplayName("cpu")} ${exchange.cpuCount} | ${getPlayerDisplayName("cpu")} hand ${cpuHandCount}">
           <div class="exchange-meter-rail">
             ${stops}
-            <span class="exchange-meter-node ${exchange.leader}${exchange.stabilizeThreat ? " stabilize" : ""}" style="--exchange-slot:${exchange.slot};">${exchange.displayMagnitude}</span>
+            <span class="exchange-meter-node ${exchange.leader}${exchange.stabilizeThreat ? " stabilize" : ""}${stabilizePending ? " stabilize-pending" : ""}${pulseActive ? " pulse" : ""}${heldExchange ? " settled" : ""}" style="--exchange-slot:${exchange.slot};">${exchange.displayMagnitude}</span>
+          </div>
+          <div class="exchange-meter-cpu-hand${cpuHandCount === 0 ? " empty" : ""}${cpuHandFlashActive ? " flash-empty" : ""}" aria-hidden="true">
+            ${cpuHandSlots}
+            <span class="exchange-meter-cpu-empty-flash">X</span>
           </div>
           <span class="exchange-meter-center-label">0</span>
         </div>
@@ -3571,7 +4089,7 @@
       const cpuStats = state.stats.cpu;
       const latestGoal = state.goalLog.length > 0 ? state.goalLog[state.goalLog.length - 1] : null;
       const summaryCards = [
-        { label: "Final", value: `Human ${state.humanScore} - ${state.cpuScore} CPU`, tone: "goal" },
+        { label: "Final", value: getScoreText(), tone: "goal" },
         { label: "Winner", value: lowerPlayerName(state.gameWinner), tone: "goal" },
         { label: "Shots", value: `${humanStats.shotsOnGoal}-${cpuStats.shotsOnGoal}`, tone: "shot" },
         { label: "Saves", value: `${humanStats.savesMade}-${cpuStats.savesMade}`, tone: "contain" },
@@ -3590,7 +4108,7 @@
           </div>
         `),
         '</div>',
-        `<div class="match-snapshot-note">Avg shot value: Human ${getAverageShotValue(humanStats)} | CPU ${getAverageShotValue(cpuStats)} | Rebounds ${humanStats.reboundsCreated}-${cpuStats.reboundsCreated}</div>`,
+        `<div class="match-snapshot-note">Avg shot value: ${escapeHtml(getPlayerDisplayName("human"))} ${getAverageShotValue(humanStats)} | ${escapeHtml(getPlayerDisplayName("cpu"))} ${getAverageShotValue(cpuStats)} | Rebounds ${humanStats.reboundsCreated}-${cpuStats.reboundsCreated}</div>`,
         `<div class="match-snapshot-note">${latestGoal ? `Last goal: ${lowerPlayerName(latestGoal.player)} ${latestGoal.periodLabel} ${latestGoal.clockText}.` : 'No goals recorded.'}</div>`,
         '</div>'
       ].join('');
@@ -3598,16 +4116,16 @@
 
     function buildMatchStatisticsLines() {
       const overviewRows = getStatsOverviewRows();
-      const zoneLines = ZONES.map((zoneName, zoneIndex) => `${zoneName}: Human plays ${state.stats.human.zonePlays[zoneIndex]}, CPU plays ${state.stats.cpu.zonePlays[zoneIndex]}, Human shots ${state.stats.human.shotOrigins[zoneIndex]}, CPU shots ${state.stats.cpu.shotOrigins[zoneIndex]}, resolved turns ${state.stats.zoneTime[zoneIndex]}`);
+      const zoneLines = getZoneNames().map((zoneName, zoneIndex) => `${zoneName}: ${getPlayerDebugName("human")} plays ${state.stats.human.zonePlays[zoneIndex]}, ${getPlayerDebugName("cpu")} plays ${state.stats.cpu.zonePlays[zoneIndex]}, ${getPlayerDebugName("human")} shots ${state.stats.human.shotOrigins[zoneIndex]}, ${getPlayerDebugName("cpu")} shots ${state.stats.cpu.shotOrigins[zoneIndex]}, resolved turns ${state.stats.zoneTime[zoneIndex]}`);
       const scoringLines = state.stats.scoringSummary.length > 0 ? state.stats.scoringSummary : ["No goals recorded."];
 
       return [
         "Match Statistics",
-        ...overviewRows.map((row) => `${row.label}: Human ${row.human} | CPU ${row.cpu}`),
+        ...overviewRows.map((row) => `${row.label}: ${getPlayerDebugName("human")} ${row.human} | ${getPlayerDebugName("cpu")} ${row.cpu}`),
         "",
         "Shot Value Lists",
-        `Human: ${state.stats.human.shotValues.length > 0 ? state.stats.human.shotValues.join(", ") : "none"}`,
-        `CPU: ${state.stats.cpu.shotValues.length > 0 ? state.stats.cpu.shotValues.join(", ") : "none"}`,
+        `${getPlayerDebugName("human")}: ${state.stats.human.shotValues.length > 0 ? state.stats.human.shotValues.join(", ") : "none"}`,
+        `${getPlayerDebugName("cpu")}: ${state.stats.cpu.shotValues.length > 0 ? state.stats.cpu.shotValues.join(", ") : "none"}`,
         "",
         "Zone Activity",
         ...zoneLines,
@@ -3618,7 +4136,7 @@
     }
 
     function buildDebugDumpText() {
-      const logLines = state.logMessages.length > 0 ? state.logMessages.map(getLogEntryText) : ["(empty log)"];
+      const logLines = state.logMessages.length > 0 ? state.logMessages.map((entry) => formatDebugPlayerText(getLogEntryText(entry))) : ["(empty log)"];
 
       return [
         "Hockey Card Prototype Debug Dump",
@@ -3628,12 +4146,12 @@
         ...buildDumpConfigLines(),
         "",
         "Game State",
-        ...buildDumpStateLines(),
+        ...buildDumpStateLines().map(formatDebugPlayerText),
         "",
         "Last Shot",
-        ...buildLastShotDumpLines(),
+        ...buildLastShotDumpLines().map(formatDebugPlayerText),
         "",
-        ...buildMatchStatisticsLines(),
+        ...buildMatchStatisticsLines().map(formatDebugPlayerText),
         "",
         "Action Log",
         ...logLines
@@ -3666,9 +4184,9 @@
         ...buildDumpConfigLines(),
         "",
         "Game State",
-        ...buildDumpStateLines(),
+        ...buildDumpStateLines().map(formatDebugPlayerText),
         "",
-        ...buildMatchStatisticsLines()
+        ...buildMatchStatisticsLines().map(formatDebugPlayerText)
       ].join("\n");
     }
 
@@ -4378,13 +4896,7 @@
     }
 
     function lowerPlayerName(player) {
-      if (player === "human") {
-        return "Human";
-      }
-      if (player === "cpu") {
-        return "CPU";
-      }
-      return "None";
+      return getPlayerDisplayName(player);
     }
 
     function clearCpuNotice() {
@@ -4429,6 +4941,305 @@
 
     function clamp(value, min, max) {
       return Math.min(max, Math.max(min, value));
+    }
+
+    function normalizeHexColor(hex) {
+      const normalized = String(hex || "").trim();
+      if (/^#[0-9a-fA-F]{6}$/.test(normalized)) {
+        return normalized.toUpperCase();
+      }
+      return "#000000";
+    }
+
+    function hexToRgbComponents(hex) {
+      const safeHex = normalizeHexColor(hex).slice(1);
+      return [
+        Number.parseInt(safeHex.slice(0, 2), 16),
+        Number.parseInt(safeHex.slice(2, 4), 16),
+        Number.parseInt(safeHex.slice(4, 6), 16)
+      ];
+    }
+
+    function mixHexColors(baseHex, targetHex, targetWeight = 0.5) {
+      const safeWeight = clamp(Number(targetWeight) || 0, 0, 1);
+      const base = hexToRgbComponents(baseHex);
+      const target = hexToRgbComponents(targetHex);
+      const mixed = base.map((value, index) => Math.round((value * (1 - safeWeight)) + (target[index] * safeWeight)));
+      return `#${mixed.map((value) => value.toString(16).padStart(2, "0")).join("")}`.toUpperCase();
+    }
+
+    function isTeamSelectionKey(selection) {
+      return Boolean(TEAM_BY_KEY[selection]);
+    }
+
+    function sanitizePlayerTeamSelection(rawValue, player) {
+      const fallback = player === "cpu" ? DEFAULT_CONFIG.cpuTeam : DEFAULT_CONFIG.humanTeam;
+      const normalized = String(rawValue ?? fallback).trim().toLowerCase();
+      if (normalized === TEAM_RANDOM_SELECTION) {
+        return TEAM_RANDOM_SELECTION;
+      }
+      if (isTeamSelectionKey(normalized)) {
+        return normalized;
+      }
+      return normalized === fallback ? fallback : fallback;
+    }
+
+    function normalizeDistinctTeamSelections(humanTeam, cpuTeam) {
+      const nextHumanTeam = sanitizePlayerTeamSelection(humanTeam, "human");
+      let nextCpuTeam = sanitizePlayerTeamSelection(cpuTeam, "cpu");
+      if (isTeamSelectionKey(nextHumanTeam) && nextHumanTeam === nextCpuTeam) {
+        nextCpuTeam = DEFAULT_CONFIG.cpuTeam;
+      }
+      return {
+        humanTeam: nextHumanTeam,
+        cpuTeam: nextCpuTeam
+      };
+    }
+
+    function getPlayerRoleLabel(player) {
+      return PLAYER_ROLE_LABELS[player] || "None";
+    }
+
+    function getAssignedTeam(player) {
+      return state.playerTeams?.[player] || null;
+    }
+
+    function getPlayerDisplayName(player) {
+      const assignedTeam = getAssignedTeam(player);
+      return assignedTeam?.city || getPlayerRoleLabel(player);
+    }
+
+    function getPlayerDebugName(player) {
+      const displayName = getPlayerDisplayName(player);
+      const roleLabel = getPlayerRoleLabel(player);
+      return displayName === roleLabel ? roleLabel : `${displayName} (${roleLabel})`;
+    }
+
+    function getPlayerScoreBugName(player) {
+      const assignedTeam = getAssignedTeam(player);
+      if (assignedTeam?.shortName) {
+        return assignedTeam.shortName;
+      }
+      return getPlayerRoleLabel(player).toUpperCase();
+    }
+
+    function getTeamSelectionPreviewLabel(selection, player) {
+      if (selection === TEAM_RANDOM_SELECTION) {
+        return "Random";
+      }
+      if (isTeamSelectionKey(selection)) {
+        return TEAM_BY_KEY[selection].city;
+      }
+      return getPlayerRoleLabel(player);
+    }
+
+    function getMatchupText(options = {}) {
+      const nameGetter = options.debug ? getPlayerDebugName : getPlayerDisplayName;
+      return `${nameGetter("human")} vs ${nameGetter("cpu")}`;
+    }
+
+    function escapeHtml(text) {
+      return String(text ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+    }
+
+    function getScoreText(options = {}) {
+      const nameGetter = options.debug ? getPlayerDebugName : getPlayerDisplayName;
+      const humanName = options.uppercase ? nameGetter("human").toUpperCase() : nameGetter("human");
+      const cpuName = options.uppercase ? nameGetter("cpu").toUpperCase() : nameGetter("cpu");
+      const humanScore = Number.isFinite(options.humanScore) ? options.humanScore : state.humanScore;
+      const cpuScore = Number.isFinite(options.cpuScore) ? options.cpuScore : state.cpuScore;
+      const scoreText = `${humanName} ${humanScore} - ${cpuScore} ${cpuName}`;
+      if (options.includeHandCounts) {
+        return `(${state.humanHand.length}) ${scoreText} (${state.cpuHand.length})`;
+      }
+      return scoreText;
+    }
+
+    function formatDisplayPlayerText(text) {
+      return String(text ?? "")
+        .replaceAll(getPlayerRoleLabel("human"), getPlayerDisplayName("human"))
+        .replaceAll(getPlayerRoleLabel("cpu"), getPlayerDisplayName("cpu"));
+    }
+
+    function formatDebugPlayerText(text) {
+      let formatted = String(text ?? "");
+      const replacements = [
+        {
+          token: "[[P1DBG]]",
+          values: [...new Set([getPlayerDebugName("human"), getPlayerDisplayName("human"), getPlayerRoleLabel("human")])].filter(Boolean),
+          replacement: getPlayerDebugName("human")
+        },
+        {
+          token: "[[P2DBG]]",
+          values: [...new Set([getPlayerDebugName("cpu"), getPlayerDisplayName("cpu"), getPlayerRoleLabel("cpu")])].filter(Boolean),
+          replacement: getPlayerDebugName("cpu")
+        }
+      ];
+
+      replacements.forEach((entry) => {
+        entry.values.sort((left, right) => right.length - left.length).forEach((value) => {
+          formatted = formatted.replaceAll(value, entry.token);
+        });
+      });
+
+      replacements.forEach((entry) => {
+        formatted = formatted.replaceAll(entry.token, entry.replacement);
+      });
+
+      return formatted;
+    }
+
+    function getZoneNames() {
+      return [
+        `${getPlayerDisplayName("human")} Goal Zone`,
+        `${getPlayerDisplayName("human")} Defensive Zone`,
+        "Neutral Zone A",
+        "Neutral Zone B",
+        `${getPlayerDisplayName("cpu")} Defensive Zone`,
+        `${getPlayerDisplayName("cpu")} Goal Zone`
+      ];
+    }
+
+    function getPlayerThemeColor(player) {
+      return getAssignedTeam(player)?.color || DEFAULT_PLAYER_THEME[player]?.color || "#000000";
+    }
+
+    function setPlayerSideTheme(player, colorHex) {
+      const safeColor = normalizeHexColor(colorHex);
+      const rgb = hexToRgbComponents(safeColor).join(", ");
+      const prefix = player === "human" ? "human" : "cpu";
+      document.documentElement.style.setProperty(`--side-${prefix}-color`, safeColor);
+      document.documentElement.style.setProperty(`--side-${prefix}-rgb`, rgb);
+      document.documentElement.style.setProperty(`--side-${prefix}-soft`, mixHexColors(safeColor, "#FFFFFF", 0.9));
+      document.documentElement.style.setProperty(`--side-${prefix}-strong`, mixHexColors(safeColor, "#1C2430", 0.26));
+    }
+
+    function applyPlayerTeamTheme() {
+      setPlayerSideTheme("human", getPlayerThemeColor("human"));
+      setPlayerSideTheme("cpu", getPlayerThemeColor("cpu"));
+    }
+
+    function resolvePlayerTeamsForGame(config = state.config) {
+      const selections = normalizeDistinctTeamSelections(config.humanTeam, config.cpuTeam);
+      const availableKeys = TEAM_CATALOG.map((team) => team.key);
+      const resolved = {
+        human: null,
+        cpu: null
+      };
+
+      ["human", "cpu"].forEach((player) => {
+        const selection = selections[player === "human" ? "humanTeam" : "cpuTeam"];
+        if (!isTeamSelectionKey(selection)) {
+          return;
+        }
+        resolved[player] = TEAM_BY_KEY[selection];
+        const index = availableKeys.indexOf(selection);
+        if (index >= 0) {
+          availableKeys.splice(index, 1);
+        }
+      });
+
+      ["human", "cpu"].forEach((player) => {
+        const selection = selections[player === "human" ? "humanTeam" : "cpuTeam"];
+        if (selection !== TEAM_RANDOM_SELECTION || availableKeys.length === 0) {
+          return;
+        }
+        const randomIndex = Math.floor(Math.random() * availableKeys.length);
+        const teamKey = availableKeys.splice(randomIndex, 1)[0];
+        resolved[player] = TEAM_BY_KEY[teamKey] || null;
+      });
+
+      return resolved;
+    }
+
+    function updateTeamSelectDisabledOptions(select, blockedTeamKey) {
+      if (!select) {
+        return;
+      }
+      Array.from(select.options).forEach((option) => {
+        option.disabled = isTeamSelectionKey(option.value) && option.value === blockedTeamKey && select.value !== option.value;
+      });
+    }
+
+    function syncTeamSelectionControls(changedPlayer = null) {
+      const humanSelect = document.getElementById("debugHumanTeam");
+      const cpuSelect = document.getElementById("debugCpuTeam");
+      if (!humanSelect || !cpuSelect) {
+        return;
+      }
+
+      let humanValue = sanitizePlayerTeamSelection(humanSelect.value, "human");
+      let cpuValue = sanitizePlayerTeamSelection(cpuSelect.value, "cpu");
+
+      if (isTeamSelectionKey(humanValue) && humanValue === cpuValue) {
+        if (changedPlayer === "human") {
+          cpuValue = DEFAULT_CONFIG.cpuTeam;
+        } else if (changedPlayer === "cpu") {
+          humanValue = DEFAULT_CONFIG.humanTeam;
+        } else {
+          cpuValue = DEFAULT_CONFIG.cpuTeam;
+        }
+      }
+
+      humanSelect.value = humanValue;
+      cpuSelect.value = cpuValue;
+      updateTeamSelectDisabledOptions(humanSelect, cpuValue);
+      updateTeamSelectDisabledOptions(cpuSelect, humanValue);
+    }
+
+    function populateTeamSelects() {
+      const humanSelect = document.getElementById("debugHumanTeam");
+      const cpuSelect = document.getElementById("debugCpuTeam");
+      if (!humanSelect || !cpuSelect) {
+        return;
+      }
+
+      const buildOptions = (select, player) => {
+        select.innerHTML = "";
+
+        const defaultOption = document.createElement("option");
+        defaultOption.value = player;
+        defaultOption.textContent = getPlayerRoleLabel(player);
+        select.appendChild(defaultOption);
+
+        const randomOption = document.createElement("option");
+        randomOption.value = TEAM_RANDOM_SELECTION;
+        randomOption.textContent = "Random";
+        select.appendChild(randomOption);
+
+        ["West", "East"].forEach((conference) => {
+          const optgroup = document.createElement("optgroup");
+          optgroup.label = conference;
+
+          TEAM_CATALOG.filter((team) => team.conference === conference).forEach((team) => {
+            const option = document.createElement("option");
+            option.value = team.key;
+            option.textContent = team.city;
+            optgroup.appendChild(option);
+          });
+
+          select.appendChild(optgroup);
+        });
+      };
+
+      buildOptions(humanSelect, "human");
+      buildOptions(cpuSelect, "cpu");
+      syncTeamSelectionControls();
+    }
+
+    function setSideTextClasses(element, player) {
+      if (!element) {
+        return;
+      }
+      element.classList.remove("side-text", "human", "cpu");
+      if (player === "human" || player === "cpu") {
+        element.classList.add("side-text", player);
+      }
     }
 
     function sanitizeCpuDifficulty(rawValue) {
@@ -4500,6 +5311,7 @@
     function sanitizeStoredConfig(rawConfig = {}) {
       const cpuDifficulty = sanitizeCpuDifficulty(rawConfig.cpuDifficulty ?? DEFAULT_CONFIG.cpuDifficulty);
       const presetConfig = getCpuPresetConfigValues(cpuDifficulty);
+      const teamSelections = normalizeDistinctTeamSelections(rawConfig.humanTeam, rawConfig.cpuTeam);
       return {
         suitCount: clamp(Number.parseInt(rawConfig.suitCount ?? DEFAULT_CONFIG.suitCount, 10), 2, 5),
         maxValue: clamp(Number.parseInt(rawConfig.maxValue ?? DEFAULT_CONFIG.maxValue, 10), 5, 10),
@@ -4526,6 +5338,8 @@
         cpuMomentumSpendAggression: clamp(Number.parseInt(rawConfig.cpuMomentumSpendAggression ?? presetConfig.cpuMomentumSpendAggression, 10), 0, 12),
         cpuLateGameRiskAggression: clamp(Number.parseInt(rawConfig.cpuLateGameRiskAggression ?? presetConfig.cpuLateGameRiskAggression, 10), 0, 12),
         cpuDefensivePanicThreshold: clamp(Number.parseInt(rawConfig.cpuDefensivePanicThreshold ?? presetConfig.cpuDefensivePanicThreshold, 10), 0, 4),
+        humanTeam: teamSelections.humanTeam,
+        cpuTeam: teamSelections.cpuTeam,
         stabilizeSanding: sanitizeStabilizeSanding(rawConfig.stabilizeSanding ?? DEFAULT_CONFIG.stabilizeSanding),
         singleRiverCrossMode: rawConfig.singleRiverCrossMode === true || rawConfig.singleRiverCrossMode === "on",
         decksPerPeriod: clamp(Number.parseInt(rawConfig.decksPerPeriod ?? DEFAULT_CONFIG.decksPerPeriod, 10), 1, 5)
@@ -4628,9 +5442,16 @@
       const cpuMomentumAggroInput = document.getElementById("debugCpuMomentumAggro");
       const cpuLateRiskInput = document.getElementById("debugCpuLateRisk");
       const cpuPanicThresholdInput = document.getElementById("debugCpuPanicThreshold");
+      const humanTeamInput = document.getElementById("debugHumanTeam");
+      const cpuTeamInput = document.getElementById("debugCpuTeam");
       const stabilizeSandingInput = document.getElementById("debugStabilizeSanding");
       const decksPerPeriodInput = document.getElementById("debugDecksPerPeriod");
       const riverModeInput = document.getElementById("debugRiverMode");
+
+      const teamSelections = normalizeDistinctTeamSelections(
+        humanTeamInput?.value || DEFAULT_CONFIG.humanTeam,
+        cpuTeamInput?.value || DEFAULT_CONFIG.cpuTeam
+      );
 
       return {
         suitCount: clamp(Number.parseInt(suitCountInput?.value || String(DEFAULT_CONFIG.suitCount), 10), 2, 5),
@@ -4658,6 +5479,8 @@
         cpuMomentumSpendAggression: clamp(Number.parseInt(cpuMomentumAggroInput?.value || String(DEFAULT_CONFIG.cpuMomentumSpendAggression), 10), 0, 12),
         cpuLateGameRiskAggression: clamp(Number.parseInt(cpuLateRiskInput?.value || String(DEFAULT_CONFIG.cpuLateGameRiskAggression), 10), 0, 12),
         cpuDefensivePanicThreshold: clamp(Number.parseInt(cpuPanicThresholdInput?.value || String(DEFAULT_CONFIG.cpuDefensivePanicThreshold), 10), 0, 4),
+        humanTeam: teamSelections.humanTeam,
+        cpuTeam: teamSelections.cpuTeam,
         stabilizeSanding: sanitizeStabilizeSanding(stabilizeSandingInput?.value || DEFAULT_CONFIG.stabilizeSanding),
         decksPerPeriod: clamp(Number.parseInt(decksPerPeriodInput?.value || String(DEFAULT_CONFIG.decksPerPeriod), 10), 1, 5),
         singleRiverCrossMode: (riverModeInput?.value || "off") === "on"
@@ -4698,6 +5521,8 @@
       const cpuMomentumAggroInput = document.getElementById("debugCpuMomentumAggro");
       const cpuLateRiskInput = document.getElementById("debugCpuLateRisk");
       const cpuPanicThresholdInput = document.getElementById("debugCpuPanicThreshold");
+      const humanTeamInput = document.getElementById("debugHumanTeam");
+      const cpuTeamInput = document.getElementById("debugCpuTeam");
       const stabilizeSandingInput = document.getElementById("debugStabilizeSanding");
       const decksPerPeriodInput = document.getElementById("debugDecksPerPeriod");
       const riverModeInput = document.getElementById("debugRiverMode");
@@ -4778,6 +5603,12 @@
       if (cpuPanicThresholdInput) {
         cpuPanicThresholdInput.value = String(config.cpuDefensivePanicThreshold);
       }
+      if (humanTeamInput) {
+        humanTeamInput.value = sanitizePlayerTeamSelection(config.humanTeam, "human");
+      }
+      if (cpuTeamInput) {
+        cpuTeamInput.value = sanitizePlayerTeamSelection(config.cpuTeam, "cpu");
+      }
       if (stabilizeSandingInput) {
         stabilizeSandingInput.value = sanitizeStabilizeSanding(config.stabilizeSanding);
       }
@@ -4790,6 +5621,8 @@
       if (momentumSystemInput) {
         momentumSystemInput.value = FEATURES.momentumSystem ? "on" : "off";
       }
+
+      syncTeamSelectionControls();
     }
 
     function refreshDebugPreview() {
@@ -4804,11 +5637,31 @@
       const stabilizeText = getStabilizeSandingModeText(config.stabilizeSanding);
       const deckSliceText = formatClockSeconds(getDeckSliceSeconds(config));
       const deckText = `${config.decksPerPeriod} deck${config.decksPerPeriod === 1 ? "" : "s"} per period (${deckSliceText} each)`;
+      const matchupText = `${getTeamSelectionPreviewLabel(config.humanTeam, "human")} vs ${getTeamSelectionPreviewLabel(config.cpuTeam, "cpu")}`;
       if (preview) {
-        preview.textContent = `Next game: ${config.suitCount} suits, values 1-${config.maxValue}, hand size ${config.handSize}, ${wildText}, deck ${getDeckSizeForConfig(config)} cards, ${deckText}, ${riverText}, ${momentumText}, stabilize ${stabilizeText}. CPU ${cpuProfile.label} at ${config.cpuSpeedPercent}% speed applies immediately.`;
+        preview.textContent = `Next game: ${matchupText}. ${config.suitCount} suits, values 1-${config.maxValue}, hand size ${config.handSize}, ${wildText}, deck ${getDeckSizeForConfig(config)} cards, ${deckText}, ${riverText}, ${momentumText}, stabilize ${stabilizeText}. CPU ${cpuProfile.label} at ${config.cpuSpeedPercent}% speed applies immediately.`;
       }
       if (rulesPreview) {
         rulesPreview.textContent = `CPU ${cpuProfile.label}: lookahead ${cpuProfile.attackLookaheadDepth}, follow-up ${cpuProfile.attackFollowUpWeight}, chain ${cpuProfile.chainLengthWeight}, empty-hand ${cpuProfile.emptyHandShotWeight}, zone push ${cpuProfile.zoneAdvanceWeight}, shot-zone ${cpuProfile.shotZoneAggression}, conserve ${cpuProfile.cardConservationWeight}, stabilize deny ${cpuProfile.avoidStabilizeWindowWeight}, faceoff ${cpuProfile.faceoffAggression}%, icing reluctance ${cpuProfile.icingReluctance}, momentum ${cpuProfile.momentumSpendAggression}, late risk ${cpuProfile.lateGameRiskAggression}, panic ${cpuProfile.defensivePanicThreshold}, D-zone ${cpuProfile.defensiveZoneDefenseTarget}+, goal-zone ${cpuProfile.goalZoneDefenseTarget}+. Chain mode: ${config.singleRiverCrossMode ? "you may switch between value and suit matching once per pile run." : "value and suit matching may alternate freely."}`;
+      }
+    }
+
+    function refreshStaticControlCopy() {
+      const cpuDebugName = getPlayerDebugName("cpu");
+      const cpuStepBtn = document.getElementById("cpuStepBtn");
+      const showCpuCardsLabelText = document.getElementById("showCpuCardsLabelText");
+      const cpuHandVisibilityHint = document.getElementById("cpuHandVisibilityHint");
+
+      if (cpuStepBtn) {
+        cpuStepBtn.textContent = `${cpuDebugName} Step / Auto Continue`;
+      }
+
+      if (showCpuCardsLabelText) {
+        showCpuCardsLabelText.textContent = `Show ${cpuDebugName} cards`;
+      }
+
+      if (cpuHandVisibilityHint) {
+        cpuHandVisibilityHint.textContent = `Use the checkbox to show or hide the ${cpuDebugName} hand. ${cpuDebugName} still plays automatically on its turn.`;
       }
     }
 
@@ -4889,16 +5742,17 @@
     }
 
     function zoneLabel(zoneIndex = state.zoneIndex) {
+      const zoneNames = getZoneNames();
       if (isCenterIce(zoneIndex)) {
         return "Center Ice";
       }
       if (zoneIndex === 0.5) {
-        return "Human End Faceoff";
+        return `${getPlayerDisplayName("human")} End Faceoff`;
       }
       if (zoneIndex === 4.5) {
-        return "CPU End Faceoff";
+        return `${getPlayerDisplayName("cpu")} End Faceoff`;
       }
-      return ZONES[zoneIndex] || "Unknown Zone";
+      return zoneNames[zoneIndex] || "Unknown Zone";
     }
 
     function getPlayByPlayZoneText(player, zoneIndex = state.zoneIndex) {
@@ -4979,6 +5833,56 @@
       return shot ? (shot.phaseRequiredLength ?? shot.requiredLength) : 0;
     }
 
+    function getNormalSaveRuleSummary() {
+      return `On a normal shot, exactly enough legal save cards freeze the puck. If the goalie submits at least 1 extra legal save card, it becomes a Controlled Save and the defending team gains possession in its own Defensive Zone. Coming up exactly 1 short creates a rebound; 2 or more short is a goal. ${getShotPowerTableSummary()}`;
+    }
+
+    function buildShotStartPlayByPlayDetails(attackerPlayer, shotCard, shotValue, requiredLength, options = {}) {
+      const closeShot = Boolean(options.closeShot);
+      const hasShotValueOverride = Boolean(options.hasShotValueOverride);
+      return createPlayByPlayDetails(
+        hasShotValueOverride
+          ? `${lowerPlayerName(attackerPlayer)} launches a Force Shot worth ${shotValue}.`
+          : `${lowerPlayerName(attackerPlayer)} creates a shot worth ${shotValue}.`,
+        hasShotValueOverride
+          ? `Force Shot sets the shot power to ${shotValue}, so the defender now needs ${requiredLength} save card${requiredLength === 1 ? "" : "s"}.`
+          : closeShot
+            ? `Close range adds +1 shot power, turning ${shotCard.value} into ${shotValue}, so the defender now needs ${requiredLength} save card${requiredLength === 1 ? "" : "s"}.`
+            : `Shot power ${shotValue} means the defender now needs ${requiredLength} save card${requiredLength === 1 ? "" : "s"}.`,
+        "Exact coverage freezes the puck, 1 extra legal save card becomes a Controlled Save, 1 short creates a rebound, and 2 or more short is a goal.",
+        getShotPowerTableSummary()
+      );
+    }
+
+    function buildGoalPlayByPlayDetails(shot) {
+      const reboundGoal = isReboundSavePhase(shot);
+      const goalShotValue = reboundGoal ? shot.reboundShotValue : shot.shotValue;
+      const shortfall = Math.max(0, shot.requiredLength - shot.savedCount);
+      return createPlayByPlayDetails(
+        reboundGoal
+          ? `${lowerPlayerName(shot.attackerPlayer)} scores on the rebound.`
+          : `${lowerPlayerName(shot.attackerPlayer)} scores on shot power ${goalShotValue}.`,
+        reboundGoal
+          ? `${lowerPlayerName(shot.defenderPlayer)} could not match the rebound value of ${shot.reboundShotValue}.`
+          : `Shot power ${goalShotValue} required ${shot.requiredLength} save card${shot.requiredLength === 1 ? "" : "s"}, and ${lowerPlayerName(shot.defenderPlayer)} finished ${shortfall} short.`,
+        reboundGoal
+          ? "A failed rebound save becomes a goal immediately."
+          : "On a normal shot, finishing 2 or more save cards short becomes a goal.",
+        getShotPowerTableSummary()
+      );
+    }
+
+    function canExtendSaveChainForControlledSave(player, shot = state.shotPending) {
+      return Boolean(
+        shot
+        && !isReboundRevealPhase(shot)
+        && !isReboundSavePhase(shot)
+        && shot.defenderPlayer === player
+        && shot.savedCount >= shot.requiredLength
+        && getLegalCardsForTurn(player).length > 0
+      );
+    }
+
     function syncShotPendingTurnState(label = "Save setup.", flash = false) {
       const shot = state.shotPending;
       if (!shot) {
@@ -5039,6 +5943,7 @@
 
       const reboundSave = isReboundSavePhase(shot);
       const saveRequirement = getShotCurrentRequiredLength(shot);
+      const saveCount = shot.savedCards.length;
       setLastShotSummary(shot, "save", shot.savedCards);
       incrementPlayerStat(shot.defenderPlayer, "savesMade");
       if (reboundSave) {
@@ -5049,9 +5954,62 @@
         : `${lowerPlayerName(shot.defenderPlayer)} makes ${shot.requiredLength}-card save: ${shot.savedCards.map(cardToText).join(" -> ")}. Frozen puck.`));
       setEvent("Save / Frozen puck", "contain");
       showDeckEvent(`${reboundSave ? "Rebound Save" : "Save"}\n${shot.savedCards.length}/${saveRequirement}`, "contain", 1500);
+      const playByPlayText = `${lowerPlayerName(shot.defenderPlayer)} makes the${reboundSave ? " rebound" : ""} save. Faceoff.`;
+      const playByPlayDetails = reboundSave
+        ? createPlayByPlayDetails(
+          playByPlayText,
+          "The defender froze the rebound and reset play to a faceoff.",
+          `The goalie answered the rebound shot with a legal save card worth at least ${shot.reboundShotValue}.`,
+          `A successful rebound save always freezes the puck and produces a faceoff in the shot zone. ${getShotPowerTableSummary()}`
+        )
+        : createPlayByPlayDetails(
+          playByPlayText,
+          "The defender met the shot's exact save requirement and froze the puck.",
+          `Shot power ${shot.shotValue} required ${shot.requiredLength} save card${shot.requiredLength === 1 ? "" : "s"}, and the goalie completed exactly ${saveCount} legal save card${saveCount === 1 ? "" : "s"}.`,
+          getNormalSaveRuleSummary()
+        );
       clearShotPending();
       startFaceoff(shot.shotZoneIndex, "Save/frozen puck.");
-      setPlayByPlay(`${lowerPlayerName(shot.defenderPlayer)} makes the${reboundSave ? " rebound" : ""} save. Faceoff.`, "contain");
+      setPlayByPlay(playByPlayText, "contain", playByPlayDetails);
+    }
+
+    function finishShotWithControlledSave(reason = "") {
+      const shot = state.shotPending;
+      if (!shot) {
+        return;
+      }
+
+      const controlledZoneIndex = getDefensiveZoneIndex(shot.defenderPlayer);
+      const extraCards = Math.max(0, shot.savedCount - shot.requiredLength);
+      const playByPlayText = `${lowerPlayerName(shot.defenderPlayer)} makes a Controlled Save. Possession in ${zoneLabel(controlledZoneIndex)}.`;
+
+      setLastShotSummary(shot, "controlledSave", shot.savedCards);
+      incrementPlayerStat(shot.defenderPlayer, "savesMade");
+      addLog(reason || `${lowerPlayerName(shot.defenderPlayer)} over-covers the shot with ${shot.savedCards.length} legal save cards on a ${shot.requiredLength}-card save. Controlled Save and possession in ${zoneLabel(controlledZoneIndex)}.`);
+      setEvent("Controlled Save / Possession", "turnover");
+      showDeckEvent("Controlled\nSave", "turnover", 1600);
+      setPlayByPlay(
+        playByPlayText,
+        "turnover",
+        createPlayByPlayDetails(
+          playByPlayText,
+          "The defender over-covered the shot and kept possession instead of stopping for a faceoff.",
+          `Shot power ${shot.shotValue} required ${shot.requiredLength} save card${shot.requiredLength === 1 ? "" : "s"}, and the goalie exceeded that by ${extraCards} legal save card${extraCards === 1 ? "" : "s"}, so the stop became a Controlled Save.`,
+          getNormalSaveRuleSummary()
+        )
+      );
+
+      clearShotPending();
+      state.attacker = shot.defenderPlayer;
+      syncDefender();
+      state.zoneIndex = controlledZoneIndex;
+
+      if (resolvePendingPeriodBreak()) {
+        return;
+      }
+
+      startAttackerTurn();
+      logTurnDiagnostics(state.currentTurn, "Controlled save.");
     }
 
     function finishShotAsGoal(reason = "") {
@@ -5062,6 +6020,7 @@
 
       const reboundGoal = isReboundSavePhase(shot);
       const goalShotValue = reboundGoal ? shot.reboundShotValue : shot.shotValue;
+      const goalPlayByPlayDetails = buildGoalPlayByPlayDetails(shot);
       setLastShotSummary(shot, "goal", shot.savedCards);
 
       if (shot.attackerPlayer === "human") {
@@ -5083,7 +6042,7 @@
       showDeckEvent(`${reboundGoal ? "Rebound Goal" : "Goal"}\nShot ${goalShotValue}`, "goal", 1700);
       triggerGoalFlash();
       clearShotPending();
-      handleGoalAfterScore(shot.attackerPlayer);
+      handleGoalAfterScore(shot.attackerPlayer, goalPlayByPlayDetails);
     }
 
     function finishShotWithRecovery(reboundCard = null, reason = "") {
@@ -5282,12 +6241,17 @@
       }
 
       const shortfall = shot.requiredLength - shot.savedCount;
-      if (shortfall <= 0) {
+      if (shortfall < 0) {
+        finishShotWithControlledSave();
+        return;
+      }
+
+      if (shortfall === 0) {
         finishShotWithSave();
         return;
       }
 
-      if (shot.requiredLength > 1 && shortfall === 1) {
+      if (shortfall === 1) {
         addLog(`${lowerPlayerName(shot.defenderPlayer)} comes up exactly 1 short on the save chain. Rebound.`);
         startRebound();
         return;
@@ -5414,8 +6378,8 @@
         return true;
       }
 
-      if (shot.savedCount >= getShotCurrentRequiredLength(shot)) {
-        finishShotWithSave();
+      if (shot.savedCount > getShotCurrentRequiredLength(shot)) {
+        finishShotWithControlledSave();
         return true;
       }
 
@@ -5724,6 +6688,32 @@
       ghost.style.opacity = "0.96";
       ghost.style.transform = "scale(0.92)";
       await animateGhostToTarget(ghost, target, duration);
+    }
+
+    function trimHandToLimitForReset(player, reasonText = "faceoff hand reset") {
+      const hand = playerHand(player);
+      const handCap = getHandCap();
+      const discardedCards = [];
+
+      while (hand.length > handCap) {
+        const discardedCard = hand.pop();
+        if (!discardedCard) {
+          break;
+        }
+        state.discardPile.push(discardedCard);
+        discardedCards.push(discardedCard);
+      }
+
+      if (discardedCards.length > 0) {
+        addLog(`${lowerPlayerName(player)} trims ${discardedCards.length} extra card${discardedCards.length === 1 ? "" : "s"} before the ${reasonText}: ${discardedCards.map(cardToText).join(", ")}.`);
+      }
+    }
+
+    function normalizeHandsForFaceoff(options = {}) {
+      clearOverflowDiscardPending();
+      trimHandToLimitForReset("human", options.reasonText || "faceoff hand reset");
+      trimHandToLimitForReset("cpu", options.reasonText || "faceoff hand reset");
+      refillHands(options);
     }
 
     function refillHands(options = {}) {
@@ -6179,6 +7169,7 @@
       clearComboWindow();
       state.activeBattleState = "none";
       state.comboImmunityActive = false;
+      noteExchangeMeterSnapshot(getExchangeMeterState());
       state.attacker = winner;
       syncDefender();
       incrementPlayerStat(winner, "exchangeWins");
@@ -6300,6 +7291,7 @@
         return;
       }
 
+      noteExchangeMeterSnapshot(getExchangeMeterState());
       clearStabilizePending();
 
       state.attacker = turnoverWinner;
@@ -6439,6 +7431,7 @@
               : `If the attacker only holds the exchange without beating the defense, possession stays in place instead of advancing.`
           )
         );
+        noteExchangeMeterSnapshot(getExchangeMeterState());
         startAttackerTurn();
         logTurnDiagnostics(state.currentTurn);
         return;
@@ -6885,7 +7878,7 @@
       const faceoffLabel = getFaceoffUiLabel(faceoffMode);
 
       if (refillForFaceoff) {
-        refillHands({ consumeClock: refillConsumesClock });
+        normalizeHandsForFaceoff({ consumeClock: refillConsumesClock, reasonText: options.reasonText || "faceoff hand reset" });
         if (resolvePendingPeriodBreak()) {
           return;
         }
@@ -6895,6 +7888,7 @@
 
       clearHumanPendingTurn();
       clearBurnSelection();
+      clearOverflowDiscardPending();
       clearStabilizePending();
       clearHumanSpecialSelection();
       state.faceoffPending = true;
@@ -7159,6 +8153,38 @@
       return bestChain.length > 0 ? bestChain : null;
     }
 
+    function cpuShouldTakeControlledSave(shot, reserveAfterControlledSave) {
+      if (!shot || isReboundRevealPhase(shot) || isReboundSavePhase(shot)) {
+        return false;
+      }
+
+      const profile = getCpuDifficultyProfile();
+      let controlScore = 2;
+
+      controlScore += Math.floor((6 - profile.cardConservationWeight) / 2);
+      controlScore += Math.floor(profile.lateGameRiskAggression / 4);
+
+      if (state.cpuScore < state.humanScore) {
+        controlScore += 2;
+      }
+
+      if (getRegulationSecondsRemaining() <= profile.lateGamePressureSeconds) {
+        controlScore += state.cpuScore <= state.humanScore ? 1 : -1;
+      }
+
+      if (shot.requiredLength <= 2) {
+        controlScore += 1;
+      }
+
+      if (reserveAfterControlledSave <= 0) {
+        controlScore -= 3;
+      } else if (reserveAfterControlledSave <= getCpuPanicWindow(profile)) {
+        controlScore -= 2;
+      }
+
+      return controlScore >= 3;
+    }
+
     async function processCpuShotSequenceTurn() {
       const shot = state.shotPending;
       if (!shot || state.currentTurn !== "cpu") {
@@ -7186,6 +8212,35 @@
         return false;
       }
 
+      if (!isReboundRevealPhase(shot) && !isReboundSavePhase(shot)) {
+        const remainingRequired = Math.max(0, shot.requiredLength - shot.savedCount);
+        if (remainingRequired === 0) {
+          const legal = getLegalCardsForTurn("cpu");
+          if (legal.length > 0 && cpuShouldTakeControlledSave(shot, state.cpuHand.length - 1)) {
+            const idx = chooseLowestValueIndex(state.cpuHand, legal);
+            state.cpuPreviewIndex = idx;
+            render();
+            await sleep(getCpuSimDuration(760, 160));
+
+            if (state.currentTurn !== "cpu" || idx < 0 || idx >= state.cpuHand.length) {
+              state.cpuPreviewIndex = null;
+              return false;
+            }
+
+            const cpuCard = state.cpuHand[idx];
+            const cpuButtons = document.querySelectorAll("#cpuHand .card-btn");
+            const sourceButton = cpuButtons[idx];
+            await animatePlayToPileFromElement(sourceButton, cpuCard, !state.showCpuCards, getCpuSimDuration(420, 120));
+            playShotSaveCard("cpu", idx);
+            state.cpuPreviewIndex = null;
+            return true;
+          }
+
+          finishShotWithSave();
+          return true;
+        }
+      }
+
       if (isReboundSavePhase(shot)) {
         const legal = getLegalCardsForTurn("cpu");
         if (legal.length === 0) {
@@ -7211,7 +8266,15 @@
         return true;
       }
 
-      const chainIndexes = findBestSaveChain(state.cpuHand, shot.requiredLength, state.activeCard);
+      const remainingRequired = Math.max(0, shot.requiredLength - shot.savedCount);
+      const plannedSearchLength = Math.min(state.cpuHand.length, remainingRequired + 1);
+      const bestChainIndexes = findBestSaveChain(state.cpuHand, plannedSearchLength, state.activeCard);
+      const shouldTakeControlledSave = bestChainIndexes
+        && bestChainIndexes.length > remainingRequired
+        && cpuShouldTakeControlledSave(shot, state.cpuHand.length - (remainingRequired + 1));
+      const chainIndexes = bestChainIndexes
+        ? bestChainIndexes.slice(0, shouldTakeControlledSave ? remainingRequired + 1 : remainingRequired)
+        : null;
       if (!chainIndexes || chainIndexes.length === 0) {
         if (canUsePitySaveDraw("cpu", shot)) {
           return await drawPitySaveCard("cpu", {
@@ -7246,7 +8309,12 @@
         state.cpuHand.splice(idx, 1);
       }
 
-      if (shot.savedCount >= shot.requiredLength) {
+      if (shot.savedCount > shot.requiredLength) {
+        finishShotWithControlledSave();
+        return true;
+      }
+
+      if (shot.savedCount === shot.requiredLength) {
         finishShotWithSave();
         return true;
       }
@@ -7278,11 +8346,16 @@
       if (closeShot && !hasShotValueOverride) {
         addLog(`Close-range bonus applies: ${shotCard.value} becomes ${shotValue}.`);
       }
-      setPlayByPlay(hasShotValueOverride
+      const playByPlayText = hasShotValueOverride
         ? `${lowerPlayerName(attackerPlayer)} unleashes a Force Shot!`
         : closeShot
           ? `${lowerPlayerName(attackerPlayer)} shoots from close range!`
-          : `${lowerPlayerName(attackerPlayer)} takes a shot!`, "shot");
+          : `${lowerPlayerName(attackerPlayer)} takes a shot!`;
+      setPlayByPlay(
+        playByPlayText,
+        "shot",
+        buildShotStartPlayByPlayDetails(attackerPlayer, shotCard, shotValue, requiredLength, { closeShot, hasShotValueOverride })
+      );
       setEvent(`Shot quality ${shotValue}`, "shot");
       showDeckEvent(`Shot ${shotValue}\nSave ${requiredLength}`, "shot", 1600);
       recordShotForStats(attackerPlayer, shotValue, shotZoneIndex);
@@ -7307,7 +8380,7 @@
       };
       state.activeCard = shotCard;
 
-      addLog(`${lowerPlayerName(defenderPlayer)} must complete a ${requiredLength}-card save chain to freeze the puck.`);
+      addLog(`${lowerPlayerName(defenderPlayer)} must complete a ${requiredLength}-card save chain to freeze the puck, or play 1 extra legal save card for a Controlled Save.`);
       setEvent(`Save chain needed: ${requiredLength}`, "contain");
       syncShotPendingTurnState("Save setup.", true);
     }
@@ -7359,6 +8432,7 @@
 
       if (player === state.attacker) {
         if (isShotZone(player)) {
+          noteExchangeMeterSnapshot(getExchangeMeterState());
           resolveShot(state.attacker, state.defender, lastPlayedCard);
         } else {
           refillHands();
@@ -8372,18 +9446,64 @@
       element.appendChild(label);
     }
 
+    function ensureZoneTrackStructure(zoneTrack) {
+      if (!zoneTrack || zoneTrack.dataset.ready === "true") {
+        return;
+      }
+
+      zoneTrack.textContent = "";
+      for (let index = 0; index < ZONES.length; index += 1) {
+        const zone = document.createElement("div");
+        zone.className = "zone";
+        zoneTrack.appendChild(zone);
+      }
+
+      const puckMarker = document.createElement("div");
+      puckMarker.className = "zone-track-puck";
+      puckMarker.setAttribute("aria-hidden", "true");
+      zoneTrack.appendChild(puckMarker);
+      zoneTrack.dataset.ready = "true";
+    }
+
+    function getZoneTrackMarkerText() {
+      if (!Number.isFinite(state.zoneIndex)) {
+        return "";
+      }
+
+      if (state.faceoffPending || !Number.isInteger(state.zoneIndex)) {
+        return "⚪";
+      }
+
+      if (state.attacker === "human") {
+        return "🔴";
+      }
+      if (state.attacker === "cpu") {
+        return "🔵";
+      }
+      return "";
+    }
+
+    function getZoneTrackMarkerLeft(zoneIndex = state.zoneIndex) {
+      return Number.isFinite(zoneIndex) ? `${((Number(zoneIndex) + 0.5) / ZONES.length) * 100}%` : "";
+    }
+
     function renderZoneTrack() {
       const zoneTrack = document.getElementById("zoneTrack");
       if (!zoneTrack) {
         return;
       }
 
+      ensureZoneTrackStructure(zoneTrack);
       zoneTrack.classList.toggle("human-control", state.attacker === "human" && !state.faceoffPending);
       zoneTrack.classList.toggle("cpu-control", state.attacker === "cpu" && !state.faceoffPending);
       zoneTrack.classList.toggle("shot-pressure", Boolean(state.shotPending));
-      zoneTrack.innerHTML = "";
-      ZONES.forEach((zoneName, idx) => {
-        const div = document.createElement("div");
+      const zoneNames = getZoneNames();
+      const zoneDivs = zoneTrack.querySelectorAll(".zone");
+      zoneNames.forEach((zoneName, idx) => {
+        const div = zoneDivs[idx];
+        if (!div) {
+          return;
+        }
         const isFaceoffPair = !Number.isInteger(state.zoneIndex) && (Math.floor(state.zoneIndex) === idx || Math.ceil(state.zoneIndex) === idx);
         const isActive = idx === state.zoneIndex || isFaceoffPair;
         const isOffensive = !state.faceoffPending && (
@@ -8396,21 +9516,15 @@
         const faceoffClass = isActive && state.faceoffPending ? " faceoff-focus" : "";
         div.className = `zone${isActive ? " active" : ""}${isOffensive ? " offensive" : ""}${controllerClass}${faceoffClass}`;
         div.title = zoneName;
-
-        const marker = document.createElement("span");
-        marker.className = "zone-marker";
-        marker.textContent = zoneMarkerForIndex(idx);
-
-        div.appendChild(marker);
-        zoneTrack.appendChild(div);
       });
 
-      if (!Number.isInteger(state.zoneIndex)) {
-        const centerMarker = document.createElement("div");
-        centerMarker.className = "zone-center-marker";
-        centerMarker.textContent = "⚪";
-        centerMarker.style.left = `${((state.zoneIndex + 0.5) / ZONES.length) * 100}%`;
-        zoneTrack.appendChild(centerMarker);
+      const puckMarker = zoneTrack.querySelector(".zone-track-puck");
+      if (puckMarker) {
+        const markerText = getZoneTrackMarkerText();
+        const markerLeft = getZoneTrackMarkerLeft();
+        puckMarker.textContent = markerText;
+        puckMarker.className = `zone-track-puck${markerText ? " show" : ""}${state.faceoffPending ? " faceoff" : state.attacker === "human" ? " human" : state.attacker === "cpu" ? " cpu" : ""}`;
+        puckMarker.style.left = markerLeft;
       }
     }
 
@@ -8513,7 +9627,7 @@
           });
         } else {
           btn.disabled = true;
-          btn.title = state.showCpuCards ? "CPU hand visible for debugging" : "CPU hand hidden";
+          btn.title = state.showCpuCards ? `${getPlayerDebugName("cpu")} hand visible for debugging` : `${getPlayerDebugName("cpu")} hand hidden`;
           if (state.cpuPreviewIndex === i && state.currentTurn === "cpu") {
             btn.classList.add("cpu-preview");
           }
@@ -8542,7 +9656,7 @@
         if (entry && typeof entry === "object" && entry.sequenceLead) {
           p.classList.add("sequence-lead");
         }
-        p.textContent = getLogEntryText(entry);
+        p.textContent = formatDebugPlayerText(getLogEntryText(entry));
         logFeed.appendChild(p);
       }
 
@@ -8618,6 +9732,8 @@
           : `${lowerPlayerName(shot.attackerPlayer)} played ${cardToText(shot.shotCard)} from ${zoneLabel(shot.shotZoneIndex)} (quality ${shot.shotValue}).`;
         const outcomeText = shot.outcome === "save"
           ? "Save / frozen puck"
+          : shot.outcome === "controlledSave"
+            ? `Controlled Save for ${lowerPlayerName(shot.defenderPlayer)}`
           : shot.outcome === "recovery"
             ? `Defensive recovery for ${lowerPlayerName(shot.defenderPlayer)}`
             : `Goal for ${lowerPlayerName(shot.attackerPlayer)}`;
@@ -8657,11 +9773,11 @@
 
         const head = document.createElement("div");
         head.className = "goal-log-head";
-        head.innerHTML = `<span>${lowerPlayerName(entry.player)} ${entry.shotKind === "powerShot" ? "Force Shot goal" : "goal"}</span><span>${entry.periodLabel} ${entry.clockText}</span>`;
+        head.innerHTML = `<span><span class="side-text ${entry.player}">${escapeHtml(getPlayerDebugName(entry.player))}</span> ${entry.shotKind === "powerShot" ? "Force Shot goal" : "goal"}</span><span>${escapeHtml(`${entry.periodLabel} ${entry.clockText}`)}</span>`;
 
         const meta = document.createElement("div");
         meta.className = "goal-log-meta";
-        meta.textContent = `${entry.zoneLabel} | ${entry.shotKind === "powerShot" ? "Force Shot | " : ""}Shot ${entry.shotValue} | Human ${entry.humanScore} - ${entry.cpuScore} CPU`;
+        meta.textContent = formatDebugPlayerText(`${entry.zoneLabel} | ${entry.shotKind === "powerShot" ? "Force Shot | " : ""}Shot ${entry.shotValue} | ${getScoreText({ debug: true, humanScore: entry.humanScore, cpuScore: entry.cpuScore })}`);
 
         item.appendChild(head);
         item.appendChild(meta);
@@ -8682,9 +9798,9 @@
           <td class="stat-value">${row.cpu}</td>
         </tr>
       `).join("");
-      const zoneRows = ZONES.map((zoneName, zoneIndex) => `
+      const zoneRows = getZoneNames().map((zoneName, zoneIndex) => `
         <tr>
-          <td>${zoneName}</td>
+          <td>${escapeHtml(formatDebugPlayerText(zoneName))}</td>
           <td class="stat-value">${state.stats.human.zonePlays[zoneIndex]}</td>
           <td class="stat-value">${state.stats.cpu.zonePlays[zoneIndex]}</td>
           <td class="stat-value">${state.stats.human.shotOrigins[zoneIndex]}</td>
@@ -8695,29 +9811,33 @@
       const humanShotValues = state.stats.human.shotValues.length > 0 ? state.stats.human.shotValues.join(", ") : "none";
       const cpuShotValues = state.stats.cpu.shotValues.length > 0 ? state.stats.cpu.shotValues.join(", ") : "none";
       const scoringSummary = state.stats.scoringSummary.length > 0
-        ? `<ul class="stats-list">${state.stats.scoringSummary.map((entry) => `<li>${entry}</li>`).join("")}</ul>`
+        ? `<ul class="stats-list">${state.stats.scoringSummary.map((entry) => `<li>${escapeHtml(formatDebugPlayerText(entry))}</li>`).join("")}</ul>`
         : '<div class="stats-note">No goals recorded yet.</div>';
+      const humanDebugName = escapeHtml(getPlayerDebugName("human"));
+      const cpuDebugName = escapeHtml(getPlayerDebugName("cpu"));
+      const humanDebugLabel = `<span class="side-text human">${humanDebugName}</span>`;
+      const cpuDebugLabel = `<span class="side-text cpu">${cpuDebugName}</span>`;
 
       panel.innerHTML = [
         '<div class="stats-section">',
         '<div class="stats-section-title">Summary</div>',
         '<div class="stats-table-wrap">',
         '<table class="stats-table">',
-        '<thead><tr><th>Stat</th><th>Human</th><th>CPU</th></tr></thead>',
+        `<thead><tr><th>Stat</th><th>${humanDebugLabel}</th><th>${cpuDebugLabel}</th></tr></thead>`,
         `<tbody>${overviewRows}</tbody>`,
         '</table>',
         '</div>',
         '</div>',
         '<div class="stats-section">',
         '<div class="stats-section-title">Shot Values</div>',
-        `<div class="stats-note"><strong>Human:</strong> ${humanShotValues}</div>`,
-        `<div class="stats-note"><strong>CPU:</strong> ${cpuShotValues}</div>`,
+        `<div class="stats-note"><strong>${humanDebugLabel}:</strong> ${humanShotValues}</div>`,
+        `<div class="stats-note"><strong>${cpuDebugLabel}:</strong> ${cpuShotValues}</div>`,
         '</div>',
         '<div class="stats-section">',
         '<div class="stats-section-title">Zone Activity</div>',
         '<div class="stats-table-wrap">',
         '<table class="stats-table">',
-        '<thead><tr><th>Zone</th><th>Human Plays</th><th>CPU Plays</th><th>Human Shots</th><th>CPU Shots</th><th>Resolved Turns</th></tr></thead>',
+        `<thead><tr><th>Zone</th><th>${humanDebugLabel} Plays</th><th>${cpuDebugLabel} Plays</th><th>${humanDebugLabel} Shots</th><th>${cpuDebugLabel} Shots</th><th>Resolved Turns</th></tr></thead>`,
         `<tbody>${zoneRows}</tbody>`,
         '</table>',
         '</div>',
@@ -8739,9 +9859,27 @@
       const stagedHumanCard = humanSpecialSelectionActive ? state.humanHand[state.humanSpecialSelectionIndex] : null;
       const humanSpecialSelectionMode = humanSpecialSelectionActive ? getHumanSpecialSelectionMode() : null;
       const humanSpecialSelectionLabel = humanSpecialSelectionMode ? getHumanSpecialSelectionLabel(humanSpecialSelectionMode) : "";
-      document.getElementById("attackerLabel").textContent = lowerPlayerName(state.attacker);
-      document.getElementById("defenderLabel").textContent = lowerPlayerName(state.defender);
-      document.getElementById("turnLabel").textContent = state.gameOver
+      const humanDisplayName = lowerPlayerName("human");
+      const cpuDisplayName = lowerPlayerName("cpu");
+      const humanScoreBugName = getPlayerScoreBugName("human");
+      const cpuScoreBugName = getPlayerScoreBugName("cpu");
+      const attackerLabel = document.getElementById("attackerLabel");
+      const defenderLabel = document.getElementById("defenderLabel");
+      const turnLabel = document.getElementById("turnLabel");
+      const scoreLabel = document.getElementById("scoreLabel");
+      const humanHandTitle = document.getElementById("humanHandTitle");
+      const cpuHandTitle = document.getElementById("cpuHandTitle");
+
+      if (attackerLabel) {
+        attackerLabel.textContent = lowerPlayerName(state.attacker);
+        setSideTextClasses(attackerLabel, state.attacker);
+      }
+      if (defenderLabel) {
+        defenderLabel.textContent = lowerPlayerName(state.defender);
+        setSideTextClasses(defenderLabel, state.defender);
+      }
+      if (turnLabel) {
+        turnLabel.textContent = state.gameOver
         ? "Final"
         : state.faceoffPending
         ? faceoffUiLabel
@@ -8750,8 +9888,21 @@
         : state.shotPending
           ? `${lowerPlayerName(state.currentTurn)} (${shotPhaseLabel})`
           : `${lowerPlayerName(state.currentTurn)} (${state.roleOfCurrentTurn === "attacker" ? "attacking" : "defending"})`;
+        setSideTextClasses(turnLabel, state.gameOver || state.faceoffPending ? null : state.currentTurn);
+      }
       document.getElementById("deckCountLabel").textContent = String(state.deck.length);
-          document.getElementById("scoreLabel").textContent = `(${state.humanHand.length}) HUMAN ${state.humanScore} - CPU ${state.cpuScore} (${state.cpuHand.length})`;
+      if (scoreLabel) {
+        scoreLabel.innerHTML = `<span class="score-aux">(${state.humanHand.length})</span> <span class="score-side human">${escapeHtml(humanScoreBugName)}</span> ${state.humanScore} - ${state.cpuScore} <span class="score-side cpu">${escapeHtml(cpuScoreBugName)}</span> <span class="score-aux">(${state.cpuHand.length})</span>`;
+      }
+      if (humanHandTitle) {
+        humanHandTitle.textContent = `${humanDisplayName} Hand`;
+        setSideTextClasses(humanHandTitle, "human");
+      }
+      if (cpuHandTitle) {
+        cpuHandTitle.textContent = `${cpuDisplayName} Hand`;
+        setSideTextClasses(cpuHandTitle, "cpu");
+      }
+      refreshStaticControlCopy();
       document.getElementById("gameClockLabel").textContent = state.gameOver ? `${getPeriodLabel()} Final` : `${getPeriodLabel()} | ${formatGameClock()}`;
       document.getElementById("showCpuCardsCheckbox").checked = state.showCpuCards;
       renderLegend();
@@ -8805,6 +9956,7 @@
         fillCardVisual(activeCardMiddle, null, { placeholderText: "Any Card" });
         activeCardMiddle.title = "";
       }
+      activeCardMiddle.title = formatDisplayPlayerText(activeCardMiddle.title);
 
       renderRecentPlays();
 
@@ -8848,13 +10000,15 @@
             ? `${lowerPlayerName(state.currentTurn)} is revealing a rebound card that must still match the active card.`
             : canUsePitySaveDraw(state.currentTurn, state.shotPending)
               ? `${lowerPlayerName(state.currentTurn)} gets a 1-card last-chance save draw.`
-              : `${lowerPlayerName(state.currentTurn)} is resolving the ${shotPhaseLabel}.`)
+              : canExtendSaveChainForControlledSave(state.currentTurn, state.shotPending)
+                ? `${lowerPlayerName(state.currentTurn)} has already met the save requirement and may play 1 extra legal save card for a Controlled Save, or submit now to freeze the puck.`
+                : `${lowerPlayerName(state.currentTurn)} is resolving the ${shotPhaseLabel}.`)
           : humanPendingCount > 0 && !isReboundSavePhase(state.shotPending)
             ? (humanPitySaveDraw
               ? `Human has ${humanPendingCount} staged save card${humanPendingCount === 1 ? "" : "s"}. Tap Deck, tap the pile, or press Submit to take the last-chance save draw, or Undo to pull one back.`
               : humanShotLegalCount > 0
-                ? `Human has ${humanPendingCount} staged save card${humanPendingCount === 1 ? "" : "s"}. Play more, Undo, or tap Deck, tap the pile, or press Submit to resolve the save chain.`
-                : `Human has ${humanPendingCount} staged save card${humanPendingCount === 1 ? "" : "s"}. Undo, or tap Deck, tap the pile, or press Submit to resolve the save chain.`)
+                ? `Human has ${humanPendingCount} staged save card${humanPendingCount === 1 ? "" : "s"}. Play more, Undo, or tap Deck, tap the pile, or press Submit to resolve freeze, Controlled Save, rebound, or goal from the current save count.`
+                : `Human has ${humanPendingCount} staged save card${humanPendingCount === 1 ? "" : "s"}. Undo, or tap Deck, tap the pile, or press Submit to resolve freeze, Controlled Save, rebound, or goal from the current save count.`)
           : selectedHumanCard
             ? `Human staged ${cardToText(selectedHumanCard)} for the ${isReboundSavePhase(state.shotPending) ? "rebound save" : "save chain"}. Tap Deck, tap the pile, or press Submit to confirm; Undo clears it.`
           : humanPitySaveDraw
@@ -8865,7 +10019,7 @@
             ? (humanShotLegalCount > 0
               ? `Human must play 1 legal rebound save. If its value is below ${state.shotPending.reboundShotValue}, another rebound occurs. Press Concede to allow the goal.`
               : "Human has no legal rebound save in hand. Press Rebound Draw to draw 1 top-deck rebound-save card into hand.")
-            : `Human must build a ${state.shotPending.requiredLength}-card save chain. Press End Save to resolve freeze, rebound, or goal from the current save count.`;
+            : `Human must build a ${state.shotPending.requiredLength}-card save chain. Exact coverage freezes the puck, 1 extra legal save card becomes a Controlled Save, 1 short is a rebound, and 2 or more short is a goal. Press End Save to resolve the current save count.`;
       } else if (state.currentTurn === "human" && canPlayerIcePuck("human")) {
         comboHint.textContent = "Human is stuck in the defensive zone. Draw normally, or use Ice Puck to reset both hands and force an Icing Faceoff.";
       } else if (state.currentTurn === "human" && canPlayerDumpAndChase("human")) {
@@ -8891,6 +10045,7 @@
       } else {
         comboHint.textContent = "";
       }
+      comboHint.textContent = formatDisplayPlayerText(comboHint.textContent);
 
       renderStateReadout({
         faceoffUiLabel,
@@ -8952,15 +10107,19 @@
       cpuPanel.classList.toggle("possession", state.attacker === "cpu");
       activeMiddle.classList.toggle("puck-battle", puckBattleActive);
       activeMiddle.classList.toggle("possession", true);
+      activeMiddle.classList.toggle("human-possession", state.attacker === "human");
+      activeMiddle.classList.toggle("cpu-possession", state.attacker === "cpu");
 
       if (momentumTracker) {
         momentumTracker.hidden = false;
       }
       if (humanMomentumDots) {
         humanMomentumDots.hidden = !FEATURES.momentumSystem;
+        humanMomentumDots.setAttribute("aria-label", `${humanDisplayName} momentum`);
       }
       if (cpuMomentumDots) {
         cpuMomentumDots.hidden = !FEATURES.momentumSystem;
+        cpuMomentumDots.setAttribute("aria-label", `${cpuDisplayName} momentum`);
       }
 
       if (FEATURES.momentumSystem) {
@@ -9059,7 +10218,7 @@
               : "Allow the rebound to become a goal")
             : humanCanUsePitySaveDraw
               ? "Draw 1 last-chance save card from the deck"
-            : "Stop the current save chain and resolve the outcome")
+            : "Stop the current save chain and resolve freeze, Controlled Save, rebound, or goal")
         : humanCanPass
           ? "Use End Chain to resolve the current exchange"
         : legal.length > 0
@@ -9110,7 +10269,7 @@
             ? "Choose a hand-limit discard first"
           : humanPendingCount > 0
             ? (state.shotPending
-              ? "Resolve the staged save chain"
+              ? "Resolve the staged save chain as a freeze, Controlled Save, rebound, or goal"
               : "Confirm the staged human turn and continue the game")
             : humanMoveRequiresSubmitConfirmation()
               ? "Stage a card first"
@@ -9263,9 +10422,12 @@
 
     function newGame() {
       clearCpuNotice();
+      clearExchangeMeterPulseTimer();
       clearHumanPendingTurn();
       Object.assign(FEATURES, getDraftFeaturesFromControls());
       state.config = getDraftConfigFromControls();
+      state.playerTeams = resolvePlayerTeamsForGame(state.config);
+      applyPlayerTeamTheme();
       state.deck = shuffle(createDeck());
       state.discardPile = [];
       state.humanHand = [];
@@ -9293,6 +10455,11 @@
       state.pendingOverflowDiscard = null;
       state.stabilizePending = null;
       state.pendingEncounterContext = null;
+      state.exchangeMeterPulseKey = "";
+      state.exchangeMeterPulseUntil = 0;
+      state.exchangeMeterSnapshot = null;
+      state.exchangeMeterLastCpuHandCount = 0;
+      state.exchangeMeterCpuHandFlashUntil = 0;
       setPlayByPlay("Opening faceoff.", "contain");
       state.logMessages = [];
       state.humanMomentum = 0;
@@ -9316,6 +10483,7 @@
       state.roleOfCurrentTurn = "faceoff";
 
       addLog("New game started.");
+  addLog(`Matchup: ${getMatchupText()}.`);
       addLog(`Config: ${state.config.suitCount} suits, values 1-${state.config.maxValue}, hand size ${state.config.handSize}, wild ${state.config.wildCardCount}, CPU ${getCpuDifficultyProfile().label.toLowerCase()} at ${state.config.cpuSpeedPercent}% speed, ${state.config.decksPerPeriod} deck${state.config.decksPerPeriod === 1 ? "" : "s"} per period, cross river once ${state.config.singleRiverCrossMode ? "on" : "off"}, stabilize ${getStabilizeSandingModeText(state.config.stabilizeSanding)}.`);
       startFaceoff(CENTER_ICE, "Opening faceoff at center ice.", { refillConsumesClock: false });
 
@@ -9325,6 +10493,16 @@
     function setupEvents() {
       document.getElementById("newGameBtn").addEventListener("click", () => {
         newGame();
+      });
+
+      document.getElementById("debugHumanTeam")?.addEventListener("change", () => {
+        syncTeamSelectionControls("human");
+        refreshDebugPreview();
+      });
+
+      document.getElementById("debugCpuTeam")?.addEventListener("change", () => {
+        syncTeamSelectionControls("cpu");
+        refreshDebugPreview();
       });
 
       document.getElementById("playByPlayHelpBtn")?.addEventListener("click", () => {
@@ -9526,6 +10704,7 @@
     }
 
     applySavedDefaults();
+    populateTeamSelects();
     setupEvents();
     syncDebugControlsFromConfig(state.config);
     refreshDebugPreview();
