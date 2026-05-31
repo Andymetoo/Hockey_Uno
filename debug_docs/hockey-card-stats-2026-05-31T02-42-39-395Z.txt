@@ -1,0 +1,93 @@
+Hockey Card Prototype Stats Dump
+Exported: 2026-05-31T02:42:39.394Z
+
+Settings
+P1 Team Selection: Random
+P2 Team Selection: Random
+Current Matchup: Toronto (Human) vs Vancouver (CPU)
+Suit Count: 4
+Max Card Value: 8
+Hand Size: 5
+Wild Cards: 0
+CPU Speed %: 200
+CPU Difficulty: Pro
+CPU Tuning: lookahead 1, follow-up 5, chain 5, empty-hand 6, zone push 5, shot-zone 5, conserve 5, stabilize deny 5, faceoff 58%, icing reluctance 5, momentum 4, late risk 4, panic 2, D-zone 2+, goal-zone 2+, icing 6+, dump 7+
+Stabilize Sanding: Default
+Decks Per Period: 2
+Cross River Once: false
+Momentum System: true
+Show Vancouver (CPU) Cards: false
+
+Game State
+Score: (5) Toronto (Human) 3 - 1 Vancouver (CPU) (7)
+Period: Period 3
+Clock: 0:00
+Game Over: true
+Zone: Vancouver (CPU) Goal Zone
+Attacker: None
+Defender: None
+Current Turn: None
+Current Role: final
+Active Card: Finesse 1
+Run Match Mode: uncommitted
+River Crossed: false
+Deck Count: 52
+Discard Count: 0
+
+Match Statistics
+Goals: Toronto (Human) 3 | Vancouver (CPU) 1
+Force Shot Goals: Toronto (Human) 0 | Vancouver (CPU) 0
+Shots On Goal: Toronto (Human) 5 | Vancouver (CPU) 2
+Saves Made: Toronto (Human) 0 | Vancouver (CPU) 2
+Exchange Wins: Toronto (Human) 36 | Vancouver (CPU) 37
+Faceoffs Won: Toronto (Human) 6 | Vancouver (CPU) 14
+Loose Pucks Won: Toronto (Human) 4 | Vancouver (CPU) 8
+Dumps Used: Toronto (Human) 2 | Vancouver (CPU) 0
+Icings Used: Toronto (Human) 0 | Vancouver (CPU) 0
+Burns Used: Toronto (Human) 0 | Vancouver (CPU) 0
+Cycles Used: Toronto (Human) 9 | Vancouver (CPU) 0
+Force Shots: Toronto (Human) 1 | Vancouver (CPU) 0
+Stabilize Saves: Toronto (Human) 13 | Vancouver (CPU) 6
+Rebounds: Toronto (Human) 0 | Vancouver (CPU) 1
+Rebound Saves: Toronto (Human) 0 | Vancouver (CPU) 0
+Defensive Recoveries: Toronto (Human) 1 | Vancouver (CPU) 0
+Total Shot Value: Toronto (Human) 28 | Vancouver (CPU) 10
+Highest Shot Value: Toronto (Human) 8 | Vancouver (CPU) 7
+Average Shot Value: Toronto (Human) 5.60 | Vancouver (CPU) 5.00
+
+Stat Notes
+Shots On Goal already includes Force Shots and rebound shots. Saves Made already includes rebound saves.
+
+Luck
+Luck Index blends draw quality versus expected value, high-card frequency, hot-hand snapshots at full hand size, and whether rescue draws or rebound reveals actually converted.
+Luck Index: Toronto (Human) +96 | Vancouver (CPU) +35
+Avg Draw Value: Toronto (Human) 4.68 | Vancouver (CPU) 4.50
+High Cards Drawn: Toronto (Human) 54 | Vancouver (CPU) 43
+Max Cards Drawn: Toronto (Human) 25 | Vancouver (CPU) 23
+Rescue Hits: Toronto (Human) 0 | Vancouver (CPU) 1
+Hot Hands: Toronto (Human) 12 | Vancouver (CPU) 10
+TOR avg 4.68 | high 54 | rescue 0/1 | rebound reveal 0/0 | hot 12 | cold 7
+VAN avg 4.50 | high 43 | rescue 1/1 | rebound reveal 0/1 | hot 10 | cold 9
+
+Time In Zone
+Toronto (Human) Zone Time: 22:09
+Neutral Zone Time: 26:35
+Vancouver (CPU) Zone Time: 11:17
+
+Shot Value Lists
+Toronto (Human): 1, 4, 8, 7, 8
+Vancouver (CPU): 7, 3
+
+Zone Activity
+Toronto (Human) Goal Zone: Toronto (Human) plays 22, Vancouver (CPU) plays 14, Toronto (Human) shots 0, Vancouver (CPU) shots 1, clock 4:19, resolved turns 14
+Toronto (Human) Defensive Zone: Toronto (Human) plays 43, Vancouver (CPU) plays 27, Toronto (Human) shots 0, Vancouver (CPU) shots 1, clock 17:50, resolved turns 24
+Neutral Zone A: Toronto (Human) plays 65, Vancouver (CPU) plays 59, Toronto (Human) shots 0, Vancouver (CPU) shots 0, clock 19:42, resolved turns 53
+Neutral Zone B: Toronto (Human) plays 26, Vancouver (CPU) plays 23, Toronto (Human) shots 0, Vancouver (CPU) shots 0, clock 6:54, resolved turns 15
+Vancouver (CPU) Defensive Zone: Toronto (Human) plays 15, Vancouver (CPU) plays 15, Toronto (Human) shots 3, Vancouver (CPU) shots 0, clock 6:09, resolved turns 10
+Vancouver (CPU) Goal Zone: Toronto (Human) plays 16, Vancouver (CPU) plays 13, Toronto (Human) shots 2, Vancouver (CPU) shots 0, clock 5:08, resolved turns 8
+
+Scoring Summary
+Period 1 | 11:51 | Vancouver (CPU) goal from Toronto (Human) Goal Zone (shot 7).
+Period 1 | 1:29 | Toronto (Human) goal from Vancouver (CPU) Defensive Zone (shot 4).
+Period 2 | 13:22 | Toronto (Human) goal from Vancouver (CPU) Goal Zone (shot 7).
+Period 3 | 17:39 | Toronto (Human) goal from Vancouver (CPU) Goal Zone (shot 8).

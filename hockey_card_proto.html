@@ -13306,9 +13306,19 @@
         }
 
         const profile = getCpuDifficultyProfile();
+        const lateNeed =
+          state.cpuScore < state.humanScore ||
+          getRegulationSecondsRemaining() <= profile.lateGamePressureSeconds ||
+          state.periodNumber > REGULATION_PERIOD_COUNT;
+        const offensivePressure = isPlayerOnOpponentSide("cpu");
+        const aggressionGate =
+          profile.momentumSpendAggression + (lateNeed ? 1 : 0);
+        if (state.roleOfCurrentTurn !== "attacker") {
+          return false;
+        }
         if (
-          profile.momentumSpendAggression < 6 ||
-          state.roleOfCurrentTurn !== "attacker"
+          aggressionGate <
+          (offensivePressure || isCpuDangerZone() ? 4 : 6)
         ) {
           return false;
         }
@@ -13330,16 +13340,44 @@
           getCpuBestHandValue() <= Math.max(lowValueThreshold, activeValue + 1);
         const weakCurrentLine =
           legalIndexes.length <= 1 && bestCurrentLegalValue <= activeValue;
+        const bestChoice = legalIndexes.length > 0 ? getCpuCardChoice() : null;
+        const immediateResolveLine = Boolean(bestChoice?.audit?.immediateResolve);
+        const responseDangerThreshold = Math.max(
+          3,
+          state.humanHand.length - 1,
+        );
+        const riskyCurrentLine =
+          !immediateResolveLine &&
+          ((bestChoice?.audit?.humanReplyCount || 0) >= responseDangerThreshold ||
+            (bestChoice?.audit?.humanDefenseRunLength || 0) >= responseDangerThreshold ||
+            (state.humanHand.length > 0 &&
+              (bestChoice?.audit?.humanDefenseRunLength || 0) >=
+                state.humanHand.length) ||
+            (bestChoice?.audit?.handAfter ?? state.cpuHand.length) > 1);
 
         if (legalIndexes.length === 0) {
-          return poorHand;
+          return poorHand || offensivePressure || lateNeed;
         }
 
-        if (!poorHand || isShotZone("cpu")) {
+        if (isShotZone("cpu")) {
+          return (
+            !immediateResolveLine &&
+            ((bestChoice?.audit?.handAfter ?? state.cpuHand.length) > 1 ||
+              riskyCurrentLine ||
+              lateNeed)
+          );
+        }
+
+        if (!poorHand && !riskyCurrentLine) {
           return false;
         }
 
-        return weakCurrentLine && (isCpuDangerZone() || state.attackerChainCount === 0);
+        return (
+          weakCurrentLine &&
+          (isCpuDangerZone() ||
+            offensivePressure ||
+            state.attackerChainCount === 0)
+        );
       }
 
       function cpuShouldPowerShotMomentum(
@@ -13372,6 +13410,12 @@
             getRegulationSecondsRemaining() <= profile.lateGamePressureSeconds) ||
           state.periodNumber > REGULATION_PERIOD_COUNT;
         if (legalIndexes.length === 0) {
+          if (isCloseOffensiveZone("cpu")) {
+            return shotPressure >= 1;
+          }
+          if (lateNeed) {
+            return shotPressure >= 1;
+          }
           return shotPressure >= (aggression >= 8 ? 1 : 2);
         }
 
@@ -13392,8 +13436,8 @@
         }
 
         if (isCloseOffensiveZone("cpu")) {
-          if (handSize >= 3 && (riskyCurrentLine || lateNeed)) {
-            return shotPressure >= 2;
+          if (handSize >= 2 && (riskyCurrentLine || lateNeed)) {
+            return shotPressure >= 1;
           }
 
           return (
@@ -13739,9 +13783,11 @@
         if (legal.length === 0) {
           if (FEATURES.momentumSystem && canPlayerDumpAndChase("cpu")) {
             addCpuAuditLog(
-              "cannot-play branch | Dump Hand was available, but the dump heuristic stayed below threshold so CPU risked the draw instead.",
+              `cannot-play branch | no legal attack card. Dump Hand was available, but it concedes possession for a deep refresh, so CPU preferred the draw instead. cycle ${canPlayerUseCycle("cpu") ? "up" : "off"}, burn ${canPlayerUseBurn("cpu") ? "up" : "off"}, force ${canPlayerUsePowerShot("cpu") ? "up" : "off"}.`,
             );
-            addLog("CPU declines Dump Hand and risks the draw instead.");
+            addLog(
+              "CPU declines Dump Hand and risks the draw instead because Dump and Chase would concede possession for a deep refresh.",
+            );
           }
           await handleCannotPlay("cpu");
           return true;
