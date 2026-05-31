@@ -9082,6 +9082,21 @@
 
         if (state.stabilizePending) {
           const pending = state.stabilizePending;
+          if (player === "cpu") {
+            if (drawnCard && drawnStillInHand) {
+              addCpuAuditLog(
+                `stabilize line | drew ${cardToText(drawnCard)} but it still does not stabilize on ${cardToText(state.activeCard)}.`,
+              );
+            } else if (drawnCard) {
+              addCpuAuditLog(
+                "stabilize line | drew 1 for Stabilize, but the hand still could not produce a legal reply after trimming back to the hand limit.",
+              );
+            } else {
+              addCpuAuditLog(
+                `stabilize line | deck empty, so CPU could not find a Stabilize reply to ${cardToText(state.activeCard)}.`,
+              );
+            }
+          }
           addLog(
             `${lowerPlayerName(player)} cannot complete the Stabilize attempt${drawnCard ? " after the draw" : ""}.`,
           );
@@ -9410,6 +9425,11 @@
           player === "cpu" && !state.showCpuCards,
           player === "cpu" ? getCpuSimDuration(420, 120) : 280,
         );
+        if (player === "cpu" && state.stabilizePending) {
+          addCpuAuditLog(
+            `stabilize line | drew ${cardToText(drawnCard)} and it is legal, so CPU auto-plays it for the Stabilize attempt.`,
+          );
+        }
         addLog(
           `${lowerPlayerName(player)} plays the drawn ${cardToText(drawnCard)} immediately.`,
         );
@@ -10187,6 +10207,12 @@
             getStabilizeRuleSummary(),
           ),
         );
+        if (pendingAttacker === "cpu") {
+          const legal = getLegalCardsForTurn("cpu");
+          addCpuAuditLog(
+            `stabilize attempt starts | active ${state.activeCard ? cardToText(state.activeCard) : "Any Card"} | legal ${cardsAtIndexesToText(state.cpuHand, legal)} | hand ${cardsToText(state.cpuHand)}.`,
+          );
+        }
         logTurnDiagnostics(state.currentTurn, "Stabilize attempt.");
       }
 
@@ -12299,7 +12325,11 @@
         }
 
         const roleLabel =
-          state.roleOfCurrentTurn === "defender" ? "defense" : "attack";
+          state.stabilizePending
+            ? "stabilize"
+            : state.roleOfCurrentTurn === "defender"
+              ? "defense"
+              : "attack";
         addCpuAuditLog(
           `${roleLabel} at ${zoneLabel(state.zoneIndex)} | active ${state.activeCard ? cardToText(state.activeCard) : "Any Card"} | legal ${cardsAtIndexesToText(state.cpuHand, legal)}.`,
         );
@@ -12503,11 +12533,12 @@
       function describeCpuDefenseEndDecision(
         legalIndexes = getLegalCardsForTurn("cpu"),
       ) {
-        const profile = getCpuDifficultyProfile();
-        const currentMargin =
-          state.defenderChainCount - state.attackerChainCount;
-        const targetMargin = getCpuDefenseMarginTarget(profile);
-        return `End defense chain | margin ${currentMargin} vs target ${targetMargin}+ | legal follow-ups ${legalIndexes.length} | human hand ${state.humanHand.length}.`;
+        const plan = getCpuDefenseContinuePlan(legalIndexes);
+        const bestFollowUpText =
+          plan.currentMargin === 1 && plan.bestEvaluation
+            ? ` | best +2 ${cardToText(plan.bestEvaluation.card)} score ${formatCpuAuditNumber(plan.bestEvaluation.score)} vs continue ${formatCpuAuditNumber(plan.continueThreshold)}`
+            : "";
+        return `End defense chain | margin ${plan.currentMargin} vs target ${plan.targetMargin}+ | legal follow-ups ${legalIndexes.length} | human hand ${state.humanHand.length}${bestFollowUpText}.`;
       }
 
       function describeCpuFaceoffLeadAudit(cpuIndex, options = {}) {
@@ -13169,6 +13200,77 @@
           : chooseLowestValueIndex(state.cpuHand, cpuIndexes);
       }
 
+      function getCpuDefenseContinuePlan(
+        legalIndexes = getLegalCardsForTurn("cpu"),
+      ) {
+        const profile = getCpuDifficultyProfile();
+        const currentMargin =
+          state.defenderChainCount - state.attackerChainCount;
+        const targetMargin = getCpuDefenseMarginTarget(profile);
+        const dangerZone = isCpuDangerZone();
+        const latePressure =
+          getRegulationSecondsRemaining() <= profile.lateGamePressureSeconds &&
+          state.cpuScore <= state.humanScore;
+        const shortHandThreat =
+          state.humanHand.length <= Math.max(3, getCpuPanicWindow(profile) + 1);
+        const evaluations =
+          currentMargin === 1 && legalIndexes.length > 0
+            ? legalIndexes
+                .map((index) => scoreCpuDefensePlay(index, profile))
+                .filter(Boolean)
+                .sort((left, right) => {
+                  if (right.score !== left.score) {
+                    return right.score - left.score;
+                  }
+                  if (left.card.value !== right.card.value) {
+                    return left.card.value - right.card.value;
+                  }
+                  return left.index - right.index;
+                })
+            : [];
+        const bestEvaluation = evaluations[0] || null;
+
+        let continuePressure =
+          profile.avoidStabilizeWindowWeight +
+          Math.round(profile.defenseStabilizePenalty / 8);
+        if (dangerZone) {
+          continuePressure += 4;
+        }
+        if (shortHandThreat) {
+          continuePressure += 3;
+        }
+        if (latePressure) {
+          continuePressure += 2;
+        }
+        if (state.humanHand.length <= 1) {
+          continuePressure += 2;
+        }
+        if (profile.faceoffAggression >= 70) {
+          continuePressure += 1;
+        }
+
+        const continueThreshold = clamp(16 - continuePressure, -2, 16);
+        const shouldContinue =
+          currentMargin === 1 &&
+          legalIndexes.length > 0 &&
+          (dangerZone ||
+            shortHandThreat ||
+            latePressure ||
+            (bestEvaluation && bestEvaluation.score >= continueThreshold));
+
+        return {
+          profile,
+          currentMargin,
+          targetMargin,
+          dangerZone,
+          latePressure,
+          shortHandThreat,
+          bestEvaluation,
+          continueThreshold,
+          shouldContinue,
+        };
+      }
+
       function cpuShouldEndDefenseChain(
         legalIndexes = getLegalCardsForTurn("cpu"),
       ) {
@@ -13180,11 +13282,12 @@
           return false;
         }
 
-        const profile = getCpuDifficultyProfile();
-        const currentMargin =
-          state.defenderChainCount - state.attackerChainCount;
-        const targetMargin = getCpuDefenseMarginTarget(profile);
-        if (currentMargin < targetMargin && legalIndexes.length > 0) {
+        const plan = getCpuDefenseContinuePlan(legalIndexes);
+        if (plan.currentMargin < plan.targetMargin && legalIndexes.length > 0) {
+          return false;
+        }
+
+        if (plan.shouldContinue) {
           return false;
         }
 
@@ -13194,17 +13297,17 @@
       function getCpuDefenseEndReason(
         legalIndexes = getLegalCardsForTurn("cpu"),
       ) {
-        const profile = getCpuDifficultyProfile();
-        const currentMargin =
-          state.defenderChainCount - state.attackerChainCount;
-        const targetMargin = getCpuDefenseMarginTarget(profile);
-        if (currentMargin >= targetMargin) {
-          if (currentMargin >= 2) {
-            return `CPU ends the defense chain with a ${currentMargin}-card edge to deny Stabilize.`;
+        const plan = getCpuDefenseContinuePlan(legalIndexes);
+        if (plan.currentMargin >= plan.targetMargin) {
+          if (plan.currentMargin >= 2) {
+            return `CPU ends the defense chain with a ${plan.currentMargin}-card edge to deny Stabilize.`;
           }
-          return "CPU ends the defense chain with a 1-card edge, forcing a Stabilize attempt because no larger margin target applied here.";
+          if (!plan.bestEvaluation) {
+            return "CPU ends the defense chain with a 1-card edge, forcing a Stabilize attempt because no legal +2 follow-up exists.";
+          }
+          return `CPU ends the defense chain with a 1-card edge, knowingly allowing a Stabilize attempt because the best +2 follow-up ${cardToText(plan.bestEvaluation.card)} scored ${formatCpuAuditNumber(plan.bestEvaluation.score)} below the continue threshold ${formatCpuAuditNumber(plan.continueThreshold)}.`;
         }
-        return `CPU ends the defense chain because it leads ${currentMargin}, but has no legal way to push past the Stabilize window.`;
+        return `CPU ends the defense chain because it leads ${plan.currentMargin}, but has no legal way to push past the Stabilize window.`;
       }
 
       function getCpuBestHandValue() {
@@ -13658,6 +13761,12 @@
 
         const legal = getLegalCardsForTurn("cpu");
 
+        if (state.stabilizePending) {
+          addCpuAuditLog(
+            `stabilize turn | active ${state.activeCard ? cardToText(state.activeCard) : "Any Card"} | legal ${cardsAtIndexesToText(state.cpuHand, legal)} | hand ${cardsToText(state.cpuHand)}.`,
+          );
+        }
+
         if (FEATURES.momentumSystem && cpuShouldPowerShotMomentum(legal)) {
           addCpuAuditLog(describeCpuPowerShotDecision(legal));
           showCpuNotice("FORCE SHOT", "info");
@@ -13781,6 +13890,11 @@
         }
 
         if (legal.length === 0) {
+          if (state.stabilizePending) {
+            addCpuAuditLog(
+              "stabilize line | no legal Stabilize card in hand, so CPU draws 1.",
+            );
+          }
           if (FEATURES.momentumSystem && canPlayerDumpAndChase("cpu")) {
             addCpuAuditLog(
               `cannot-play branch | no legal attack card. Dump Hand was available, but it concedes possession for a deep refresh, so CPU preferred the draw instead. cycle ${canPlayerUseCycle("cpu") ? "up" : "off"}, burn ${canPlayerUseBurn("cpu") ? "up" : "off"}, force ${canPlayerUsePowerShot("cpu") ? "up" : "off"}.`,
@@ -13798,6 +13912,12 @@
         if (idx === null || idx === undefined) {
           endComboByChoice("cpu");
           return true;
+        }
+
+        if (state.stabilizePending) {
+          addCpuAuditLog(
+            `stabilize line | legal ${cardsAtIndexesToText(state.cpuHand, legal)} | chooses ${cardToText(choice.card)}.`,
+          );
         }
 
         logCpuCardChoiceAudit(choice, legal);
