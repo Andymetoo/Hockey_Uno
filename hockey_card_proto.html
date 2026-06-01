@@ -2848,6 +2848,18 @@
             <select id="debugCpuTeam"></select>
           </label>
         </div>
+        <div class="team-setup-grid">
+          <label class="team-setup-field">
+            <span>CPU Difficulty</span>
+            <select id="debugCpuDifficulty">
+              <option value="rookie">Rookie</option>
+              <option value="veteran" selected>Pro</option>
+              <option value="allstar">All-Star</option>
+              <option value="playoff">Playoff</option>
+              <option value="custom">Custom</option>
+            </select>
+          </label>
+        </div>
         <div class="controls">
           <button id="newGameBtn">New Game</button>
           <button id="cpuStepBtn">P2 Step / Auto Continue</button>
@@ -2914,16 +2926,6 @@
                   step="10"
                   value="200"
                 />
-              </label>
-              <label class="debug-field">
-                <span>CPU Difficulty</span>
-                <select id="debugCpuDifficulty">
-                  <option value="rookie">Rookie</option>
-                  <option value="veteran" selected>Pro</option>
-                  <option value="allstar">All-Star</option>
-                  <option value="playoff">Playoff</option>
-                  <option value="custom">Custom</option>
-                </select>
               </label>
               <details class="debug-subsection debug-cpu-tuning">
                 <summary>CPU Tuning Overrides</summary>
@@ -3474,8 +3476,8 @@
         cpuMomentumSpendAggression: 4,
         cpuLateGameRiskAggression: 4,
         cpuDefensivePanicThreshold: 2,
-        humanTeam: "human",
-        cpuTeam: "cpu",
+        humanTeam: "random",
+        cpuTeam: "random",
         stabilizeSanding: "default",
         singleRiverCrossMode: false,
         decksPerPeriod: 3,
@@ -4284,7 +4286,7 @@
           return createPlayByPlayDetails(
             text,
             "A fresh 1-card faceoff is setting possession before the next chain starts.",
-            "Each side plays 1 faceoff card. Higher card wins, ties break randomly, and the winner starts the next attack from the resolved faceoff lane.",
+            "Each side chooses 1 faceoff card blindly. Higher card wins, ties break randomly, and the winner starts the next attack from the resolved faceoff lane.",
           );
         }
 
@@ -4370,7 +4372,7 @@
             text,
             "A shot has started and the defender now has to answer it with a save sequence.",
             "The attacker reached a shot result, so the game converted the exchange into a goalie save test.",
-            "Shots create a save-chain requirement based on shot quality. Exact coverage freezes the puck, 1 extra legal save card becomes a Controlled Save, 1 short creates a rebound, and 2 or more short is a goal.",
+            "Shots create a save-chain requirement based on shot quality. Exact coverage freezes the puck, 1 extra legal save card becomes a Controlled Save, and a 1-card shot with no save is a goal; otherwise, 1 short creates a rebound and 2 or more short is a goal.",
             getShotPowerTableSummary(),
           );
         }
@@ -4379,7 +4381,7 @@
           return createPlayByPlayDetails(
             text,
             "The shot was not fully dead, so a rebound sequence starts immediately.",
-            "The defense finished exactly 1 card short of a normal save chain, or the rebound save was too weak to freeze the puck.",
+            "The defense finished exactly 1 card short of a normal save chain after getting part of the save sequence down, or the rebound save was too weak to freeze the puck.",
             "A rebound creates a second-chance shot flow. The attacker reveals a rebound card, and the defense must answer that rebound shot if it stays live.",
           );
         }
@@ -4436,7 +4438,7 @@
             text,
             "The shot got through and the game is resetting to center ice.",
             "The defender finished too far short of the save requirement, or failed the rebound save, so the attack became a goal.",
-            "On a normal shot, finishing 2 or more save cards short becomes a goal. A failed rebound save also becomes a goal. After a normal goal, play restarts with a center-ice faceoff.",
+            "On a normal shot, a 1-card shot with no save is a goal, and otherwise finishing 2 or more save cards short becomes a goal. A failed rebound save also becomes a goal. After a normal goal, play restarts with a center-ice faceoff.",
             getShotPowerTableSummary(),
           );
         }
@@ -5314,8 +5316,8 @@
           });
           if (state.currentTurn === "human" && humanPitySaveDraw) {
             items.push({
-              label: "Last Chance",
-              value: "Last-chance draw live",
+              label: "Pity Draw",
+              value: "Pity save draw live",
               tone: "puck",
             });
           }
@@ -7971,7 +7973,7 @@
         const icingText = isIcingFaceoff()
           ? " Icing Faceoff: the icing side reveals first, then the opponent answers after seeing it."
           : "";
-        const text = `Faceoff: higher card wins and exact ties resolve randomly.${icingText}`;
+        const text = `Faceoff: both sides choose 1 card blindly, higher card wins, and exact ties resolve randomly.${icingText}`;
         hint.textContent = text;
         hint.title = text;
       }
@@ -8095,18 +8097,21 @@
           !shot ||
           shot.defenderPlayer !== player ||
           isReboundRevealPhase(shot) ||
-          isReboundSavePhase(shot) ||
-          shot.pitySaveDrawUsed
+          isReboundSavePhase(shot)
         ) {
           return false;
         }
 
         const shortfall = getShotCurrentRequiredLength(shot) - shot.savedCount;
-        if (shortfall !== 1 || player !== state.currentTurn) {
+        if (shortfall <= 0 || player !== state.currentTurn) {
           return false;
         }
 
         return getLegalCardsForTurn(player).length === 0;
+      }
+
+      function getNormalShotOutcomeRuleText() {
+        return "Exact coverage freezes the puck, 1 extra legal save card becomes a Controlled Save, and a 1-card shot with no save is a goal; otherwise, 1 short creates a rebound and 2 or more short is a goal.";
       }
 
       function getShotCurrentRequiredLength(shot = state.shotPending) {
@@ -8114,7 +8119,7 @@
       }
 
       function getNormalSaveRuleSummary() {
-        return `On a normal shot, exactly enough legal save cards freeze the puck. If the goalie submits at least 1 extra legal save card, it becomes a Controlled Save and the defending team gains possession in its own Defensive Zone. Coming up exactly 1 short creates a rebound; 2 or more short is a goal. ${getShotPowerTableSummary()}`;
+        return `On a normal shot, exactly enough legal save cards freeze the puck. If the goalie submits at least 1 extra legal save card, it becomes a Controlled Save and the defending team gains possession in its own Defensive Zone. A 1-card shot with no save is a goal; otherwise, coming up exactly 1 short creates a rebound, and 2 or more short is a goal. ${getShotPowerTableSummary()}`;
       }
 
       function buildShotStartPlayByPlayDetails(
@@ -8135,13 +8140,15 @@
             : closeShot
               ? `Close range adds +1 shot power, turning ${shotCard.value} into ${shotValue}, so the defender now needs ${requiredLength} save card${requiredLength === 1 ? "" : "s"}.`
               : `Shot power ${shotValue} means the defender now needs ${requiredLength} save card${requiredLength === 1 ? "" : "s"}.`,
-          "Exact coverage freezes the puck, 1 extra legal save card becomes a Controlled Save, 1 short creates a rebound, and 2 or more short is a goal.",
+          getNormalShotOutcomeRuleText(),
           getShotPowerTableSummary(),
         );
       }
 
       function buildGoalPlayByPlayDetails(shot) {
         const reboundGoal = isReboundSavePhase(shot);
+        const singleNoSaveGoal =
+          !reboundGoal && shot.requiredLength === 1 && shot.savedCount === 0;
         const goalShotValue = reboundGoal
           ? shot.reboundShotValue
           : shot.shotValue;
@@ -8152,10 +8159,14 @@
             : `${lowerPlayerName(shot.attackerPlayer)} scores on shot power ${goalShotValue}.`,
           reboundGoal
             ? `${lowerPlayerName(shot.defenderPlayer)} could not match the rebound value of ${shot.reboundShotValue}.`
-            : `Shot power ${goalShotValue} required ${shot.requiredLength} save card${shot.requiredLength === 1 ? "" : "s"}, and ${lowerPlayerName(shot.defenderPlayer)} finished ${shortfall} short.`,
+            : singleNoSaveGoal
+              ? `Shot power ${goalShotValue} only needed 1 save card, and ${lowerPlayerName(shot.defenderPlayer)} produced none.`
+              : `Shot power ${goalShotValue} required ${shot.requiredLength} save card${shot.requiredLength === 1 ? "" : "s"}, and ${lowerPlayerName(shot.defenderPlayer)} finished ${shortfall} short.`,
           reboundGoal
             ? "A failed rebound save becomes a goal immediately."
-            : "On a normal shot, finishing 2 or more save cards short becomes a goal.",
+            : singleNoSaveGoal
+              ? "A 1-card shot with no save becomes a goal immediately."
+              : "On a normal shot, finishing 2 or more save cards short becomes a goal.",
           getShotPowerTableSummary(),
         );
       }
@@ -8749,7 +8760,8 @@
           return;
         }
 
-        const shortfall = shot.requiredLength - shot.savedCount;
+        const requiredLength = getShotCurrentRequiredLength(shot);
+        const shortfall = requiredLength - shot.savedCount;
         if (shortfall < 0) {
           finishShotWithControlledSave();
           return;
@@ -8761,6 +8773,13 @@
         }
 
         if (shortfall === 1) {
+          if (requiredLength === 1) {
+            finishShotAsGoal(
+              `${lowerPlayerName(shot.defenderPlayer)} cannot answer the 1-card shot. GOAL ${lowerPlayerName(shot.attackerPlayer)}.`,
+            );
+            return;
+          }
+
           addLog(
             `${lowerPlayerName(shot.defenderPlayer)} comes up exactly 1 short on the save chain. Rebound.`,
           );
@@ -8779,11 +8798,10 @@
           return false;
         }
 
-        shot.pitySaveDrawUsed = true;
         const drawnCard = drawOneCard(player, { luckCategory: "rescue" });
         if (drawnCard) {
           addLog(
-            `${lowerPlayerName(player)} gets a 1-card last-chance save draw: ${cardToText(drawnCard)}.`,
+            `${lowerPlayerName(player)} gets a 1-card pity save draw: ${cardToText(drawnCard)}.`,
           );
           render();
           await animateDrawToHand(
@@ -8810,7 +8828,7 @@
           }
         } else {
           addLog(
-            `${lowerPlayerName(player)} has no last-chance save draw available. Deck is empty.`,
+            `${lowerPlayerName(player)} has no pity save draw available. Deck is empty.`,
           );
         }
 
@@ -8822,7 +8840,7 @@
         if (!drawnCard || legal.length === 0) {
           recordLuckSpecialOutcome(player, "rescue", false);
           addLog(
-            `${lowerPlayerName(player)} cannot turn the last-chance save draw into a save.`,
+            `${lowerPlayerName(player)} cannot turn the pity save draw into a save.`,
           );
           resolveNormalShotSaveAttempt();
           return true;
@@ -8845,7 +8863,7 @@
         }
 
         addLog(
-          `Human may now use ${cardToText(drawnCard)} as the last save card.`,
+          `Human may now use ${cardToText(drawnCard)} as the next save card.`,
         );
         return true;
       }
@@ -9193,7 +9211,7 @@
           const legal = getLegalCardsForTurn(pending.player);
           if (legal.length === 0) {
             addLog(
-              `${lowerPlayerName(pending.player)} cannot turn the last-chance save draw into a save.`,
+              `${lowerPlayerName(pending.player)} cannot turn the pity save draw into a save.`,
             );
             resolveNormalShotSaveAttempt();
             return true;
@@ -11024,7 +11042,7 @@
           );
         } else {
           addLog(
-            `${faceoffLabel} at ${zoneLabel(state.zoneIndex)}. Human choose a card.`,
+            `${faceoffLabel} at ${zoneLabel(state.zoneIndex)}. Both sides choose blindly. Human choose a card.`,
           );
         }
         setEvent(
@@ -11134,7 +11152,7 @@
             { sequenceLead: true },
           );
         } else {
-          const cpuIndex = chooseCpuFaceoffResponseIndex(humanCard, {
+          const cpuIndex = chooseCpuFaceoffLeadIndex({
             faceoffMode,
             zoneIndex: state.zoneIndex,
           });
@@ -11148,7 +11166,7 @@
             return;
           }
           addCpuAuditLog(
-            describeCpuFaceoffResponseAudit(humanCard, cpuIndex, {
+            describeCpuFaceoffLeadAudit(cpuIndex, {
               faceoffMode,
               zoneIndex: state.zoneIndex,
             }),
@@ -11559,7 +11577,7 @@
         if (!chainIndexes || chainIndexes.length === 0) {
           if (canUsePitySaveDraw("cpu", shot)) {
             addCpuAuditLog(
-              `save chain line | no legal ${shot.requiredLength}-card save chain, so CPU uses the last-chance save draw.`,
+              `save chain line | no legal continuation for the remaining ${remainingRequired}-card save requirement, so CPU uses the pity save draw.`,
             );
             return await drawPitySaveCard("cpu", {
               drawDuration: getCpuSimDuration(460, 140),
@@ -11567,10 +11585,10 @@
             });
           }
           addCpuAuditLog(
-            `save chain line | no legal ${shot.requiredLength}-card save chain and no last-chance draw available, so the shot becomes a goal.`,
+            `save chain line | no legal continuation for the remaining ${remainingRequired}-card save requirement and no pity save draw is available, so the shot becomes a goal.`,
           );
           finishShotAsGoal(
-            `${lowerPlayerName(shot.defenderPlayer)} cannot start the ${shot.requiredLength}-card save chain. GOAL ${lowerPlayerName(shot.attackerPlayer)}.`,
+            `${lowerPlayerName(shot.defenderPlayer)} cannot continue the save chain. GOAL ${lowerPlayerName(shot.attackerPlayer)}.`,
           );
           return true;
         }
@@ -11699,7 +11717,6 @@
           phaseRequiredLength: requiredLength,
           savedCards: [],
           savedCount: 0,
-          pitySaveDrawUsed: false,
           reboundCount: 0,
           reboundShotCard: null,
           reboundShotValue: null,
@@ -14725,7 +14742,7 @@
                 "Human must reveal first for the Icing Faceoff. Play 1 card; it resolves immediately and CPU answers after seeing it.";
             }
           } else {
-            comboHint.textContent = `Play 1 card for the ${faceoffUiLabel.toLowerCase()}. It resolves immediately; higher card wins and ties are random.`;
+            comboHint.textContent = `Play 1 card for the ${faceoffUiLabel.toLowerCase()}. Both sides reveal simultaneously; higher card wins and ties are random.`;
           }
         } else if (state.shotPending) {
           comboHint.textContent =
@@ -14733,7 +14750,7 @@
               ? isReboundRevealPhase(state.shotPending)
                 ? `${lowerPlayerName(state.currentTurn)} is revealing a rebound card that must still match the active card.`
                 : canUsePitySaveDraw(state.currentTurn, state.shotPending)
-                  ? `${lowerPlayerName(state.currentTurn)} gets a 1-card last-chance save draw.`
+                  ? `${lowerPlayerName(state.currentTurn)} gets a 1-card pity save draw.`
                   : canExtendSaveChainForControlledSave(
                         state.currentTurn,
                         state.shotPending,
@@ -14742,14 +14759,14 @@
                     : `${lowerPlayerName(state.currentTurn)} is resolving the ${shotPhaseLabel}.`
               : humanPendingCount > 0 && !isReboundSavePhase(state.shotPending)
                 ? humanPitySaveDraw
-                  ? `Human has ${humanPendingCount} staged save card${humanPendingCount === 1 ? "" : "s"}. Tap Deck, tap the pile, or press Submit to take the last-chance save draw, or Undo to pull one back.`
+                  ? `Human has ${humanPendingCount} staged save card${humanPendingCount === 1 ? "" : "s"}. Tap Deck, tap the pile, or press Submit to take the pity save draw, or Undo to pull one back.`
                   : humanShotLegalCount > 0
                     ? `Human has ${humanPendingCount} staged save card${humanPendingCount === 1 ? "" : "s"}. Play more, Undo, or tap Deck, tap the pile, or press Submit to resolve freeze, Controlled Save, rebound, or goal from the current save count.`
                     : `Human has ${humanPendingCount} staged save card${humanPendingCount === 1 ? "" : "s"}. Undo, or tap Deck, tap the pile, or press Submit to resolve freeze, Controlled Save, rebound, or goal from the current save count.`
                 : selectedHumanCard
                   ? `Human staged ${cardToText(selectedHumanCard)} for the ${isReboundRevealPhase(state.shotPending) ? "rebound shot" : isReboundSavePhase(state.shotPending) ? "rebound save" : "save chain"}. Tap Deck, tap the pile, or press Submit to confirm; Undo clears it.`
                   : humanPitySaveDraw
-                    ? "Human has no legal save card. Tap Deck for a 1-card last-chance save draw."
+                    ? "Human has no legal save card. Tap Deck for a 1-card pity save draw."
                     : humanReboundRevealCard
                       ? `Rebound ${state.shotPending.reboundCount}: Human drew ${cardToText(humanReboundRevealCard)} into hand. Stage it, then tap Deck, tap the pile, or press Submit to create the rebound shot.`
                       : isReboundRevealPhase(state.shotPending)
@@ -14758,7 +14775,7 @@
                           ? humanShotLegalCount > 0
                             ? `Human must play 1 legal rebound save. If its value is below ${state.shotPending.reboundShotValue}, another rebound occurs. Press Concede to allow the goal.`
                             : "Human has no legal rebound save in hand. Press Rebound Draw to draw 1 top-deck rebound-save card into hand."
-                          : `Human must build a ${state.shotPending.requiredLength}-card save chain. Exact coverage freezes the puck, 1 extra legal save card becomes a Controlled Save, 1 short is a rebound, and 2 or more short is a goal. Press End Save to resolve the current save count.`;
+                          : `Human must build a ${state.shotPending.requiredLength}-card save chain. Exact coverage freezes the puck, 1 extra legal save card becomes a Controlled Save, and a 1-card shot with no save is a goal; otherwise, 1 short is a rebound and 2 or more short is a goal. Press End Save to resolve the current save count.`;
         } else if (state.currentTurn === "human" && canPlayerIcePuck("human")) {
           comboHint.textContent =
             "Human is stuck in the defensive zone. Draw normally, or use Ice Puck to reset both hands and force an Icing Faceoff.";
@@ -15008,7 +15025,7 @@
                   ? "Rebound Draw"
                   : "Concede"
                 : humanCanUsePitySaveDraw
-                  ? "Last Chance"
+                  ? "Pity Draw"
                   : "End Save";
         if (humanMomentumActions) {
           humanMomentumActions.hidden =
@@ -15054,7 +15071,7 @@
                             ? "Draw 1 top-deck rebound-save card into hand"
                             : "Allow the rebound to become a goal"
                           : humanCanUsePitySaveDraw
-                            ? "Draw 1 last-chance save card from the deck"
+                            ? "Draw 1 pity save card from the deck"
                             : "Stop the current save chain and resolve freeze, Controlled Save, rebound, or goal"
                       : humanCanPass
                         ? "Use End Chain to resolve the current exchange"
