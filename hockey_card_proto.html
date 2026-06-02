@@ -10689,6 +10689,14 @@
         return player === "human" ? state.humanHand : state.cpuHand;
       }
 
+      function getOpponentPlayer(player) {
+        return player === "human" ? "cpu" : "human";
+      }
+
+      function getPlayerScore(player) {
+        return player === "human" ? state.humanScore : state.cpuScore;
+      }
+
       function getHandCap(config = state.config) {
         return config.handSize + 3;
       }
@@ -12350,29 +12358,38 @@
         profile = getCpuDifficultyProfile(),
         zoneIndex = state.zoneIndex,
       ) {
+        return getAiDefenseMarginTarget("cpu", profile, zoneIndex);
+      }
+
+      function getAiDefenseMarginTarget(
+        player,
+        profile = getCpuDifficultyProfile(),
+        zoneIndex = state.zoneIndex,
+      ) {
         let target = profile.neutralDefenseTarget;
 
-        if (zoneIndex === getGoalZoneIndex("cpu")) {
+        if (zoneIndex === getGoalZoneIndex(player)) {
           target = profile.goalZoneDefenseTarget;
-        } else if (zoneIndex === getDefensiveZoneIndex("cpu")) {
+        } else if (zoneIndex === getDefensiveZoneIndex(player)) {
           target = profile.defensiveZoneDefenseTarget;
         }
 
+        const opponent = getOpponentPlayer(player);
         const latePressure =
           getRegulationSecondsRemaining() <= profile.lateGamePressureSeconds &&
-          state.cpuScore <= state.humanScore;
+          getPlayerScore(player) <= getPlayerScore(opponent);
         const shortHandPressure =
-          state.humanHand.length <= getCpuPanicWindow(profile) &&
+          playerHand(opponent).length <= getCpuPanicWindow(profile) &&
           state.defenderChainCount >= state.attackerChainCount;
 
         if (
-          isCpuDangerZone(zoneIndex) &&
+          isDangerZoneFor(player, zoneIndex) &&
           profile.avoidStabilizeWindowWeight >= 6
         ) {
           target = Math.max(target, 2);
         }
         if (
-          zoneIndex === getGoalZoneIndex("cpu") &&
+          zoneIndex === getGoalZoneIndex(player) &&
           profile.avoidStabilizeWindowWeight >= 10
         ) {
           target = Math.max(target, 3);
@@ -12380,7 +12397,7 @@
         if (latePressure || shortHandPressure) {
           target = Math.max(
             target,
-            zoneIndex === getGoalZoneIndex("cpu") ? 2 : 1,
+            zoneIndex === getGoalZoneIndex(player) ? 2 : 1,
           );
         }
 
@@ -12392,12 +12409,21 @@
         zoneIndex = state.zoneIndex,
         faceoffMode = state.faceoffMode,
       ) {
+        return getAiFaceoffPressure("cpu", profile, zoneIndex, faceoffMode);
+      }
+
+      function getAiFaceoffPressure(
+        player,
+        profile = getCpuDifficultyProfile(),
+        zoneIndex = state.zoneIndex,
+        faceoffMode = state.faceoffMode,
+      ) {
         let pressure = Math.max(
           profile.faceoffNeutralBias,
           profile.faceoffAggression / 100,
         );
 
-        if (zoneIndex === getGoalZoneIndex("cpu")) {
+        if (zoneIndex === getGoalZoneIndex(player)) {
           pressure = Math.min(
             1,
             Math.max(
@@ -12405,12 +12431,12 @@
               (profile.faceoffAggression + 12) / 100,
             ) + 0.06,
           );
-        } else if (zoneIndex === getDefensiveZoneIndex("cpu")) {
+        } else if (zoneIndex === getDefensiveZoneIndex(player)) {
           pressure = Math.max(
             profile.faceoffDangerBias,
             (profile.faceoffAggression + 6) / 100,
           );
-        } else if (isShotZone("cpu", zoneIndex)) {
+        } else if (isShotZone(player, zoneIndex)) {
           pressure = Math.max(
             profile.faceoffOffenseBias,
             (profile.faceoffAggression - 10) / 100,
@@ -12421,8 +12447,9 @@
           pressure = Math.min(1, pressure + 0.08);
         }
 
+        const opponent = getOpponentPlayer(player);
         if (
-          state.cpuScore < state.humanScore &&
+          getPlayerScore(player) < getPlayerScore(opponent) &&
           getRegulationSecondsRemaining() <= profile.lateGamePressureSeconds
         ) {
           pressure = Math.min(
@@ -12432,8 +12459,8 @@
         }
 
         if (
-          isCpuDangerZone(zoneIndex) &&
-          state.humanHand.length <= getCpuPanicWindow(profile)
+          isDangerZoneFor(player, zoneIndex) &&
+          playerHand(opponent).length <= getCpuPanicWindow(profile)
         ) {
           pressure = Math.min(1, pressure + 0.05);
         }
@@ -12897,7 +12924,15 @@
       }
 
       function getProjectedCpuPlayState(cardIndex, lookaheadDepth) {
-        return getProjectedPlayState(state.cpuHand, cardIndex, lookaheadDepth);
+        return getProjectedAiPlayState("cpu", cardIndex, lookaheadDepth);
+      }
+
+      function getProjectedAiPlayState(player, cardIndex, lookaheadDepth) {
+        return getProjectedPlayState(
+          playerHand(player),
+          cardIndex,
+          lookaheadDepth,
+        );
       }
 
       function scoreKnownAttackPlay(
@@ -13159,11 +13194,13 @@
         }
       }
 
-      function scoreCpuAttackPlay(
+      function scoreAiAttackPlay(
+        player,
         cardIndex,
         profile = getCpuDifficultyProfile(),
       ) {
-        const projected = getProjectedCpuPlayState(
+        const projected = getProjectedAiPlayState(
+          player,
           cardIndex,
           profile.attackLookaheadDepth,
         );
@@ -13171,50 +13208,51 @@
           return null;
         }
 
+        const opponent = getOpponentPlayer(player);
+        const opponentHand = playerHand(opponent);
         const currentZoneIndex = state.zoneIndex;
-        const shotZone = isShotZone("cpu", currentZoneIndex);
-        const dangerZone = isCpuDangerZone(currentZoneIndex);
-        const goalZone = currentZoneIndex === getGoalZoneIndex("cpu");
+        const shotZone = isShotZone(player, currentZoneIndex);
+        const dangerZone = isDangerZoneFor(player, currentZoneIndex);
+        const goalZone = currentZoneIndex === getGoalZoneIndex(player);
         const offensivePush =
           shotZone ||
-          isFarOffensiveZone("cpu", currentZoneIndex) ||
-          isCloseOffensiveZone("cpu", currentZoneIndex);
-        const trailing = state.cpuScore < state.humanScore;
+          isFarOffensiveZone(player, currentZoneIndex) ||
+          isCloseOffensiveZone(player, currentZoneIndex);
+        const trailing = getPlayerScore(player) < getPlayerScore(opponent);
         const latePressure =
           getRegulationSecondsRemaining() <= profile.lateGamePressureSeconds ||
           state.periodNumber > REGULATION_PERIOD_COUNT;
         const lateRiskBoost = (trailing ? 1 : 0) + (latePressure ? 0.7 : 0);
         const immediateResolve = projected.remainingHand.length === 0;
-        const humanReplyCount = immediateResolve
+        const opponentReplyCount = immediateResolve
           ? 0
           : getLegalCards(
-              state.humanHand,
+              opponentHand,
               projected.card,
               projected.decision.nextMode,
               projected.decision.nextHasCrossed,
             ).length;
-        const humanDefenseRunLength =
-          immediateResolve || state.humanHand.length === 0
+        const opponentDefenseRunLength =
+          immediateResolve || opponentHand.length === 0
             ? 0
             : getLongestPlayableContinuationLength(
-                state.humanHand,
+                opponentHand,
                 projected.card,
                 projected.decision.nextMode,
                 projected.decision.nextHasCrossed,
-                state.humanHand.length,
+                opponentHand.length,
               );
         const panicWindow = getCpuPanicWindow(profile);
-        const humanShortHandDanger =
-          state.humanHand.length > 0 &&
-          state.humanHand.length <= panicWindow + 1;
-        const humanCanRunOut =
+        const opponentShortHandDanger =
+          opponentHand.length > 0 && opponentHand.length <= panicWindow + 1;
+        const opponentCanRunOut =
           !immediateResolve &&
-          state.humanHand.length > 0 &&
-          humanDefenseRunLength >= state.humanHand.length;
-        const humanCanNearlyRunOut =
+          opponentHand.length > 0 &&
+          opponentDefenseRunLength >= opponentHand.length;
+        const opponentCanNearlyRunOut =
           !immediateResolve &&
-          state.humanHand.length > 1 &&
-          humanDefenseRunLength >= state.humanHand.length - 1;
+          opponentHand.length > 1 &&
+          opponentDefenseRunLength >= opponentHand.length - 1;
 
         const followUpScore =
           projected.legalAfter * profile.attackFollowUpWeight;
@@ -13261,11 +13299,11 @@
           } else {
             const suppressedReplies = Math.max(
               0,
-              state.humanHand.length - humanReplyCount,
+              opponentHand.length - opponentReplyCount,
             );
             const suppressedRun = Math.max(
               0,
-              state.humanHand.length - humanDefenseRunLength,
+              opponentHand.length - opponentDefenseRunLength,
             );
             breakoutScore =
               suppressedReplies *
@@ -13310,21 +13348,21 @@
 
         if (!immediateResolve) {
           opponentReplyPenalty =
-            -humanReplyCount *
+            -opponentReplyCount *
             ((dangerZone
               ? profile.zoneAdvanceWeight * (goalZone ? 0.85 : 0.65)
               : 0.45) + (offensivePush ? 0.35 : 0));
           opponentChainPenalty =
-            -humanDefenseRunLength *
+            -opponentDefenseRunLength *
             ((dangerZone
               ? profile.zoneAdvanceWeight * (goalZone ? 0.7 : 0.55)
               : profile.shotZoneAggression * 0.18) + 0.2);
           score += opponentReplyPenalty;
           score += opponentChainPenalty;
 
-          if (humanCanNearlyRunOut) {
-            const trapMultiplier = humanCanRunOut ? 1 : 0.55;
-            const shortHandMultiplier = humanShortHandDanger ? 1.35 : 1;
+          if (opponentCanNearlyRunOut) {
+            const trapMultiplier = opponentCanRunOut ? 1 : 0.55;
+            const shortHandMultiplier = opponentShortHandDanger ? 1.35 : 1;
             trapPenalty =
               -(
                 profile.emptyHandShotWeight * (dangerZone ? 1.35 : 0.8) +
@@ -13392,13 +13430,17 @@
               : dangerZone
                 ? `immediate breakout win from ${zoneLabel(currentZoneIndex)}`
                 : "immediate hand-empty exchange win"
-            : `attack chain ${projected.continuationLength + 1}, ${projected.legalAfter} follow-up${projected.legalAfter === 1 ? "" : "s"}, human replies ${humanReplyCount}, defense run ${humanDefenseRunLength}`,
+            : `attack chain ${projected.continuationLength + 1}, ${projected.legalAfter} follow-up${projected.legalAfter === 1 ? "" : "s"}, ${lowerPlayerName(opponent)} replies ${opponentReplyCount}, defense run ${opponentDefenseRunLength}`,
           audit: {
             mode: "attack",
+            player,
+            opponent,
             continuationLength: projected.continuationLength,
             legalAfter: projected.legalAfter,
-            humanReplyCount,
-            humanDefenseRunLength,
+            opponentReplyCount,
+            opponentDefenseRunLength,
+            humanReplyCount: opponentReplyCount,
+            humanDefenseRunLength: opponentDefenseRunLength,
             handAfter: projected.remainingHand.length,
             immediateResolve,
             components: [
@@ -13420,11 +13462,20 @@
         };
       }
 
-      function scoreCpuDefensePlay(
+      function scoreCpuAttackPlay(
         cardIndex,
         profile = getCpuDifficultyProfile(),
       ) {
-        const projected = getProjectedCpuPlayState(
+        return scoreAiAttackPlay("cpu", cardIndex, profile);
+      }
+
+      function scoreAiDefensePlay(
+        player,
+        cardIndex,
+        profile = getCpuDifficultyProfile(),
+      ) {
+        const projected = getProjectedAiPlayState(
+          player,
           cardIndex,
           profile.defenseLookaheadDepth,
         );
@@ -13432,15 +13483,16 @@
           return null;
         }
 
-        const dangerZone = isCpuDangerZone();
-        const targetMargin = getCpuDefenseMarginTarget(profile);
+        const opponent = getOpponentPlayer(player);
+        const dangerZone = isDangerZoneFor(player);
+        const targetMargin = getAiDefenseMarginTarget(player, profile);
         const projectedMargin =
           state.defenderChainCount + 1 - state.attackerChainCount;
         const opponentDanger =
-          state.humanHand.length <= getCpuPanicWindow(profile);
+          playerHand(opponent).length <= getCpuPanicWindow(profile);
         const latePressure =
           getRegulationSecondsRemaining() <= profile.lateGamePressureSeconds &&
-          state.cpuScore <= state.humanScore;
+          getPlayerScore(player) <= getPlayerScore(opponent);
         const marginScore = projectedMargin * profile.defenseMarginWeight;
         const chainScore =
           projected.continuationLength *
@@ -13526,6 +13578,8 @@
           reason: `defense edge ${projectedMargin}, target ${targetMargin}+, ${projected.legalAfter} follow-up${projected.legalAfter === 1 ? "" : "s"}`,
           audit: {
             mode: "defense",
+            player,
+            opponent,
             projectedMargin,
             targetMargin,
             legalAfter: projected.legalAfter,
@@ -13545,22 +13599,31 @@
         };
       }
 
-      function getCpuCardChoice() {
-        if (state.currentTurn !== "cpu") {
+      function scoreCpuDefensePlay(
+        cardIndex,
+        profile = getCpuDifficultyProfile(),
+      ) {
+        return scoreAiDefensePlay("cpu", cardIndex, profile);
+      }
+
+      function getAiCardChoice(
+        player,
+        profile = getCpuDifficultyProfile(),
+      ) {
+        if (state.currentTurn !== player) {
           return null;
         }
 
-        const legal = getLegalCardsForTurn("cpu");
+        const legal = getLegalCardsForTurn(player);
         if (legal.length === 0) {
           return null;
         }
 
-        const profile = getCpuDifficultyProfile();
         const evaluations = legal
           .map((index) =>
             state.roleOfCurrentTurn === "defender"
-              ? scoreCpuDefensePlay(index, profile)
-              : scoreCpuAttackPlay(index, profile),
+              ? scoreAiDefensePlay(player, index, profile)
+              : scoreAiAttackPlay(player, index, profile),
           )
           .filter(Boolean);
 
@@ -13594,21 +13657,40 @@
         };
       }
 
-      function chooseCpuFaceoffLeadIndex(options = {}) {
-        const indexes = state.cpuHand.map((_, index) => index);
+      function getCpuCardChoice() {
+        return getAiCardChoice("cpu");
+      }
+
+      function getFaceoffComparisonPreviewForPlayer(
+        player,
+        playerCard,
+        opponentCard,
+        config = state.config,
+      ) {
+        return player === "human"
+          ? getFaceoffComparisonPreview(playerCard, opponentCard, config)
+          : getFaceoffComparisonPreview(opponentCard, playerCard, config);
+      }
+
+      function chooseAiFaceoffLeadIndex(
+        player,
+        options = {},
+        profile = getCpuDifficultyProfile(),
+      ) {
+        const hand = playerHand(player);
+        const indexes = hand.map((_, index) => index);
         if (indexes.length === 0) {
           return null;
         }
 
-        const profile = getCpuDifficultyProfile();
-        const pressure = getCpuFaceoffPressure(
+        const pressure = getAiFaceoffPressure(
+          player,
           profile,
           options.zoneIndex ?? state.zoneIndex,
           options.faceoffMode ?? state.faceoffMode,
         );
         const ordered = [...indexes].sort((left, right) => {
-          const valueDiff =
-            state.cpuHand[right].value - state.cpuHand[left].value;
+          const valueDiff = hand[right].value - hand[left].value;
           if (valueDiff !== 0) {
             return valueDiff;
           }
@@ -13629,48 +13711,68 @@
         return ordered[slot];
       }
 
-      function chooseCpuFaceoffResponseIndex(humanCard, options = {}) {
-        const cpuIndexes = state.cpuHand.map((_, index) => index);
-        if (cpuIndexes.length === 0) {
+      function chooseCpuFaceoffLeadIndex(options = {}) {
+        return chooseAiFaceoffLeadIndex("cpu", options);
+      }
+
+      function chooseAiFaceoffResponseIndex(
+        player,
+        opponentCard,
+        options = {},
+        profile = getCpuDifficultyProfile(),
+      ) {
+        const hand = playerHand(player);
+        const indexes = hand.map((_, index) => index);
+        if (indexes.length === 0) {
           return null;
         }
 
-        const profile = getCpuDifficultyProfile();
         const zoneIndex = options.zoneIndex ?? state.zoneIndex;
-        const pressure = getCpuFaceoffPressure(
+        const pressure = getAiFaceoffPressure(
+          player,
           profile,
           zoneIndex,
           options.faceoffMode ?? state.faceoffMode,
         );
-        const winningIndexes = cpuIndexes.filter(
+        const winningIndexes = indexes.filter(
           (index) =>
-            getFaceoffComparisonPreview(humanCard, state.cpuHand[index])
-              .winner === "cpu",
+            getFaceoffComparisonPreviewForPlayer(
+              player,
+              hand[index],
+              opponentCard,
+            ).winner === player,
         );
         if (winningIndexes.length > 0) {
           const mustOverpower =
             pressure >= 0.96 &&
-            isCpuDangerZone(zoneIndex) &&
-            humanCard.value >= state.config.maxValue - 1;
+            isDangerZoneFor(player, zoneIndex) &&
+            opponentCard.value >= state.config.maxValue - 1;
           return mustOverpower
-            ? chooseHighestValueIndex(state.cpuHand, winningIndexes)
-            : chooseLowestValueIndex(state.cpuHand, winningIndexes);
+            ? chooseHighestValueIndex(hand, winningIndexes)
+            : chooseLowestValueIndex(hand, winningIndexes);
         }
 
-        const tyingIndexes = cpuIndexes.filter(
+        const tyingIndexes = indexes.filter(
           (index) =>
-            getFaceoffComparisonPreview(humanCard, state.cpuHand[index])
-              .winner === null,
+            getFaceoffComparisonPreviewForPlayer(
+              player,
+              hand[index],
+              opponentCard,
+            ).winner === null,
         );
         if (tyingIndexes.length > 0) {
           return pressure >= 0.9 && profile.faceoffAggression < 70
-            ? chooseHighestValueIndex(state.cpuHand, tyingIndexes)
-            : chooseLowestValueIndex(state.cpuHand, tyingIndexes);
+            ? chooseHighestValueIndex(hand, tyingIndexes)
+            : chooseLowestValueIndex(hand, tyingIndexes);
         }
 
         return pressure >= 0.78 && profile.faceoffAggression < 70
-          ? chooseHighestValueIndex(state.cpuHand, cpuIndexes)
-          : chooseLowestValueIndex(state.cpuHand, cpuIndexes);
+          ? chooseHighestValueIndex(hand, indexes)
+          : chooseLowestValueIndex(hand, indexes);
+      }
+
+      function chooseCpuFaceoffResponseIndex(humanCard, options = {}) {
+        return chooseAiFaceoffResponseIndex("cpu", humanCard, options);
       }
 
       function getCpuDefenseContinuePlan(
@@ -13783,11 +13885,15 @@
         return `CPU ends the defense chain because it leads ${plan.currentMargin}, but has no legal way to push past the Stabilize window.`;
       }
 
-      function getCpuBestHandValue() {
-        return state.cpuHand.reduce(
+      function getAiBestHandValue(player) {
+        return playerHand(player).reduce(
           (best, card) => Math.max(best, card?.value || 0),
           0,
         );
+      }
+
+      function getCpuBestHandValue() {
+        return getAiBestHandValue("cpu");
       }
 
       function sleep(ms) {
@@ -13835,26 +13941,27 @@
         ).length;
       }
 
-      function getCpuBurnIndex() {
-        const allIndexes = state.cpuHand.map((_, index) => index);
+      function getAiBurnIndex(player) {
+        const hand = playerHand(player);
+        const allIndexes = hand.map((_, index) => index);
         if (allIndexes.length === 0) {
           return null;
         }
 
         let bestIndex = allIndexes[0];
-        let bestFollowUpCount = getBurnFollowUpCount(state.cpuHand, bestIndex);
+        let bestFollowUpCount = getBurnFollowUpCount(hand, bestIndex);
         for (let i = 1; i < allIndexes.length; i += 1) {
           const idx = allIndexes[i];
-          const candidateValue = state.cpuHand[idx].value;
-          const bestValue = state.cpuHand[bestIndex].value;
+          const candidateValue = hand[idx].value;
+          const bestValue = hand[bestIndex].value;
           if (candidateValue < bestValue) {
             bestIndex = idx;
-            bestFollowUpCount = getBurnFollowUpCount(state.cpuHand, bestIndex);
+            bestFollowUpCount = getBurnFollowUpCount(hand, bestIndex);
             continue;
           }
 
           if (candidateValue === bestValue) {
-            const followUpCount = getBurnFollowUpCount(state.cpuHand, idx);
+            const followUpCount = getBurnFollowUpCount(hand, idx);
             if (followUpCount > bestFollowUpCount) {
               bestIndex = idx;
               bestFollowUpCount = followUpCount;
@@ -13865,28 +13972,80 @@
         return bestIndex;
       }
 
-      function getCpuCycleIndex() {
-        const allIndexes = state.cpuHand.map((_, index) => index);
+      function getCpuBurnIndex() {
+        return getAiBurnIndex("cpu");
+      }
+
+      function getAiCycleIndex(player) {
+        const hand = playerHand(player);
+        const allIndexes = hand.map((_, index) => index);
         if (allIndexes.length === 0) {
           return null;
         }
 
-        return chooseLowestValueIndex(state.cpuHand, allIndexes);
+        return chooseLowestValueIndex(hand, allIndexes);
       }
 
-      function cpuShouldCycleMomentum(
-        legalIndexes = getLegalCardsForTurn("cpu"),
+      function getCpuCycleIndex() {
+        return getAiCycleIndex("cpu");
+      }
+
+      function getAiNormalLineRiskContext(
+        player,
+        legalIndexes = getLegalCardsForTurn(player),
+        profile = getCpuDifficultyProfile(),
       ) {
-        if (!FEATURES.momentumSystem || !canPlayerUseCycle("cpu")) {
+        const hand = playerHand(player);
+        const opponentHand = playerHand(getOpponentPlayer(player));
+        const bestChoice =
+          legalIndexes.length > 0 ? getAiCardChoice(player, profile) : null;
+        const immediateResolveLine = Boolean(bestChoice?.audit?.immediateResolve);
+        const opponentReplyCount =
+          bestChoice?.audit?.opponentReplyCount ??
+          bestChoice?.audit?.humanReplyCount ??
+          0;
+        const opponentDefenseRunLength =
+          bestChoice?.audit?.opponentDefenseRunLength ??
+          bestChoice?.audit?.humanDefenseRunLength ??
+          0;
+        const responseDangerThreshold = Math.max(3, opponentHand.length - 1);
+        const handAfter = bestChoice?.audit?.handAfter ?? hand.length;
+        const riskyCurrentLine =
+          !immediateResolveLine &&
+          (legalIndexes.length <= 1 ||
+            opponentReplyCount >= responseDangerThreshold ||
+            opponentDefenseRunLength >= responseDangerThreshold ||
+            (opponentHand.length > 0 &&
+              opponentDefenseRunLength >= opponentHand.length) ||
+            handAfter > 1);
+
+        return {
+          bestChoice,
+          immediateResolveLine,
+          opponentReplyCount,
+          opponentDefenseRunLength,
+          responseDangerThreshold,
+          handAfter,
+          riskyCurrentLine,
+        };
+      }
+
+      function shouldAiCycleMomentum(
+        player,
+        legalIndexes = getLegalCardsForTurn(player),
+        profile = getCpuDifficultyProfile(),
+      ) {
+        if (!FEATURES.momentumSystem || !canPlayerUseCycle(player)) {
           return false;
         }
 
-        const profile = getCpuDifficultyProfile();
+        const opponent = getOpponentPlayer(player);
+        const hand = playerHand(player);
         const lateNeed =
-          state.cpuScore < state.humanScore ||
+          getPlayerScore(player) < getPlayerScore(opponent) ||
           getRegulationSecondsRemaining() <= profile.lateGamePressureSeconds ||
           state.periodNumber > REGULATION_PERIOD_COUNT;
-        const offensivePressure = isPlayerOnOpponentSide("cpu");
+        const offensivePressure = isPlayerOnOpponentSide(player);
         const aggressionGate =
           profile.momentumSpendAggression + (lateNeed ? 1 : 0);
         if (state.roleOfCurrentTurn !== "attacker") {
@@ -13894,13 +14053,13 @@
         }
         if (
           aggressionGate <
-          (offensivePressure || isCpuDangerZone() ? 4 : 6)
+          (offensivePressure || isDangerZoneFor(player) ? 4 : 6)
         ) {
           return false;
         }
 
         const bestCurrentLegalValue = legalIndexes.reduce(
-          (best, idx) => Math.max(best, state.cpuHand[idx].value),
+          (best, idx) => Math.max(best, hand[idx].value),
           0,
         );
         const activeValue = state.activeCard?.value ?? bestCurrentLegalValue;
@@ -13908,70 +14067,70 @@
           2,
           Math.ceil(state.config.maxValue / 2),
         );
-        const lowValueCount = state.cpuHand.filter(
+        const lowValueCount = hand.filter(
           (card) => card.value <= lowValueThreshold,
         ).length;
         const poorHand =
-          lowValueCount >= Math.ceil(state.cpuHand.length / 2) ||
-          getCpuBestHandValue() <= Math.max(lowValueThreshold, activeValue + 1);
+          lowValueCount >= Math.ceil(hand.length / 2) ||
+          getAiBestHandValue(player) <= Math.max(lowValueThreshold, activeValue + 1);
         const weakCurrentLine =
           legalIndexes.length <= 1 && bestCurrentLegalValue <= activeValue;
-        const bestChoice = legalIndexes.length > 0 ? getCpuCardChoice() : null;
-        const immediateResolveLine = Boolean(bestChoice?.audit?.immediateResolve);
-        const responseDangerThreshold = Math.max(
-          3,
-          state.humanHand.length - 1,
-        );
-        const riskyCurrentLine =
-          !immediateResolveLine &&
-          ((bestChoice?.audit?.humanReplyCount || 0) >= responseDangerThreshold ||
-            (bestChoice?.audit?.humanDefenseRunLength || 0) >= responseDangerThreshold ||
-            (state.humanHand.length > 0 &&
-              (bestChoice?.audit?.humanDefenseRunLength || 0) >=
-                state.humanHand.length) ||
-            (bestChoice?.audit?.handAfter ?? state.cpuHand.length) > 1);
 
         if (legalIndexes.length === 0) {
           return poorHand || offensivePressure || lateNeed;
         }
 
-        if (isShotZone("cpu")) {
+        const lineContext = getAiNormalLineRiskContext(
+          player,
+          legalIndexes,
+          profile,
+        );
+
+        if (isShotZone(player)) {
           return (
-            !immediateResolveLine &&
-            ((bestChoice?.audit?.handAfter ?? state.cpuHand.length) > 1 ||
-              riskyCurrentLine ||
+            !lineContext.immediateResolveLine &&
+            (lineContext.handAfter > 1 ||
+              lineContext.riskyCurrentLine ||
               lateNeed)
           );
         }
 
-        if (!poorHand && !riskyCurrentLine) {
+        if (!poorHand && !lineContext.riskyCurrentLine) {
           return false;
         }
 
         return (
           weakCurrentLine &&
-          (isCpuDangerZone() ||
+          (isDangerZoneFor(player) ||
             offensivePressure ||
             state.attackerChainCount === 0)
         );
       }
 
-      function cpuShouldPowerShotMomentum(
+      function cpuShouldCycleMomentum(
         legalIndexes = getLegalCardsForTurn("cpu"),
       ) {
-        if (!FEATURES.momentumSystem || !canPlayerUsePowerShot("cpu")) {
+        return shouldAiCycleMomentum("cpu", legalIndexes);
+      }
+
+      function shouldAiPowerShotMomentum(
+        player,
+        legalIndexes = getLegalCardsForTurn(player),
+        profile = getCpuDifficultyProfile(),
+      ) {
+        if (!FEATURES.momentumSystem || !canPlayerUsePowerShot(player)) {
           return false;
         }
 
-        const profile = getCpuDifficultyProfile();
-        const handSize = getPowerShotValue("cpu");
+        const opponent = getOpponentPlayer(player);
+        const handSize = getPowerShotValue(player);
         if (handSize < 2) {
           return false;
         }
 
         const aggression =
           profile.momentumSpendAggression +
-          (state.cpuScore < state.humanScore ||
+          (getPlayerScore(player) < getPlayerScore(opponent) ||
           getRegulationSecondsRemaining() <= profile.lateGamePressureSeconds
             ? Math.ceil(profile.lateGameRiskAggression / 3)
             : 0);
@@ -13981,12 +14140,12 @@
 
         const shotPressure = requiredSaveLengthFromShotValue(handSize);
         const lateNeed =
-          state.cpuScore < state.humanScore ||
-          (state.cpuScore === state.humanScore &&
+          getPlayerScore(player) < getPlayerScore(opponent) ||
+          (getPlayerScore(player) === getPlayerScore(opponent) &&
             getRegulationSecondsRemaining() <= profile.lateGamePressureSeconds) ||
           state.periodNumber > REGULATION_PERIOD_COUNT;
         if (legalIndexes.length === 0) {
-          if (isCloseOffensiveZone("cpu")) {
+          if (isCloseOffensiveZone(player)) {
             return shotPressure >= 1;
           }
           if (lateNeed) {
@@ -13995,24 +14154,17 @@
           return shotPressure >= (aggression >= 8 ? 1 : 2);
         }
 
-        const bestChoice = getCpuCardChoice();
-        const responseDangerThreshold = Math.max(3, state.humanHand.length - 1);
-        const immediateResolveLine = Boolean(bestChoice?.audit?.immediateResolve);
-        const riskyCurrentLine =
-          !immediateResolveLine &&
-          (legalIndexes.length <= 1 ||
-            (bestChoice?.audit?.humanReplyCount || 0) >= responseDangerThreshold ||
-            (bestChoice?.audit?.humanDefenseRunLength || 0) >= responseDangerThreshold ||
-            (state.humanHand.length > 0 &&
-              (bestChoice?.audit?.humanDefenseRunLength || 0) >= state.humanHand.length) ||
-            (bestChoice?.audit?.handAfter ?? state.cpuHand.length) > 1);
-
-        if (immediateResolveLine && !lateNeed) {
+        const lineContext = getAiNormalLineRiskContext(
+          player,
+          legalIndexes,
+          profile,
+        );
+        if (lineContext.immediateResolveLine && !lateNeed) {
           return false;
         }
 
-        if (isCloseOffensiveZone("cpu")) {
-          if (handSize >= 2 && (riskyCurrentLine || lateNeed)) {
+        if (isCloseOffensiveZone(player)) {
+          if (handSize >= 2 && (lineContext.riskyCurrentLine || lateNeed)) {
             return shotPressure >= 1;
           }
 
@@ -14027,7 +14179,7 @@
         if (
           handSize >= Math.max(3, state.config.handSize - 1) &&
           shotPressure >= 2 &&
-          (lateNeed || riskyCurrentLine) &&
+          (lateNeed || lineContext.riskyCurrentLine) &&
           legalIndexes.length <= (aggression >= 8 ? 2 : 1)
         ) {
           return true;
@@ -14040,14 +14192,22 @@
         );
       }
 
-      function cpuShouldDumpAndChase() {
-        if (!FEATURES.momentumSystem || !canPlayerDumpAndChase("cpu")) {
+      function cpuShouldPowerShotMomentum(
+        legalIndexes = getLegalCardsForTurn("cpu"),
+      ) {
+        return shouldAiPowerShotMomentum("cpu", legalIndexes);
+      }
+
+      function shouldAiDumpAndChase(
+        player,
+        profile = getCpuDifficultyProfile(),
+      ) {
+        if (!FEATURES.momentumSystem || !canPlayerDumpAndChase(player)) {
           return false;
         }
 
-        const profile = getCpuDifficultyProfile();
-
-        const hand = state.cpuHand;
+        const opponent = getOpponentPlayer(player);
+        const hand = playerHand(player);
         const lowValueThreshold = Math.max(
           2,
           Math.ceil(state.config.maxValue / 2),
@@ -14057,13 +14217,13 @@
         ).length;
         const mostlyLowValue = lowValueCount >= Math.ceil(hand.length / 2);
         const veryWeakHand = lowValueCount >= Math.max(3, hand.length - 1);
-        const scoreDiff = state.cpuScore - state.humanScore;
+        const scoreDiff = getPlayerScore(player) - getPlayerScore(opponent);
         const regulationSecondsRemaining = getRegulationSecondsRemaining();
         let dumpScore = 0;
 
-        if (isCloseOffensiveZone("cpu")) {
+        if (isCloseOffensiveZone(player)) {
           dumpScore += 3;
-        } else if (isFarOffensiveZone("cpu")) {
+        } else if (isFarOffensiveZone(player)) {
           dumpScore += 2;
         }
 
@@ -14088,7 +14248,7 @@
         if (state.periodNumber > REGULATION_PERIOD_COUNT) {
           dumpScore -= 2;
         }
-        if (FEATURES.momentumSystem && getMomentum("cpu") > 0) {
+        if (FEATURES.momentumSystem && getMomentum(player) > 0) {
           dumpScore -= 1 + Math.round(profile.momentumSpendAggression / 5);
         }
 
@@ -14108,44 +14268,52 @@
         return dumpScore >= effectiveDumpThreshold;
       }
 
-      function cpuShouldIcePuck(legalIndexes = getLegalCardsForTurn("cpu")) {
-        if (!canPlayerIcePuck("cpu") || legalIndexes.length > 0) {
+      function cpuShouldDumpAndChase() {
+        return shouldAiDumpAndChase("cpu");
+      }
+
+      function shouldAiIcePuck(
+        player,
+        legalIndexes = getLegalCardsForTurn(player),
+        profile = getCpuDifficultyProfile(),
+      ) {
+        if (!canPlayerIcePuck(player) || legalIndexes.length > 0) {
           return false;
         }
 
-        if (FEATURES.momentumSystem && canPlayerUseCycle("cpu")) {
+        if (FEATURES.momentumSystem && canPlayerUseCycle(player)) {
           return false;
         }
 
-        const profile = getCpuDifficultyProfile();
+        const opponent = getOpponentPlayer(player);
         const panicWindow = getCpuPanicWindow(profile);
         let dangerScore = 0;
 
-        if (isShotZone("human", state.zoneIndex)) {
+        if (isShotZone(opponent, state.zoneIndex)) {
           dangerScore += 3;
         }
-        if (state.humanHand.length <= panicWindow) {
+        if (playerHand(opponent).length <= panicWindow) {
           dangerScore += 2;
         }
-        if (state.humanHand.length <= 1) {
+        if (playerHand(opponent).length <= 1) {
           dangerScore += 1;
         }
-        if (FEATURES.momentumSystem && getMomentum("human") >= 2) {
+        if (FEATURES.momentumSystem && getMomentum(opponent) >= 2) {
           dangerScore += 1;
         }
         if (state.deck.length === 0) {
           dangerScore += 1;
         }
         if (
-          state.cpuScore > state.humanScore &&
+          getPlayerScore(player) > getPlayerScore(opponent) &&
           getRegulationSecondsRemaining() <= 180
         ) {
           dangerScore += 1;
         }
-        if (state.cpuScore < state.humanScore) {
+        if (getPlayerScore(player) < getPlayerScore(opponent)) {
           dangerScore -= 1 + Math.floor(profile.lateGameRiskAggression / 5);
         }
-        if (getCpuBestHandValue() >= state.config.maxValue - 1) {
+        if (getAiBestHandValue(player) >= state.config.maxValue - 1) {
           dangerScore += 1;
         }
 
@@ -14157,28 +14325,32 @@
         return dangerScore >= effectiveIcingThreshold;
       }
 
-      function cpuShouldBurnMomentum(
-        legalIndexes = getLegalCardsForTurn("cpu"),
+      function cpuShouldIcePuck(legalIndexes = getLegalCardsForTurn("cpu")) {
+        return shouldAiIcePuck("cpu", legalIndexes);
+      }
+
+      function shouldAiBurnMomentum(
+        player,
+        legalIndexes = getLegalCardsForTurn(player),
+        profile = getCpuDifficultyProfile(),
       ) {
-        if (!FEATURES.momentumSystem || !canPlayerUseBurn("cpu")) {
+        if (!FEATURES.momentumSystem || !canPlayerUseBurn(player)) {
           return false;
         }
 
-        const profile = getCpuDifficultyProfile();
         if (profile.momentumSpendAggression <= 1) {
           return false;
         }
 
-        const burnIndex = getCpuBurnIndex();
+        const opponent = getOpponentPlayer(player);
+        const burnIndex = getAiBurnIndex(player);
         if (burnIndex === null || burnIndex === undefined) {
           return false;
         }
 
-        const burnFollowUpCount = getBurnFollowUpCount(
-          state.cpuHand,
-          burnIndex,
-        );
-        const canDump = canPlayerDumpAndChase("cpu");
+        const hand = playerHand(player);
+        const burnFollowUpCount = getBurnFollowUpCount(hand, burnIndex);
+        const canDump = canPlayerDumpAndChase(player);
 
         if (legalIndexes.length === 0) {
           if (canDump && burnFollowUpCount === 0) {
@@ -14190,7 +14362,6 @@
           );
         }
 
-        const hand = state.cpuHand;
         const lowValueThreshold = Math.max(
           2,
           Math.ceil(state.config.maxValue / 2),
@@ -14209,7 +14380,7 @@
         const burnImprovesOptions = burnFollowUpCount > legalIndexes.length;
         const aggressionGate =
           profile.momentumSpendAggression +
-          (state.cpuScore < state.humanScore ||
+          (getPlayerScore(player) < getPlayerScore(opponent) ||
           getRegulationSecondsRemaining() <= profile.lateGamePressureSeconds
             ? 1
             : 0);
@@ -14221,6 +14392,12 @@
             burnImprovesOptions ||
             (aggressionGate >= 8 && state.roleOfCurrentTurn === "attacker"))
         );
+      }
+
+      function cpuShouldBurnMomentum(
+        legalIndexes = getLegalCardsForTurn("cpu"),
+      ) {
+        return shouldAiBurnMomentum("cpu", legalIndexes);
       }
 
       async function cpuTakeTurn() {
