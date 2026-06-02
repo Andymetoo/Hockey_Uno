@@ -2061,6 +2061,10 @@
         font: inherit;
       }
 
+      .debug-grid > .controls {
+        grid-column: 1 / -1;
+      }
+
       .debug-preview {
         margin: 0;
         color: var(--muted);
@@ -2092,6 +2096,22 @@
 
       .debug-subsection-body {
         padding: 10px;
+      }
+
+      .debug-output {
+        margin: 0;
+        min-height: 92px;
+        max-height: 240px;
+        overflow: auto;
+        white-space: pre-wrap;
+        background: #f2f7ff;
+        color: #173250;
+        border: 1px solid #d9e3f1;
+        border-radius: 8px;
+        padding: 10px;
+        font-family: Consolas, Monaco, "Courier New", monospace;
+        font-size: 0.8rem;
+        line-height: 1.4;
       }
 
       .log {
@@ -3143,6 +3163,57 @@
                   </div>
                 </div>
               </details>
+              <div class="controls">
+                <button id="saveDefaultsBtn" type="button">Save Defaults</button>
+              </div>
+              <details class="debug-subsection debug-cpu-monte-carlo">
+                <summary>CPU Monte Carlo</summary>
+                <div class="debug-subsection-body">
+                  <div class="debug-grid">
+                    <label class="debug-field">
+                      <span>Use Monte Carlo</span>
+                      <select id="debugCpuMonteCarloEnabled">
+                        <option value="off" selected>Off</option>
+                        <option value="on">On</option>
+                      </select>
+                    </label>
+                    <label class="debug-field">
+                      <span>MC Rollouts / Choice</span>
+                      <input
+                        id="debugCpuMonteCarloRollouts"
+                        type="number"
+                        min="1"
+                        max="64"
+                        step="1"
+                        value="6"
+                      />
+                    </label>
+                    <label class="debug-field">
+                      <span>MC Candidate Lines</span>
+                      <input
+                        id="debugCpuMonteCarloCandidates"
+                        type="number"
+                        min="2"
+                        max="8"
+                        step="1"
+                        value="3"
+                      />
+                    </label>
+                    <label class="debug-field">
+                      <span>MC Max Steps</span>
+                      <input
+                        id="debugCpuMonteCarloMaxSteps"
+                        type="number"
+                        min="40"
+                        max="1600"
+                        step="20"
+                        value="220"
+                      />
+                    </label>
+                  </div>
+                  <p class="debug-preview" id="debugMonteCarloPreview"></p>
+                </div>
+              </details>
               <label class="debug-field">
                 <span>Decks Per Period</span>
                 <input
@@ -3177,15 +3248,77 @@
                 </select>
               </label>
             </div>
-            <div class="controls">
-              <button id="saveDefaultsBtn" type="button">Save Defaults</button>
-            </div>
+            <details class="debug-subsection debug-headless-batch">
+              <summary>Headless Batch Runner</summary>
+              <div class="debug-subsection-body">
+                <div class="debug-grid">
+                  <label class="debug-field">
+                    <span>Sim Games</span>
+                    <input
+                      id="debugSimGames"
+                      type="number"
+                      min="1"
+                      max="200"
+                      step="1"
+                      value="12"
+                    />
+                  </label>
+                  <label class="debug-field">
+                    <span>Sim Max Steps</span>
+                    <input
+                      id="debugSimMaxSteps"
+                      type="number"
+                      min="40"
+                      max="2400"
+                      step="20"
+                      value="800"
+                    />
+                  </label>
+                  <label class="debug-field">
+                    <span>Start Point</span>
+                    <select id="debugSimStartPoint">
+                      <option value="fresh" selected>Fresh New Games</option>
+                      <option value="current">Current Board State</option>
+                    </select>
+                  </label>
+                  <label class="debug-field">
+                    <span>Detail Level</span>
+                    <select id="debugSimDetailLevel">
+                      <option value="summary" selected>Summary Only</option>
+                      <option value="matches">Include Match Detail</option>
+                    </select>
+                  </label>
+                </div>
+                <p class="debug-preview">
+                  Press Run Headless Batch to simulate full matches. The CPU side
+                  follows the CPU Monte Carlo setting; the opposing AI stays on
+                  the baseline heuristic for comparison.
+                </p>
+                <div class="controls">
+                  <button id="runHeadlessBatchBtn" type="button">
+                    Run Headless Batch
+                  </button>
+                  <button
+                    id="downloadHeadlessBatchCsvBtn"
+                    type="button"
+                    disabled
+                  >
+                    Download Batch CSV
+                  </button>
+                </div>
+                <pre
+                  class="debug-output"
+                  id="debugSimOutput"
+                  aria-live="polite"
+                >Headless batch idle.</pre>
+              </div>
+            </details>
             <p class="debug-preview" id="debugPreview"></p>
             <p class="debug-preview" id="debugRulesPreview"></p>
             <p class="hint">
               Suit, value, hand size, wild-card settings, feature flags, and
-              Stabilize sanding apply on New Game. AI speed, difficulty, and AI
-              tuning knobs apply immediately.
+              Stabilize sanding apply on New Game. AI speed, difficulty, Monte
+              Carlo, and AI tuning knobs apply immediately.
             </p>
           </div>
         </details>
@@ -3476,6 +3609,10 @@
         cpuMomentumSpendAggression: 4,
         cpuLateGameRiskAggression: 4,
         cpuDefensivePanicThreshold: 2,
+        cpuMonteCarloEnabled: false,
+        cpuMonteCarloRollouts: 6,
+        cpuMonteCarloCandidateCount: 3,
+        cpuMonteCarloMaxSteps: 220,
         humanTeam: "random",
         cpuTeam: "random",
         stabilizeSanding: "default",
@@ -3865,6 +4002,79 @@
       let cpuNoticeTimeoutId = null;
       let deckEventTimeoutId = null;
       let exchangeMeterPulseTimeoutId = null;
+      let activeSimulationContext = null;
+      let lastHeadlessBatchResult = null;
+
+      function isHeadlessSimulationActive() {
+        return Boolean(activeSimulationContext?.headless);
+      }
+
+      function isAiControlledPlayer(player) {
+        return player === "cpu" || Boolean(activeSimulationContext?.aiPlayers?.[player]);
+      }
+
+      function getAiProfileForPlayer(player) {
+        return activeSimulationContext?.profiles?.[player] || getCpuDifficultyProfile();
+      }
+
+      function cloneSimulationData(value) {
+        return JSON.parse(JSON.stringify(value));
+      }
+
+      function captureSimulationSnapshot() {
+        return {
+          state: cloneSimulationData(state),
+          features: cloneSimulationData(FEATURES),
+        };
+      }
+
+      function clearSimulationTimers() {
+        if (goalFlashTimeoutId) {
+          clearTimeout(goalFlashTimeoutId);
+          goalFlashTimeoutId = null;
+        }
+        if (periodFlashTimeoutId) {
+          clearTimeout(periodFlashTimeoutId);
+          periodFlashTimeoutId = null;
+        }
+        if (phaseFlashTimeoutId) {
+          clearTimeout(phaseFlashTimeoutId);
+          phaseFlashTimeoutId = null;
+        }
+        if (cpuNoticeTimeoutId) {
+          clearTimeout(cpuNoticeTimeoutId);
+          cpuNoticeTimeoutId = null;
+        }
+        if (deckEventTimeoutId) {
+          clearTimeout(deckEventTimeoutId);
+          deckEventTimeoutId = null;
+        }
+        if (exchangeMeterPulseTimeoutId) {
+          clearTimeout(exchangeMeterPulseTimeoutId);
+          exchangeMeterPulseTimeoutId = null;
+        }
+        if (activeDrag?.ghost) {
+          activeDrag.ghost.remove();
+        }
+        activeDrag = null;
+        suppressHumanCardClickUntil = 0;
+      }
+
+      function restoreSimulationSnapshot(snapshot) {
+        if (!snapshot) {
+          return;
+        }
+
+        clearSimulationTimers();
+        Object.assign(state, cloneSimulationData(snapshot.state || {}));
+        Object.assign(FEATURES, cloneSimulationData(snapshot.features || {}));
+        state.playByPlayDetails =
+          state.playByPlayDetails ||
+          buildPlayByPlayDetails(
+            state.playByPlayText || "Opening faceoff.",
+            state.playByPlayType || "contain",
+          );
+      }
 
       // ---------------------------
       // Utility and setup functions
@@ -4530,6 +4740,11 @@
       }
 
       function showDeckEvent(text, type = "contain", duration = 1200) {
+        if (isHeadlessSimulationActive()) {
+          state.deckEvent = null;
+          return;
+        }
+
         clearDeckEvent();
         state.deckEvent = { text, type };
         render();
@@ -5806,6 +6021,10 @@
       }
 
       function addLog(message, options = {}) {
+        if (activeSimulationContext?.suppressLogs) {
+          return;
+        }
+
         state.logMessages.push({
           text: message,
           sequenceLead: Boolean(options.sequenceLead),
@@ -5832,13 +6051,20 @@
         ].join("\n");
       }
 
-      function downloadTextFile(text, filenamePrefix, successMessage) {
+      function downloadTextFile(
+        text,
+        filenamePrefix,
+        successMessage,
+        options = {},
+      ) {
         const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-        const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+        const extension = options.extension || "txt";
+        const mimeType = options.mimeType || "text/plain;charset=utf-8";
+        const blob = new Blob([text], { type: mimeType });
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
         link.href = url;
-        link.download = `${filenamePrefix}-${stamp}.txt`;
+        link.download = `${filenamePrefix}-${stamp}.${extension}`;
         document.body.appendChild(link);
         link.click();
         link.remove();
@@ -6685,6 +6911,11 @@
       }
 
       function showCpuNotice(text, tone = "danger", duration = 1000) {
+        if (isHeadlessSimulationActive()) {
+          state.cpuNotice = null;
+          return;
+        }
+
         clearCpuNotice();
         state.cpuNotice = { text, tone };
         render();
@@ -6696,6 +6927,10 @@
       }
 
       function triggerPhaseFlash(tone = "neutral") {
+        if (isHeadlessSimulationActive()) {
+          return;
+        }
+
         const activeMiddle = document.getElementById("activeMiddle");
         if (!activeMiddle) {
           return;
@@ -7393,6 +7628,36 @@
             0,
             4,
           ),
+          cpuMonteCarloEnabled:
+            rawConfig.cpuMonteCarloEnabled === true ||
+            rawConfig.cpuMonteCarloEnabled === "on",
+          cpuMonteCarloRollouts: clamp(
+            Number.parseInt(
+              rawConfig.cpuMonteCarloRollouts ??
+                DEFAULT_CONFIG.cpuMonteCarloRollouts,
+              10,
+            ),
+            1,
+            64,
+          ),
+          cpuMonteCarloCandidateCount: clamp(
+            Number.parseInt(
+              rawConfig.cpuMonteCarloCandidateCount ??
+                DEFAULT_CONFIG.cpuMonteCarloCandidateCount,
+              10,
+            ),
+            2,
+            8,
+          ),
+          cpuMonteCarloMaxSteps: clamp(
+            Number.parseInt(
+              rawConfig.cpuMonteCarloMaxSteps ??
+                DEFAULT_CONFIG.cpuMonteCarloMaxSteps,
+              10,
+            ),
+            40,
+            1600,
+          ),
           humanTeam: teamSelections.humanTeam,
           cpuTeam: teamSelections.cpuTeam,
           stabilizeSanding: sanitizeStabilizeSanding(
@@ -7545,6 +7810,18 @@
         const cpuLateRiskInput = document.getElementById("debugCpuLateRisk");
         const cpuPanicThresholdInput = document.getElementById(
           "debugCpuPanicThreshold",
+        );
+        const cpuMonteCarloEnabledInput = document.getElementById(
+          "debugCpuMonteCarloEnabled",
+        );
+        const cpuMonteCarloRolloutsInput = document.getElementById(
+          "debugCpuMonteCarloRollouts",
+        );
+        const cpuMonteCarloCandidatesInput = document.getElementById(
+          "debugCpuMonteCarloCandidates",
+        );
+        const cpuMonteCarloMaxStepsInput = document.getElementById(
+          "debugCpuMonteCarloMaxSteps",
         );
         const humanTeamInput = document.getElementById("debugHumanTeam");
         const cpuTeamInput = document.getElementById("debugCpuTeam");
@@ -7776,6 +8053,35 @@
             0,
             4,
           ),
+          cpuMonteCarloEnabled:
+            (cpuMonteCarloEnabledInput?.value || "off") === "on",
+          cpuMonteCarloRollouts: clamp(
+            Number.parseInt(
+              cpuMonteCarloRolloutsInput?.value ||
+                String(DEFAULT_CONFIG.cpuMonteCarloRollouts),
+              10,
+            ),
+            1,
+            64,
+          ),
+          cpuMonteCarloCandidateCount: clamp(
+            Number.parseInt(
+              cpuMonteCarloCandidatesInput?.value ||
+                String(DEFAULT_CONFIG.cpuMonteCarloCandidateCount),
+              10,
+            ),
+            2,
+            8,
+          ),
+          cpuMonteCarloMaxSteps: clamp(
+            Number.parseInt(
+              cpuMonteCarloMaxStepsInput?.value ||
+                String(DEFAULT_CONFIG.cpuMonteCarloMaxSteps),
+              10,
+            ),
+            40,
+            1600,
+          ),
           humanTeam: teamSelections.humanTeam,
           cpuTeam: teamSelections.cpuTeam,
           stabilizeSanding: sanitizeStabilizeSanding(
@@ -7861,6 +8167,18 @@
         const cpuLateRiskInput = document.getElementById("debugCpuLateRisk");
         const cpuPanicThresholdInput = document.getElementById(
           "debugCpuPanicThreshold",
+        );
+        const cpuMonteCarloEnabledInput = document.getElementById(
+          "debugCpuMonteCarloEnabled",
+        );
+        const cpuMonteCarloRolloutsInput = document.getElementById(
+          "debugCpuMonteCarloRollouts",
+        );
+        const cpuMonteCarloCandidatesInput = document.getElementById(
+          "debugCpuMonteCarloCandidates",
+        );
+        const cpuMonteCarloMaxStepsInput = document.getElementById(
+          "debugCpuMonteCarloMaxSteps",
         );
         const humanTeamInput = document.getElementById("debugHumanTeam");
         const cpuTeamInput = document.getElementById("debugCpuTeam");
@@ -7968,6 +8286,26 @@
             config.cpuDefensivePanicThreshold,
           );
         }
+        if (cpuMonteCarloEnabledInput) {
+          cpuMonteCarloEnabledInput.value = config.cpuMonteCarloEnabled
+            ? "on"
+            : "off";
+        }
+        if (cpuMonteCarloRolloutsInput) {
+          cpuMonteCarloRolloutsInput.value = String(
+            config.cpuMonteCarloRollouts,
+          );
+        }
+        if (cpuMonteCarloCandidatesInput) {
+          cpuMonteCarloCandidatesInput.value = String(
+            config.cpuMonteCarloCandidateCount,
+          );
+        }
+        if (cpuMonteCarloMaxStepsInput) {
+          cpuMonteCarloMaxStepsInput.value = String(
+            config.cpuMonteCarloMaxSteps,
+          );
+        }
         if (humanTeamInput) {
           humanTeamInput.value = sanitizePlayerTeamSelection(
             config.humanTeam,
@@ -8004,6 +8342,9 @@
         const cpuProfile = getCpuDifficultyProfile(config);
         const preview = document.getElementById("debugPreview");
         const rulesPreview = document.getElementById("debugRulesPreview");
+        const monteCarloPreview = document.getElementById(
+          "debugMonteCarloPreview",
+        );
         const wildText = `${config.wildCardCount} wild card${config.wildCardCount === 1 ? "" : "s"}`;
         const riverText = config.singleRiverCrossMode
           ? "cross river once ON"
@@ -8022,6 +8363,46 @@
         }
         if (rulesPreview) {
           rulesPreview.textContent = `CPU ${cpuProfile.label}: lookahead ${cpuProfile.attackLookaheadDepth}, follow-up ${cpuProfile.attackFollowUpWeight}, chain ${cpuProfile.chainLengthWeight}, empty-hand ${cpuProfile.emptyHandShotWeight}, zone push ${cpuProfile.zoneAdvanceWeight}, shot-zone ${cpuProfile.shotZoneAggression}, conserve ${cpuProfile.cardConservationWeight}, stabilize deny ${cpuProfile.avoidStabilizeWindowWeight}, faceoff ${cpuProfile.faceoffAggression}%, icing reluctance ${cpuProfile.icingReluctance}, momentum ${cpuProfile.momentumSpendAggression}, late risk ${cpuProfile.lateGameRiskAggression}, panic ${cpuProfile.defensivePanicThreshold}, D-zone ${cpuProfile.defensiveZoneDefenseTarget}+, goal-zone ${cpuProfile.goalZoneDefenseTarget}+. Chain mode: ${config.singleRiverCrossMode ? "you may switch between value and suit matching once per pile run." : "value and suit matching may alternate freely."}`;
+        }
+        if (monteCarloPreview) {
+          monteCarloPreview.textContent = config.cpuMonteCarloEnabled
+            ? `Monte Carlo ON: ${config.cpuMonteCarloRollouts} rollout${config.cpuMonteCarloRollouts === 1 ? "" : "s"} over the top ${config.cpuMonteCarloCandidateCount} candidate line${config.cpuMonteCarloCandidateCount === 1 ? "" : "s"}, capped at ${config.cpuMonteCarloMaxSteps} steps each. This applies to live CPU turns and the CPU side of headless batch runs.`
+            : "Monte Carlo OFF: CPU uses the existing heuristic line chooser in live play and headless batch runs.";
+        }
+      }
+
+      function getDebugSimulationOptionsFromControls() {
+        const gamesInput = document.getElementById("debugSimGames");
+        const maxStepsInput = document.getElementById("debugSimMaxSteps");
+        const startPointInput = document.getElementById(
+          "debugSimStartPoint",
+        );
+        const detailLevelInput = document.getElementById(
+          "debugSimDetailLevel",
+        );
+
+        return {
+          games: clamp(
+            Number.parseInt(gamesInput?.value || "12", 10),
+            1,
+            200,
+          ),
+          maxSteps: clamp(
+            Number.parseInt(maxStepsInput?.value || "800", 10),
+            40,
+            2400,
+          ),
+          startFromCurrentState:
+            (startPointInput?.value || "fresh") === "current",
+          includeMatches:
+            (detailLevelInput?.value || "summary") === "matches",
+        };
+      }
+
+      function setDebugSimulationOutput(text) {
+        const output = document.getElementById("debugSimOutput");
+        if (output) {
+          output.textContent = text || "Headless batch idle.";
         }
       }
 
@@ -8563,7 +8944,7 @@
           return false;
         }
 
-        if (player === "human") {
+        if (player === "human" && !isAiControlledPlayer(player)) {
           const desperationCard = drawOneCard(player, {
             luckCategory: "rescue",
           });
@@ -8916,6 +9297,8 @@
           return false;
         }
 
+        const autoPlayer = isAiControlledPlayer(player);
+
         const drawnCard = drawOneCard(player, { luckCategory: "rescue" });
         if (drawnCard) {
           addLog(
@@ -8929,7 +9312,7 @@
               (player === "cpu" ? getCpuSimDuration(460, 140) : 320),
           );
 
-          if (player === "human") {
+          if (player === "human" && !autoPlayer) {
             if (
               await maybeHandleHandOverflow(player, {
                 origin: "lastChanceSaveDraw",
@@ -8967,16 +9350,14 @@
         recordLuckSpecialOutcome(player, "rescue", true);
 
         const drawnIndex = playerHand(player).length - 1;
-        if (player === "cpu") {
-          const cpuButtons = document.querySelectorAll("#cpuHand .card-btn");
-          const sourceButton = cpuButtons[drawnIndex];
-          await animatePlayToPileFromElement(
-            sourceButton,
+        if (autoPlayer) {
+          await animatePlayerHandCardToPile(
+            player,
+            drawnIndex,
             drawnCard,
-            !state.showCpuCards,
             options.playDuration ?? getCpuSimDuration(420, 120),
           );
-          playShotSaveCard("cpu", drawnIndex);
+          playShotSaveCard(player, drawnIndex);
           return true;
         }
 
@@ -9189,7 +9570,11 @@
           drawnCard && playerHand(player).includes(drawnCard),
         );
 
-        if (player === "human" && legal.length > 0) {
+        if (
+          player === "human" &&
+          !isAiControlledPlayer(player) &&
+          legal.length > 0
+        ) {
           addLog(
             options.fromOverflow
               ? "Human now has a legal card after trimming back to the hand limit. Choose it manually if you want to use it."
@@ -9199,7 +9584,10 @@
           return true;
         }
 
-        if (player === "cpu" && (await tryPlayDrawnCard(player, drawnCard))) {
+        if (
+          isAiControlledPlayer(player) &&
+          (await tryPlayDrawnCard(player, drawnCard))
+        ) {
           return true;
         }
 
@@ -9377,7 +9765,7 @@
         const handCap = getHandCap();
         const drawnCard = options.drawnCard ?? hand[hand.length - 1] ?? null;
 
-        if (player === "cpu") {
+        if (isAiControlledPlayer(player)) {
           while (getHandOverflowCount(player) > 0) {
             const discardIndex = chooseCpuOverflowDiscardIndex(
               player,
@@ -9389,7 +9777,7 @@
             }
             state.discardPile.push(discardedCard);
             addLog(
-              `CPU is over the hand limit of ${handCap} and discards ${cardToText(discardedCard)}.`,
+              `${player === "cpu" ? "CPU" : "Human"} is over the hand limit of ${handCap} and discards ${cardToText(discardedCard)}.`,
             );
           }
           return false;
@@ -9469,6 +9857,10 @@
       }
 
       async function animateDrawToHand(player, drawnCard, duration = 320) {
+        if (isHeadlessSimulationActive()) {
+          return;
+        }
+
         const deckButton = document.getElementById("cannotPlayBtn");
         const target = getDrawAnimationTarget(player);
         if (!deckButton || !target || !drawnCard) {
@@ -9538,11 +9930,7 @@
       }
 
       async function tryPlayDrawnCard(player, drawnCard) {
-        if (!drawnCard) {
-          return false;
-        }
-
-        if (player === "human") {
+        if (!drawnCard || !isAiControlledPlayer(player)) {
           return false;
         }
 
@@ -10911,6 +11299,10 @@
         hidden = false,
         duration = 360,
       ) {
+        if (isHeadlessSimulationActive()) {
+          return Promise.resolve();
+        }
+
         const target = document.getElementById("activeCardMiddle");
         if (!element || !card || !target) {
           return Promise.resolve();
@@ -10924,6 +11316,24 @@
           hidden,
         );
         return animateGhostToTarget(ghost, target, duration);
+      }
+
+      async function animatePlayerHandCardToPile(
+        player,
+        cardIndex,
+        card,
+        duration = 360,
+      ) {
+        const sourceButtons = document.querySelectorAll(
+          player === "human" ? "#humanHand .card-btn" : "#cpuHand .card-btn",
+        );
+        const sourceButton = sourceButtons[cardIndex];
+        await animatePlayToPileFromElement(
+          sourceButton,
+          card,
+          player === "cpu" && !state.showCpuCards,
+          duration,
+        );
       }
 
       function setDropTargetHighlight(isActive) {
@@ -11517,14 +11927,20 @@
         return bestChain.length > 0 ? bestChain : null;
       }
 
-      function cpuShouldTakeControlledSave(shot, reserveAfterControlledSave) {
+      function shouldAiTakeControlledSave(
+        player,
+        shot,
+        reserveAfterControlledSave,
+        profile = getAiProfileForPlayer(player),
+      ) {
         if (!shot || isReboundRevealPhase(shot) || isReboundSavePhase(shot)) {
           return false;
         }
 
-        const profile = getCpuDifficultyProfile();
-        const closePressure = isCloseOffensiveZone("human", shot.shotZoneIndex);
-        const faceoffPressure = getCpuFaceoffPressure(
+        const opponent = getOpponentPlayer(player);
+        const closePressure = isCloseOffensiveZone(opponent, shot.shotZoneIndex);
+        const faceoffPressure = getAiFaceoffPressure(
+          player,
           profile,
           shot.shotZoneIndex,
           "standard",
@@ -11535,14 +11951,15 @@
         controlScore += Math.floor(profile.lateGameRiskAggression / 4);
         controlScore += Math.round(faceoffPressure * 2);
 
-        if (state.cpuScore < state.humanScore) {
+        if (getPlayerScore(player) < getPlayerScore(opponent)) {
           controlScore += 2;
         }
 
         if (
           getRegulationSecondsRemaining() <= profile.lateGamePressureSeconds
         ) {
-          controlScore += state.cpuScore <= state.humanScore ? 1 : -1;
+          controlScore +=
+            getPlayerScore(player) <= getPlayerScore(opponent) ? 1 : -1;
         }
 
         if (shot.requiredLength <= 2) {
@@ -11551,10 +11968,12 @@
         if (closePressure) {
           controlScore += 2;
         }
-        if (state.humanHand.length >= Math.max(3, state.config.handSize - 1)) {
+        if (
+          playerHand(opponent).length >= Math.max(3, state.config.handSize - 1)
+        ) {
           controlScore += 1;
         }
-        if (FEATURES.momentumSystem && getMomentum("human") >= 2) {
+        if (FEATURES.momentumSystem && getMomentum(opponent) >= 2) {
           controlScore += 1;
         }
 
@@ -11567,41 +11986,56 @@
         return controlScore >= (closePressure ? 4 : 6);
       }
 
-      async function processCpuShotSequenceTurn() {
+      function cpuShouldTakeControlledSave(shot, reserveAfterControlledSave) {
+        return shouldAiTakeControlledSave(
+          "cpu",
+          shot,
+          reserveAfterControlledSave,
+        );
+      }
+
+      async function processAiShotSequenceTurn(
+        player,
+        profile = getAiProfileForPlayer(player),
+      ) {
         const shot = state.shotPending;
-        if (!shot || state.currentTurn !== "cpu") {
+        if (!shot || state.currentTurn !== player) {
           return false;
         }
 
         if (isReboundRevealPhase(shot)) {
-          if (shot.attackerPlayer !== "cpu") {
+          if (shot.attackerPlayer !== player) {
             return false;
           }
 
-          addCpuAuditLog(
-            `rebound reveal turn | active ${cardToText(state.activeCard)} must still match, so CPU reveals the top deck card.`,
-          );
-          showCpuNotice("REBOUND", "info");
+          if (player === "cpu") {
+            addCpuAuditLog(
+              `rebound reveal turn | active ${cardToText(state.activeCard)} must still match, so CPU reveals the top deck card.`,
+            );
+            showCpuNotice("REBOUND", "info");
+          }
           render();
           await sleep(getCpuSimDuration(760, 160));
 
           if (
-            state.currentTurn !== "cpu" ||
+            state.currentTurn !== player ||
             !state.shotPending ||
             !isReboundRevealPhase(state.shotPending)
           ) {
             return false;
           }
 
-          await revealReboundShotCard("cpu", {
+          await revealReboundShotCard(player, {
             duration: getCpuSimDuration(440, 140),
           });
           return true;
         }
 
-        if (shot.defenderPlayer !== "cpu") {
+        if (shot.defenderPlayer !== player) {
           return false;
         }
+
+        const hand = playerHand(player);
 
         if (!isReboundRevealPhase(shot) && !isReboundSavePhase(shot)) {
           const remainingRequired = Math.max(
@@ -11609,88 +12043,97 @@
             shot.requiredLength - shot.savedCount,
           );
           if (remainingRequired === 0) {
-            const legal = getLegalCardsForTurn("cpu");
+            const legal = getLegalCardsForTurn(player);
             if (
               legal.length > 0 &&
-              cpuShouldTakeControlledSave(shot, state.cpuHand.length - 1)
+              shouldAiTakeControlledSave(player, shot, hand.length - 1, profile)
             ) {
-              const idx = chooseLowestValueIndex(state.cpuHand, legal);
-              addCpuAuditLog(
-                `controlled save line | requirement met, reserve after play ${state.cpuHand.length - 1}, extra legal saves ${legal.length}; CPU uses ${cardToText(state.cpuHand[idx])} to gain possession instead of freezing.`,
-              );
-              state.cpuPreviewIndex = idx;
+              const idx = chooseLowestValueIndex(hand, legal);
+              if (player === "cpu") {
+                addCpuAuditLog(
+                  `controlled save line | requirement met, reserve after play ${hand.length - 1}, extra legal saves ${legal.length}; CPU uses ${cardToText(hand[idx])} to gain possession instead of freezing.`,
+                );
+                state.cpuPreviewIndex = idx;
+              }
               render();
               await sleep(getCpuSimDuration(760, 160));
 
               if (
-                state.currentTurn !== "cpu" ||
+                state.currentTurn !== player ||
                 idx < 0 ||
-                idx >= state.cpuHand.length
+                idx >= hand.length
               ) {
-                state.cpuPreviewIndex = null;
+                if (player === "cpu") {
+                  state.cpuPreviewIndex = null;
+                }
                 return false;
               }
 
-              const cpuCard = state.cpuHand[idx];
-              const cpuButtons =
-                document.querySelectorAll("#cpuHand .card-btn");
-              const sourceButton = cpuButtons[idx];
-              await animatePlayToPileFromElement(
-                sourceButton,
-                cpuCard,
-                !state.showCpuCards,
+              await animatePlayerHandCardToPile(
+                player,
+                idx,
+                hand[idx],
                 getCpuSimDuration(420, 120),
               );
-              playShotSaveCard("cpu", idx);
-              state.cpuPreviewIndex = null;
+              playShotSaveCard(player, idx);
+              if (player === "cpu") {
+                state.cpuPreviewIndex = null;
+              }
               return true;
             }
 
-            addCpuAuditLog(
-              "freeze line | save requirement already met and no extra control card cleared the possession threshold.",
-            );
+            if (player === "cpu") {
+              addCpuAuditLog(
+                "freeze line | save requirement already met and no extra control card cleared the possession threshold.",
+              );
+            }
             finishShotWithSave();
             return true;
           }
         }
 
         if (isReboundSavePhase(shot)) {
-          const legal = getLegalCardsForTurn("cpu");
+          const legal = getLegalCardsForTurn(player);
           if (legal.length === 0) {
-            addCpuAuditLog(
-              `rebound save line | no legal rebound save against ${shot.reboundShotValue}, so CPU takes the rebound draw.`,
-            );
-            return await tryReboundDesperationSave("cpu");
+            if (player === "cpu") {
+              addCpuAuditLog(
+                `rebound save line | no legal rebound save against ${shot.reboundShotValue}, so CPU takes the rebound draw.`,
+              );
+            }
+            return await tryReboundDesperationSave(player);
           }
 
-          const idx = chooseHighestValueIndex(state.cpuHand, legal);
-          addCpuAuditLog(
-            `rebound save line | target ${shot.reboundShotValue} | legal ${cardsAtIndexesToText(state.cpuHand, legal)} | chooses highest legal ${cardToText(state.cpuHand[idx])}.`,
-          );
-          state.cpuPreviewIndex = idx;
+          const idx = chooseHighestValueIndex(hand, legal);
+          if (player === "cpu") {
+            addCpuAuditLog(
+              `rebound save line | target ${shot.reboundShotValue} | legal ${cardsAtIndexesToText(hand, legal)} | chooses highest legal ${cardToText(hand[idx])}.`,
+            );
+            state.cpuPreviewIndex = idx;
+          }
           render();
           await sleep(getCpuSimDuration(760, 160));
 
           if (
-            state.currentTurn !== "cpu" ||
+            state.currentTurn !== player ||
             idx < 0 ||
-            idx >= state.cpuHand.length
+            idx >= hand.length
           ) {
-            state.cpuPreviewIndex = null;
+            if (player === "cpu") {
+              state.cpuPreviewIndex = null;
+            }
             return false;
           }
 
-          const cpuCard = state.cpuHand[idx];
-          const cpuButtons = document.querySelectorAll("#cpuHand .card-btn");
-          const sourceButton = cpuButtons[idx];
-          await animatePlayToPileFromElement(
-            sourceButton,
-            cpuCard,
-            !state.showCpuCards,
+          await animatePlayerHandCardToPile(
+            player,
+            idx,
+            hand[idx],
             getCpuSimDuration(420, 120),
           );
-          playShotSaveCard("cpu", idx);
-          state.cpuPreviewIndex = null;
+          playShotSaveCard(player, idx);
+          if (player === "cpu") {
+            state.cpuPreviewIndex = null;
+          }
           return true;
         }
 
@@ -11699,20 +12142,22 @@
           shot.requiredLength - shot.savedCount,
         );
         const plannedSearchLength = Math.min(
-          state.cpuHand.length,
+          hand.length,
           remainingRequired + 1,
         );
         const bestChainIndexes = findBestSaveChain(
-          state.cpuHand,
+          hand,
           plannedSearchLength,
           state.activeCard,
         );
         const shouldTakeControlledSave =
           bestChainIndexes &&
           bestChainIndexes.length > remainingRequired &&
-          cpuShouldTakeControlledSave(
+          shouldAiTakeControlledSave(
+            player,
             shot,
-            state.cpuHand.length - (remainingRequired + 1),
+            hand.length - (remainingRequired + 1),
+            profile,
           );
         const chainIndexes = bestChainIndexes
           ? bestChainIndexes.slice(
@@ -11723,28 +12168,34 @@
             )
           : null;
         if (!chainIndexes || chainIndexes.length === 0) {
-          if (canUsePitySaveDraw("cpu", shot)) {
-            addCpuAuditLog(
-              `save chain line | no legal continuation for the remaining ${remainingRequired}-card save requirement, so CPU uses the pity save draw.`,
-            );
-            return await drawPitySaveCard("cpu", {
+          if (canUsePitySaveDraw(player, shot)) {
+            if (player === "cpu") {
+              addCpuAuditLog(
+                `save chain line | no legal continuation for the remaining ${remainingRequired}-card save requirement, so CPU uses the pity save draw.`,
+              );
+            }
+            return await drawPitySaveCard(player, {
               drawDuration: getCpuSimDuration(460, 140),
               playDuration: getCpuSimDuration(420, 120),
             });
           }
-          addCpuAuditLog(
-            `save chain line | no legal continuation for the remaining ${remainingRequired}-card save requirement and no pity save draw is available, so the shot becomes a goal.`,
-          );
+          if (player === "cpu") {
+            addCpuAuditLog(
+              `save chain line | no legal continuation for the remaining ${remainingRequired}-card save requirement and no pity save draw is available, so the shot becomes a goal.`,
+            );
+          }
           finishShotAsGoal(
             `${lowerPlayerName(shot.defenderPlayer)} cannot continue the save chain. GOAL ${lowerPlayerName(shot.attackerPlayer)}.`,
           );
           return true;
         }
 
-        const selectedCards = chainIndexes.map((idx) => state.cpuHand[idx]);
-        addCpuAuditLog(
-          `save chain plan | need ${remainingRequired}${shouldTakeControlledSave ? " plus control" : ""} | cards ${selectedCards.map(cardToText).join(" -> ")}.`,
-        );
+        const selectedCards = chainIndexes.map((idx) => hand[idx]);
+        if (player === "cpu") {
+          addCpuAuditLog(
+            `save chain plan | need ${remainingRequired}${shouldTakeControlledSave ? " plus control" : ""} | cards ${selectedCards.map(cardToText).join(" -> ")}.`,
+          );
+        }
         let currentCard = state.activeCard;
         let currentMode = state.runMatchMode;
         let hasCrossed = state.runHasCrossedRiver;
@@ -11771,7 +12222,7 @@
 
         const descending = [...chainIndexes].sort((a, b) => b - a);
         for (const idx of descending) {
-          state.cpuHand.splice(idx, 1);
+          hand.splice(idx, 1);
         }
 
         if (shot.savedCount > shot.requiredLength) {
@@ -11784,8 +12235,8 @@
           return true;
         }
 
-        if (canUsePitySaveDraw("cpu", shot)) {
-          return await drawPitySaveCard("cpu", {
+        if (canUsePitySaveDraw(player, shot)) {
+          return await drawPitySaveCard(player, {
             drawDuration: getCpuSimDuration(460, 140),
             playDuration: getCpuSimDuration(420, 120),
           });
@@ -11793,6 +12244,10 @@
 
         resolveNormalShotSaveAttempt();
         return true;
+      }
+
+      async function processCpuShotSequenceTurn() {
+        return await processAiShotSequenceTurn("cpu");
       }
 
       function resolveShot(
@@ -12326,6 +12781,36 @@
             0,
             4,
           ),
+          monteCarloEnabled:
+            config?.cpuMonteCarloEnabled === true ||
+            config?.cpuMonteCarloEnabled === "on",
+          monteCarloRollouts: clamp(
+            Number.parseInt(
+              config?.cpuMonteCarloRollouts ??
+                DEFAULT_CONFIG.cpuMonteCarloRollouts,
+              10,
+            ),
+            1,
+            64,
+          ),
+          monteCarloCandidateCount: clamp(
+            Number.parseInt(
+              config?.cpuMonteCarloCandidateCount ??
+                DEFAULT_CONFIG.cpuMonteCarloCandidateCount,
+              10,
+            ),
+            2,
+            8,
+          ),
+          monteCarloMaxSteps: clamp(
+            Number.parseInt(
+              config?.cpuMonteCarloMaxSteps ??
+                DEFAULT_CONFIG.cpuMonteCarloMaxSteps,
+              10,
+            ),
+            40,
+            1600,
+          ),
         };
       }
 
@@ -12363,7 +12848,7 @@
 
       function getAiDefenseMarginTarget(
         player,
-        profile = getCpuDifficultyProfile(),
+        profile = getAiProfileForPlayer(player),
         zoneIndex = state.zoneIndex,
       ) {
         let target = profile.neutralDefenseTarget;
@@ -12414,7 +12899,7 @@
 
       function getAiFaceoffPressure(
         player,
-        profile = getCpuDifficultyProfile(),
+        profile = getAiProfileForPlayer(player),
         zoneIndex = state.zoneIndex,
         faceoffMode = state.faceoffMode,
       ) {
@@ -12537,6 +13022,793 @@
             .join(" || ")}`,
         );
       }
+
+      function shouldUseAiMonteCarloDecision(
+        player,
+        profile = getAiProfileForPlayer(player),
+      ) {
+        return (
+          Boolean(profile?.monteCarloEnabled) &&
+          !activeSimulationContext?.disableMonteCarlo &&
+          state.currentTurn === player &&
+          !state.faceoffPending &&
+          !state.shotPending &&
+          !state.gameOver
+        );
+      }
+
+      function getAiActionCandidateKey(candidate) {
+        if (!candidate) {
+          return "unknown";
+        }
+        return `${candidate.type}:${candidate.index ?? ""}`;
+      }
+
+      function getAiActionCandidateLabel(candidate) {
+        if (!candidate) {
+          return "Unknown action";
+        }
+
+        switch (candidate.type) {
+          case "playCard":
+            return `Play ${cardToText(candidate.card)}`;
+          case "powerShot":
+            return "Force Shot";
+          case "cycle":
+            return `Cycle ${cardToText(candidate.card)}`;
+          case "burn":
+            return `Burn ${cardToText(candidate.card)}`;
+          case "endChain":
+            return "End Chain";
+          case "icePuck":
+            return "Ice Puck";
+          case "dumpAndChase":
+            return "Dump and Chase";
+          case "cannotPlay":
+            return state.stabilizePending
+              ? "Draw Stabilize Card"
+              : "Draw / Cannot Play";
+          default:
+            return candidate.type;
+        }
+      }
+
+      function getAiActionCandidateNoticeText(candidate) {
+        switch (candidate?.type) {
+          case "playCard":
+            return "MC PLAY";
+          case "powerShot":
+            return "MC FORCE";
+          case "cycle":
+            return "MC CYCLE";
+          case "burn":
+            return "MC BURN";
+          case "endChain":
+            return "MC END";
+          case "icePuck":
+            return "MC ICING";
+          case "dumpAndChase":
+            return "MC DUMP";
+          case "cannotPlay":
+            return "MC DRAW";
+          default:
+            return "MC";
+        }
+      }
+
+      function getAiHeuristicPrimaryCandidate(
+        player,
+        legalIndexes = getLegalCardsForTurn(player),
+        profile = getAiProfileForPlayer(player),
+        cardChoice = legalIndexes.length > 0
+          ? getAiCardChoice(player, profile)
+          : null,
+      ) {
+        if (
+          FEATURES.momentumSystem &&
+          shouldAiPowerShotMomentum(player, legalIndexes, profile)
+        ) {
+          return {
+            type: "powerShot",
+            priority: 92,
+            detail: "heuristic force shot trigger",
+          };
+        }
+
+        if (
+          FEATURES.momentumSystem &&
+          shouldAiCycleMomentum(player, legalIndexes, profile)
+        ) {
+          const cycleIndex = getAiCycleIndex(player);
+          if (
+            Number.isInteger(cycleIndex) &&
+            cycleIndex >= 0 &&
+            cycleIndex < playerHand(player).length
+          ) {
+            return {
+              type: "cycle",
+              index: cycleIndex,
+              card: playerHand(player)[cycleIndex],
+              priority: 88,
+              detail: "heuristic cycle trigger",
+            };
+          }
+        }
+
+        if (
+          FEATURES.momentumSystem &&
+          shouldAiBurnMomentum(player, legalIndexes, profile)
+        ) {
+          const burnIndex = getAiBurnIndex(player);
+          if (
+            Number.isInteger(burnIndex) &&
+            burnIndex >= 0 &&
+            burnIndex < playerHand(player).length
+          ) {
+            return {
+              type: "burn",
+              index: burnIndex,
+              card: playerHand(player)[burnIndex],
+              priority: 86,
+              detail: "heuristic burn trigger",
+            };
+          }
+        }
+
+        if (shouldAiEndDefenseChain(player, legalIndexes)) {
+          return {
+            type: "endChain",
+            priority: 84,
+            detail: "heuristic defense cash-out",
+          };
+        }
+
+        if (
+          state.roleOfCurrentTurn === "attacker" &&
+          currentTurnCanPass() &&
+          legalIndexes.length === 0
+        ) {
+          return {
+            type: "endChain",
+            priority: 82,
+            detail: "heuristic attack end with no continuation",
+          };
+        }
+
+        if (shouldAiIcePuck(player, legalIndexes, profile)) {
+          return {
+            type: "icePuck",
+            priority: 78,
+            detail: "heuristic icing trigger",
+          };
+        }
+
+        if (FEATURES.momentumSystem && shouldAiDumpAndChase(player, profile)) {
+          return {
+            type: "dumpAndChase",
+            priority: 76,
+            detail: "heuristic dump trigger",
+          };
+        }
+
+        if (legalIndexes.length === 0) {
+          return {
+            type: "cannotPlay",
+            priority: 70,
+            detail: "no legal cards available",
+          };
+        }
+
+        if (!cardChoice) {
+          return null;
+        }
+
+        return {
+          type: "playCard",
+          index: cardChoice.index,
+          card: cardChoice.card,
+          heuristicScore: cardChoice.score,
+          priority: 60 + cardChoice.score,
+          detail: cardChoice.reason,
+        };
+      }
+
+      function buildAiMonteCarloCandidates(
+        player,
+        legalIndexes = getLegalCardsForTurn(player),
+        profile = getAiProfileForPlayer(player),
+      ) {
+        const candidateLimit = clamp(
+          Number.parseInt(
+            profile?.monteCarloCandidateCount ??
+              DEFAULT_CONFIG.cpuMonteCarloCandidateCount,
+            10,
+          ),
+          2,
+          8,
+        );
+        const cardChoice =
+          legalIndexes.length > 0 ? getAiCardChoice(player, profile) : null;
+        const candidates = [];
+        const seen = new Set();
+
+        function addCandidate(candidate) {
+          if (!candidate) {
+            return;
+          }
+
+          const key = getAiActionCandidateKey(candidate);
+          if (seen.has(key)) {
+            return;
+          }
+
+          seen.add(key);
+          candidates.push(candidate);
+        }
+
+        const primary = getAiHeuristicPrimaryCandidate(
+          player,
+          legalIndexes,
+          profile,
+          cardChoice,
+        );
+        if (primary) {
+          addCandidate({
+            ...primary,
+            isPrimary: true,
+            priority: (primary.priority || 0) + 1000,
+          });
+        }
+
+        if (cardChoice?.evaluations?.length) {
+          cardChoice.evaluations
+            .slice(0, Math.max(2, candidateLimit))
+            .forEach((evaluation) => {
+              addCandidate({
+                type: "playCard",
+                index: evaluation.index,
+                card: evaluation.card,
+                heuristicScore: evaluation.score,
+                priority: 60 + evaluation.score,
+                detail: evaluation.reason,
+              });
+            });
+        }
+
+        if (canPlayerUsePowerShot(player)) {
+          addCandidate({
+            type: "powerShot",
+            priority: 90,
+            detail: "legal force shot",
+          });
+        }
+
+        const cycleIndex = canPlayerUseCycle(player) ? getAiCycleIndex(player) : null;
+        if (
+          Number.isInteger(cycleIndex) &&
+          cycleIndex >= 0 &&
+          cycleIndex < playerHand(player).length
+        ) {
+          addCandidate({
+            type: "cycle",
+            index: cycleIndex,
+            card: playerHand(player)[cycleIndex],
+            priority: 84,
+            detail: "legal cycle option",
+          });
+        }
+
+        const burnIndex = canPlayerUseBurn(player) ? getAiBurnIndex(player) : null;
+        if (
+          Number.isInteger(burnIndex) &&
+          burnIndex >= 0 &&
+          burnIndex < playerHand(player).length
+        ) {
+          addCandidate({
+            type: "burn",
+            index: burnIndex,
+            card: playerHand(player)[burnIndex],
+            priority: 82,
+            detail: "legal burn option",
+          });
+        }
+
+        if (currentTurnCanPass()) {
+          addCandidate({
+            type: "endChain",
+            priority: state.roleOfCurrentTurn === "defender" ? 80 : 74,
+            detail: "end the current chain now",
+          });
+        }
+
+        if (canPlayerIcePuck(player)) {
+          addCandidate({
+            type: "icePuck",
+            priority: 72,
+            detail: "legal icing reset",
+          });
+        }
+
+        if (canPlayerDumpAndChase(player)) {
+          addCandidate({
+            type: "dumpAndChase",
+            priority: 70,
+            detail: "legal dump and chase",
+          });
+        }
+
+        if (legalIndexes.length === 0) {
+          addCandidate({
+            type: "cannotPlay",
+            priority: 68,
+            detail: state.stabilizePending
+              ? "draw a stabilize card"
+              : "draw because no legal card remains",
+          });
+        }
+
+        candidates.sort((left, right) => {
+          const leftPrimary = Number(Boolean(left.isPrimary));
+          const rightPrimary = Number(Boolean(right.isPrimary));
+          if (rightPrimary !== leftPrimary) {
+            return rightPrimary - leftPrimary;
+          }
+
+          if ((right.priority || 0) !== (left.priority || 0)) {
+            return (right.priority || 0) - (left.priority || 0);
+          }
+
+          if (
+            (right.heuristicScore ?? -Infinity) !==
+            (left.heuristicScore ?? -Infinity)
+          ) {
+            return (
+              (right.heuristicScore ?? -Infinity) -
+              (left.heuristicScore ?? -Infinity)
+            );
+          }
+
+          return getAiActionCandidateKey(left).localeCompare(
+            getAiActionCandidateKey(right),
+          );
+        });
+
+        return candidates.slice(0, candidateLimit);
+      }
+
+      function formatAiMonteCarloCandidateResult(candidate) {
+        if (!candidate?.rollout) {
+          return getAiActionCandidateLabel(candidate);
+        }
+
+        const summary = candidate.rollout;
+        return `${getAiActionCandidateLabel(candidate)} | W${summary.playerWins}-L${summary.opponentWins}${summary.incompleteMatches ? `-I${summary.incompleteMatches}` : ""} | diff ${formatCpuAuditSigned(summary.averageGoalDiff, 2)} | score ${formatCpuAuditSigned(summary.weightedScore, 1)}`;
+      }
+
+      async function chooseAiMonteCarloAction(
+        player,
+        legalIndexes = getLegalCardsForTurn(player),
+        profile = getAiProfileForPlayer(player),
+      ) {
+        if (!shouldUseAiMonteCarloDecision(player, profile)) {
+          return null;
+        }
+
+        const candidates = buildAiMonteCarloCandidates(
+          player,
+          legalIndexes,
+          profile,
+        );
+        if (candidates.length < 2) {
+          return {
+            usedMonteCarlo: false,
+            candidate: candidates[0] || null,
+            candidates,
+          };
+        }
+
+        const rolloutCount = clamp(
+          Number.parseInt(profile.monteCarloRollouts ?? 1, 10),
+          1,
+          64,
+        );
+        const rolloutMaxSteps = clamp(
+          Number.parseInt(profile.monteCarloMaxSteps ?? 800, 10),
+          40,
+          1600,
+        );
+        if (rolloutCount < 2) {
+          return {
+            usedMonteCarlo: false,
+            candidate: candidates[0] || null,
+            candidates,
+          };
+        }
+
+        if (player === "cpu") {
+          addCpuAuditLog(
+            `monte carlo rollout | ${candidates.length} line${candidates.length === 1 ? "" : "s"} x ${rolloutCount} rollout${rolloutCount === 1 ? "" : "s"} | max ${rolloutMaxSteps} steps.`,
+          );
+          showCpuNotice("SIM", "info");
+          render();
+        }
+
+        const rolloutProfile = {
+          ...profile,
+          monteCarloEnabled: false,
+        };
+        const evaluated = [];
+
+        for (const candidate of candidates) {
+          const batchResult = await runHeadlessAiBatch({
+            games: rolloutCount,
+            maxSteps: rolloutMaxSteps,
+            startFromCurrentState: true,
+            preserveLiveState: true,
+            initialAction: {
+              ...candidate,
+              player,
+            },
+            humanProfile: rolloutProfile,
+            cpuProfile: rolloutProfile,
+            disableMonteCarlo: true,
+          });
+
+          evaluated.push({
+            ...candidate,
+            rollout: getHeadlessBatchPerspective(batchResult, player),
+          });
+        }
+
+        evaluated.sort((left, right) => {
+          if (right.rollout.weightedScore !== left.rollout.weightedScore) {
+            return right.rollout.weightedScore - left.rollout.weightedScore;
+          }
+
+          if (right.rollout.playerWins !== left.rollout.playerWins) {
+            return right.rollout.playerWins - left.rollout.playerWins;
+          }
+
+          if (
+            (right.heuristicScore ?? -Infinity) !==
+            (left.heuristicScore ?? -Infinity)
+          ) {
+            return (
+              (right.heuristicScore ?? -Infinity) -
+              (left.heuristicScore ?? -Infinity)
+            );
+          }
+
+          return (right.priority || 0) - (left.priority || 0);
+        });
+
+        if (player === "cpu") {
+          addCpuAuditLog(
+            `monte carlo ranked ${evaluated
+              .map(
+                (candidate, index) =>
+                  `${index + 1}) ${formatAiMonteCarloCandidateResult(candidate)}`,
+              )
+              .join(" || ")}`,
+          );
+          addCpuAuditLog(
+            `monte carlo chose ${getAiActionCandidateLabel(evaluated[0])}.`,
+          );
+        }
+
+        return {
+          usedMonteCarlo: true,
+          candidate: evaluated[0],
+          candidates: evaluated,
+        };
+      }
+
+      async function executeAiMonteCarloChoice(player, candidate) {
+        if (!candidate || state.currentTurn !== player) {
+          return false;
+        }
+
+        if (player === "cpu") {
+          addCpuAuditLog(
+            `monte carlo executes ${getAiActionCandidateLabel(candidate)}.`,
+          );
+          showCpuNotice(getAiActionCandidateNoticeText(candidate), "info");
+        }
+
+        const usesCardPreview =
+          candidate.type === "playCard" ||
+          candidate.type === "cycle" ||
+          candidate.type === "burn";
+        const pauseMs =
+          candidate.type === "playCard"
+            ? getCpuSimDuration(1000)
+            : candidate.type === "powerShot"
+              ? getCpuSimDuration(900, 180)
+              : candidate.type === "burn"
+                ? getCpuSimDuration(850, 180)
+                : candidate.type === "cycle"
+                  ? getCpuSimDuration(760, 160)
+                  : 0;
+
+        if (usesCardPreview && player === "cpu") {
+          state.cpuPreviewIndex = candidate.index;
+        }
+
+        if (usesCardPreview || pauseMs > 0) {
+          render();
+          if (pauseMs > 0) {
+            await sleep(pauseMs);
+          }
+
+          if (state.currentTurn !== player) {
+            if (player === "cpu") {
+              state.cpuPreviewIndex = null;
+            }
+            return false;
+          }
+        }
+
+        if (usesCardPreview) {
+          if (
+            !Number.isInteger(candidate.index) ||
+            candidate.index < 0 ||
+            candidate.index >= playerHand(player).length
+          ) {
+            if (player === "cpu") {
+              state.cpuPreviewIndex = null;
+            }
+            return false;
+          }
+
+          await animatePlayerHandCardToPile(
+            player,
+            candidate.index,
+            playerHand(player)[candidate.index],
+            getCpuSimDuration(420, 120),
+          );
+        }
+
+        const applied = await applyAiActionCandidate(player, candidate);
+        if (player === "cpu") {
+          state.cpuPreviewIndex = null;
+        }
+        return applied;
+      }
+
+        function getHeadlessLoopCardKey(card) {
+          return card ? `${card.suit}:${card.value}` : "none";
+        }
+
+        function getHeadlessLoopCardsKey(cards = []) {
+          return cards.length > 0
+            ? cards.map((card) => getHeadlessLoopCardKey(card)).join("|")
+            : "none";
+        }
+
+        function buildHeadlessLoopFaceoffSummary() {
+          if (!state.faceoffPending) {
+            return "none";
+          }
+
+          return [
+            state.faceoffMode || "standard",
+            state.icingFaceoffPlayer || "none",
+            getHeadlessLoopCardKey(state.icingFaceoffLeadCard),
+          ].join(":");
+        }
+
+        function buildHeadlessLoopShotSummary(shot = state.shotPending) {
+          if (!shot) {
+            return "none";
+          }
+
+          let phase = "standard";
+          if (isReboundRevealPhase(shot)) {
+            phase = "reboundReveal";
+          } else if (isReboundSavePhase(shot)) {
+            phase = "reboundSave";
+          } else if (shot.controlledSave) {
+            phase = "controlledSave";
+          }
+
+          return [
+            phase,
+            `${shot.attackerPlayer || "none"}>${shot.defenderPlayer || "none"}`,
+            `need${shot.requiredLength ?? 0}`,
+            `saved${shot.savedCount ?? 0}`,
+            `value${shot.reboundShotValue ?? shot.shotValue ?? 0}`,
+          ].join(":");
+        }
+
+        function buildHeadlessLoopSignature() {
+          return JSON.stringify({
+            periodNumber: state.periodNumber,
+            clockSeconds: state.periodClockSeconds,
+            currentTurn: state.currentTurn || "none",
+            role: state.roleOfCurrentTurn || "none",
+            attacker: state.attacker || "none",
+            defender: state.defender || "none",
+            zoneIndex: state.zoneIndex,
+            activeCard: getHeadlessLoopCardKey(state.activeCard),
+            attackerChainCount: state.attackerChainCount || 0,
+            defenderChainCount: state.defenderChainCount || 0,
+            turnPlayCount: state.turnPlayCount || 0,
+            faceoffSummary: buildHeadlessLoopFaceoffSummary(),
+            shotSummary: buildHeadlessLoopShotSummary(),
+            humanHand: getHeadlessLoopCardsKey(state.humanHand),
+            cpuHand: getHeadlessLoopCardsKey(state.cpuHand),
+            humanScore: state.humanScore,
+            cpuScore: state.cpuScore,
+            humanMomentum: state.humanMomentum,
+            cpuMomentum: state.cpuMomentum,
+            deckCardsRemaining: state.deck.length,
+            stabilizePending: Boolean(state.stabilizePending),
+            pendingPeriodBreak: Boolean(state.pendingPeriodBreak),
+            runMatchMode: state.runMatchMode || "none",
+            runHasCrossedRiver: Boolean(state.runHasCrossedRiver),
+          });
+        }
+
+        function buildHeadlessLoopSnapshot(step = 0) {
+          return {
+            step,
+            periodNumber: state.periodNumber,
+            clock: formatGameClock(),
+            clockSeconds: state.periodClockSeconds,
+            currentTurn: state.currentTurn || "none",
+            role: state.roleOfCurrentTurn || "none",
+            attacker: state.attacker || "none",
+            defender: state.defender || "none",
+            zoneIndex: state.zoneIndex,
+            zone: zoneLabel(state.zoneIndex),
+            activeCard: cardToText(state.activeCard),
+            attackerChainCount: state.attackerChainCount || 0,
+            defenderChainCount: state.defenderChainCount || 0,
+            turnPlayCount: state.turnPlayCount || 0,
+            faceoffPending: Boolean(state.faceoffPending),
+            faceoffMode: state.faceoffMode || "standard",
+            faceoffSummary: buildHeadlessLoopFaceoffSummary(),
+            shotPending: Boolean(state.shotPending),
+            shotSummary: buildHeadlessLoopShotSummary(),
+            humanHandCount: state.humanHand.length,
+            cpuHandCount: state.cpuHand.length,
+            humanHand: cardsToText(state.humanHand),
+            cpuHand: cardsToText(state.cpuHand),
+            humanScore: state.humanScore,
+            cpuScore: state.cpuScore,
+            humanMomentum: state.humanMomentum,
+            cpuMomentum: state.cpuMomentum,
+            deckCardsRemaining: state.deck.length,
+            stabilizePending: Boolean(state.stabilizePending),
+            pendingPeriodBreak: Boolean(state.pendingPeriodBreak),
+            runMatchMode: state.runMatchMode || "none",
+            runHasCrossedRiver: Boolean(state.runHasCrossedRiver),
+            signature: buildHeadlessLoopSignature(),
+          };
+        }
+
+        function getHeadlessLoopPhaseLabel(snapshot) {
+          if (!snapshot) {
+            return "unknown";
+          }
+          if (snapshot.faceoffPending) {
+            return `faceoff ${snapshot.faceoffMode}`;
+          }
+          if (snapshot.shotPending) {
+            return `shot ${snapshot.shotSummary}`;
+          }
+          if (snapshot.stabilizePending) {
+            return "stabilize";
+          }
+          if (snapshot.pendingPeriodBreak) {
+            return "period break";
+          }
+          return snapshot.role || "idle";
+        }
+
+        function formatHeadlessLoopSnapshot(snapshot) {
+          if (!snapshot) {
+            return "unknown state";
+          }
+
+          return `P${snapshot.periodNumber} ${snapshot.clock} | ${getHeadlessLoopPhaseLabel(snapshot)} | turn ${snapshot.currentTurn}/${snapshot.role} | ${snapshot.zone} | active ${snapshot.activeCard} | chain ${snapshot.attackerChainCount}-${snapshot.defenderChainCount} | hands H${snapshot.humanHandCount}/C${snapshot.cpuHandCount} | score ${snapshot.humanScore}-${snapshot.cpuScore} | deck ${snapshot.deckCardsRemaining}`;
+        }
+
+        function createHeadlessHaltTracker(maxSteps = 80) {
+          return {
+            maxSteps,
+            recentStates: [],
+            signatureCounts: new Map(),
+            snapshotsBySignature: new Map(),
+            clockKeys: new Set(),
+          };
+        }
+
+        function noteHeadlessHaltTrackerState(tracker, step = 0) {
+          if (!tracker) {
+            return null;
+          }
+
+          const snapshot = buildHeadlessLoopSnapshot(step);
+          tracker.recentStates.push(snapshot);
+          if (tracker.recentStates.length > 12) {
+            tracker.recentStates.shift();
+          }
+
+          tracker.clockKeys.add(`P${snapshot.periodNumber}:${snapshot.clockSeconds}`);
+          tracker.signatureCounts.set(
+            snapshot.signature,
+            (tracker.signatureCounts.get(snapshot.signature) || 0) + 1,
+          );
+          if (!tracker.snapshotsBySignature.has(snapshot.signature)) {
+            tracker.snapshotsBySignature.set(snapshot.signature, snapshot);
+          }
+
+          return snapshot;
+        }
+
+        function finalizeHeadlessHaltTracker(tracker, options = {}) {
+          if (!tracker) {
+            return null;
+          }
+
+          const repeatedStates = [...tracker.signatureCounts.entries()]
+            .filter(([, count]) => count > 1)
+            .sort((left, right) => {
+              if (right[1] !== left[1]) {
+                return right[1] - left[1];
+              }
+              return left[0].localeCompare(right[0]);
+            })
+            .slice(0, 3)
+            .map(([signature, count]) => {
+              const snapshot = tracker.snapshotsBySignature.get(signature);
+              return {
+                count,
+                step: snapshot?.step || 0,
+                phase: getHeadlessLoopPhaseLabel(snapshot),
+                summary: formatHeadlessLoopSnapshot(snapshot),
+              };
+            });
+
+          const finalState = buildHeadlessLoopSnapshot(options.steps || 0);
+          const recentTrail = tracker.recentStates.map((snapshot) => ({
+            step: snapshot.step,
+            clock: snapshot.clock,
+            phase: getHeadlessLoopPhaseLabel(snapshot),
+            summary: formatHeadlessLoopSnapshot(snapshot),
+          }));
+          const clockStalled =
+            tracker.clockKeys.size <= 1 && tracker.recentStates.length >= 3;
+          const topRepeatedState = repeatedStates[0] || null;
+          let hint = "";
+
+          if (options.haltedReason === "stalled") {
+            hint = `AI returned no progress from ${formatHeadlessLoopSnapshot(finalState)}.`;
+          } else if (options.haltedReason === "limit") {
+            if (clockStalled && topRepeatedState) {
+              hint = `Reached the ${options.maxSteps || tracker.maxSteps}-step safety cap while the clock stayed at ${finalState.clock} and the same exact state repeated ${topRepeatedState.count} times.`;
+            } else if (clockStalled) {
+              hint = `Reached the ${options.maxSteps || tracker.maxSteps}-step safety cap while the clock stayed frozen at ${finalState.clock}.`;
+            } else if (topRepeatedState) {
+              hint = `Reached the ${options.maxSteps || tracker.maxSteps}-step safety cap after repeating the same exact state ${topRepeatedState.count} times.`;
+            } else {
+              hint = `Reached the ${options.maxSteps || tracker.maxSteps}-step safety cap without finishing.`;
+            }
+          } else if (options.haltedReason === "busy") {
+            hint = "Simulation started while cpuBusy was already set.";
+          }
+
+          return {
+            haltedReason: options.haltedReason || null,
+            maxSteps: options.maxSteps || tracker.maxSteps,
+            clockStalled,
+            hint,
+            finalState,
+            topRepeatedStates: repeatedStates,
+            recentTrail,
+          };
+        }
 
       function describeCpuPowerShotDecision(
         legalIndexes = getLegalCardsForTurn("cpu"),
@@ -12732,7 +14004,7 @@
           plan.currentMargin === 1 && plan.bestEvaluation
             ? ` | best +2 ${cardToText(plan.bestEvaluation.card)} score ${formatCpuAuditNumber(plan.bestEvaluation.score)} vs continue ${formatCpuAuditNumber(plan.continueThreshold)}`
             : "";
-        return `End defense chain | margin ${plan.currentMargin} vs target ${plan.targetMargin}+ | legal follow-ups ${legalIndexes.length} | human hand ${state.humanHand.length}${bestFollowUpText}.`;
+        return `End defense chain | margin ${plan.currentMargin} vs target ${plan.targetMargin}+ | legal follow-ups ${legalIndexes.length} | human hand ${plan.opponentHandCount}${bestFollowUpText}.`;
       }
 
       function describeCpuFaceoffLeadAudit(cpuIndex, options = {}) {
@@ -13197,7 +14469,7 @@
       function scoreAiAttackPlay(
         player,
         cardIndex,
-        profile = getCpuDifficultyProfile(),
+        profile = getAiProfileForPlayer(player),
       ) {
         const projected = getProjectedAiPlayState(
           player,
@@ -13472,7 +14744,7 @@
       function scoreAiDefensePlay(
         player,
         cardIndex,
-        profile = getCpuDifficultyProfile(),
+        profile = getAiProfileForPlayer(player),
       ) {
         const projected = getProjectedAiPlayState(
           player,
@@ -13608,7 +14880,7 @@
 
       function getAiCardChoice(
         player,
-        profile = getCpuDifficultyProfile(),
+        profile = getAiProfileForPlayer(player),
       ) {
         if (state.currentTurn !== player) {
           return null;
@@ -13675,7 +14947,7 @@
       function chooseAiFaceoffLeadIndex(
         player,
         options = {},
-        profile = getCpuDifficultyProfile(),
+        profile = getAiProfileForPlayer(player),
       ) {
         const hand = playerHand(player);
         const indexes = hand.map((_, index) => index);
@@ -13719,7 +14991,7 @@
         player,
         opponentCard,
         options = {},
-        profile = getCpuDifficultyProfile(),
+        profile = getAiProfileForPlayer(player),
       ) {
         const hand = playerHand(player);
         const indexes = hand.map((_, index) => index);
@@ -13775,23 +15047,26 @@
         return chooseAiFaceoffResponseIndex("cpu", humanCard, options);
       }
 
-      function getCpuDefenseContinuePlan(
-        legalIndexes = getLegalCardsForTurn("cpu"),
+      function getAiDefenseContinuePlan(
+        player,
+        legalIndexes = getLegalCardsForTurn(player),
+        profile = getAiProfileForPlayer(player),
       ) {
-        const profile = getCpuDifficultyProfile();
+        const opponent = getOpponentPlayer(player);
+        const opponentHandCount = playerHand(opponent).length;
         const currentMargin =
           state.defenderChainCount - state.attackerChainCount;
-        const targetMargin = getCpuDefenseMarginTarget(profile);
-        const dangerZone = isCpuDangerZone();
+        const targetMargin = getAiDefenseMarginTarget(player, profile);
+        const dangerZone = isDangerZoneFor(player);
         const latePressure =
           getRegulationSecondsRemaining() <= profile.lateGamePressureSeconds &&
-          state.cpuScore <= state.humanScore;
+          getPlayerScore(player) <= getPlayerScore(opponent);
         const shortHandThreat =
-          state.humanHand.length <= Math.max(3, getCpuPanicWindow(profile) + 1);
+          opponentHandCount <= Math.max(3, getCpuPanicWindow(profile) + 1);
         const evaluations =
           currentMargin === 1 && legalIndexes.length > 0
             ? legalIndexes
-                .map((index) => scoreCpuDefensePlay(index, profile))
+                .map((index) => scoreAiDefensePlay(player, index, profile))
                 .filter(Boolean)
                 .sort((left, right) => {
                   if (right.score !== left.score) {
@@ -13817,7 +15092,7 @@
         if (latePressure) {
           continuePressure += 2;
         }
-        if (state.humanHand.length <= 1) {
+        if (opponentHandCount <= 1) {
           continuePressure += 2;
         }
         if (profile.faceoffAggression >= 70) {
@@ -13834,6 +15109,9 @@
             (bestEvaluation && bestEvaluation.score >= continueThreshold));
 
         return {
+          player,
+          opponent,
+          opponentHandCount,
           profile,
           currentMargin,
           targetMargin,
@@ -13846,8 +15124,15 @@
         };
       }
 
-      function cpuShouldEndDefenseChain(
+      function getCpuDefenseContinuePlan(
         legalIndexes = getLegalCardsForTurn("cpu"),
+      ) {
+        return getAiDefenseContinuePlan("cpu", legalIndexes);
+      }
+
+      function shouldAiEndDefenseChain(
+        player,
+        legalIndexes = getLegalCardsForTurn(player),
       ) {
         if (
           state.roleOfCurrentTurn !== "defender" ||
@@ -13857,7 +15142,7 @@
           return false;
         }
 
-        const plan = getCpuDefenseContinuePlan(legalIndexes);
+        const plan = getAiDefenseContinuePlan(player, legalIndexes);
         if (plan.currentMargin < plan.targetMargin && legalIndexes.length > 0) {
           return false;
         }
@@ -13869,20 +15154,35 @@
         return true;
       }
 
+      function cpuShouldEndDefenseChain(
+        legalIndexes = getLegalCardsForTurn("cpu"),
+      ) {
+        return shouldAiEndDefenseChain("cpu", legalIndexes);
+      }
+
+      function getAiDefenseEndReason(
+        player,
+        legalIndexes = getLegalCardsForTurn(player),
+      ) {
+        const plan = getAiDefenseContinuePlan(player, legalIndexes);
+        const playerLabel =
+          player === "cpu" ? "CPU" : getPlayerDebugName(player);
+        if (plan.currentMargin >= plan.targetMargin) {
+          if (plan.currentMargin >= 2) {
+            return `${playerLabel} ends the defense chain with a ${plan.currentMargin}-card edge to deny Stabilize.`;
+          }
+          if (!plan.bestEvaluation) {
+            return `${playerLabel} ends the defense chain with a 1-card edge, forcing a Stabilize attempt because no legal +2 follow-up exists.`;
+          }
+          return `${playerLabel} ends the defense chain with a 1-card edge, knowingly allowing a Stabilize attempt because the best +2 follow-up ${cardToText(plan.bestEvaluation.card)} scored ${formatCpuAuditNumber(plan.bestEvaluation.score)} below the continue threshold ${formatCpuAuditNumber(plan.continueThreshold)}.`;
+        }
+        return `${playerLabel} ends the defense chain because ${lowerPlayerName(player)} leads ${plan.currentMargin}, but has no legal way to push past the Stabilize window.`;
+      }
+
       function getCpuDefenseEndReason(
         legalIndexes = getLegalCardsForTurn("cpu"),
       ) {
-        const plan = getCpuDefenseContinuePlan(legalIndexes);
-        if (plan.currentMargin >= plan.targetMargin) {
-          if (plan.currentMargin >= 2) {
-            return `CPU ends the defense chain with a ${plan.currentMargin}-card edge to deny Stabilize.`;
-          }
-          if (!plan.bestEvaluation) {
-            return "CPU ends the defense chain with a 1-card edge, forcing a Stabilize attempt because no legal +2 follow-up exists.";
-          }
-          return `CPU ends the defense chain with a 1-card edge, knowingly allowing a Stabilize attempt because the best +2 follow-up ${cardToText(plan.bestEvaluation.card)} scored ${formatCpuAuditNumber(plan.bestEvaluation.score)} below the continue threshold ${formatCpuAuditNumber(plan.continueThreshold)}.`;
-        }
-        return `CPU ends the defense chain because it leads ${plan.currentMargin}, but has no legal way to push past the Stabilize window.`;
+        return getAiDefenseEndReason("cpu", legalIndexes);
       }
 
       function getAiBestHandValue(player) {
@@ -13897,6 +15197,10 @@
       }
 
       function sleep(ms) {
+        if (isHeadlessSimulationActive()) {
+          return Promise.resolve();
+        }
+
         return new Promise((resolve) => {
           setTimeout(resolve, ms);
         });
@@ -13993,7 +15297,7 @@
       function getAiNormalLineRiskContext(
         player,
         legalIndexes = getLegalCardsForTurn(player),
-        profile = getCpuDifficultyProfile(),
+        profile = getAiProfileForPlayer(player),
       ) {
         const hand = playerHand(player);
         const opponentHand = playerHand(getOpponentPlayer(player));
@@ -14033,7 +15337,7 @@
       function shouldAiCycleMomentum(
         player,
         legalIndexes = getLegalCardsForTurn(player),
-        profile = getCpuDifficultyProfile(),
+        profile = getAiProfileForPlayer(player),
       ) {
         if (!FEATURES.momentumSystem || !canPlayerUseCycle(player)) {
           return false;
@@ -14116,7 +15420,7 @@
       function shouldAiPowerShotMomentum(
         player,
         legalIndexes = getLegalCardsForTurn(player),
-        profile = getCpuDifficultyProfile(),
+        profile = getAiProfileForPlayer(player),
       ) {
         if (!FEATURES.momentumSystem || !canPlayerUsePowerShot(player)) {
           return false;
@@ -14200,7 +15504,7 @@
 
       function shouldAiDumpAndChase(
         player,
-        profile = getCpuDifficultyProfile(),
+        profile = getAiProfileForPlayer(player),
       ) {
         if (!FEATURES.momentumSystem || !canPlayerDumpAndChase(player)) {
           return false;
@@ -14275,7 +15579,7 @@
       function shouldAiIcePuck(
         player,
         legalIndexes = getLegalCardsForTurn(player),
-        profile = getCpuDifficultyProfile(),
+        profile = getAiProfileForPlayer(player),
       ) {
         if (!canPlayerIcePuck(player) || legalIndexes.length > 0) {
           return false;
@@ -14332,7 +15636,7 @@
       function shouldAiBurnMomentum(
         player,
         legalIndexes = getLegalCardsForTurn(player),
-        profile = getCpuDifficultyProfile(),
+        profile = getAiProfileForPlayer(player),
       ) {
         if (!FEATURES.momentumSystem || !canPlayerUseBurn(player)) {
           return false;
@@ -14400,112 +15704,185 @@
         return shouldAiBurnMomentum("cpu", legalIndexes);
       }
 
-      async function cpuTakeTurn() {
-        if (state.currentTurn !== "cpu") {
+      function getAiFaceoffChoiceIndex(
+        player,
+        profile = getAiProfileForPlayer(player),
+      ) {
+        if (!state.faceoffPending || state.currentTurn !== player) {
+          return null;
+        }
+
+        const faceoffOptions = {
+          faceoffMode: state.faceoffMode,
+          zoneIndex: state.zoneIndex,
+        };
+        if (
+          isIcingFaceoff() &&
+          state.icingFaceoffPlayer &&
+          state.icingFaceoffPlayer !== player &&
+          state.icingFaceoffLeadCard
+        ) {
+          return chooseAiFaceoffResponseIndex(
+            player,
+            state.icingFaceoffLeadCard,
+            faceoffOptions,
+            profile,
+          );
+        }
+
+        return chooseAiFaceoffLeadIndex(player, faceoffOptions, profile);
+      }
+
+      async function aiTakeTurn(
+        player,
+        profile = getAiProfileForPlayer(player),
+      ) {
+        if (state.currentTurn !== player) {
           return false;
         }
 
-        if (state.shotPending) {
-          return await processCpuShotSequenceTurn();
+        if (state.faceoffPending) {
+          if (player !== "human") {
+            return false;
+          }
+
+          const faceoffIndex = getAiFaceoffChoiceIndex(player, profile);
+          if (
+            faceoffIndex === null ||
+            faceoffIndex === undefined ||
+            faceoffIndex < 0 ||
+            faceoffIndex >= state.humanHand.length
+          ) {
+            return false;
+          }
+
+          resolveFaceoff(faceoffIndex);
+          return true;
         }
 
-        const legal = getLegalCardsForTurn("cpu");
+        if (state.shotPending) {
+          return await processAiShotSequenceTurn(player, profile);
+        }
 
-        if (state.stabilizePending) {
+        const legal = getLegalCardsForTurn(player);
+
+        if (state.stabilizePending && player === "cpu") {
           addCpuAuditLog(
             `stabilize turn | active ${state.activeCard ? cardToText(state.activeCard) : "Any Card"} | legal ${cardsAtIndexesToText(state.cpuHand, legal)} | hand ${cardsToText(state.cpuHand)}.`,
           );
         }
 
-        if (FEATURES.momentumSystem && cpuShouldPowerShotMomentum(legal)) {
-          addCpuAuditLog(describeCpuPowerShotDecision(legal));
-          showCpuNotice("FORCE SHOT", "info");
+        const monteCarloDecision = await chooseAiMonteCarloAction(
+          player,
+          legal,
+          profile,
+        );
+        if (monteCarloDecision?.usedMonteCarlo && monteCarloDecision.candidate) {
+          return await executeAiMonteCarloChoice(
+            player,
+            monteCarloDecision.candidate,
+          );
+        }
+
+        if (FEATURES.momentumSystem && shouldAiPowerShotMomentum(player, legal, profile)) {
+          if (player === "cpu") {
+            addCpuAuditLog(describeCpuPowerShotDecision(legal));
+            showCpuNotice("FORCE SHOT", "info");
+          }
           render();
           await sleep(getCpuSimDuration(900, 180));
 
-          if (state.currentTurn !== "cpu") {
+          if (state.currentTurn !== player) {
             return false;
           }
 
-          powerShot("cpu");
+          powerShot(player);
           return true;
         }
 
-        if (FEATURES.momentumSystem && cpuShouldCycleMomentum(legal)) {
-          const cycleIndex = getCpuCycleIndex();
+        if (FEATURES.momentumSystem && shouldAiCycleMomentum(player, legal, profile)) {
+          const cycleIndex = getAiCycleIndex(player);
           if (cycleIndex !== null && cycleIndex !== undefined) {
-            addCpuAuditLog(describeCpuCycleDecision(legal));
-            showCpuNotice("CYCLE", "info");
+            if (player === "cpu") {
+              addCpuAuditLog(describeCpuCycleDecision(legal));
+              showCpuNotice("CYCLE", "info");
+              state.cpuPreviewIndex = cycleIndex;
+            }
 
-            state.cpuPreviewIndex = cycleIndex;
             render();
             await sleep(getCpuSimDuration(760, 160));
 
             if (
-              state.currentTurn !== "cpu" ||
+              state.currentTurn !== player ||
               cycleIndex < 0 ||
-              cycleIndex >= state.cpuHand.length
+              cycleIndex >= playerHand(player).length
             ) {
-              state.cpuPreviewIndex = null;
+              if (player === "cpu") {
+                state.cpuPreviewIndex = null;
+              }
               return false;
             }
 
-            const cpuButtons = document.querySelectorAll("#cpuHand .card-btn");
-            const sourceButton = cpuButtons[cycleIndex];
-            const cycleCard = state.cpuHand[cycleIndex];
-            await animatePlayToPileFromElement(
-              sourceButton,
-              cycleCard,
-              !state.showCpuCards,
+            await animatePlayerHandCardToPile(
+              player,
+              cycleIndex,
+              playerHand(player)[cycleIndex],
               getCpuSimDuration(420, 120),
             );
 
-            cycleMomentumCard("cpu", cycleIndex);
-            state.cpuPreviewIndex = null;
+            cycleMomentumCard(player, cycleIndex);
+            if (player === "cpu") {
+              state.cpuPreviewIndex = null;
+            }
             return true;
           }
         }
 
-        if (FEATURES.momentumSystem && cpuShouldBurnMomentum(legal)) {
-          const burnIndex = getCpuBurnIndex();
+        if (FEATURES.momentumSystem && shouldAiBurnMomentum(player, legal, profile)) {
+          const burnIndex = getAiBurnIndex(player);
           if (burnIndex !== null && burnIndex !== undefined) {
-            addCpuAuditLog(describeCpuBurnDecision(legal));
-            showCpuNotice("BURN", "info");
+            if (player === "cpu") {
+              addCpuAuditLog(describeCpuBurnDecision(legal));
+              showCpuNotice("BURN", "info");
+              state.cpuPreviewIndex = burnIndex;
+            }
 
-            state.cpuPreviewIndex = burnIndex;
             render();
             await sleep(getCpuSimDuration(850, 180));
 
             if (
-              state.currentTurn !== "cpu" ||
+              state.currentTurn !== player ||
               burnIndex < 0 ||
-              burnIndex >= state.cpuHand.length
+              burnIndex >= playerHand(player).length
             ) {
-              state.cpuPreviewIndex = null;
+              if (player === "cpu") {
+                state.cpuPreviewIndex = null;
+              }
               return false;
             }
 
-            const cpuButtons = document.querySelectorAll("#cpuHand .card-btn");
-            const sourceButton = cpuButtons[burnIndex];
-            const burnCard = state.cpuHand[burnIndex];
-            await animatePlayToPileFromElement(
-              sourceButton,
-              burnCard,
-              !state.showCpuCards,
+            await animatePlayerHandCardToPile(
+              player,
+              burnIndex,
+              playerHand(player)[burnIndex],
               getCpuSimDuration(420, 120),
             );
 
-            burnMomentumCard("cpu", burnIndex);
-            state.cpuPreviewIndex = null;
+            burnMomentumCard(player, burnIndex);
+            if (player === "cpu") {
+              state.cpuPreviewIndex = null;
+            }
             return true;
           }
         }
 
-        if (cpuShouldEndDefenseChain(legal)) {
-          showCpuNotice("TAKES PUCK", "info");
-          addCpuAuditLog(describeCpuDefenseEndDecision(legal));
-          addLog(getCpuDefenseEndReason(legal));
-          endComboByChoice("cpu");
+        if (shouldAiEndDefenseChain(player, legal)) {
+          if (player === "cpu") {
+            showCpuNotice("TAKES PUCK", "info");
+            addCpuAuditLog(describeCpuDefenseEndDecision(legal));
+          }
+          addLog(getAiDefenseEndReason(player, legal));
+          endComboByChoice(player);
           return true;
         }
 
@@ -14514,38 +15891,48 @@
           currentTurnCanPass() &&
           legal.length === 0
         ) {
-          showCpuNotice("ENDS CHAIN", "info");
-          addCpuAuditLog(
-            "end attack chain | no legal continuation cards remain, and the draw rule is only available before a live chain starts.",
-          );
+          if (player === "cpu") {
+            showCpuNotice("ENDS CHAIN", "info");
+            addCpuAuditLog(
+              "end attack chain | no legal continuation cards remain, and the draw rule is only available before a live chain starts.",
+            );
+          }
           addLog(
-            "CPU ends the attack chain because there are no legal continuation cards; drawing is only used before a live chain begins.",
+            `${player === "cpu" ? "CPU" : "Human"} ends the attack chain because there are no legal continuation cards; drawing is only used before a live chain begins.`,
           );
-          endComboByChoice("cpu");
+          endComboByChoice(player);
           return true;
         }
 
-        if (cpuShouldIcePuck(legal)) {
-          addCpuAuditLog(describeCpuIcingDecision(legal));
-          showCpuNotice("ICING", "info");
-          icePuck("cpu");
+        if (shouldAiIcePuck(player, legal, profile)) {
+          if (player === "cpu") {
+            addCpuAuditLog(describeCpuIcingDecision(legal));
+            showCpuNotice("ICING", "info");
+          }
+          icePuck(player);
           return true;
         }
 
-        if (FEATURES.momentumSystem && cpuShouldDumpAndChase()) {
-          addCpuAuditLog(describeCpuDumpDecision());
-          showCpuNotice("DUMP", "info");
-          dumpAndChase("cpu");
+        if (FEATURES.momentumSystem && shouldAiDumpAndChase(player, profile)) {
+          if (player === "cpu") {
+            addCpuAuditLog(describeCpuDumpDecision());
+            showCpuNotice("DUMP", "info");
+          }
+          dumpAndChase(player);
           return true;
         }
 
         if (legal.length === 0) {
-          if (state.stabilizePending) {
+          if (state.stabilizePending && player === "cpu") {
             addCpuAuditLog(
               "stabilize line | no legal Stabilize card in hand, so CPU draws 1.",
             );
           }
-          if (FEATURES.momentumSystem && canPlayerDumpAndChase("cpu")) {
+          if (
+            player === "cpu" &&
+            FEATURES.momentumSystem &&
+            canPlayerDumpAndChase("cpu")
+          ) {
             addCpuAuditLog(
               `cannot-play branch | no legal attack card. Dump Hand was available, but it concedes possession for a deep refresh, so CPU preferred the draw instead. cycle ${canPlayerUseCycle("cpu") ? "up" : "off"}, burn ${canPlayerUseBurn("cpu") ? "up" : "off"}, force ${canPlayerUsePowerShot("cpu") ? "up" : "off"}.`,
             );
@@ -14553,77 +15940,121 @@
               "CPU declines Dump Hand and risks the draw instead because Dump and Chase would concede possession for a deep refresh.",
             );
           }
-          await handleCannotPlay("cpu");
+          await handleCannotPlay(player);
           return true;
         }
 
-        const choice = getCpuCardChoice();
+        const choice = getAiCardChoice(player, profile);
         const idx = choice?.index;
         if (idx === null || idx === undefined) {
-          endComboByChoice("cpu");
+          endComboByChoice(player);
           return true;
         }
 
-        if (state.stabilizePending) {
+        if (state.stabilizePending && player === "cpu") {
           addCpuAuditLog(
             `stabilize line | legal ${cardsAtIndexesToText(state.cpuHand, legal)} | chooses ${cardToText(choice.card)}.`,
           );
         }
 
-        logCpuCardChoiceAudit(choice, legal);
+        if (player === "cpu") {
+          logCpuCardChoiceAudit(choice, legal);
+          state.cpuPreviewIndex = idx;
+        }
 
-        state.cpuPreviewIndex = idx;
         render();
         await sleep(getCpuSimDuration(1000));
 
-        if (state.currentTurn !== "cpu") {
-          state.cpuPreviewIndex = null;
+        if (state.currentTurn !== player) {
+          if (player === "cpu") {
+            state.cpuPreviewIndex = null;
+          }
           return false;
         }
 
-        if (idx < 0 || idx >= state.cpuHand.length) {
-          state.cpuPreviewIndex = null;
+        if (idx < 0 || idx >= playerHand(player).length) {
+          if (player === "cpu") {
+            state.cpuPreviewIndex = null;
+          }
           return false;
         }
 
-        const cpuCard = state.cpuHand[idx];
-        const cpuButtons = document.querySelectorAll("#cpuHand .card-btn");
-        const sourceButton = cpuButtons[idx];
-        await animatePlayToPileFromElement(
-          sourceButton,
-          cpuCard,
-          !state.showCpuCards,
+        await animatePlayerHandCardToPile(
+          player,
+          idx,
+          playerHand(player)[idx],
           getCpuSimDuration(420, 120),
         );
 
-        playCard("cpu", idx);
-        state.cpuPreviewIndex = null;
+        playCard(player, idx);
+        if (player === "cpu") {
+          state.cpuPreviewIndex = null;
+        }
         return true;
       }
 
-      async function autoContinueCpuTurns(maxSteps = 80) {
+      async function cpuTakeTurn() {
+        return await aiTakeTurn("cpu");
+      }
+
+      async function autoContinueAiTurns(maxSteps = 80) {
         if (state.cpuBusy) {
-          return;
+          return {
+            steps: 0,
+            completed: state.gameOver,
+            haltedReason: "busy",
+            haltDiagnostics: null,
+          };
         }
 
         state.cpuBusy = true;
         let steps = 0;
-        while (state.currentTurn === "cpu" && steps < maxSteps) {
-          const progressed = await cpuTakeTurn();
-          if (!progressed) {
+        let haltedReason = "yielded";
+        const haltTracker = activeSimulationContext?.collectDiagnostics
+          ? createHeadlessHaltTracker(maxSteps)
+          : null;
+
+        while (!state.gameOver && steps < maxSteps) {
+          const player = state.currentTurn;
+          if (!isAiControlledPlayer(player)) {
             break;
           }
+
+          noteHeadlessHaltTrackerState(haltTracker, steps);
+          const progressed = await aiTakeTurn(player, getAiProfileForPlayer(player));
+          if (!progressed) {
+            haltedReason = "stalled";
+            break;
+          }
+
           steps += 1;
           render();
         }
 
-        if (steps >= maxSteps) {
+        if (steps >= maxSteps && !state.gameOver) {
           addLog("Auto-continue safety stop reached.");
+          haltedReason = "limit";
         }
 
         state.cpuBusy = false;
         state.cpuPreviewIndex = null;
         render();
+        return {
+          steps,
+          completed: state.gameOver,
+          haltedReason,
+          haltDiagnostics: state.gameOver
+            ? null
+            : finalizeHeadlessHaltTracker(haltTracker, {
+                haltedReason,
+                steps,
+                maxSteps,
+              }),
+        };
+      }
+
+      async function autoContinueCpuTurns(maxSteps = 80) {
+        return await autoContinueAiTurns(maxSteps);
       }
 
       function runCpuAuto() {
@@ -14631,6 +16062,532 @@
           return;
         }
         void autoContinueCpuTurns();
+      }
+
+      async function applyAiActionCandidate(player, candidate) {
+        if (!candidate || state.currentTurn !== player) {
+          return false;
+        }
+
+        switch (candidate.type) {
+          case "playCard": {
+            const legalIndexes = getLegalCardsForTurn(player);
+            if (
+              !Number.isInteger(candidate.index) ||
+              !legalIndexes.includes(candidate.index)
+            ) {
+              return false;
+            }
+            playCard(player, candidate.index);
+            return true;
+          }
+          case "powerShot":
+            return powerShot(player);
+          case "cycle":
+            if (
+              !Number.isInteger(candidate.index) ||
+              candidate.index < 0 ||
+              candidate.index >= playerHand(player).length
+            ) {
+              return false;
+            }
+            cycleMomentumCard(player, candidate.index);
+            return true;
+          case "burn":
+            if (
+              !Number.isInteger(candidate.index) ||
+              candidate.index < 0 ||
+              candidate.index >= playerHand(player).length
+            ) {
+              return false;
+            }
+            burnMomentumCard(player, candidate.index);
+            return true;
+          case "endChain":
+            if (!currentTurnCanPass()) {
+              return false;
+            }
+            endComboByChoice(player);
+            return true;
+          case "icePuck":
+            return icePuck(player);
+          case "dumpAndChase":
+            return dumpAndChase(player);
+          case "cannotPlay":
+            if (getLegalCardsForTurn(player).length > 0) {
+              return false;
+            }
+            await handleCannotPlay(player);
+            return true;
+          default:
+            return false;
+        }
+      }
+
+      function prepareSimulationTurnState() {
+        state.cpuBusy = false;
+        state.cpuPreviewIndex = null;
+        state.playByPlayHelpOpen = false;
+      }
+
+      function buildAiSimulationProfile(options = {}) {
+        if (options.profile) {
+          return {
+            ...getCpuDifficultyProfile(),
+            ...options.profile,
+          };
+        }
+
+        let profileConfig = {
+          ...state.config,
+          ...(options.config || {}),
+        };
+        const difficulty = sanitizeCpuDifficulty(
+          options.difficulty ?? profileConfig.cpuDifficulty,
+        );
+        profileConfig = {
+          ...profileConfig,
+          cpuDifficulty: difficulty,
+        };
+        if (difficulty !== "custom") {
+          profileConfig = applyCpuDifficultyPresetToConfig(
+            profileConfig,
+            difficulty,
+          );
+        }
+
+        return getCpuDifficultyProfile(profileConfig);
+      }
+
+      function buildAiSimulationContext(options = {}) {
+        return {
+          headless: true,
+          suppressLogs: options.suppressLogs !== false,
+          disableMonteCarlo: options.disableMonteCarlo !== false,
+          collectDiagnostics: options.collectDiagnostics === true,
+          aiPlayers: {
+            human: true,
+            cpu: true,
+          },
+          profiles: {
+            human: buildAiSimulationProfile({
+              difficulty: options.humanDifficulty,
+              config: options.humanConfig,
+              profile: options.humanProfile,
+            }),
+            cpu: buildAiSimulationProfile({
+              difficulty: options.cpuDifficulty,
+              config: options.cpuConfig,
+              profile: options.cpuProfile,
+            }),
+          },
+        };
+      }
+
+      function buildHeadlessAiMatchResult(loopResult = {}) {
+        return {
+          completed: Boolean(state.gameOver),
+          winner: state.gameWinner,
+          humanScore: state.humanScore,
+          cpuScore: state.cpuScore,
+          periodNumber: state.periodNumber,
+          clock: formatGameClock(),
+          deckCardsRemaining: state.deck.length,
+          steps: loopResult.steps || 0,
+          haltedReason: loopResult.haltedReason || null,
+          haltDiagnostics: loopResult.haltDiagnostics || null,
+          stats: cloneMatchStats(),
+        };
+      }
+
+      function getHeadlessBatchPerspective(batchResult, player = "cpu") {
+        const matchesRequested = Math.max(
+          1,
+          Number.parseInt(batchResult?.matchesRequested ?? 1, 10) || 1,
+        );
+        const playerWins =
+          player === "human"
+            ? batchResult?.humanWins || 0
+            : batchResult?.cpuWins || 0;
+        const opponentWins =
+          player === "human"
+            ? batchResult?.cpuWins || 0
+            : batchResult?.humanWins || 0;
+        const averageScore =
+          player === "human"
+            ? Number(batchResult?.averageHumanScore || 0)
+            : Number(batchResult?.averageCpuScore || 0);
+        const averageOpponentScore =
+          player === "human"
+            ? Number(batchResult?.averageCpuScore || 0)
+            : Number(batchResult?.averageHumanScore || 0);
+        const incompleteMatches = Number(batchResult?.incompleteMatches || 0);
+        const averageGoalDiff = averageScore - averageOpponentScore;
+        const winRate = playerWins / matchesRequested;
+        const weightedScore =
+          (playerWins - opponentWins) * 12 +
+          averageGoalDiff * 8 -
+          incompleteMatches * 10;
+
+        return {
+          matchesRequested,
+          playerWins,
+          opponentWins,
+          incompleteMatches,
+          averageScore,
+          averageOpponentScore,
+          averageGoalDiff,
+          winRate,
+          weightedScore,
+        };
+      }
+
+      function formatHeadlessHaltTrail(haltDiagnostics, limit = 4) {
+        if (
+          !Array.isArray(haltDiagnostics?.recentTrail) ||
+          haltDiagnostics.recentTrail.length === 0
+        ) {
+          return "";
+        }
+
+        return haltDiagnostics.recentTrail
+          .slice(-limit)
+          .map((entry) => `${entry.step}:${entry.phase}@${entry.clock}`)
+          .join(" -> ");
+      }
+
+      function formatHeadlessHaltDetails(matchResult) {
+        const haltDiagnostics = matchResult?.haltDiagnostics;
+        if (!haltDiagnostics) {
+          return `halted ${matchResult?.haltedReason || "unknown"}`;
+        }
+
+        const parts = [];
+        if (haltDiagnostics.hint) {
+          parts.push(haltDiagnostics.hint);
+        }
+
+        if (haltDiagnostics.finalState) {
+          parts.push(`final ${formatHeadlessLoopSnapshot(haltDiagnostics.finalState)}`);
+        }
+
+        const topRepeatedState = haltDiagnostics.topRepeatedStates?.[0];
+        if (topRepeatedState) {
+          parts.push(`top repeat x${topRepeatedState.count}: ${topRepeatedState.summary}`);
+        }
+
+        const trailText = formatHeadlessHaltTrail(haltDiagnostics, 4);
+        if (trailText) {
+          parts.push(`trail ${trailText}`);
+        }
+
+        return parts.join(" | ");
+      }
+
+      function escapeCsvValue(value) {
+        if (value === null || value === undefined) {
+          return "";
+        }
+
+        const text = String(value);
+        if (/[",\n]/.test(text)) {
+          return `"${text.replace(/"/g, '""')}"`;
+        }
+        return text;
+      }
+
+      function buildHeadlessBatchCsv(batchResult) {
+        const matches = Array.isArray(batchResult?.matches)
+          ? batchResult.matches
+          : [];
+        const rows = [
+          [
+            "matchIndex",
+            "completed",
+            "winner",
+            "cpuScore",
+            "humanScore",
+            "periodNumber",
+            "clock",
+            "deckCardsRemaining",
+            "steps",
+            "haltedReason",
+            "haltHint",
+            "haltClockStalled",
+            "haltFinalState",
+            "haltTopRepeatCount",
+            "haltTopRepeatState",
+            "haltRecentTrail",
+            "cpuGoals",
+            "humanGoals",
+            "cpuShotsOnGoal",
+            "humanShotsOnGoal",
+            "cpuSavesMade",
+            "humanSavesMade",
+            "cpuExchangeWins",
+            "humanExchangeWins",
+            "cpuFaceoffsWon",
+            "humanFaceoffsWon",
+          ],
+        ];
+
+        matches.forEach((matchResult, index) => {
+          const haltDiagnostics = matchResult.haltDiagnostics || null;
+          const topRepeatedState = haltDiagnostics?.topRepeatedStates?.[0] || null;
+          rows.push([
+            index + 1,
+            matchResult.completed ? "yes" : "no",
+            matchResult.winner || "",
+            matchResult.cpuScore,
+            matchResult.humanScore,
+            matchResult.periodNumber,
+            matchResult.clock,
+            matchResult.deckCardsRemaining,
+            matchResult.steps,
+            matchResult.haltedReason || "",
+            haltDiagnostics?.hint || "",
+            haltDiagnostics?.clockStalled ? "yes" : "no",
+            haltDiagnostics?.finalState
+              ? formatHeadlessLoopSnapshot(haltDiagnostics.finalState)
+              : "",
+            topRepeatedState?.count || 0,
+            topRepeatedState?.summary || "",
+            formatHeadlessHaltTrail(haltDiagnostics, 6),
+            matchResult.stats?.cpu?.goals || 0,
+            matchResult.stats?.human?.goals || 0,
+            matchResult.stats?.cpu?.shotsOnGoal || 0,
+            matchResult.stats?.human?.shotsOnGoal || 0,
+            matchResult.stats?.cpu?.savesMade || 0,
+            matchResult.stats?.human?.savesMade || 0,
+            matchResult.stats?.cpu?.exchangeWins || 0,
+            matchResult.stats?.human?.exchangeWins || 0,
+            matchResult.stats?.cpu?.faceoffsWon || 0,
+            matchResult.stats?.human?.faceoffsWon || 0,
+          ]);
+        });
+
+        return rows
+          .map((row) => row.map((value) => escapeCsvValue(value)).join(","))
+          .join("\n");
+      }
+
+      function downloadHeadlessBatchCsv(batchResult = lastHeadlessBatchResult) {
+        if (
+          !batchResult ||
+          !Array.isArray(batchResult.matches) ||
+          batchResult.matches.length === 0
+        ) {
+          setDebugSimulationOutput(
+            "Run a headless batch first to download match-by-match CSV output.",
+          );
+          return false;
+        }
+
+        downloadTextFile(
+          buildHeadlessBatchCsv(batchResult),
+          "hockey-card-headless-batch",
+          "Headless batch CSV downloaded.",
+          {
+            extension: "csv",
+            mimeType: "text/csv;charset=utf-8",
+          },
+        );
+        return true;
+      }
+
+      function formatHeadlessBatchSummary(
+        batchResult,
+        player = "cpu",
+        options = {},
+      ) {
+        if (!batchResult) {
+          return "No simulation results.";
+        }
+
+        const showMatches = options.showMatches === true;
+        const summary = getHeadlessBatchPerspective(batchResult, player);
+        const diffText = `${summary.averageGoalDiff > 0 ? "+" : ""}${summary.averageGoalDiff.toFixed(2)}`;
+        const scoreText = `${summary.weightedScore > 0 ? "+" : ""}${summary.weightedScore.toFixed(1)}`;
+        const lines = [
+          `Matches: ${batchResult.matchesRequested} requested | ${batchResult.matchesCompleted} completed | ${batchResult.incompleteMatches} incomplete`,
+          `Wins: CPU ${batchResult.cpuWins} | Human ${batchResult.humanWins}`,
+          `Average score: CPU ${Number(batchResult.averageCpuScore || 0).toFixed(2)} | Human ${Number(batchResult.averageHumanScore || 0).toFixed(2)}`,
+          `${player === "cpu" ? "CPU" : "Human"} view: win rate ${Math.round(summary.winRate * 100)}% | avg goal diff ${diffText} | rollout score ${scoreText}`,
+        ];
+
+        if (batchResult.runSettings) {
+          lines.push(
+            `AI settings: CPU Monte Carlo ${batchResult.runSettings.cpuMonteCarloEnabled ? "ON" : "OFF"} | Opponent heuristic baseline`,
+          );
+        }
+
+        const haltedMatches = Array.isArray(batchResult.matches)
+          ? batchResult.matches
+              .map((matchResult, index) => ({ matchResult, index }))
+              .filter(({ matchResult }) => !matchResult.completed)
+          : [];
+        if (haltedMatches.length > 0) {
+          const visibleHalts = haltedMatches.slice(0, 8);
+          lines.push("", "Halt detail:");
+          visibleHalts.forEach(({ matchResult, index }) => {
+            lines.push(`${index + 1}. ${formatHeadlessHaltDetails(matchResult)}`);
+          });
+          if (haltedMatches.length > visibleHalts.length) {
+            lines.push(
+              `... ${haltedMatches.length - visibleHalts.length} more halted matches omitted.`,
+            );
+          }
+        }
+
+        if (
+          showMatches &&
+          Array.isArray(batchResult.matches) &&
+          batchResult.matches.length > 0
+        ) {
+          const visibleMatches = batchResult.matches.slice(0, 20);
+          lines.push("", "Per-match:");
+          visibleMatches.forEach((matchResult, index) => {
+            const headline = matchResult.completed
+              ? `${matchResult.winner === "cpu" ? "CPU" : "Human"} ${matchResult.cpuScore}-${matchResult.humanScore}`
+              : `HALTED ${matchResult.haltedReason || "unknown"}`;
+            lines.push(
+              `${index + 1}. ${headline} | P${matchResult.periodNumber} ${matchResult.clock} | deck ${matchResult.deckCardsRemaining} | steps ${matchResult.steps}`,
+            );
+            if (!matchResult.completed && matchResult.haltDiagnostics) {
+              lines.push(`   ${formatHeadlessHaltDetails(matchResult)}`);
+            }
+          });
+          if (batchResult.matches.length > visibleMatches.length) {
+            lines.push(
+              `... ${batchResult.matches.length - visibleMatches.length} more matches omitted.`,
+            );
+          }
+        }
+
+        return lines.join("\n");
+      }
+
+      async function runHeadlessAiMatch(options = {}) {
+        const preserveLiveState = options.preserveLiveState !== false;
+        const startFromCurrentState = options.startFromCurrentState === true;
+        const liveSnapshot = preserveLiveState
+          ? captureSimulationSnapshot()
+          : null;
+        const simulationContext = buildAiSimulationContext(options);
+
+        try {
+          activeSimulationContext = simulationContext;
+          if (!startFromCurrentState) {
+            newGame();
+          }
+          prepareSimulationTurnState();
+          if (options.initialAction) {
+            const actionPlayer = options.initialAction.player ?? state.currentTurn;
+            const applied = await applyAiActionCandidate(
+              actionPlayer,
+              options.initialAction,
+            );
+            if (!applied) {
+              throw new Error("Could not apply the initial simulation action.");
+            }
+          }
+          const loopResult = await autoContinueAiTurns(
+            Math.max(1, Number.parseInt(options.maxSteps ?? 800, 10) || 800),
+          );
+          return buildHeadlessAiMatchResult(loopResult);
+        } finally {
+          activeSimulationContext = null;
+          if (liveSnapshot) {
+            restoreSimulationSnapshot(liveSnapshot);
+          }
+          render();
+        }
+      }
+
+      async function runHeadlessAiBatch(options = {}) {
+        const matchesRequested = Math.max(
+          1,
+          Number.parseInt(options.games ?? options.matches ?? 1, 10) || 1,
+        );
+        const includeMatches = Boolean(options.includeMatches);
+        const preserveLiveState = options.preserveLiveState !== false;
+        const startFromCurrentState = options.startFromCurrentState === true;
+        const liveSnapshot = preserveLiveState
+          ? captureSimulationSnapshot()
+          : null;
+        const startingSnapshot = captureSimulationSnapshot();
+        const simulationContext = buildAiSimulationContext(options);
+        const matches = [];
+        let humanWins = 0;
+        let cpuWins = 0;
+        let incompleteMatches = 0;
+        let totalHumanScore = 0;
+        let totalCpuScore = 0;
+
+        try {
+          activeSimulationContext = simulationContext;
+
+          for (let index = 0; index < matchesRequested; index += 1) {
+            if (startFromCurrentState) {
+              restoreSimulationSnapshot(startingSnapshot);
+            } else {
+              newGame();
+            }
+
+            prepareSimulationTurnState();
+            if (options.initialAction) {
+              const actionPlayer =
+                options.initialAction.player ?? state.currentTurn;
+              const applied = await applyAiActionCandidate(
+                actionPlayer,
+                options.initialAction,
+              );
+              if (!applied) {
+                throw new Error(
+                  "Could not apply the initial simulation action.",
+                );
+              }
+            }
+
+            const loopResult = await autoContinueAiTurns(
+              Math.max(
+                1,
+                Number.parseInt(options.maxSteps ?? 800, 10) || 800,
+              ),
+            );
+            const matchResult = buildHeadlessAiMatchResult(loopResult);
+            totalHumanScore += matchResult.humanScore;
+            totalCpuScore += matchResult.cpuScore;
+            if (!matchResult.completed) {
+              incompleteMatches += 1;
+            } else if (matchResult.winner === "human") {
+              humanWins += 1;
+            } else if (matchResult.winner === "cpu") {
+              cpuWins += 1;
+            }
+
+            if (includeMatches) {
+              matches.push(matchResult);
+            }
+          }
+
+          return {
+            matchesRequested,
+            matchesCompleted: matchesRequested - incompleteMatches,
+            incompleteMatches,
+            humanWins,
+            cpuWins,
+            averageHumanScore: totalHumanScore / matchesRequested,
+            averageCpuScore: totalCpuScore / matchesRequested,
+            matches: includeMatches ? matches : undefined,
+          };
+        } finally {
+          activeSimulationContext = null;
+          if (liveSnapshot) {
+            restoreSimulationSnapshot(liveSnapshot);
+          }
+          render();
+        }
       }
 
       // ---------------------------
@@ -15185,6 +17142,10 @@
       }
 
       function render() {
+        if (isHeadlessSimulationActive()) {
+          return;
+        }
+
         const faceoffUiLabel = state.faceoffPending
           ? getFaceoffUiLabel()
           : "Faceoff";
@@ -16274,6 +18235,103 @@
             render();
           });
 
+        document
+          .getElementById("runHeadlessBatchBtn")
+          ?.addEventListener("click", async () => {
+            const runHeadlessBatchBtn = document.getElementById(
+              "runHeadlessBatchBtn",
+            );
+            const downloadHeadlessBatchCsvBtn = document.getElementById(
+              "downloadHeadlessBatchCsvBtn",
+            );
+            const simulationOptions = getDebugSimulationOptionsFromControls();
+            const simulationConfig = getDraftConfigFromControls();
+            const cpuMonteCarloEnabled = Boolean(
+              simulationConfig.cpuMonteCarloEnabled,
+            );
+            const baselineOpponentConfig = {
+              ...simulationConfig,
+              cpuMonteCarloEnabled: false,
+            };
+
+            if (state.cpuBusy) {
+              setDebugSimulationOutput(
+                "Wait for the current AI action to finish before running a headless batch.",
+              );
+              return;
+            }
+
+            if (
+              simulationOptions.startFromCurrentState &&
+              (hasHumanPendingTurn() || hasHumanSpecialSelection())
+            ) {
+              setDebugSimulationOutput(
+                "Finish or undo the staged human move before simulating from the current state.",
+              );
+              return;
+            }
+
+            if (runHeadlessBatchBtn) {
+              runHeadlessBatchBtn.disabled = true;
+            }
+            if (downloadHeadlessBatchCsvBtn) {
+              downloadHeadlessBatchCsvBtn.disabled = true;
+            }
+            lastHeadlessBatchResult = null;
+            setDebugSimulationOutput(
+              `Running ${simulationOptions.games} headless match${simulationOptions.games === 1 ? "" : "es"} with CPU Monte Carlo ${cpuMonteCarloEnabled ? "ON" : "OFF"}...`,
+            );
+
+            try {
+              const batchResult = await runHeadlessAiBatch({
+                games: simulationOptions.games,
+                maxSteps: simulationOptions.maxSteps,
+                includeMatches: true,
+                startFromCurrentState:
+                  simulationOptions.startFromCurrentState,
+                disableMonteCarlo: !cpuMonteCarloEnabled,
+                collectDiagnostics: true,
+                humanConfig: baselineOpponentConfig,
+                cpuConfig: simulationConfig,
+              });
+              batchResult.runSettings = {
+                cpuMonteCarloEnabled,
+                humanMonteCarloEnabled: false,
+              };
+              lastHeadlessBatchResult = batchResult;
+              setDebugSimulationOutput(
+                formatHeadlessBatchSummary(batchResult, "cpu", {
+                  showMatches: simulationOptions.includeMatches,
+                }),
+              );
+              if (downloadHeadlessBatchCsvBtn) {
+                downloadHeadlessBatchCsvBtn.disabled =
+                  !Array.isArray(batchResult.matches) ||
+                  batchResult.matches.length === 0;
+              }
+            } catch (error) {
+              lastHeadlessBatchResult = null;
+              setDebugSimulationOutput(
+                `Headless batch failed: ${error instanceof Error ? error.message : String(error)}`,
+              );
+              if (downloadHeadlessBatchCsvBtn) {
+                downloadHeadlessBatchCsvBtn.disabled = true;
+              }
+            } finally {
+              if (runHeadlessBatchBtn) {
+                runHeadlessBatchBtn.disabled = false;
+              }
+              render();
+            }
+          });
+
+        document
+          .getElementById("downloadHeadlessBatchCsvBtn")
+          ?.addEventListener("click", () => {
+            downloadHeadlessBatchCsv();
+            render();
+          });
+
         const cpuDifficultyInput =
           document.getElementById("debugCpuDifficulty");
         const cpuTuningIds = [
@@ -16296,6 +18354,12 @@
           "debugCpuMomentumAggro",
           "debugCpuLateRisk",
           "debugCpuPanicThreshold",
+        ];
+        const cpuMonteCarloIds = [
+          "debugCpuMonteCarloEnabled",
+          "debugCpuMonteCarloRollouts",
+          "debugCpuMonteCarloCandidates",
+          "debugCpuMonteCarloMaxSteps",
         ];
 
         cpuDifficultyInput?.addEventListener("input", () => {
@@ -16325,6 +18389,14 @@
           });
         });
 
+        cpuMonteCarloIds.forEach((id) => {
+          const element = document.getElementById(id);
+          element?.addEventListener("input", () => {
+            state.config = { ...state.config, ...getDraftConfigFromControls() };
+            refreshDebugPreview();
+          });
+        });
+
         [
           "debugSuitCount",
           "debugMaxValue",
@@ -16346,6 +18418,11 @@
           });
         });
       }
+
+      window.hockeyCardSim = {
+        runHeadlessAiMatch,
+        runHeadlessAiBatch,
+      };
 
       applySavedDefaults();
       populateTeamSelects();
