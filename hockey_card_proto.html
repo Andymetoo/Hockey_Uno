@@ -3907,6 +3907,9 @@
           goals: 0,
           forceShotGoals: 0,
           shotsOnGoal: 0,
+          knownPlayAccuracyTotal: 0,
+          knownPlayAccuracyCount: 0,
+          knownPlayAccuracyBestCount: 0,
           savesMade: 0,
           exchangeWins: 0,
           faceoffsWon: 0,
@@ -3924,6 +3927,10 @@
           highestShotValue: 0,
           shotValues: [],
           luck: createEmptyLuckStats(),
+          runLengths: {
+            attack: {},
+            defense: {},
+          },
           zonePlays: createEmptyZoneCounter(),
           shotOrigins: createEmptyZoneCounter(),
         };
@@ -3937,6 +3944,12 @@
           zoneSeconds: createEmptyZoneCounter(),
           scoringSummary: [],
         };
+      }
+
+      function cloneMatchStats(stats = state.stats) {
+        return stats
+          ? JSON.parse(JSON.stringify(stats))
+          : createEmptyMatchStats();
       }
 
       function getPlayerStats(player) {
@@ -4863,6 +4876,99 @@
         return (stats.totalShotValue / stats.shotValues.length).toFixed(2);
       }
 
+      function getKnownPlayAccuracyPercent(player) {
+        const stats = getPlayerStats(player);
+        if (!stats || stats.knownPlayAccuracyCount === 0) {
+          return 0;
+        }
+        return (
+          (stats.knownPlayAccuracyTotal / stats.knownPlayAccuracyCount) * 100
+        );
+      }
+
+      function getKnownPlayAccuracyDisplay(player) {
+        const stats = getPlayerStats(player);
+        if (!stats || stats.knownPlayAccuracyCount === 0) {
+          return "n/a";
+        }
+        return `${getKnownPlayAccuracyPercent(player).toFixed(1)}%`;
+      }
+
+      function getKnownPlayAccuracyRowNote() {
+        const humanStats = getPlayerStats("human") || createEmptyPlayerStats();
+        const cpuStats = getPlayerStats("cpu") || createEmptyPlayerStats();
+        return `${getPlayerScoreBugName("human")} best-known ${humanStats.knownPlayAccuracyBestCount}/${humanStats.knownPlayAccuracyCount} | ${getPlayerScoreBugName("cpu")} best-known ${cpuStats.knownPlayAccuracyBestCount}/${cpuStats.knownPlayAccuracyCount}`;
+      }
+
+      function getAccuracyStatsNote() {
+        return "Accuracy grades only normal attack/defense card plays against the best public-state option from that player's hand. Hidden hands, faceoffs, saves, rebounds, and Stabilize are excluded.";
+      }
+
+      function recordRunLengthStat(player, role, runLength) {
+        const stats = getPlayerStats(player);
+        if (!stats || (role !== "attack" && role !== "defense")) {
+          return;
+        }
+
+        const normalizedLength = Math.max(
+          0,
+          Number.isFinite(runLength) ? Math.floor(runLength) : 0,
+        );
+        if (!stats.runLengths) {
+          stats.runLengths = {
+            attack: {},
+            defense: {},
+          };
+        }
+        if (!stats.runLengths[role]) {
+          stats.runLengths[role] = {};
+        }
+
+        const bucket = String(normalizedLength);
+        stats.runLengths[role][bucket] =
+          (stats.runLengths[role][bucket] || 0) + 1;
+      }
+
+      function getRunLengthCount(player, role, runLength) {
+        const stats = getPlayerStats(player) || createEmptyPlayerStats();
+        const bucket = String(runLength);
+        return stats.runLengths?.[role]?.[bucket] || 0;
+      }
+
+      function getRunLengthBuckets() {
+        const buckets = new Set();
+        ["human", "cpu"].forEach((player) => {
+          const stats = getPlayerStats(player);
+          ["attack", "defense"].forEach((role) => {
+            Object.keys(stats?.runLengths?.[role] || {}).forEach((key) => {
+              const numericKey = Number.parseInt(key, 10);
+              if (Number.isFinite(numericKey)) {
+                buckets.add(numericKey);
+              }
+            });
+          });
+        });
+
+        const maxBucket = Math.max(state.config.handSize, ...buckets, 0);
+        return Array.from({ length: maxBucket + 1 }, (_, index) => index);
+      }
+
+      function getRunLengthCompareRows(role) {
+        return getRunLengthBuckets().map((runLength) =>
+          createComparisonRow(
+            `${runLength}-Card Run${runLength === 1 ? "" : "s"}`,
+            getRunLengthCount("human", role, runLength),
+            getRunLengthCount("cpu", role, runLength),
+            getRunLengthCount("human", role, runLength),
+            getRunLengthCount("cpu", role, runLength),
+          ),
+        );
+      }
+
+      function getRunLengthStatsNote(role) {
+        return `${role === "attack" ? "Attack" : "Defense"} chain lengths only. A 0-card run means the turn ended without a normal card play.`;
+      }
+
       function createComparisonRow(
         label,
         humanDisplay,
@@ -4953,6 +5059,16 @@
             "Shots On Goal",
             humanStats.shotsOnGoal,
             cpuStats.shotsOnGoal,
+          ),
+          createComparisonRow(
+            "Accuracy",
+            getKnownPlayAccuracyDisplay("human"),
+            getKnownPlayAccuracyDisplay("cpu"),
+            getKnownPlayAccuracyPercent("human"),
+            getKnownPlayAccuracyPercent("cpu"),
+            {
+              note: getKnownPlayAccuracyRowNote(),
+            },
           ),
           createComparisonRow(
             "Saves Made",
@@ -6462,6 +6578,7 @@
         return {
           humanHand: cloneCards(state.humanHand),
           discardPile: cloneCards(state.discardPile),
+          stats: cloneMatchStats(state.stats),
           shotPending: cloneShotPending(state.shotPending),
           activeCard: cloneCard(state.activeCard),
           runMatchMode: state.runMatchMode,
@@ -6485,6 +6602,7 @@
       function restoreHumanTurnSnapshot(snapshot) {
         state.humanHand = cloneCards(snapshot.humanHand);
         state.discardPile = cloneCards(snapshot.discardPile);
+        state.stats = cloneMatchStats(snapshot.stats);
         state.shotPending = cloneShotPending(snapshot.shotPending);
         state.activeCard = cloneCard(snapshot.activeCard);
         state.runMatchMode = snapshot.runMatchMode;
@@ -10168,6 +10286,17 @@
       }
 
       function passAttackTurn(whyText = "") {
+        if (
+          state.currentTurn === state.attacker &&
+          state.roleOfCurrentTurn === "attacker"
+        ) {
+          recordRunLengthStat(
+            state.attacker,
+            "attack",
+            state.attackerChainCount,
+          );
+        }
+
         clearComboWindow();
         clearHumanPendingTurn();
         clearBurnSelection();
@@ -10320,6 +10449,17 @@
       }
 
       function resolveExchange(winner, reason, outcomeContext = null) {
+        if (
+          state.currentTurn === state.defender &&
+          state.roleOfCurrentTurn === "defender"
+        ) {
+          recordRunLengthStat(
+            state.defender,
+            "defense",
+            state.defenderChainCount,
+          );
+        }
+
         clearComboWindow();
         state.activeBattleState = "none";
         state.comboImmunityActive = false;
@@ -11790,6 +11930,9 @@
         }
 
         if (player === state.attacker) {
+          if (state.roleOfCurrentTurn === "attacker") {
+            recordRunLengthStat(player, "attack", state.attackerChainCount);
+          }
           if (isShotZone(player)) {
             noteExchangeMeterSnapshot(getExchangeMeterState());
             resolveShot(state.attacker, state.defender, lastPlayedCard);
@@ -11806,6 +11949,9 @@
           return true;
         }
 
+        if (state.roleOfCurrentTurn === "defender") {
+          recordRunLengthStat(player, "defense", state.defenderChainCount);
+        }
         resolveDefenderRunoutTurnover(player, lastPlayedCard);
         return true;
       }
@@ -11860,6 +12006,10 @@
             `Illegal play: ${lowerPlayerName(player)} tried ${cardToText(card)} (${matchDecision.reason}).`,
           );
           return false;
+        }
+
+        if (!stabilizePlay) {
+          recordKnownPlayAccuracy(player, cardIndex, legalForTurn);
         }
 
         hand.splice(cardIndex, 1);
@@ -12613,6 +12763,50 @@
         return `faceoff reply to ${cardToText(humanCard)} | pressure ${formatCpuAuditNumber(pressure, 2)} | chose ${cardToText(state.cpuHand[cpuIndex])} as ${strategy} | winning replies ${winningIndexes.length}, ties ${tyingIndexes.length}.`;
       }
 
+      const KNOWN_PLAY_ACCURACY_PROFILE = Object.freeze({
+        attackLookaheadDepth: 3,
+        attackFollowUpWeight: 5,
+        attackChainWeight: 4,
+        zoneAdvanceWeight: 4,
+        shotZoneAggression: 5,
+        cardConservationWeight: 4,
+        emptyHandShotWeight: 6,
+        attackEmptyHandBonus: 6,
+        attackOffenseValueWeight: 1.1,
+        attackConserveWeight: 0.42,
+        defenseLookaheadDepth: 3,
+        neutralDefenseTarget: 1,
+        defensiveZoneDefenseTarget: 2,
+        goalZoneDefenseTarget: 2,
+        defenseMarginWeight: 7,
+        defenseFollowUpWeight: 4,
+        dangerDefenseFollowUpWeight: 6,
+        avoidStabilizeWindowWeight: 6,
+        defenseStabilizePenalty: 7,
+        defenseConserveWeight: 0.22,
+      });
+
+      function isDangerZoneFor(player, zoneIndex = state.zoneIndex) {
+        return (
+          zoneIndex === getDefensiveZoneIndex(player) ||
+          zoneIndex === getGoalZoneIndex(player)
+        );
+      }
+
+      function getKnownDefenseMarginTarget(
+        player,
+        zoneIndex = state.zoneIndex,
+        profile = KNOWN_PLAY_ACCURACY_PROFILE,
+      ) {
+        if (zoneIndex === getGoalZoneIndex(player)) {
+          return profile.goalZoneDefenseTarget;
+        }
+        if (zoneIndex === getDefensiveZoneIndex(player)) {
+          return profile.defensiveZoneDefenseTarget;
+        }
+        return profile.neutralDefenseTarget;
+      }
+
       function getLongestPlayableContinuationLength(
         hand,
         activeCard,
@@ -12661,8 +12855,7 @@
         return bestLength;
       }
 
-      function getProjectedCpuPlayState(cardIndex, lookaheadDepth) {
-        const hand = state.cpuHand;
+      function getProjectedPlayState(hand, cardIndex, lookaheadDepth) {
         const card = hand[cardIndex];
         if (!card) {
           return null;
@@ -12701,6 +12894,269 @@
           legalAfter,
           continuationLength,
         };
+      }
+
+      function getProjectedCpuPlayState(cardIndex, lookaheadDepth) {
+        return getProjectedPlayState(state.cpuHand, cardIndex, lookaheadDepth);
+      }
+
+      function scoreKnownAttackPlay(
+        player,
+        cardIndex,
+        profile = KNOWN_PLAY_ACCURACY_PROFILE,
+      ) {
+        const projected = getProjectedPlayState(
+          playerHand(player),
+          cardIndex,
+          profile.attackLookaheadDepth,
+        );
+        if (!projected) {
+          return null;
+        }
+
+        const currentZoneIndex = state.zoneIndex;
+        const shotZone = isShotZone(player, currentZoneIndex);
+        const dangerZone = isDangerZoneFor(player, currentZoneIndex);
+        const goalZone = currentZoneIndex === getGoalZoneIndex(player);
+        const offensivePush =
+          shotZone ||
+          isFarOffensiveZone(player, currentZoneIndex) ||
+          isCloseOffensiveZone(player, currentZoneIndex);
+        const immediateResolve = projected.remainingHand.length === 0;
+
+        let score =
+          projected.legalAfter * profile.attackFollowUpWeight +
+          projected.continuationLength * profile.attackChainWeight;
+
+        if (!shotZone) {
+          const advancePotential = Math.min(
+            4,
+            projected.continuationLength +
+              projected.legalAfter +
+              (state.attackerChainCount === 0 ? 1 : 0),
+          );
+          score +=
+            advancePotential *
+            (dangerZone
+              ? profile.zoneAdvanceWeight * (goalZone ? 0.95 : 0.75)
+              : offensivePush
+                ? profile.zoneAdvanceWeight * 0.42
+                : profile.zoneAdvanceWeight * 0.22);
+        }
+
+        if (dangerZone) {
+          score += immediateResolve
+            ? 5 + profile.zoneAdvanceWeight + (goalZone ? 2 : 0)
+            : 1.5 +
+              projected.legalAfter * 1.1 +
+              projected.continuationLength * (goalZone ? 1.3 : 0.9);
+        }
+
+        if (immediateResolve) {
+          score +=
+            profile.attackEmptyHandBonus +
+            profile.emptyHandShotWeight *
+              (shotZone ? 1.8 : offensivePush ? 1.05 : dangerZone ? 1.35 : 0.6);
+        }
+
+        if (shotZone) {
+          if (immediateResolve) {
+            score += 8 + profile.shotZoneAggression * 2;
+          } else if (projected.remainingHand.length === 1) {
+            score += 3 + profile.shotZoneAggression * 1.1;
+          } else if (projected.remainingHand.length === 2) {
+            score += 1 + profile.shotZoneAggression * 0.45;
+          }
+        }
+
+        if (shotZone) {
+          score +=
+            projected.card.value *
+            (profile.attackOffenseValueWeight +
+              profile.shotZoneAggression * 0.18);
+        } else if (offensivePush) {
+          score +=
+            projected.card.value *
+            (profile.attackOffenseValueWeight * 0.6 +
+              profile.zoneAdvanceWeight * 0.12);
+        } else {
+          score +=
+            projected.card.value * 0.18 -
+            projected.card.value * profile.attackConserveWeight;
+        }
+
+        if (state.activeCard === null && projected.legalAfter > 0) {
+          score += 1.4;
+        }
+
+        if (
+          !offensivePush &&
+          projected.legalAfter === 0 &&
+          projected.continuationLength === 0
+        ) {
+          score -= 3 + profile.cardConservationWeight * 0.3;
+        }
+
+        return {
+          index: cardIndex,
+          card: projected.card,
+          score,
+        };
+      }
+
+      function scoreKnownDefensePlay(
+        player,
+        cardIndex,
+        profile = KNOWN_PLAY_ACCURACY_PROFILE,
+      ) {
+        const projected = getProjectedPlayState(
+          playerHand(player),
+          cardIndex,
+          profile.defenseLookaheadDepth,
+        );
+        if (!projected) {
+          return null;
+        }
+
+        const dangerZone = isDangerZoneFor(player);
+        const targetMargin = getKnownDefenseMarginTarget(
+          player,
+          state.zoneIndex,
+          profile,
+        );
+        const projectedMargin =
+          state.defenderChainCount + 1 - state.attackerChainCount;
+        const followUpWeight = dangerZone
+          ? profile.dangerDefenseFollowUpWeight
+          : profile.defenseFollowUpWeight;
+        let score =
+          projectedMargin * profile.defenseMarginWeight +
+          projected.continuationLength * followUpWeight +
+          projected.legalAfter * Math.round(followUpWeight / 2);
+
+        if (projectedMargin >= targetMargin) {
+          score += (dangerZone ? 10 : 6) + profile.avoidStabilizeWindowWeight;
+        }
+
+        if (dangerZone && projectedMargin === 1) {
+          score -=
+            profile.defenseStabilizePenalty +
+            profile.avoidStabilizeWindowWeight * 0.8;
+        }
+
+        if (
+          projected.remainingHand.length === 0 &&
+          projectedMargin < targetMargin
+        ) {
+          score -= 10 + profile.avoidStabilizeWindowWeight;
+        }
+
+        score -=
+          projected.card.value *
+          (dangerZone ? 0.12 : profile.defenseConserveWeight);
+
+        return {
+          index: cardIndex,
+          card: projected.card,
+          score,
+        };
+      }
+
+      function getKnownPlayEvaluations(
+        player,
+        legalIndexes = getLegalCardsForTurn(player),
+        profile = KNOWN_PLAY_ACCURACY_PROFILE,
+      ) {
+        if (
+          state.currentTurn !== player ||
+          state.faceoffPending ||
+          state.shotPending ||
+          state.stabilizePending ||
+          (state.roleOfCurrentTurn !== "attacker" &&
+            state.roleOfCurrentTurn !== "defender") ||
+          legalIndexes.length === 0
+        ) {
+          return [];
+        }
+
+        const evaluations = legalIndexes
+          .map((index) =>
+            state.roleOfCurrentTurn === "defender"
+              ? scoreKnownDefensePlay(player, index, profile)
+              : scoreKnownAttackPlay(player, index, profile),
+          )
+          .filter(Boolean);
+
+        evaluations.sort((left, right) => {
+          if (right.score !== left.score) {
+            return right.score - left.score;
+          }
+
+          if (state.roleOfCurrentTurn === "defender") {
+            if (left.card.value !== right.card.value) {
+              return left.card.value - right.card.value;
+            }
+          } else if (left.card.value !== right.card.value) {
+            return right.card.value - left.card.value;
+          }
+
+          return left.index - right.index;
+        });
+
+        return evaluations;
+      }
+
+      function getKnownPlayAccuracySample(
+        player,
+        chosenIndex,
+        legalIndexes = getLegalCardsForTurn(player),
+      ) {
+        const evaluations = getKnownPlayEvaluations(player, legalIndexes);
+        if (evaluations.length === 0) {
+          return null;
+        }
+
+        const chosen = evaluations.find(
+          (evaluation) => evaluation.index === chosenIndex,
+        );
+        if (!chosen) {
+          return null;
+        }
+
+        const bestScore = evaluations[0].score;
+        const worstScore = evaluations[evaluations.length - 1].score;
+        const scoreSpan = bestScore - worstScore;
+        const fraction =
+          evaluations.length === 1 || Math.abs(scoreSpan) < 0.001
+            ? 1
+            : clamp((chosen.score - worstScore) / scoreSpan, 0, 1);
+
+        return {
+          fraction,
+          perfect: Math.abs(bestScore - chosen.score) < 0.001,
+        };
+      }
+
+      function recordKnownPlayAccuracy(
+        player,
+        chosenIndex,
+        legalIndexes = getLegalCardsForTurn(player),
+      ) {
+        const stats = getPlayerStats(player);
+        const sample = getKnownPlayAccuracySample(
+          player,
+          chosenIndex,
+          legalIndexes,
+        );
+        if (!stats || !sample) {
+          return;
+        }
+
+        stats.knownPlayAccuracyTotal += sample.fraction;
+        stats.knownPlayAccuracyCount += 1;
+        if (sample.perfect) {
+          stats.knownPlayAccuracyBestCount += 1;
+        }
       }
 
       function scoreCpuAttackPlay(
@@ -14488,6 +14944,8 @@
         const luckRows = getLuckOverviewRows();
         const zoneTimeRows = getZoneTimeComparisonRows();
         const zoneActivityRows = getZoneActivityCompareRows();
+        const attackRunLengthRows = getRunLengthCompareRows("attack");
+        const defenseRunLengthRows = getRunLengthCompareRows("defense");
         const humanShotValues =
           state.stats.human.shotValues.length > 0
             ? state.stats.human.shotValues.join(", ")
@@ -14510,6 +14968,7 @@
           '<div class="stats-section-title">Summary</div>',
           renderStatsCompareRowsHtml(overviewRows),
           `<div class="stats-note">${escapeHtml(getShotStatsNote())}</div>`,
+          `<div class="stats-note">${escapeHtml(getAccuracyStatsNote())}</div>`,
           "</div>",
           '<div class="stats-section">',
           '<div class="stats-section-title">Luck</div>',
@@ -14530,6 +14989,16 @@
           '<div class="stats-section">',
           '<div class="stats-section-title">Zone Activity</div>',
           renderStatsCompareRowsHtml(zoneActivityRows),
+          "</div>",
+          '<div class="stats-section">',
+          '<div class="stats-section-title">Attack Runs</div>',
+          renderStatsCompareRowsHtml(attackRunLengthRows),
+          `<div class="stats-note">${escapeHtml(getRunLengthStatsNote("attack"))}</div>`,
+          "</div>",
+          '<div class="stats-section">',
+          '<div class="stats-section-title">Defense Runs</div>',
+          renderStatsCompareRowsHtml(defenseRunLengthRows),
+          `<div class="stats-note">${escapeHtml(getRunLengthStatsNote("defense"))}</div>`,
           "</div>",
           '<div class="stats-section">',
           '<div class="stats-section-title">Scoring Summary</div>',
