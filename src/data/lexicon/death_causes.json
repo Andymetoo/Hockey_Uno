@@ -1,0 +1,44 @@
+[
+  {
+    "id": "lex.cause.drowning",
+    "terms": ["drown", "drowned", "drowning"],
+    "concepts": [
+      ["death.cause", "drowning"],
+      ["tag", "water"]
+    ]
+  },
+  {
+    "id": "lex.cause.illness",
+    "terms": ["illness", "sick", "fever", "disease", "natural cause"],
+    "concepts": [
+      ["death.cause", "illness"],
+      ["death.manner", "natural"],
+      ["tag", "sickness"],
+      ["tag", "fever"]
+    ]
+  },
+  {
+    "id": "lex.cause.blood_loss",
+    "terms": ["blood loss", "bled out", "bleeding"],
+    "concepts": [
+      ["death.cause", "blood_loss"],
+      ["tag", "blood"]
+    ]
+  },
+  {
+    "id": "lex.cause.cut",
+    "terms": ["cut", "slashed", "slice"],
+    "concepts": [
+      ["death.directCause", "cut"],
+      ["tag", "sharp"]
+    ]
+  },
+  {
+    "id": "lex.cause.impact",
+    "terms": ["impact", "hit"],
+    "concepts": [
+      ["death.cause", "impact"],
+      ["tag", "impact"]
+    ]
+  }
+]

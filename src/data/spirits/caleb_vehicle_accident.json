@@ -1,0 +1,20 @@
+{
+  "id": "spirit.caleb",
+  "name": "Caleb",
+  "aliases": ["caleb"],
+  "facts": [
+    ["death.manner", "accident"],
+    ["death.cause", "vehicle_collision"],
+    ["location.death", "road"],
+    ["object.fatal", "vehicle"],
+    ["tag", "vehicle"],
+    ["tag", "metal"],
+    ["tag", "road"],
+    ["tag", "outside"],
+    ["tag", "impact"]
+  ],
+  "unknowns": [
+    ["person.driver", "*"]
+  ],
+  "refusals": []
+}

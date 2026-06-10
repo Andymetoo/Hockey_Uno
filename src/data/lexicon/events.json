@@ -1,0 +1,16 @@
+[
+  {
+    "id": "lex.event.someone",
+    "terms": ["someone", "somebody"],
+    "concepts": [
+      ["event", "unknown_person"]
+    ]
+  },
+  {
+    "id": "lex.event.important",
+    "terms": ["important"],
+    "concepts": [
+      ["event", "important"]
+    ]
+  }
+]

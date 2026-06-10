@@ -1,0 +1,44 @@
+[
+  {
+    "id": "lex.person.julia",
+    "terms": ["julia"],
+    "concepts": [
+      ["person", "julia"]
+    ]
+  },
+  {
+    "id": "lex.person.thomas",
+    "terms": ["thomas"],
+    "concepts": [
+      ["person", "thomas"]
+    ]
+  },
+  {
+    "id": "lex.person.mara",
+    "terms": ["mara", "woman in the kitchen"],
+    "concepts": [
+      ["person", "mara"]
+    ]
+  },
+  {
+    "id": "lex.person.elias",
+    "terms": ["elias"],
+    "concepts": [
+      ["person", "elias"]
+    ]
+  },
+  {
+    "id": "lex.person.ruth",
+    "terms": ["ruth"],
+    "concepts": [
+      ["person", "ruth"]
+    ]
+  },
+  {
+    "id": "lex.person.caleb",
+    "terms": ["caleb"],
+    "concepts": [
+      ["person", "caleb"]
+    ]
+  }
+]

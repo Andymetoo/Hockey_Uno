@@ -1,0 +1,53 @@
+[
+  {
+    "id": "lex.place.kitchen",
+    "terms": ["kitchen"],
+    "concepts": [
+      ["place", "kitchen"],
+      ["tag", "indoors"]
+    ]
+  },
+  {
+    "id": "lex.place.bedroom",
+    "terms": ["bedroom"],
+    "concepts": [
+      ["place", "bedroom"],
+      ["tag", "indoors"]
+    ]
+  },
+  {
+    "id": "lex.place.river",
+    "terms": ["river"],
+    "concepts": [
+      ["place", "river"],
+      ["tag", "water"],
+      ["tag", "outside"]
+    ]
+  },
+  {
+    "id": "lex.place.road",
+    "terms": ["road", "street", "highway"],
+    "concepts": [
+      ["place", "road"],
+      ["tag", "road"],
+      ["tag", "outside"]
+    ]
+  },
+  {
+    "id": "lex.place.hospital",
+    "terms": ["hospital"],
+    "concepts": [
+      ["place", "hospital"],
+      ["tag", "indoors"]
+    ]
+  },
+  {
+    "id": "lex.place.lake",
+    "terms": ["lake"],
+    "concepts": [
+      ["place", "lake"],
+      ["tag", "water"],
+      ["tag", "outside"]
+    ]
+  }
+]

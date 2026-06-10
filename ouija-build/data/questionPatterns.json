@@ -1,0 +1,57 @@
+[
+  {
+    "id": "pattern.was_it.subject",
+    "intent": "was_it_subject",
+    "regexes": ["^was it (?:a |an |the )?(?<subject>.+)$"]
+  },
+  {
+    "id": "pattern.was_there.subject",
+    "intent": "was_there_subject",
+    "regexes": ["^was there (?:a |an |the )?(?<subject>.+)$"]
+  },
+  {
+    "id": "pattern.were_you.state",
+    "intent": "were_you_state",
+    "regexes": ["^were you (?<subject>.+)$", "^are you (?<subject>.+)$"]
+  },
+  {
+    "id": "pattern.did_you_die_from",
+    "intent": "did_you_die_from",
+    "regexes": ["^did you die (?:from|of) (?<subject>.+)$"]
+  },
+  {
+    "id": "pattern.were_you_in_place",
+    "intent": "were_you_in_place",
+    "regexes": ["^were you (?:in|at|on) (?:the )?(?<subject>.+)$"]
+  },
+  {
+    "id": "pattern.did_person_know_you",
+    "intent": "did_person_know_you",
+    "regexes": ["^did (?<person>.+) know you$", "^does (?<person>.+) know you$"]
+  },
+  {
+    "id": "pattern.did_you_know_person",
+    "intent": "did_you_know_person",
+    "regexes": ["^did you know (?<person>.+)$", "^do you know (?<person>.+)$"]
+  },
+  {
+    "id": "pattern.did_you.state",
+    "intent": "did_you_state",
+    "regexes": ["^did you (?<subject>.+)$"]
+  },
+  {
+    "id": "pattern.did_person_kill_you",
+    "intent": "did_person_kill_you",
+    "regexes": ["^did (?<person>.+) kill you$"]
+  },
+  {
+    "id": "pattern.did_someone_kill_you",
+    "intent": "did_someone_kill_you",
+    "regexes": ["^did someone kill you$", "^did somebody kill you$"]
+  },
+  {
+    "id": "pattern.was_subject_important",
+    "intent": "was_subject_important",
+    "regexes": ["^was (?<subject>.+) important$"]
+  }
+]

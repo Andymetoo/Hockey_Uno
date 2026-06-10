@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Hockey Cards Prototype</title>
+  <title>Prototype Launcher</title>
   <style>
     body {
       margin: 0;
@@ -25,6 +25,13 @@
       font-size: 1.6rem;
     }
 
+    .button-row {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
     .open-btn {
       display: inline-block;
       text-decoration: none;
@@ -44,8 +51,11 @@
 </head>
 <body>
   <main>
-    <h1>Hockey Cards Prototype</h1>
-    <a class="open-btn" href="hockey_card_proto.html">Open Prototype</a>
+    <h1>Prototype Launcher</h1>
+    <div class="button-row">
+      <a class="open-btn" href="hockey_card_proto.html">Open Hockey Prototype</a>
+      <a class="open-btn" href="OuijaSimulator.html">Open Ouija Simulator</a>
+    </div>
   </main>
 </body>
 </html>

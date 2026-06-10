@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ouija Simulator Prototype</title>
+  <link rel="stylesheet" href="./ouija-build/ouija.css" />
+  <style>
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: #07090d;
+      color: #f7f1e3;
+      font-family: Georgia, "Times New Roman", serif;
+    }
+
+    .boot-note {
+      width: min(760px, calc(100vw - 32px));
+      margin: 48px auto;
+      padding: 20px 22px;
+      border-radius: 16px;
+      background: rgba(19, 16, 20, 0.92);
+      border: 1px solid rgba(228, 190, 132, 0.25);
+      line-height: 1.5;
+    }
+
+    code {
+      font-family: Consolas, monospace;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div class="boot-note">
+      Loading Ouija runtime...
+      If this stays here, run <code>npm run build</code> once so <code>./ouija-build/</code> exists.
+    </div>
+  </div>
+  <script src="./ouija-build/ouija.js"></script>
+</body>
+</html>

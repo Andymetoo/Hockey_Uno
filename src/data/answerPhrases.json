@@ -1,0 +1,26 @@
+{
+  "yes": {
+    "default": {
+      "displayKey": "ouija.yes.default",
+      "text": "YES"
+    }
+  },
+  "no": {
+    "default": {
+      "displayKey": "ouija.no.default",
+      "text": "NO"
+    }
+  },
+  "unknown": {
+    "default": {
+      "displayKey": "ouija.unknown.default",
+      "text": "UNKNOWN"
+    }
+  },
+  "partial": {
+    "default": {
+      "displayKey": "ouija.partial.default",
+      "text": "PARTIAL"
+    }
+  }
+}

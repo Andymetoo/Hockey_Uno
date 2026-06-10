@@ -1,0 +1,78 @@
+[
+  {
+    "id": "lex.object.knife",
+    "terms": ["knife", "blade", "dagger", "shiv", "box cutter", "kitchen knife"],
+    "concepts": [
+      ["object", "knife"],
+      ["tag", "sharp"],
+      ["tag", "blade"],
+      ["tag", "metal"]
+    ]
+  },
+  {
+    "id": "lex.object.gun",
+    "terms": ["gun", "pistol", "rifle", "bullet", "firearm"],
+    "concepts": [
+      ["object", "gun"],
+      ["tag", "metal"],
+      ["tag", "weapon"],
+      ["death.cause", "gunshot"]
+    ]
+  },
+  {
+    "id": "lex.object.water",
+    "terms": ["water", "river water", "lake water"],
+    "concepts": [
+      ["tag", "water"]
+    ]
+  },
+  {
+    "id": "lex.object.fire",
+    "terms": ["fire", "flame", "smoke", "ash", "burn"],
+    "concepts": [
+      ["tag", "fire"],
+      ["tag", "smoke"],
+      ["death.cause", "burning"]
+    ]
+  },
+  {
+    "id": "lex.object.vehicle",
+    "terms": ["car", "truck", "vehicle", "crash", "collision", "hit by a car", "ran over"],
+    "concepts": [
+      ["object", "vehicle"],
+      ["tag", "vehicle"],
+      ["tag", "metal"],
+      ["tag", "impact"],
+      ["death.cause", "vehicle_collision"]
+    ]
+  },
+  {
+    "id": "lex.object.locket",
+    "terms": ["locket", "pendant", "necklace"],
+    "concepts": [
+      ["object", "locket"],
+      ["tag", "metal"]
+    ]
+  },
+  {
+    "id": "lex.object.weapon",
+    "terms": ["weapon"],
+    "concepts": [
+      ["tag", "weapon"]
+    ]
+  },
+  {
+    "id": "lex.tag.sharp",
+    "terms": ["sharp"],
+    "concepts": [
+      ["tag", "sharp"]
+    ]
+  },
+  {
+    "id": "lex.tag.metal",
+    "terms": ["metal"],
+    "concepts": [
+      ["tag", "metal"]
+    ]
+  }
+]

@@ -1,0 +1,23 @@
+{
+  "id": "spirit.mara",
+  "name": "Mara",
+  "aliases": ["mara", "woman in the kitchen"],
+  "facts": [
+    ["death.manner", "accident"],
+    ["death.cause", "blood_loss"],
+    ["death.directCause", "cut"],
+    ["location.death", "kitchen"],
+    ["object.fatal", "knife"],
+    ["tag", "sharp"],
+    ["tag", "blade"],
+    ["tag", "metal"],
+    ["tag", "indoors"],
+    ["tag", "alone"],
+    ["tag", "blood"]
+  ],
+  "unknowns": [
+    ["time.exact", "*"],
+    ["person.killer", "*"]
+  ],
+  "refusals": []
+}

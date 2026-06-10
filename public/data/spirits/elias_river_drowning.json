@@ -1,0 +1,20 @@
+{
+  "id": "spirit.elias",
+  "name": "Elias",
+  "aliases": ["elias", "man by the river"],
+  "facts": [
+    ["death.manner", "accident"],
+    ["death.cause", "drowning"],
+    ["location.death", "river"],
+    ["object.important", "locket"],
+    ["person.known", "julia"],
+    ["tag", "water"],
+    ["tag", "outside"],
+    ["tag", "cold"],
+    ["tag", "alone"]
+  ],
+  "unknowns": [
+    ["time.exact", "*"]
+  ],
+  "refusals": []
+}
