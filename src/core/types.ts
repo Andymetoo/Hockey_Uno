@@ -98,6 +98,7 @@ export interface AnswerResult {
   debug: {
     normalizedQuestion: string;
     patternId: string;
+    intent: string;
     reason: string;
     validationIssues: string[];
   };

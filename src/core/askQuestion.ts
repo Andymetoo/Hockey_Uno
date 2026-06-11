@@ -9,6 +9,14 @@ function getDisplay(gameData: GameData, answer: AnswerResult["answer"]) {
   };
 }
 
+function describeIntent(intent: string): string {
+  if (intent === "were_you_killed_by") {
+    return "This intent checks the fatal mechanism or direct cause, not whether the death was homicide.";
+  }
+
+  return "";
+}
+
 export function askQuestion(
   gameData: GameData,
   request: AskRequest,
@@ -33,6 +41,7 @@ export function askQuestion(
       debug: {
         normalizedQuestion: request.questionText,
         patternId: "",
+        intent: "",
         reason: `Spirit "${request.spiritId}" was not found.`,
         validationIssues
       }
@@ -42,6 +51,12 @@ export function askQuestion(
   const parsed = parseQuestion(gameData, request.questionText);
   if (!parsed.patternId || parsed.claims.length === 0) {
     const display = getDisplay(gameData, "unknown");
+    const reason = !parsed.patternId
+      ? "The question did not match a supported pattern strongly enough to evaluate."
+      : parsed.matchedTerms.length === 0
+        ? "The question pattern was recognized, but no lexicon terms were matched strongly enough to produce claims."
+        : "The question pattern was recognized, but the matched terms did not map to any supported claim type.";
+
     return {
       answer: "unknown",
       displayKey: display.displayKey,
@@ -58,7 +73,8 @@ export function askQuestion(
       debug: {
         normalizedQuestion: parsed.normalizedQuestion,
         patternId: parsed.patternId,
-        reason: "The question did not match a supported pattern strongly enough to evaluate.",
+        intent: parsed.intent,
+        reason,
         validationIssues
       }
     };
@@ -89,6 +105,11 @@ export function askQuestion(
       : "No generated claims matched known spirit facts.";
   }
 
+  const intentNote = describeIntent(parsed.intent);
+  if (intentNote) {
+    reason = `${reason} ${intentNote}`;
+  }
+
   const display = getDisplay(gameData, answer);
 
   return {
@@ -102,6 +123,7 @@ export function askQuestion(
     debug: {
       normalizedQuestion: parsed.normalizedQuestion,
       patternId: parsed.patternId,
+      intent: parsed.intent,
       reason,
       validationIssues
     }

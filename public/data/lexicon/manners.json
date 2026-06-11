@@ -26,5 +26,12 @@
     "concepts": [
       ["tag", "alone"]
     ]
+  },
+  {
+    "id": "lex.state.dead",
+    "terms": ["dead", "deceased"],
+    "concepts": [
+      ["state", "dead"]
+    ]
   }
 ]

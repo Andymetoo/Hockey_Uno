@@ -10,6 +10,7 @@ import { validateData } from "./validateData";
 
 const LEXICON_PATHS = [
   "/data/lexicon/objects.json",
+  "/data/lexicon/biography.json",
   "/data/lexicon/death_causes.json",
   "/data/lexicon/manners.json",
   "/data/lexicon/places.json",

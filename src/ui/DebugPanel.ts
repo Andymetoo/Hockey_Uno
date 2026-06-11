@@ -25,6 +25,7 @@ export function updateDebugPanel(node: HTMLElement, result: AnswerResult): void 
   const content = [
     `normalized question: ${result.debug.normalizedQuestion}`,
     `pattern id: ${result.debug.patternId || "<none>"}`,
+    `intent: ${result.debug.intent || "<none>"}`,
     `matched terms: ${list(result.matchedTerms.map((term) => term.term))}`,
     `matched lexicon ids: ${list(result.matchedTerms.map((term) => term.lexiconId))}`,
     `concepts produced: ${JSON.stringify(result.concepts, null, 2)}`,

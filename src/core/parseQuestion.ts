@@ -15,20 +15,18 @@ interface PatternMatch {
   captures: Record<string, string>;
 }
 
-function tryMatchPattern(question: string, patterns: QuestionPatternDefinition[]): PatternMatch | null {
-  for (const definition of patterns) {
-    for (const regexText of definition.regexes) {
-      const regex = new RegExp(regexText);
-      const result = regex.exec(question);
-      if (!result) {
-        continue;
-      }
-
-      return {
-        definition,
-        captures: Object.fromEntries(Object.entries(result.groups ?? {}).map(([key, value]) => [key, value ?? ""]))
-      };
+function matchPatternDefinition(question: string, definition: QuestionPatternDefinition): PatternMatch | null {
+  for (const regexText of definition.regexes) {
+    const regex = new RegExp(regexText);
+    const result = regex.exec(question);
+    if (!result) {
+      continue;
     }
+
+    return {
+      definition,
+      captures: Object.fromEntries(Object.entries(result.groups ?? {}).map(([key, value]) => [key, value ?? ""]))
+    };
   }
 
   return null;
@@ -64,6 +62,8 @@ function factOptionsForConcept(intent: string, concept: ConceptMatch): FactTuple
     case "did_you_state":
     case "did_you_die_from":
       return factOptionsForStateConcept(concept);
+    case "were_you_killed_by":
+      return factOptionsForFatalMechanismConcept(concept);
     case "were_you_in_place":
       return concept.conceptType === "place"
         ? [["location.death", concept.conceptValue], ["location.important", concept.conceptValue]]
@@ -77,6 +77,47 @@ function factOptionsForConcept(intent: string, concept: ConceptMatch): FactTuple
         : [];
     case "did_someone_kill_you":
       return [["death.manner", "homicide"]];
+    case "were_you_relationship_state":
+      return concept.conceptType === "relationship.status"
+        ? [["relationship.marital_status", concept.conceptValue]]
+        : [];
+    case "did_you_have_family_member":
+      return concept.conceptType === "family.member" && concept.conceptValue === "child"
+        ? [["family.has_children", "yes"]]
+        : [];
+    case "did_you_work_as_role":
+      return concept.conceptType === "occupation.role"
+        ? [["occupation.role", concept.conceptValue]]
+        : [];
+    case "were_you_emotion_state":
+      return concept.conceptType === "emotion"
+        ? [["emotion.baseline", concept.conceptValue]]
+        : [];
+    case "were_you_trait_state":
+      return concept.conceptType === "trait"
+        ? [["trait.primary", concept.conceptValue]]
+        : [];
+    case "were_you_family_role":
+      return concept.conceptType === "family.role"
+        ? [["family.role", concept.conceptValue]]
+        : [];
+    default:
+      return [];
+  }
+}
+
+function factOptionsForFatalMechanismConcept(concept: ConceptMatch): FactTuple[] {
+  switch (concept.conceptType) {
+    case "object":
+      return [["object.fatal", concept.conceptValue]];
+    case "death.cause":
+      return [["death.cause", concept.conceptValue]];
+    case "death.directCause":
+      return [["death.directCause", concept.conceptValue]];
+    case "tag":
+      return [["tag", concept.conceptValue]];
+    case "state":
+      return [["state", concept.conceptValue]];
     default:
       return [];
   }
@@ -98,6 +139,8 @@ function factOptionsForEntityConcept(concept: ConceptMatch): FactTuple[] {
       return [["death.manner", concept.conceptValue]];
     case "tag":
       return [["tag", concept.conceptValue]];
+    case "state":
+      return [["state", concept.conceptValue]];
     default:
       return [];
   }
@@ -113,6 +156,8 @@ function factOptionsForStateConcept(concept: ConceptMatch): FactTuple[] {
       return [["death.manner", concept.conceptValue]];
     case "tag":
       return [["tag", concept.conceptValue]];
+    case "state":
+      return [["state", concept.conceptValue]];
     case "place":
       return [["location.death", concept.conceptValue]];
     default:
@@ -129,7 +174,9 @@ function conceptAllowed(intent: string, concept: ConceptMatch): boolean {
     case "were_you_state":
     case "did_you_state":
     case "did_you_die_from":
-      return ["death.cause", "death.directCause", "death.manner", "tag", "place"].includes(concept.conceptType);
+      return ["death.cause", "death.directCause", "death.manner", "tag", "place", "state"].includes(concept.conceptType);
+    case "were_you_killed_by":
+      return ["object", "death.cause", "death.directCause", "tag", "state"].includes(concept.conceptType);
     case "were_you_in_place":
       return concept.conceptType === "place";
     case "did_person_know_you":
@@ -138,12 +185,40 @@ function conceptAllowed(intent: string, concept: ConceptMatch): boolean {
       return concept.conceptType === "person";
     case "did_someone_kill_you":
       return concept.conceptType === "event";
+    case "were_you_relationship_state":
+      return concept.conceptType === "relationship.status";
+    case "did_you_have_family_member":
+      return concept.conceptType === "family.member";
+    case "did_you_work_as_role":
+      return concept.conceptType === "occupation.role";
+    case "were_you_emotion_state":
+      return concept.conceptType === "emotion";
+    case "were_you_trait_state":
+      return concept.conceptType === "trait";
+    case "were_you_family_role":
+      return concept.conceptType === "family.role";
     default:
       return false;
   }
 }
 
 function buildClaims(intent: string, concepts: ConceptMatch[]): Claim[] {
+  if (intent === "did_you_die" || intent === "are_you_dead") {
+    return [
+      {
+        id: "claim.1",
+        label: "state:dead",
+        sourceConcept: {
+          lexiconId: "builtin.state.dead",
+          term: "dead",
+          conceptType: "state",
+          conceptValue: "dead"
+        },
+        candidateFacts: [["state", "dead"]]
+      }
+    ];
+  }
+
   if (intent === "did_person_kill_you") {
     return concepts
       .filter((concept) => concept.conceptType === "person")
@@ -177,31 +252,43 @@ function buildClaims(intent: string, concepts: ConceptMatch[]): Claim[] {
 export function parseQuestion(gameData: GameData, questionText: string): ParsedQuestion {
   const normalizedQuestion = normalizeText(questionText);
   const matchedTerms = matchLexicon(normalizedQuestion, gameData.lexiconEntries);
-  const patternMatch = tryMatchPattern(normalizedQuestion, gameData.questionPatterns);
+  let fallbackMatch: ParsedQuestion | null = null;
 
-  if (!patternMatch) {
-    return {
+  for (const definition of gameData.questionPatterns) {
+    const patternMatch = matchPatternDefinition(normalizedQuestion, definition);
+    if (!patternMatch) {
+      continue;
+    }
+
+    const relevantTerms = getCapturedTerms(patternMatch.captures, matchedTerms);
+    const concepts = expandConcepts(relevantTerms);
+    const claims = buildClaims(patternMatch.definition.intent, concepts);
+    const parsedQuestion: ParsedQuestion = {
       normalizedQuestion,
-      patternId: "",
-      intent: "",
+      patternId: patternMatch.definition.id,
+      intent: patternMatch.definition.intent,
       matchedTerms,
-      concepts: [],
-      claims: [],
-      captures: {}
+      concepts,
+      claims,
+      captures: patternMatch.captures
     };
+
+    if (claims.length > 0) {
+      return parsedQuestion;
+    }
+
+    if (!fallbackMatch) {
+      fallbackMatch = parsedQuestion;
+    }
   }
 
-  const relevantTerms = getCapturedTerms(patternMatch.captures, matchedTerms);
-  const concepts = expandConcepts(relevantTerms);
-  const claims = buildClaims(patternMatch.definition.intent, concepts);
-
-  return {
+  return fallbackMatch ?? {
     normalizedQuestion,
-    patternId: patternMatch.definition.id,
-    intent: patternMatch.definition.intent,
+    patternId: "",
+    intent: "",
     matchedTerms,
-    concepts,
-    claims,
-    captures: patternMatch.captures
+    concepts: [],
+    claims: [],
+    captures: {}
   };
 }

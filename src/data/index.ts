@@ -1,5 +1,6 @@
 import answerPhrases from "./answerPhrases.json";
 import questionPatterns from "./questionPatterns.json";
+import biography from "./lexicon/biography.json";
 import deathCauses from "./lexicon/death_causes.json";
 import events from "./lexicon/events.json";
 import manners from "./lexicon/manners.json";
@@ -56,6 +57,7 @@ function toSpiritProfile(spirit: {
 export const rawGameData: RawGameData = {
   lexiconEntries: [
     ...objects.map(toLexiconEntry),
+    ...biography.map(toLexiconEntry),
     ...deathCauses.map(toLexiconEntry),
     ...manners.map(toLexiconEntry),
     ...places.map(toLexiconEntry),

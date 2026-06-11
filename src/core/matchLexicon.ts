@@ -34,7 +34,7 @@ export function matchLexicon(normalizedQuestion: string, entries: LexiconEntry[]
 
     let searchIndex = paddedQuestion.indexOf(` ${candidate.normalizedTerm} `);
     while (searchIndex >= 0) {
-      const start = searchIndex;
+      const start = searchIndex + 1;
       const end = start + candidate.normalizedTerm.length;
       const overlaps = occupied.some((range) => !(end <= range.start || start >= range.end));
 
