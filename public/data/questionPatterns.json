@@ -2,16 +2,19 @@
   {
     "id": "pattern.was_it.subject",
     "intent": "was_it_subject",
+    "priority": 20,
     "regexes": ["^was it (?:a |an |the )?(?<subject>.+)$"]
   },
   {
     "id": "pattern.was_there.subject",
     "intent": "was_there_subject",
+    "priority": 20,
     "regexes": ["^was there (?:a |an |the )?(?<subject>.+)$"]
   },
   {
     "id": "pattern.were_you_killed_by",
     "intent": "were_you_killed_by",
+    "priority": 90,
     "regexes": [
       "^were you killed by (?<subject>.+)$",
       "^were you hit by (?<subject>.+)$"
@@ -20,86 +23,79 @@
   {
     "id": "pattern.are_you_dead",
     "intent": "are_you_dead",
+    "priority": 95,
     "regexes": ["^are you dead$", "^were you dead$"]
   },
   {
     "id": "pattern.did_you_die",
     "intent": "did_you_die",
+    "priority": 95,
     "regexes": ["^did you die$"]
-  },
-  {
-    "id": "pattern.were_you_relationship_state",
-    "intent": "were_you_relationship_state",
-    "regexes": ["^were you (?<subject>.+)$"]
-  },
-  {
-    "id": "pattern.were_you_emotion_state",
-    "intent": "were_you_emotion_state",
-    "regexes": ["^were you (?<subject>.+)$"]
   },
   {
     "id": "pattern.did_you_work_as_role",
     "intent": "did_you_work_as_role",
+    "priority": 85,
     "regexes": ["^were you (?:a |an )(?<subject>.+)$", "^did you work as (?:a |an )?(?<subject>.+)$"]
-  },
-  {
-    "id": "pattern.were_you_trait_state",
-    "intent": "were_you_trait_state",
-    "regexes": ["^were you (?<subject>.+)$"]
-  },
-  {
-    "id": "pattern.were_you_family_role",
-    "intent": "were_you_family_role",
-    "regexes": ["^were you (?:a |an )(?<subject>.+)$"]
   },
   {
     "id": "pattern.did_you_have_family_member",
     "intent": "did_you_have_family_member",
+    "priority": 85,
     "regexes": ["^did you have (?<subject>.+)$", "^did you have any (?<subject>.+)$"]
   },
   {
-    "id": "pattern.were_you.state",
-    "intent": "were_you_state",
+    "id": "pattern.were_you.subject",
+    "intent": "were_you_subject",
+    "priority": 15,
     "regexes": ["^were you (?<subject>.+)$", "^are you (?<subject>.+)$"]
   },
   {
     "id": "pattern.did_you_die_from",
     "intent": "did_you_die_from",
+    "priority": 90,
     "regexes": ["^did you die (?:from|of) (?<subject>.+)$"]
   },
   {
     "id": "pattern.were_you_in_place",
     "intent": "were_you_in_place",
+    "priority": 90,
     "regexes": ["^were you (?:in|at|on) (?:the )?(?<subject>.+)$"]
   },
   {
     "id": "pattern.did_person_know_you",
     "intent": "did_person_know_you",
+    "priority": 100,
     "regexes": ["^did (?<person>.+) know you$", "^does (?<person>.+) know you$"]
   },
   {
     "id": "pattern.did_you_know_person",
     "intent": "did_you_know_person",
+    "priority": 100,
     "regexes": ["^did you know (?<person>.+)$", "^do you know (?<person>.+)$"]
   },
   {
     "id": "pattern.did_you.state",
     "intent": "did_you_state",
+    "priority": 10,
     "regexes": ["^did you (?<subject>.+)$"]
   },
   {
     "id": "pattern.did_person_kill_you",
     "intent": "did_person_kill_you",
+    "priority": 100,
     "regexes": ["^did (?<person>.+) kill you$"]
   },
   {
     "id": "pattern.did_someone_kill_you",
     "intent": "did_someone_kill_you",
+    "priority": 95,
     "regexes": ["^did someone kill you$", "^did somebody kill you$"]
   },
   {
     "id": "pattern.was_subject_important",
     "intent": "was_subject_important",
+    "priority": 25,
     "regexes": ["^was (?<subject>.+) important$"]
   }
 ]

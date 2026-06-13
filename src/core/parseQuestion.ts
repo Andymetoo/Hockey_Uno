@@ -6,6 +6,7 @@ import type {
   FactTuple,
   GameData,
   MatchedTerm,
+  PatternMatchDebug,
   ParsedQuestion,
   QuestionPatternDefinition
 } from "./types";
@@ -13,6 +14,15 @@ import type {
 interface PatternMatch {
   definition: QuestionPatternDefinition;
   captures: Record<string, string>;
+}
+
+interface RankedPatternMatch {
+  match: PatternMatch;
+  relevantTerms: MatchedTerm[];
+  concepts: ConceptMatch[];
+  claims: Claim[];
+  score: number;
+  index: number;
 }
 
 function matchPatternDefinition(question: string, definition: QuestionPatternDefinition): PatternMatch | null {
@@ -52,12 +62,49 @@ function expandConcepts(matchedTerms: MatchedTerm[]): ConceptMatch[] {
   );
 }
 
+function selectEntityConcepts(concepts: ConceptMatch[]): ConceptMatch[] {
+  const grouped = new Map<string, ConceptMatch[]>();
+
+  for (const concept of concepts) {
+    const group = grouped.get(concept.lexiconId) ?? [];
+    group.push(concept);
+    grouped.set(concept.lexiconId, group);
+  }
+
+  const selected: ConceptMatch[] = [];
+
+  for (const group of grouped.values()) {
+    const objectConcept = group.find((concept) => concept.conceptType === "object");
+    if (objectConcept) {
+      selected.push(objectConcept);
+      continue;
+    }
+
+    const placeConcept = group.find((concept) => concept.conceptType === "place");
+    if (placeConcept) {
+      selected.push(placeConcept);
+      continue;
+    }
+
+    const personConcept = group.find((concept) => concept.conceptType === "person");
+    if (personConcept) {
+      selected.push(personConcept);
+      continue;
+    }
+
+    selected.push(...group);
+  }
+
+  return selected;
+}
+
 function factOptionsForConcept(intent: string, concept: ConceptMatch): FactTuple[] {
   switch (intent) {
     case "was_it_subject":
     case "was_there_subject":
     case "was_subject_important":
       return factOptionsForEntityConcept(concept);
+    case "were_you_subject":
     case "were_you_state":
     case "did_you_state":
     case "did_you_die_from":
@@ -77,10 +124,6 @@ function factOptionsForConcept(intent: string, concept: ConceptMatch): FactTuple
         : [];
     case "did_someone_kill_you":
       return [["death.manner", "homicide"]];
-    case "were_you_relationship_state":
-      return concept.conceptType === "relationship.status"
-        ? [["relationship.marital_status", concept.conceptValue]]
-        : [];
     case "did_you_have_family_member":
       return concept.conceptType === "family.member" && concept.conceptValue === "child"
         ? [["family.has_children", "yes"]]
@@ -88,18 +131,6 @@ function factOptionsForConcept(intent: string, concept: ConceptMatch): FactTuple
     case "did_you_work_as_role":
       return concept.conceptType === "occupation.role"
         ? [["occupation.role", concept.conceptValue]]
-        : [];
-    case "were_you_emotion_state":
-      return concept.conceptType === "emotion"
-        ? [["emotion.baseline", concept.conceptValue]]
-        : [];
-    case "were_you_trait_state":
-      return concept.conceptType === "trait"
-        ? [["trait.primary", concept.conceptValue]]
-        : [];
-    case "were_you_family_role":
-      return concept.conceptType === "family.role"
-        ? [["family.role", concept.conceptValue]]
         : [];
     default:
       return [];
@@ -148,6 +179,18 @@ function factOptionsForEntityConcept(concept: ConceptMatch): FactTuple[] {
 
 function factOptionsForStateConcept(concept: ConceptMatch): FactTuple[] {
   switch (concept.conceptType) {
+    case "relationship.status":
+      return [["relationship.marital_status", concept.conceptValue]];
+    case "emotion":
+      return [["emotion.baseline", concept.conceptValue], ["emotion.recent", concept.conceptValue]];
+    case "trait":
+      return [["trait.primary", concept.conceptValue]];
+    case "family.role":
+      return [["family.role", concept.conceptValue]];
+    case "occupation.role":
+      return [["occupation.role", concept.conceptValue]];
+    case "life.stage":
+      return [["life.stage", concept.conceptValue]];
     case "death.cause":
       return [["death.cause", concept.conceptValue]];
     case "death.directCause":
@@ -171,6 +214,20 @@ function conceptAllowed(intent: string, concept: ConceptMatch): boolean {
     case "was_there_subject":
     case "was_subject_important":
       return ["object", "place", "person", "death.cause", "death.directCause", "death.manner", "tag"].includes(concept.conceptType);
+    case "were_you_subject":
+      return [
+        "relationship.status",
+        "emotion",
+        "trait",
+        "family.role",
+        "occupation.role",
+        "life.stage",
+        "death.cause",
+        "death.directCause",
+        "death.manner",
+        "tag",
+        "state"
+      ].includes(concept.conceptType);
     case "were_you_state":
     case "did_you_state":
     case "did_you_die_from":
@@ -185,21 +242,51 @@ function conceptAllowed(intent: string, concept: ConceptMatch): boolean {
       return concept.conceptType === "person";
     case "did_someone_kill_you":
       return concept.conceptType === "event";
-    case "were_you_relationship_state":
-      return concept.conceptType === "relationship.status";
     case "did_you_have_family_member":
       return concept.conceptType === "family.member";
     case "did_you_work_as_role":
-      return concept.conceptType === "occupation.role";
-    case "were_you_emotion_state":
-      return concept.conceptType === "emotion";
-    case "were_you_trait_state":
-      return concept.conceptType === "trait";
-    case "were_you_family_role":
-      return concept.conceptType === "family.role";
+      return ["occupation.role", "family.role"].includes(concept.conceptType);
     default:
       return false;
   }
+}
+
+function scorePatternMatch(
+  definition: QuestionPatternDefinition,
+  claims: Claim[],
+  relevantTerms: MatchedTerm[],
+  concepts: ConceptMatch[]
+): number {
+  return (definition.priority * 1000) + (claims.length * 100) + (relevantTerms.length * 10) + concepts.length;
+}
+
+function buildPatternDebug(
+  rankedMatch: RankedPatternMatch,
+  selected: boolean,
+  selectedMatch: RankedPatternMatch
+): PatternMatchDebug {
+  const reason = selected
+    ? "Selected by priority, then claim count, then captured-term coverage, then stable order."
+    : rankedMatch.match.definition.priority < selectedMatch.match.definition.priority
+      ? `Lost to ${selectedMatch.match.definition.id} on priority.`
+      : rankedMatch.claims.length < selectedMatch.claims.length
+        ? `Lost to ${selectedMatch.match.definition.id} on claim count.`
+        : rankedMatch.relevantTerms.length < selectedMatch.relevantTerms.length
+          ? `Lost to ${selectedMatch.match.definition.id} on captured-term coverage.`
+          : `Lost to ${selectedMatch.match.definition.id} on stable file order.`;
+
+  return {
+    patternId: rankedMatch.match.definition.id,
+    intent: rankedMatch.match.definition.intent,
+    priority: rankedMatch.match.definition.priority,
+    matched: true,
+    selected,
+    claimCount: rankedMatch.claims.length,
+    capturedTermCount: rankedMatch.relevantTerms.length,
+    conceptCount: rankedMatch.concepts.length,
+    score: rankedMatch.score,
+    reason
+  };
 }
 
 function buildClaims(intent: string, concepts: ConceptMatch[]): Claim[] {
@@ -238,7 +325,15 @@ function buildClaims(intent: string, concepts: ConceptMatch[]): Claim[] {
       ]));
   }
 
-  return concepts
+  const normalizedConcepts = (
+    intent === "was_it_subject"
+    || intent === "was_there_subject"
+    || intent === "was_subject_important"
+  )
+    ? selectEntityConcepts(concepts)
+    : concepts;
+
+  return normalizedConcepts
     .filter((concept) => conceptAllowed(intent, concept))
     .map((concept, index) => ({
       id: `claim.${index + 1}`,
@@ -252,9 +347,9 @@ function buildClaims(intent: string, concepts: ConceptMatch[]): Claim[] {
 export function parseQuestion(gameData: GameData, questionText: string): ParsedQuestion {
   const normalizedQuestion = normalizeText(questionText);
   const matchedTerms = matchLexicon(normalizedQuestion, gameData.lexiconEntries);
-  let fallbackMatch: ParsedQuestion | null = null;
+  const rankedMatches: RankedPatternMatch[] = [];
 
-  for (const definition of gameData.questionPatterns) {
+  for (const [index, definition] of gameData.questionPatterns.entries()) {
     const patternMatch = matchPatternDefinition(normalizedQuestion, definition);
     if (!patternMatch) {
       continue;
@@ -263,32 +358,54 @@ export function parseQuestion(gameData: GameData, questionText: string): ParsedQ
     const relevantTerms = getCapturedTerms(patternMatch.captures, matchedTerms);
     const concepts = expandConcepts(relevantTerms);
     const claims = buildClaims(patternMatch.definition.intent, concepts);
-    const parsedQuestion: ParsedQuestion = {
-      normalizedQuestion,
-      patternId: patternMatch.definition.id,
-      intent: patternMatch.definition.intent,
-      matchedTerms,
+    rankedMatches.push({
+      match: patternMatch,
+      relevantTerms,
       concepts,
       claims,
-      captures: patternMatch.captures
-    };
-
-    if (claims.length > 0) {
-      return parsedQuestion;
-    }
-
-    if (!fallbackMatch) {
-      fallbackMatch = parsedQuestion;
-    }
+      score: scorePatternMatch(definition, claims, relevantTerms, concepts),
+      index
+    });
   }
 
-  return fallbackMatch ?? {
+  if (rankedMatches.length === 0) {
+    return {
+      normalizedQuestion,
+      patternId: "",
+      intent: "",
+      matchedTerms,
+      concepts: [],
+      claims: [],
+      captures: {},
+      patternMatches: [],
+      selectedPattern: null
+    };
+  }
+
+  const rankedClaimMatches = rankedMatches.filter((rankedMatch) => rankedMatch.claims.length > 0);
+  const matchesToRank = rankedClaimMatches.length > 0 ? rankedClaimMatches : rankedMatches;
+
+  matchesToRank.sort((left, right) =>
+    right.match.definition.priority - left.match.definition.priority
+    || right.claims.length - left.claims.length
+    || right.relevantTerms.length - left.relevantTerms.length
+    || right.concepts.length - left.concepts.length
+    || left.index - right.index
+  );
+
+  const winner = matchesToRank[0];
+  const patternMatches = rankedMatches.map((rankedMatch) => buildPatternDebug(rankedMatch, rankedMatch === winner, winner));
+  const selectedPattern = patternMatches.find((patternMatch) => patternMatch.selected) ?? null;
+
+  return {
     normalizedQuestion,
-    patternId: "",
-    intent: "",
+    patternId: winner.match.definition.id,
+    intent: winner.match.definition.intent,
     matchedTerms,
-    concepts: [],
-    claims: [],
-    captures: {}
+    concepts: winner.concepts,
+    claims: winner.claims,
+    captures: winner.match.captures,
+    patternMatches,
+    selectedPattern
   };
 }

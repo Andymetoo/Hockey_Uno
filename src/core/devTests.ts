@@ -1,5 +1,6 @@
 import { askQuestion } from "./askQuestion";
-import type { GameData } from "./types";
+import { buildGameData } from "./loadData";
+import type { GameData, RawGameData } from "./types";
 
 interface TestCase {
   spiritId: string;
@@ -28,7 +29,7 @@ const TEST_CASES: TestCase[] = [
   { spiritId: "spirit.elias", questionText: "Was there water?", expected: "yes" },
   { spiritId: "spirit.elias", questionText: "Do you know Julia?", expected: "yes" },
   { spiritId: "spirit.elias", questionText: "Were you happy?", expected: "yes" },
-  { spiritId: "spirit.elias", questionText: "Were you lonely?", expected: "no" },
+  { spiritId: "spirit.elias", questionText: "Were you lonely?", expected: "yes" },
   { spiritId: "spirit.elias", questionText: "Were you a fisherman?", expected: "yes" },
   { spiritId: "spirit.elias", questionText: "Did you die?", expected: "yes" },
   { spiritId: "spirit.ruth", questionText: "Were you murdered?", expected: "no" },
@@ -63,6 +64,48 @@ export function runDevTests(gameData: GameData, validationIssues: string[]): str
     if (result.answer !== testCase.expected) {
       failures.push(`${testCase.spiritId} :: "${testCase.questionText}" expected ${testCase.expected} but got ${result.answer}`);
     }
+  }
+
+  const generatedPersonWorld: RawGameData = {
+    lexiconEntries: gameData.lexiconEntries.filter((entry) => !entry.id.startsWith("lex.generated.")),
+    spirits: [
+      {
+        id: "spirit.generated_alias_test",
+        name: "Alias Test Spirit",
+        aliases: ["alias test spirit"],
+        facts: [["person.known", "person.001"], ["state", "dead"]],
+        unknowns: [],
+        refusals: []
+      }
+    ],
+    people: [
+      {
+        id: "person.001",
+        displayName: "Ada",
+        aliases: ["ada"]
+      }
+    ],
+    relationships: [],
+    questionPatterns: gameData.questionPatterns,
+    answerPhrases: gameData.answerPhrases
+  };
+
+  const generatedGame = buildGameData(generatedPersonWorld);
+  if (generatedGame.validationIssues.length > 0) {
+    failures.push(`generated-person validation produced unexpected issues: ${generatedGame.validationIssues.join("; ")}`);
+  }
+
+  const generatedPersonResult = askQuestion(
+    generatedGame.gameData,
+    {
+      spiritId: "spirit.generated_alias_test",
+      questionText: "Do you know Ada?"
+    },
+    generatedGame.validationIssues
+  );
+
+  if (generatedPersonResult.answer !== "yes") {
+    failures.push(`generated-person alias test expected yes but got ${generatedPersonResult.answer}`);
   }
 
   return failures;

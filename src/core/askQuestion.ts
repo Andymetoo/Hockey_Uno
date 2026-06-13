@@ -42,6 +42,9 @@ export function askQuestion(
         normalizedQuestion: request.questionText,
         patternId: "",
         intent: "",
+        patternMatches: [],
+        selectedPatternId: "",
+        selectedPatternPriority: null,
         reason: `Spirit "${request.spiritId}" was not found.`,
         validationIssues
       }
@@ -74,6 +77,9 @@ export function askQuestion(
         normalizedQuestion: parsed.normalizedQuestion,
         patternId: parsed.patternId,
         intent: parsed.intent,
+        patternMatches: parsed.patternMatches,
+        selectedPatternId: parsed.selectedPattern?.patternId ?? "",
+        selectedPatternPriority: parsed.selectedPattern?.priority ?? null,
         reason,
         validationIssues
       }
@@ -124,6 +130,9 @@ export function askQuestion(
       normalizedQuestion: parsed.normalizedQuestion,
       patternId: parsed.patternId,
       intent: parsed.intent,
+      patternMatches: parsed.patternMatches,
+      selectedPatternId: parsed.selectedPattern?.patternId ?? "",
+      selectedPatternPriority: parsed.selectedPattern?.priority ?? null,
       reason,
       validationIssues
     }

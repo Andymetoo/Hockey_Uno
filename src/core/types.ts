@@ -9,6 +9,21 @@ export interface LexiconEntry {
   concepts: ConceptTuple[];
 }
 
+export interface LexiconAddition extends LexiconEntry {}
+
+export interface PersonProfile {
+  id: string;
+  displayName: string;
+  aliases: string[];
+}
+
+export interface RelationshipRecord {
+  fromPersonId: string;
+  toPersonId: string;
+  type: string;
+  tags: string[];
+}
+
 export interface SpiritProfile {
   id: string;
   name: string;
@@ -22,6 +37,7 @@ export interface QuestionPatternDefinition {
   id: string;
   intent: string;
   regexes: string[];
+  priority: number;
 }
 
 export interface AnswerPhrase {
@@ -35,6 +51,9 @@ export interface GameData {
   lexiconEntries: LexiconEntry[];
   spirits: SpiritProfile[];
   spiritsById: Record<string, SpiritProfile>;
+  people: PersonProfile[];
+  peopleById: Record<string, PersonProfile>;
+  relationships: RelationshipRecord[];
   questionPatterns: QuestionPatternDefinition[];
   answerPhrases: AnswerPhraseMap;
 }
@@ -56,6 +75,8 @@ export interface ParsedQuestion {
   concepts: ConceptMatch[];
   claims: Claim[];
   captures: Record<string, string>;
+  patternMatches: PatternMatchDebug[];
+  selectedPattern: PatternMatchDebug | null;
 }
 
 export interface ConceptMatch {
@@ -82,6 +103,19 @@ export interface ClaimEvaluation {
   outcome: "matched" | "contradicted" | "unknown" | "unresolved";
 }
 
+export interface PatternMatchDebug {
+  patternId: string;
+  intent: string;
+  priority: number;
+  matched: boolean;
+  selected: boolean;
+  claimCount: number;
+  capturedTermCount: number;
+  conceptCount: number;
+  score: number;
+  reason: string;
+}
+
 export interface AnswerResult {
   answer: AnswerType;
   displayKey: string;
@@ -99,6 +133,9 @@ export interface AnswerResult {
     normalizedQuestion: string;
     patternId: string;
     intent: string;
+    patternMatches: PatternMatchDebug[];
+    selectedPatternId: string;
+    selectedPatternPriority: number | null;
     reason: string;
     validationIssues: string[];
   };
@@ -112,6 +149,20 @@ export interface AskRequest {
 export interface RawGameData {
   lexiconEntries: LexiconEntry[];
   spirits: SpiritProfile[];
+  people?: PersonProfile[];
+  relationships?: RelationshipRecord[];
+  lexiconAdditions?: LexiconAddition[];
   questionPatterns: QuestionPatternDefinition[];
   answerPhrases: AnswerPhraseMap;
+}
+
+export interface WorldState {
+  people: PersonProfile[];
+  relationships: RelationshipRecord[];
+  spirits: SpiritProfile[];
+  lexiconAdditions: LexiconAddition[];
+}
+
+export interface GeneratedWorld extends WorldState {
+  seed: number;
 }
