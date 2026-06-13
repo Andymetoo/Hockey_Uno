@@ -3171,10 +3171,13 @@
                 <div class="debug-subsection-body">
                   <div class="debug-grid">
                     <label class="debug-field">
-                      <span>Use Monte Carlo</span>
+                      <span>Monte Carlo Mode</span>
                       <select id="debugCpuMonteCarloEnabled">
-                        <option value="off" selected>Off</option>
-                        <option value="on">On</option>
+                        <option value="off">Off</option>
+                        <option value="playoff_selective" selected>
+                          Playoff Selective
+                        </option>
+                        <option value="always">Always</option>
                       </select>
                     </label>
                     <label class="debug-field">
@@ -3208,6 +3211,17 @@
                         max="1600"
                         step="20"
                         value="220"
+                      />
+                    </label>
+                    <label class="debug-field">
+                      <span>MC Time Budget (ms)</span>
+                      <input
+                        id="debugCpuMonteCarloTimeBudgetMs"
+                        type="number"
+                        min="20"
+                        max="1000"
+                        step="10"
+                        value="120"
                       />
                     </label>
                   </div>
@@ -3665,10 +3679,12 @@
         cpuMomentumSpendAggression: 4,
         cpuLateGameRiskAggression: 4,
         cpuDefensivePanicThreshold: 2,
-        cpuMonteCarloEnabled: false,
+        cpuMonteCarloMode: "playoff_selective",
+        cpuMonteCarloEnabled: true,
         cpuMonteCarloRollouts: 6,
         cpuMonteCarloCandidateCount: 3,
         cpuMonteCarloMaxSteps: 220,
+        cpuMonteCarloTimeBudgetMs: 120,
         momentumGainExchangeMarginThreshold: 2,
         enableWeakShotsOnOffensiveMargin: false,
         weakShotOffensiveMarginThreshold: 2,
@@ -3683,151 +3699,151 @@
       const CPU_DIFFICULTY_PRESETS = {
         rookie: {
           label: "Rookie",
-          attackLookaheadDepth: 0,
-          attackFollowUpWeight: 2,
-          attackChainWeight: 1,
-          chainLengthWeight: 2,
-          attackOffenseValueWeight: 0.8,
-          attackComebackValueWeight: 1.1,
-          attackConserveWeight: 1.8,
-          attackEmptyHandBonus: 2,
-          emptyHandShotWeight: 2,
-          zoneAdvanceWeight: 2,
-          shotZoneAggression: 2,
-          cardConservationWeight: 9,
+          attackLookaheadDepth: 1,
+          attackFollowUpWeight: 3,
+          attackChainWeight: 2,
+          chainLengthWeight: 3,
+          attackOffenseValueWeight: 1,
+          attackComebackValueWeight: 1.3,
+          attackConserveWeight: 1.5,
+          attackEmptyHandBonus: 4,
+          emptyHandShotWeight: 3,
+          zoneAdvanceWeight: 3,
+          shotZoneAggression: 3,
+          cardConservationWeight: 8,
           defenseLookaheadDepth: 0,
-          defenseMarginWeight: 8,
-          defenseFollowUpWeight: 1,
-          dangerDefenseFollowUpWeight: 2,
-          avoidStabilizeWindowWeight: 1,
-          defenseStabilizePenalty: 4,
-          defenseConserveWeight: 1.6,
+          defenseMarginWeight: 9,
+          defenseFollowUpWeight: 2,
+          dangerDefenseFollowUpWeight: 3,
+          avoidStabilizeWindowWeight: 2,
+          defenseStabilizePenalty: 6,
+          defenseConserveWeight: 1.4,
           neutralDefenseTarget: 1,
           defensiveZoneDefenseTarget: 1,
           goalZoneDefenseTarget: 1,
-          faceoffAggression: 28,
-          faceoffOffenseBias: 0.32,
-          faceoffNeutralBias: 0.42,
-          faceoffDangerBias: 0.55,
-          icingReluctance: 2,
+          faceoffAggression: 35,
+          faceoffOffenseBias: 0.38,
+          faceoffNeutralBias: 0.5,
+          faceoffDangerBias: 0.65,
+          icingReluctance: 3,
           icingDangerThreshold: 4,
           dumpThreshold: 6,
-          momentumSpendAggression: 1,
-          lateGameRiskAggression: 1,
+          momentumSpendAggression: 2,
+          lateGameRiskAggression: 2,
           shortHandThreat: 1,
           defensivePanicThreshold: 1,
-          lateGamePressureSeconds: 120,
+          lateGamePressureSeconds: 180,
         },
         veteran: {
           label: "Pro",
-          attackLookaheadDepth: 1,
-          attackFollowUpWeight: 5,
-          attackChainWeight: 4,
-          chainLengthWeight: 5,
-          attackOffenseValueWeight: 1.4,
-          attackComebackValueWeight: 1.8,
-          attackConserveWeight: 1,
-          attackEmptyHandBonus: 8,
-          emptyHandShotWeight: 6,
-          zoneAdvanceWeight: 5,
-          shotZoneAggression: 5,
-          cardConservationWeight: 5,
-          defenseLookaheadDepth: 1,
-          defenseMarginWeight: 12,
-          defenseFollowUpWeight: 4,
-          dangerDefenseFollowUpWeight: 6,
-          avoidStabilizeWindowWeight: 5,
-          defenseStabilizePenalty: 14,
-          defenseConserveWeight: 0.9,
+          attackLookaheadDepth: 3,
+          attackFollowUpWeight: 6,
+          attackChainWeight: 5,
+          chainLengthWeight: 6,
+          attackOffenseValueWeight: 1.7,
+          attackComebackValueWeight: 2.1,
+          attackConserveWeight: 0.8,
+          attackEmptyHandBonus: 10,
+          emptyHandShotWeight: 8,
+          zoneAdvanceWeight: 6,
+          shotZoneAggression: 6,
+          cardConservationWeight: 4,
+          defenseLookaheadDepth: 2,
+          defenseMarginWeight: 14,
+          defenseFollowUpWeight: 5,
+          dangerDefenseFollowUpWeight: 8,
+          avoidStabilizeWindowWeight: 6,
+          defenseStabilizePenalty: 18,
+          defenseConserveWeight: 0.75,
           neutralDefenseTarget: 1,
           defensiveZoneDefenseTarget: 2,
           goalZoneDefenseTarget: 2,
-          faceoffAggression: 58,
-          faceoffOffenseBias: 0.46,
-          faceoffNeutralBias: 0.62,
-          faceoffDangerBias: 0.8,
-          icingReluctance: 5,
-          icingDangerThreshold: 6,
-          dumpThreshold: 7,
-          momentumSpendAggression: 4,
-          lateGameRiskAggression: 4,
+          faceoffAggression: 62,
+          faceoffOffenseBias: 0.5,
+          faceoffNeutralBias: 0.68,
+          faceoffDangerBias: 0.84,
+          icingReluctance: 6,
+          icingDangerThreshold: 7,
+          dumpThreshold: 8,
+          momentumSpendAggression: 5,
+          lateGameRiskAggression: 5,
           shortHandThreat: 2,
           defensivePanicThreshold: 2,
-          lateGamePressureSeconds: 240,
+          lateGamePressureSeconds: 300,
         },
         allstar: {
           label: "All-Star",
           attackLookaheadDepth: 10,
-          attackFollowUpWeight: 8,
-          attackChainWeight: 8,
-          chainLengthWeight: 9,
-          attackOffenseValueWeight: 2.1,
-          attackComebackValueWeight: 2.5,
-          attackConserveWeight: 0.45,
-          attackEmptyHandBonus: 13,
-          emptyHandShotWeight: 11,
-          zoneAdvanceWeight: 7,
-          shotZoneAggression: 8,
-          cardConservationWeight: 3,
-          defenseLookaheadDepth: 10,
-          defenseMarginWeight: 16,
-          defenseFollowUpWeight: 6,
-          dangerDefenseFollowUpWeight: 11,
-          avoidStabilizeWindowWeight: 9,
-          defenseStabilizePenalty: 22,
-          defenseConserveWeight: 0.4,
-          neutralDefenseTarget: 1,
-          defensiveZoneDefenseTarget: 2,
-          goalZoneDefenseTarget: 3,
-          faceoffAggression: 74,
-          faceoffOffenseBias: 0.56,
-          faceoffNeutralBias: 0.74,
-          faceoffDangerBias: 0.92,
-          icingReluctance: 8,
-          icingDangerThreshold: 8,
-          dumpThreshold: 8,
-          momentumSpendAggression: 7,
-          lateGameRiskAggression: 7,
-          shortHandThreat: 2,
-          defensivePanicThreshold: 2,
-          lateGamePressureSeconds: 360,
-        },
-        playoff: {
-          label: "Playoff",
-          attackLookaheadDepth: 10,
           attackFollowUpWeight: 10,
           attackChainWeight: 10,
           chainLengthWeight: 12,
-          attackOffenseValueWeight: 2.6,
-          attackComebackValueWeight: 3.1,
-          attackConserveWeight: 0.15,
-          attackEmptyHandBonus: 18,
-          emptyHandShotWeight: 15,
+          attackOffenseValueWeight: 2.5,
+          attackComebackValueWeight: 3,
+          attackConserveWeight: 0.2,
+          attackEmptyHandBonus: 17,
+          emptyHandShotWeight: 14,
           zoneAdvanceWeight: 9,
           shotZoneAggression: 10,
           cardConservationWeight: 2,
           defenseLookaheadDepth: 10,
-          defenseMarginWeight: 20,
+          defenseMarginWeight: 19,
           defenseFollowUpWeight: 8,
-          dangerDefenseFollowUpWeight: 14,
-          avoidStabilizeWindowWeight: 12,
-          defenseStabilizePenalty: 28,
-          defenseConserveWeight: 0.2,
+          dangerDefenseFollowUpWeight: 13,
+          avoidStabilizeWindowWeight: 11,
+          defenseStabilizePenalty: 26,
+          defenseConserveWeight: 0.25,
           neutralDefenseTarget: 1,
           defensiveZoneDefenseTarget: 2,
           goalZoneDefenseTarget: 3,
-          faceoffAggression: 84,
+          faceoffAggression: 82,
           faceoffOffenseBias: 0.62,
           faceoffNeutralBias: 0.82,
           faceoffDangerBias: 0.98,
-          icingReluctance: 10,
+          icingReluctance: 9,
           icingDangerThreshold: 9,
           dumpThreshold: 9,
-          momentumSpendAggression: 9,
-          lateGameRiskAggression: 10,
+          momentumSpendAggression: 8,
+          lateGameRiskAggression: 8,
           shortHandThreat: 2,
           defensivePanicThreshold: 3,
-          lateGamePressureSeconds: 480,
+          lateGamePressureSeconds: 420,
+        },
+        playoff: {
+          label: "Playoff",
+          attackLookaheadDepth: 10,
+          attackFollowUpWeight: 13,
+          attackChainWeight: 13,
+          chainLengthWeight: 15,
+          attackOffenseValueWeight: 3,
+          attackComebackValueWeight: 3.6,
+          attackConserveWeight: 0.05,
+          attackEmptyHandBonus: 20,
+          emptyHandShotWeight: 17,
+          zoneAdvanceWeight: 11,
+          shotZoneAggression: 12,
+          cardConservationWeight: 1,
+          defenseLookaheadDepth: 10,
+          defenseMarginWeight: 24,
+          defenseFollowUpWeight: 10,
+          dangerDefenseFollowUpWeight: 16,
+          avoidStabilizeWindowWeight: 14,
+          defenseStabilizePenalty: 32,
+          defenseConserveWeight: 0.12,
+          neutralDefenseTarget: 1,
+          defensiveZoneDefenseTarget: 3,
+          goalZoneDefenseTarget: 4,
+          faceoffAggression: 90,
+          faceoffOffenseBias: 0.68,
+          faceoffNeutralBias: 0.88,
+          faceoffDangerBias: 1,
+          icingReluctance: 11,
+          icingDangerThreshold: 10,
+          dumpThreshold: 10,
+          momentumSpendAggression: 10,
+          lateGameRiskAggression: 11,
+          shortHandThreat: 3,
+          defensivePanicThreshold: 4,
+          lateGamePressureSeconds: 540,
         },
       };
       const CPU_DIFFICULTY_ALIASES = {
@@ -4031,6 +4047,7 @@
         pendingCycleSelection: false,
         pendingOverflowDiscard: null,
         stabilizePending: null,
+        pressureTracker: null,
         humanMomentum: 0,
         cpuMomentum: 0,
         zoneIndex: 0,
@@ -4180,6 +4197,10 @@
           shotsOnGoal: 0,
           momentumEarned: 0,
           momentumSpent: 0,
+          monteCarloUses: 0,
+          monteCarloDecisionChanges: 0,
+          monteCarloTotalMs: 0,
+          monteCarloMaxMs: 0,
           knownPlayAccuracyTotal: 0,
           knownPlayAccuracyCount: 0,
           knownPlayAccuracyBestCount: 0,
@@ -4193,6 +4214,12 @@
           cyclesUsed: 0,
           forceShotsUsed: 0,
           breakoutsUsed: 0,
+          offensiveZonePossessionsStarted: 0,
+          exchangeWinsToShotSamePossession: 0,
+          exchangeWinsToTurnoverBeforeShot: 0,
+          cycleUsesLeadingToShotSoon: 0,
+          burnUsesLeadingToShotSoon: 0,
+          breakoutsLeadingToShotSoon: 0,
           stabilizeSuccesses: 0,
           reboundsCreated: 0,
           reboundSavesMade: 0,
@@ -4421,6 +4448,136 @@
           return;
         }
         stats[statKey] += amount;
+      }
+
+      function recordMonteCarloStat(player, elapsedMs, changedDecision) {
+        const stats = getPlayerStats(player);
+        if (!stats) {
+          return;
+        }
+        incrementPlayerStat(player, "monteCarloUses");
+        stats.monteCarloTotalMs += elapsedMs;
+        stats.monteCarloMaxMs = Math.max(stats.monteCarloMaxMs, elapsedMs);
+        if (changedDecision) {
+          incrementPlayerStat(player, "monteCarloDecisionChanges");
+        }
+      }
+
+      function clearPressureTracker() {
+        state.pressureTracker = null;
+      }
+
+      function getPressureTracker() {
+        return state.pressureTracker;
+      }
+
+      function startPossessionTracker(player, options = {}) {
+        if (player !== "human" && player !== "cpu") {
+          clearPressureTracker();
+          return;
+        }
+
+        const startedInOffensiveZone = isPlayerOnOpponentSide(
+          player,
+          options.zoneIndex ?? state.zoneIndex,
+        );
+        if (startedInOffensiveZone) {
+          incrementPlayerStat(player, "offensiveZonePossessionsStarted");
+        }
+
+        state.pressureTracker = {
+          player,
+          startedFromExchangeWin: options.startedFromExchangeWin === true,
+          shotOccurred: false,
+          pendingSpecials: [],
+        };
+      }
+
+      function notePressureExchangeWin(player) {
+        const tracker = getPressureTracker();
+        if (!tracker || tracker.player !== player) {
+          startPossessionTracker(player, {
+            startedFromExchangeWin: true,
+            zoneIndex: state.zoneIndex,
+          });
+          return;
+        }
+        tracker.startedFromExchangeWin = true;
+      }
+
+      function finalizePressureTracker(outcome = "") {
+        const tracker = getPressureTracker();
+        if (
+          tracker &&
+          tracker.startedFromExchangeWin &&
+          !tracker.shotOccurred &&
+          outcome === "turnover"
+        ) {
+          incrementPlayerStat(
+            tracker.player,
+            "exchangeWinsToTurnoverBeforeShot",
+          );
+        }
+        clearPressureTracker();
+      }
+
+      function markPossessionShot(player) {
+        const tracker = getPressureTracker();
+        if (!tracker || tracker.player !== player) {
+          return;
+        }
+
+        if (tracker.startedFromExchangeWin && !tracker.shotOccurred) {
+          incrementPlayerStat(player, "exchangeWinsToShotSamePossession");
+        }
+        tracker.shotOccurred = true;
+
+        tracker.pendingSpecials.forEach((entry) => {
+          if (entry.type === "cycle") {
+            incrementPlayerStat(player, "cycleUsesLeadingToShotSoon");
+          } else if (entry.type === "burn") {
+            incrementPlayerStat(player, "burnUsesLeadingToShotSoon");
+          } else if (entry.type === "breakout") {
+            incrementPlayerStat(player, "breakoutsLeadingToShotSoon");
+          }
+        });
+        tracker.pendingSpecials = [];
+      }
+
+      function notePressureSpecialUse(player, type) {
+        const tracker = getPressureTracker();
+        if (!tracker || tracker.player !== player) {
+          return;
+        }
+
+        tracker.pendingSpecials = tracker.pendingSpecials.filter(
+          (entry) => entry.type !== type,
+        );
+        tracker.pendingSpecials.push({
+          type,
+          playsRemaining: 2,
+        });
+      }
+
+      function notePressureAttackerCardPlay(player) {
+        const tracker = getPressureTracker();
+        if (!tracker || tracker.player !== player) {
+          return;
+        }
+
+        tracker.pendingSpecials = tracker.pendingSpecials
+          .map((entry) => ({
+            ...entry,
+            playsRemaining: entry.playsRemaining - 1,
+          }))
+          .filter((entry) => entry.playsRemaining > 0);
+      }
+
+      function getAverageMonteCarloMs(stats) {
+        if (!stats || stats.monteCarloUses <= 0) {
+          return "0";
+        }
+        return (stats.monteCarloTotalMs / stats.monteCarloUses).toFixed(1);
       }
 
       function recordZonePlayForStats(player, zoneIndex = state.zoneIndex) {
@@ -5119,6 +5276,7 @@
           `CPU Speed %: ${state.config.cpuSpeedPercent}`,
           `CPU Difficulty: ${cpuProfile.label}`,
           `CPU Tuning: lookahead ${cpuProfile.attackLookaheadDepth}, follow-up ${cpuProfile.attackFollowUpWeight}, chain ${cpuProfile.chainLengthWeight}, empty-hand ${cpuProfile.emptyHandShotWeight}, zone push ${cpuProfile.zoneAdvanceWeight}, shot-zone ${cpuProfile.shotZoneAggression}, conserve ${cpuProfile.cardConservationWeight}, stabilize deny ${cpuProfile.avoidStabilizeWindowWeight}, faceoff ${cpuProfile.faceoffAggression}%, icing reluctance ${cpuProfile.icingReluctance}, momentum ${cpuProfile.momentumSpendAggression}, late risk ${cpuProfile.lateGameRiskAggression}, panic ${cpuProfile.defensivePanicThreshold}, D-zone ${cpuProfile.defensiveZoneDefenseTarget}+, goal-zone ${cpuProfile.goalZoneDefenseTarget}+, icing ${cpuProfile.icingDangerThreshold}+, dump ${cpuProfile.dumpThreshold}+`,
+          `CPU Monte Carlo: ${sanitizeCpuMonteCarloMode(state.config.cpuMonteCarloMode).replace(/_/g, " ")} | rollouts ${state.config.cpuMonteCarloRollouts} | candidates ${state.config.cpuMonteCarloCandidateCount} | max steps ${state.config.cpuMonteCarloMaxSteps} | time budget ${state.config.cpuMonteCarloTimeBudgetMs} ms`,
           `Stabilize Sanding: ${getStabilizeSandingModeText(state.config.stabilizeSanding)}`,
           `Decks Per Period: ${state.config.decksPerPeriod}`,
           `Cross River Once: ${state.config.singleRiverCrossMode}`,
@@ -5474,6 +5632,66 @@
             getAverageShotValue(cpuStats),
             humanAverageShotValue,
             cpuAverageShotValue,
+          ),
+        ];
+      }
+
+      function getAiDiagnosticsRows() {
+        const humanStats = state.stats.human;
+        const cpuStats = state.stats.cpu;
+
+        return [
+          createComparisonRow(
+            "MC Uses",
+            humanStats.monteCarloUses,
+            cpuStats.monteCarloUses,
+          ),
+          createComparisonRow(
+            "MC Changed",
+            humanStats.monteCarloDecisionChanges,
+            cpuStats.monteCarloDecisionChanges,
+          ),
+          createComparisonRow(
+            "MC Avg Ms",
+            getAverageMonteCarloMs(humanStats),
+            getAverageMonteCarloMs(cpuStats),
+            Number(getAverageMonteCarloMs(humanStats)),
+            Number(getAverageMonteCarloMs(cpuStats)),
+          ),
+          createComparisonRow(
+            "MC Max Ms",
+            humanStats.monteCarloMaxMs,
+            cpuStats.monteCarloMaxMs,
+          ),
+          createComparisonRow(
+            "Offensive Zone Possessions",
+            humanStats.offensiveZonePossessionsStarted,
+            cpuStats.offensiveZonePossessionsStarted,
+          ),
+          createComparisonRow(
+            "Exchange Win -> Shot",
+            humanStats.exchangeWinsToShotSamePossession,
+            cpuStats.exchangeWinsToShotSamePossession,
+          ),
+          createComparisonRow(
+            "Exchange Win -> Turnover",
+            humanStats.exchangeWinsToTurnoverBeforeShot,
+            cpuStats.exchangeWinsToTurnoverBeforeShot,
+          ),
+          createComparisonRow(
+            "Cycle -> Shot Soon",
+            humanStats.cycleUsesLeadingToShotSoon,
+            cpuStats.cycleUsesLeadingToShotSoon,
+          ),
+          createComparisonRow(
+            "Burn -> Shot Soon",
+            humanStats.burnUsesLeadingToShotSoon,
+            cpuStats.burnUsesLeadingToShotSoon,
+          ),
+          createComparisonRow(
+            "Breakout -> Shot Soon",
+            humanStats.breakoutsLeadingToShotSoon,
+            cpuStats.breakoutsLeadingToShotSoon,
           ),
         ];
       }
@@ -6020,6 +6238,7 @@
       function buildMatchStatisticsLines() {
         const overviewRows = getStatsOverviewRows();
         const luckRows = getLuckOverviewRows();
+        const aiDiagnosticsRows = getAiDiagnosticsRows();
         const zoneTimeLines = getZoneTimeSummaryItems({ debug: true }).map(
           (entry) => `${entry.label}: ${entry.value}`,
         );
@@ -6051,6 +6270,12 @@
           ),
           getLuckBreakdownText("human"),
           getLuckBreakdownText("cpu"),
+          "",
+          "AI Diagnostics",
+          ...aiDiagnosticsRows.map(
+            (row) =>
+              `${row.label}: ${getPlayerDebugName("human")} ${row.human} | ${getPlayerDebugName("cpu")} ${row.cpu}`,
+          ),
           "",
           "Time In Zone",
           ...zoneTimeLines,
@@ -6531,12 +6756,10 @@
       }
 
       function applyMomentumPenaltyForCannotPlay(player) {
-        if (FEATURES.momentumSystem && player) {
-          changeMomentum(player, -1, "cannot play and must draw");
-        }
+        return;
       }
 
-      function trimMomentumForFaceoff(
+      function resetMomentumForStoppage(
         faceoffMode = state.faceoffMode,
         faceoffLabel = "faceoff",
       ) {
@@ -6544,14 +6767,24 @@
           return;
         }
 
-        changeMomentum("human", -1, faceoffLabel.toLowerCase());
-        changeMomentum("cpu", -1, faceoffLabel.toLowerCase());
+        const humanBefore = getMomentum("human");
+        const cpuBefore = getMomentum("cpu");
+        if (humanBefore === 0 && cpuBefore === 0) {
+          addLog(
+            `${faceoffLabel} resets Momentum on stoppage. Both sides were already 0/3.`,
+          );
+          return;
+        }
+
+        addLog(
+          `${faceoffLabel} resets Momentum on stoppage: ${getPlayerDisplayName("human")} ${humanBefore}/3, ${getPlayerDisplayName("cpu")} ${cpuBefore}/3 -> 0/3.`,
+        );
+        state.humanMomentum = 0;
+        state.cpuMomentum = 0;
       }
 
       function resetMomentumAfterShot() {
-        if (FEATURES.momentumSystem) {
-          resetMomentum("shot taken");
-        }
+        return;
       }
 
       function isLoosePuckFaceoff() {
@@ -6824,6 +7057,7 @@
           );
         }
         incrementPlayerStat(player, "cyclesUsed");
+        notePressureSpecialUse(player, "cycle");
 
         setEvent(`${lowerPlayerName(player)} cycles a card`, "contain");
 
@@ -6884,6 +7118,7 @@
           `${lowerPlayerName(player)} spends 2 Momentum to Burn ${cardToText(card)} out of hand and send it to the bottom of the deck.`,
         );
         incrementPlayerStat(player, "burnsUsed");
+        notePressureSpecialUse(player, "burn");
         setEvent(`${lowerPlayerName(player)} burns a card`, "contain");
         refreshComboWindow();
 
@@ -6955,6 +7190,7 @@
         setMomentum(player, momentumBefore - 3, "Breakout");
         clearBurnSelection();
         incrementPlayerStat(player, "breakoutsUsed");
+        notePressureSpecialUse(player, "breakout");
         state.zoneIndex = targetZone;
 
         addLog(
@@ -7058,6 +7294,7 @@
           turnPlayCount: state.turnPlayCount,
           attackerChainCount: state.attackerChainCount,
           defenderChainCount: state.defenderChainCount,
+          pressureTracker: cloneSimulationData(state.pressureTracker),
           activeBattleState: state.activeBattleState,
           comboImmunityActive: state.comboImmunityActive,
           recentPlayedCards: cloneRecentPlayedCards(state.recentPlayedCards),
@@ -7082,6 +7319,7 @@
         state.turnPlayCount = snapshot.turnPlayCount;
         state.attackerChainCount = snapshot.attackerChainCount;
         state.defenderChainCount = snapshot.defenderChainCount;
+        state.pressureTracker = cloneSimulationData(snapshot.pressureTracker);
         state.activeBattleState = snapshot.activeBattleState;
         state.comboImmunityActive = snapshot.comboImmunityActive;
         state.recentPlayedCards = cloneRecentPlayedCards(
@@ -7589,6 +7827,25 @@
           : DEFAULT_CONFIG.cpuDifficulty;
       }
 
+      function sanitizeCpuMonteCarloMode(rawValue) {
+        const normalized = String(
+          rawValue ?? DEFAULT_CONFIG.cpuMonteCarloMode,
+        )
+          .trim()
+          .toLowerCase();
+        if (
+          normalized === "off" ||
+          normalized === "playoff_selective" ||
+          normalized === "always"
+        ) {
+          return normalized;
+        }
+        if (normalized === "on" || normalized === "true") {
+          return "always";
+        }
+        return DEFAULT_CONFIG.cpuMonteCarloMode;
+      }
+
       function sanitizeStabilizeSanding(rawValue) {
         const normalized = String(rawValue ?? DEFAULT_CONFIG.stabilizeSanding)
           .trim()
@@ -7872,9 +8129,21 @@
             0,
             4,
           ),
+          cpuMonteCarloMode: sanitizeCpuMonteCarloMode(
+            rawConfig.cpuMonteCarloMode ??
+              (rawConfig.cpuMonteCarloEnabled === true ||
+              rawConfig.cpuMonteCarloEnabled === "on"
+                ? "always"
+                : DEFAULT_CONFIG.cpuMonteCarloMode),
+          ),
           cpuMonteCarloEnabled:
-            rawConfig.cpuMonteCarloEnabled === true ||
-            rawConfig.cpuMonteCarloEnabled === "on",
+            sanitizeCpuMonteCarloMode(
+              rawConfig.cpuMonteCarloMode ??
+                (rawConfig.cpuMonteCarloEnabled === true ||
+                rawConfig.cpuMonteCarloEnabled === "on"
+                  ? "always"
+                  : DEFAULT_CONFIG.cpuMonteCarloMode),
+            ) !== "off",
           cpuMonteCarloRollouts: clamp(
             Number.parseInt(
               rawConfig.cpuMonteCarloRollouts ??
@@ -7901,6 +8170,15 @@
             ),
             40,
             1600,
+          ),
+          cpuMonteCarloTimeBudgetMs: clamp(
+            Number.parseInt(
+              rawConfig.cpuMonteCarloTimeBudgetMs ??
+                DEFAULT_CONFIG.cpuMonteCarloTimeBudgetMs,
+              10,
+            ),
+            20,
+            1000,
           ),
           momentumGainExchangeMarginThreshold: clamp(
             Number.parseInt(
@@ -8101,6 +8379,9 @@
         );
         const cpuMonteCarloMaxStepsInput = document.getElementById(
           "debugCpuMonteCarloMaxSteps",
+        );
+        const cpuMonteCarloTimeBudgetInput = document.getElementById(
+          "debugCpuMonteCarloTimeBudgetMs",
         );
         const humanTeamInput = document.getElementById("debugHumanTeam");
         const cpuTeamInput = document.getElementById("debugCpuTeam");
@@ -8347,8 +8628,15 @@
             0,
             4,
           ),
+          cpuMonteCarloMode: sanitizeCpuMonteCarloMode(
+            cpuMonteCarloEnabledInput?.value ||
+              DEFAULT_CONFIG.cpuMonteCarloMode,
+          ),
           cpuMonteCarloEnabled:
-            (cpuMonteCarloEnabledInput?.value || "off") === "on",
+            sanitizeCpuMonteCarloMode(
+              cpuMonteCarloEnabledInput?.value ||
+                DEFAULT_CONFIG.cpuMonteCarloMode,
+            ) !== "off",
           cpuMonteCarloRollouts: clamp(
             Number.parseInt(
               cpuMonteCarloRolloutsInput?.value ||
@@ -8375,6 +8663,15 @@
             ),
             40,
             1600,
+          ),
+          cpuMonteCarloTimeBudgetMs: clamp(
+            Number.parseInt(
+              cpuMonteCarloTimeBudgetInput?.value ||
+                String(DEFAULT_CONFIG.cpuMonteCarloTimeBudgetMs),
+              10,
+            ),
+            20,
+            1000,
           ),
           humanTeam: teamSelections.humanTeam,
           cpuTeam: teamSelections.cpuTeam,
@@ -8505,6 +8802,9 @@
         const cpuMonteCarloMaxStepsInput = document.getElementById(
           "debugCpuMonteCarloMaxSteps",
         );
+        const cpuMonteCarloTimeBudgetInput = document.getElementById(
+          "debugCpuMonteCarloTimeBudgetMs",
+        );
         const humanTeamInput = document.getElementById("debugHumanTeam");
         const cpuTeamInput = document.getElementById("debugCpuTeam");
         const stabilizeSandingInput = document.getElementById(
@@ -8627,9 +8927,9 @@
           );
         }
         if (cpuMonteCarloEnabledInput) {
-          cpuMonteCarloEnabledInput.value = config.cpuMonteCarloEnabled
-            ? "on"
-            : "off";
+          cpuMonteCarloEnabledInput.value = sanitizeCpuMonteCarloMode(
+            config.cpuMonteCarloMode,
+          );
         }
         if (cpuMonteCarloRolloutsInput) {
           cpuMonteCarloRolloutsInput.value = String(
@@ -8644,6 +8944,11 @@
         if (cpuMonteCarloMaxStepsInput) {
           cpuMonteCarloMaxStepsInput.value = String(
             config.cpuMonteCarloMaxSteps,
+          );
+        }
+        if (cpuMonteCarloTimeBudgetInput) {
+          cpuMonteCarloTimeBudgetInput.value = String(
+            config.cpuMonteCarloTimeBudgetMs,
           );
         }
         if (humanTeamInput) {
@@ -8733,9 +9038,13 @@
           rulesPreview.textContent = `CPU ${cpuProfile.label}: lookahead ${cpuProfile.attackLookaheadDepth}, follow-up ${cpuProfile.attackFollowUpWeight}, chain ${cpuProfile.chainLengthWeight}, empty-hand ${cpuProfile.emptyHandShotWeight}, zone push ${cpuProfile.zoneAdvanceWeight}, shot-zone ${cpuProfile.shotZoneAggression}, conserve ${cpuProfile.cardConservationWeight}, stabilize deny ${cpuProfile.avoidStabilizeWindowWeight}, faceoff ${cpuProfile.faceoffAggression}%, icing reluctance ${cpuProfile.icingReluctance}, momentum ${cpuProfile.momentumSpendAggression}, late risk ${cpuProfile.lateGameRiskAggression}, panic ${cpuProfile.defensivePanicThreshold}, D-zone ${cpuProfile.defensiveZoneDefenseTarget}+, goal-zone ${cpuProfile.goalZoneDefenseTarget}+. Momentum rules: ${momentumRulesText}. Chain mode: ${config.singleRiverCrossMode ? "you may switch between value and suit matching once per pile run." : "value and suit matching may alternate freely."}`;
         }
         if (monteCarloPreview) {
-          monteCarloPreview.textContent = config.cpuMonteCarloEnabled
-            ? `Monte Carlo ON: ${config.cpuMonteCarloRollouts} rollout${config.cpuMonteCarloRollouts === 1 ? "" : "s"} over the top ${config.cpuMonteCarloCandidateCount} candidate line${config.cpuMonteCarloCandidateCount === 1 ? "" : "s"}, capped at ${config.cpuMonteCarloMaxSteps} steps each. This applies to live CPU turns and the CPU side of headless batch runs.`
-            : "Monte Carlo OFF: CPU uses the existing heuristic line chooser in live play and headless batch runs.";
+          const mcMode = sanitizeCpuMonteCarloMode(config.cpuMonteCarloMode);
+          monteCarloPreview.textContent =
+            mcMode === "off"
+              ? "Monte Carlo OFF: CPU uses the existing heuristic line chooser in live play and headless batch runs."
+              : mcMode === "always"
+                ? `Monte Carlo ALWAYS ON: ${config.cpuMonteCarloRollouts} rollout${config.cpuMonteCarloRollouts === 1 ? "" : "s"} over the top ${config.cpuMonteCarloCandidateCount} candidate line${config.cpuMonteCarloCandidateCount === 1 ? "" : "s"}, capped at ${config.cpuMonteCarloMaxSteps} steps each, with a ${config.cpuMonteCarloTimeBudgetMs} ms live time budget.`
+                : `Monte Carlo PLAYOFF SELECTIVE: ${config.cpuMonteCarloRollouts} rollout${config.cpuMonteCarloRollouts === 1 ? "" : "s"} over the top ${config.cpuMonteCarloCandidateCount} candidate line${config.cpuMonteCarloCandidateCount === 1 ? "" : "s"}, capped at ${config.cpuMonteCarloMaxSteps} steps each, with a ${config.cpuMonteCarloTimeBudgetMs} ms live time budget. Live use is limited to high-leverage Playoff situations.`;
         }
       }
 
@@ -9290,6 +9599,7 @@
         );
 
         clearShotPending();
+        finalizePressureTracker("turnover");
         state.attacker = shot.defenderPlayer;
         syncDefender();
         state.zoneIndex = controlledZoneIndex;
@@ -9298,6 +9608,10 @@
           return;
         }
 
+        startPossessionTracker(shot.defenderPlayer, {
+          startedFromExchangeWin: false,
+          zoneIndex: state.zoneIndex,
+        });
         startAttackerTurn();
         logTurnDiagnostics(state.currentTurn, "Controlled save.");
       }
@@ -9381,6 +9695,7 @@
         );
 
         clearShotPending();
+        finalizePressureTracker("turnover");
         state.attacker = shot.defenderPlayer;
         syncDefender();
         state.zoneIndex = getHomeGoalZoneIndex(shot.defenderPlayer);
@@ -9390,6 +9705,10 @@
           return;
         }
 
+        startPossessionTracker(shot.defenderPlayer, {
+          startedFromExchangeWin: false,
+          zoneIndex: state.zoneIndex,
+        });
         startAttackerTurn();
         logTurnDiagnostics(state.currentTurn, "Defensive recovery.");
       }
@@ -11115,6 +11434,7 @@
         state.activeBattleState = "none";
         state.comboImmunityActive = false;
         noteExchangeMeterSnapshot(getExchangeMeterState());
+        finalizePressureTracker("turnover");
         state.attacker = winner;
         syncDefender();
         incrementPlayerStat(winner, "exchangeWins");
@@ -11132,6 +11452,10 @@
             `Special turnover reward: ${lowerPlayerName(state.attacker)} gets an immediate shot from ${zoneLabel(state.zoneIndex)} with ${cardToText(lastPlayedCard)}.`,
           );
           setEvent("Special turnover shot", "shot");
+          startPossessionTracker(state.attacker, {
+            startedFromExchangeWin: true,
+            zoneIndex: state.zoneIndex,
+          });
           resolveShot(state.attacker, state.defender, lastPlayedCard);
           return;
         }
@@ -11166,6 +11490,10 @@
         if (resolvePendingPeriodBreak()) {
           return;
         }
+        startPossessionTracker(state.attacker, {
+          startedFromExchangeWin: true,
+          zoneIndex: state.zoneIndex,
+        });
         startAttackerTurn();
         logTurnDiagnostics(state.currentTurn, "Special turnover.");
       }
@@ -11277,6 +11605,7 @@
 
         noteExchangeMeterSnapshot(getExchangeMeterState());
         clearStabilizePending();
+        finalizePressureTracker("turnover");
 
         state.attacker = turnoverWinner;
         syncDefender();
@@ -11309,6 +11638,10 @@
               : `When the defender finishes ahead in the exchange, possession flips immediately.`,
           ),
         );
+        startPossessionTracker(turnoverWinner, {
+          startedFromExchangeWin: true,
+          zoneIndex: state.zoneIndex,
+        });
         startAttackerTurn();
         logTurnDiagnostics(state.currentTurn);
       }
@@ -11432,6 +11765,7 @@
           }
 
           incrementPlayerStat(winner, "exchangeWins");
+          notePressureExchangeWin(winner);
           recordZoneResolution();
           awardMomentumForExchangeWin(winner, exchangeMargin);
 
@@ -12066,7 +12400,8 @@
           }
         }
 
-        trimMomentumForFaceoff(faceoffMode, faceoffLabel);
+        finalizePressureTracker("stoppage");
+        resetMomentumForStoppage(faceoffMode, faceoffLabel);
 
         clearHumanPendingTurn();
         clearBurnSelection();
@@ -12182,6 +12517,10 @@
               );
             }
             setEvent("Loose Puck won", "turnover");
+            startPossessionTracker("human", {
+              startedFromExchangeWin: false,
+              zoneIndex: state.zoneIndex,
+            });
             startAttackerTurn();
             logTurnDiagnostics(state.currentTurn);
             return;
@@ -12304,6 +12643,10 @@
           }
         }
 
+        startPossessionTracker(winner, {
+          startedFromExchangeWin: false,
+          zoneIndex: state.zoneIndex,
+        });
         startAttackerTurn();
 
         addLog(
@@ -12833,9 +13176,8 @@
             : shotCard.value;
         const requiredLength = requiredSaveLengthFromShotValue(shotValue);
 
-        resetMomentumAfterShot();
-
         resetRunMatchState();
+        markPossessionShot(attackerPlayer);
 
         addLog(
           options.logLine ||
@@ -12909,6 +13251,7 @@
           : shotCard.value;
 
         resetRunMatchState();
+        markPossessionShot(attackerPlayer);
         incrementPlayerStat(attackerPlayer, "weakShots");
         addLog(
           options.logLine ||
@@ -12960,8 +13303,6 @@
         if (player === "cpu") {
           showCpuNotice("CANNOT PLAY");
         }
-
-        applyMomentumPenaltyForCannotPlay(player);
 
         const drawnCard = drawOneCard(player);
 
@@ -13115,6 +13456,7 @@
             { sequenceLead: true },
           );
         } else if (state.roleOfCurrentTurn === "attacker") {
+          notePressureAttackerCardPlay(player);
           state.attackerChainCount += 1;
           syncTurnPlayCount();
           if (isOpeningAttackPlay) {
@@ -13400,9 +13742,22 @@
             0,
             4,
           ),
+          difficultyKey: difficulty,
+          monteCarloMode: sanitizeCpuMonteCarloMode(
+            config?.cpuMonteCarloMode ??
+              (config?.cpuMonteCarloEnabled === true ||
+              config?.cpuMonteCarloEnabled === "on"
+                ? "always"
+                : DEFAULT_CONFIG.cpuMonteCarloMode),
+          ),
           monteCarloEnabled:
-            config?.cpuMonteCarloEnabled === true ||
-            config?.cpuMonteCarloEnabled === "on",
+            sanitizeCpuMonteCarloMode(
+              config?.cpuMonteCarloMode ??
+                (config?.cpuMonteCarloEnabled === true ||
+                config?.cpuMonteCarloEnabled === "on"
+                  ? "always"
+                  : DEFAULT_CONFIG.cpuMonteCarloMode),
+            ) !== "off",
           monteCarloRollouts: clamp(
             Number.parseInt(
               config?.cpuMonteCarloRollouts ??
@@ -13429,6 +13784,15 @@
             ),
             40,
             1600,
+          ),
+          monteCarloTimeBudgetMs: clamp(
+            Number.parseInt(
+              config?.cpuMonteCarloTimeBudgetMs ??
+                DEFAULT_CONFIG.cpuMonteCarloTimeBudgetMs,
+              10,
+            ),
+            20,
+            1000,
           ),
         };
       }
@@ -13642,18 +14006,136 @@
         );
       }
 
+      function getAiMonteCarloTrigger(
+        player,
+        legalIndexes = getLegalCardsForTurn(player),
+        profile = getAiProfileForPlayer(player),
+        cardChoice = legalIndexes.length > 0
+          ? getAiCardChoice(player, profile)
+          : null,
+      ) {
+        const mode = sanitizeCpuMonteCarloMode(profile?.monteCarloMode);
+        if (
+          mode === "off" ||
+          state.currentTurn !== player ||
+          state.faceoffPending ||
+          state.shotPending ||
+          state.gameOver
+        ) {
+          return {
+            shouldUse: false,
+            reason: "",
+            cardChoice,
+          };
+        }
+
+        if (activeSimulationContext?.disableMonteCarlo) {
+          return {
+            shouldUse: false,
+            reason: "",
+            cardChoice,
+          };
+        }
+
+        if (mode === "always") {
+          return {
+            shouldUse: true,
+            reason: "mode always",
+            cardChoice,
+          };
+        }
+
+        if (profile?.difficultyKey !== "playoff") {
+          return {
+            shouldUse: false,
+            reason: "",
+            cardChoice,
+          };
+        }
+
+        const opponent = getOpponentPlayer(player);
+        const latePressure =
+          getRegulationSecondsRemaining() <= profile.lateGamePressureSeconds &&
+          getPlayerScore(player) <= getPlayerScore(opponent);
+        const topScores = cardChoice?.evaluations?.slice(0, 2) || [];
+        const scoreGap =
+          topScores.length >= 2
+            ? Math.abs(topScores[0].score - topScores[1].score)
+            : Number.POSITIVE_INFINITY;
+
+        if (FEATURES.momentumSystem && canPlayerUseBreakout(player)) {
+          return {
+            shouldUse: true,
+            reason: "breakout choice",
+            cardChoice,
+          };
+        }
+
+        if (FEATURES.momentumSystem && canPlayerUsePowerShot(player)) {
+          return {
+            shouldUse: true,
+            reason: "force shot choice",
+            cardChoice,
+          };
+        }
+
+        if (
+          state.roleOfCurrentTurn === "attacker" &&
+          isShotZone(player) &&
+          legalIndexes.length > 0
+        ) {
+          return {
+            shouldUse: true,
+            reason: "shot-zone pressure",
+            cardChoice,
+          };
+        }
+
+        if (
+          state.roleOfCurrentTurn === "attacker" &&
+          isPlayerOnOpponentSide(player) &&
+          legalIndexes.length > 0 &&
+          legalIndexes.length <= 3
+        ) {
+          return {
+            shouldUse: true,
+            reason: "offensive-zone pressure",
+            cardChoice,
+          };
+        }
+
+        if (latePressure) {
+          return {
+            shouldUse: true,
+            reason: "late tied-or-trailing pressure",
+            cardChoice,
+          };
+        }
+
+        if (legalIndexes.length > 1 && scoreGap <= 2.5) {
+          return {
+            shouldUse: true,
+            reason: `close heuristic race (${formatCpuAuditNumber(scoreGap, 2)})`,
+            cardChoice,
+          };
+        }
+
+        return {
+          shouldUse: false,
+          reason: "",
+          cardChoice,
+        };
+      }
+
       function shouldUseAiMonteCarloDecision(
         player,
         profile = getAiProfileForPlayer(player),
       ) {
-        return (
-          Boolean(profile?.monteCarloEnabled) &&
-          !activeSimulationContext?.disableMonteCarlo &&
-          state.currentTurn === player &&
-          !state.faceoffPending &&
-          !state.shotPending &&
-          !state.gameOver
-        );
+        return getAiMonteCarloTrigger(
+          player,
+          getLegalCardsForTurn(player),
+          profile,
+        ).shouldUse;
       }
 
       function getAiActionCandidateKey(candidate) {
@@ -14032,7 +14514,12 @@
         legalIndexes = getLegalCardsForTurn(player),
         profile = getAiProfileForPlayer(player),
       ) {
-        if (!shouldUseAiMonteCarloDecision(player, profile)) {
+        const trigger = getAiMonteCarloTrigger(
+          player,
+          legalIndexes,
+          profile,
+        );
+        if (!trigger.shouldUse) {
           return null;
         }
 
@@ -14041,11 +14528,18 @@
           legalIndexes,
           profile,
         );
+        const heuristicCandidate = candidates[0] || null;
         if (candidates.length < 2) {
           return {
+            attemptedMonteCarlo: true,
             usedMonteCarlo: false,
-            candidate: candidates[0] || null,
+            candidate: heuristicCandidate,
             candidates,
+            heuristicCandidate,
+            triggerReason: trigger.reason,
+            elapsedMs: 0,
+            timedOut: false,
+            changedDecision: false,
           };
         }
 
@@ -14061,16 +14555,28 @@
         );
         if (rolloutCount < 2) {
           return {
+            attemptedMonteCarlo: true,
             usedMonteCarlo: false,
-            candidate: candidates[0] || null,
+            candidate: heuristicCandidate,
             candidates,
+            heuristicCandidate,
+            triggerReason: trigger.reason,
+            elapsedMs: 0,
+            timedOut: false,
+            changedDecision: false,
           };
         }
 
+        const timeBudgetMs = clamp(
+          Number.parseInt(
+            profile.monteCarloTimeBudgetMs ??
+              DEFAULT_CONFIG.cpuMonteCarloTimeBudgetMs,
+            10,
+          ),
+          20,
+          1000,
+        );
         if (player === "cpu") {
-          addCpuAuditLog(
-            `monte carlo rollout | ${candidates.length} line${candidates.length === 1 ? "" : "s"} x ${rolloutCount} rollout${rolloutCount === 1 ? "" : "s"} | max ${rolloutMaxSteps} steps.`,
-          );
           showCpuNotice("SIM", "info");
           render();
         }
@@ -14078,10 +14584,18 @@
         const rolloutProfile = {
           ...profile,
           monteCarloEnabled: false,
+          monteCarloMode: "off",
         };
         const evaluated = [];
+        const startedAt = Date.now();
+        let timedOut = false;
 
         for (const candidate of candidates) {
+          if (Date.now() - startedAt >= timeBudgetMs) {
+            timedOut = true;
+            break;
+          }
+
           const batchResult = await runHeadlessAiBatch({
             games: rolloutCount,
             maxSteps: rolloutMaxSteps,
@@ -14100,6 +14614,26 @@
             ...candidate,
             rollout: getHeadlessBatchPerspective(batchResult, player),
           });
+
+          if (Date.now() - startedAt >= timeBudgetMs) {
+            timedOut = true;
+            break;
+          }
+        }
+
+        const elapsedMs = Date.now() - startedAt;
+        if (evaluated.length < 2) {
+          return {
+            attemptedMonteCarlo: true,
+            usedMonteCarlo: false,
+            candidate: heuristicCandidate,
+            candidates: evaluated.length > 0 ? evaluated : candidates,
+            heuristicCandidate,
+            triggerReason: trigger.reason,
+            elapsedMs,
+            timedOut,
+            changedDecision: false,
+          };
         }
 
         evaluated.sort((left, right) => {
@@ -14124,24 +14658,20 @@
           return (right.priority || 0) - (left.priority || 0);
         });
 
-        if (player === "cpu") {
-          addCpuAuditLog(
-            `monte carlo ranked ${evaluated
-              .map(
-                (candidate, index) =>
-                  `${index + 1}) ${formatAiMonteCarloCandidateResult(candidate)}`,
-              )
-              .join(" || ")}`,
-          );
-          addCpuAuditLog(
-            `monte carlo chose ${getAiActionCandidateLabel(evaluated[0])}.`,
-          );
-        }
+        const changedDecision =
+          getAiActionCandidateKey(heuristicCandidate) !==
+          getAiActionCandidateKey(evaluated[0]);
 
         return {
+          attemptedMonteCarlo: true,
           usedMonteCarlo: true,
           candidate: evaluated[0],
           candidates: evaluated,
+          heuristicCandidate,
+          triggerReason: trigger.reason,
+          elapsedMs,
+          timedOut,
+          changedDecision,
         };
       }
 
@@ -15134,6 +15664,10 @@
           shotZone ||
           isFarOffensiveZone(player, currentZoneIndex) ||
           isCloseOffensiveZone(player, currentZoneIndex);
+        const upperTier =
+          profile.difficultyKey === "allstar" ||
+          profile.difficultyKey === "playoff";
+        const playoffTier = profile.difficultyKey === "playoff";
         const trailing = getPlayerScore(player) < getPlayerScore(opponent);
         const latePressure =
           getRegulationSecondsRemaining() <= profile.lateGamePressureSeconds ||
@@ -15186,6 +15720,7 @@
         let opponentChainPenalty = 0;
         let trapPenalty = 0;
         let deadLinePenalty = 0;
+        let pressureStallPenalty = 0;
         let score = followUpScore + chainScore;
 
         if (!shotZone) {
@@ -15259,6 +15794,9 @@
           ) {
             shotCreationScore = 1 + profile.shotZoneAggression * 0.55;
           }
+          if (upperTier && projected.remainingHand.length <= 1) {
+            shotCreationScore += 1 + profile.shotZoneAggression * 0.25;
+          }
           score += shotCreationScore;
         }
 
@@ -15328,6 +15866,23 @@
         }
 
         if (
+          upperTier &&
+          offensivePush &&
+          !immediateResolve &&
+          projected.remainingHand.length > 1
+        ) {
+          pressureStallPenalty =
+            -(
+              (shotZone ? 1.2 : 0.8) +
+              projected.remainingHand.length *
+                (playoffTier ? 0.85 : 0.55) +
+              Math.max(0, 2 - projected.legalAfter) *
+                (shotZone ? 1.1 : 0.65)
+            );
+          score += pressureStallPenalty;
+        }
+
+        if (
           !offensivePush &&
           projected.legalAfter === 0 &&
           projected.continuationLength === 0
@@ -15372,6 +15927,7 @@
               { label: "reply-risk", value: opponentReplyPenalty },
               { label: "defense-run", value: opponentChainPenalty },
               { label: "trap", value: trapPenalty },
+              { label: "stall", value: pressureStallPenalty },
               { label: "dead-line", value: deadLinePenalty },
             ],
           },
@@ -16033,14 +16589,36 @@
           legalIndexes,
           profile,
         );
+        const upperTier =
+          profile.difficultyKey === "allstar" ||
+          profile.difficultyKey === "playoff";
 
         if (isShotZone(player)) {
+          if (
+            upperTier &&
+            (lineContext.immediateResolveLine ||
+              (legalIndexes.length >= 2 &&
+                !lineContext.riskyCurrentLine &&
+                lineContext.handAfter <= 1))
+          ) {
+            return false;
+          }
           return (
             !lineContext.immediateResolveLine &&
-            (lineContext.handAfter > 1 ||
+            (lineContext.handAfter > (upperTier ? 2 : 1) ||
               lineContext.riskyCurrentLine ||
               lateNeed)
           );
+        }
+
+        if (
+          upperTier &&
+          offensivePressure &&
+          legalIndexes.length >= 2 &&
+          !lineContext.riskyCurrentLine &&
+          !poorHand
+        ) {
+          return false;
         }
 
         if (!poorHand && !lineContext.riskyCurrentLine) {
@@ -16375,6 +16953,25 @@
           getRegulationSecondsRemaining() <= profile.lateGamePressureSeconds
             ? 1
             : 0);
+        const lineContext = getAiNormalLineRiskContext(
+          player,
+          legalIndexes,
+          profile,
+        );
+        const upperTier =
+          profile.difficultyKey === "allstar" ||
+          profile.difficultyKey === "playoff";
+        if (
+          upperTier &&
+          state.roleOfCurrentTurn === "attacker" &&
+          (isShotZone(player) || isPlayerOnOpponentSide(player)) &&
+          (lineContext.immediateResolveLine ||
+            (!lineContext.riskyCurrentLine &&
+              legalIndexes.length >= 2 &&
+              lineContext.handAfter <= 1))
+        ) {
+          return false;
+        }
         return (
           aggressionGate >= 4 &&
           mostlyLowValue &&
@@ -16464,6 +17061,36 @@
           legal,
           profile,
         );
+        if (monteCarloDecision?.attemptedMonteCarlo) {
+          const rankedSummary = Array.isArray(monteCarloDecision.candidates)
+            ? monteCarloDecision.candidates
+                .slice(0, 3)
+                .map(
+                  (candidate, index) =>
+                    `${index + 1}) ${formatAiMonteCarloCandidateResult(candidate)}`,
+                )
+                .join(" || ")
+            : "none";
+          const heuristicLabel = getAiActionCandidateLabel(
+            monteCarloDecision.heuristicCandidate,
+          );
+          const selectedLabel = getAiActionCandidateLabel(
+            monteCarloDecision.candidate,
+          );
+          if (player === "cpu") {
+            addCpuAuditLog(
+              `Monte Carlo ${monteCarloDecision.usedMonteCarlo ? "used" : "fallback"} | difficulty ${profile.label} | trigger ${monteCarloDecision.triggerReason || "n/a"} | candidates ${Array.isArray(monteCarloDecision.candidates) ? monteCarloDecision.candidates.length : 0} | rollouts ${profile.monteCarloRollouts} | max ${profile.monteCarloMaxSteps} | elapsed ${monteCarloDecision.elapsedMs} ms | heuristic ${heuristicLabel} | selected ${selectedLabel} | changed ${monteCarloDecision.changedDecision ? "yes" : "no"}${monteCarloDecision.timedOut ? " | timed out" : ""}.`,
+            );
+            if (rankedSummary && rankedSummary !== "none") {
+              addCpuAuditLog(`Monte Carlo ranked ${rankedSummary}`);
+            }
+          }
+          recordMonteCarloStat(
+            player,
+            Number(monteCarloDecision.elapsedMs || 0),
+            monteCarloDecision.changedDecision === true,
+          );
+        }
         if (monteCarloDecision?.usedMonteCarlo && monteCarloDecision.candidate) {
           return await executeAiMonteCarloChoice(
             player,
@@ -17038,6 +17665,21 @@
             "humanExchangeWins",
             "cpuFaceoffsWon",
             "humanFaceoffsWon",
+            "cpuMcUses",
+            "cpuMcChanged",
+            "cpuMcAvgMs",
+            "cpuOffensiveZonePossessions",
+            "humanOffensiveZonePossessions",
+            "cpuExchangeWinsToShot",
+            "humanExchangeWinsToShot",
+            "cpuExchangeWinsToTurnover",
+            "humanExchangeWinsToTurnover",
+            "cpuCycleToShotSoon",
+            "humanCycleToShotSoon",
+            "cpuBurnToShotSoon",
+            "humanBurnToShotSoon",
+            "cpuBreakoutToShotSoon",
+            "humanBreakoutToShotSoon",
           ],
         ];
 
@@ -17073,6 +17715,21 @@
             matchResult.stats?.human?.exchangeWins || 0,
             matchResult.stats?.cpu?.faceoffsWon || 0,
             matchResult.stats?.human?.faceoffsWon || 0,
+            matchResult.stats?.cpu?.monteCarloUses || 0,
+            matchResult.stats?.cpu?.monteCarloDecisionChanges || 0,
+            getAverageMonteCarloMs(matchResult.stats?.cpu),
+            matchResult.stats?.cpu?.offensiveZonePossessionsStarted || 0,
+            matchResult.stats?.human?.offensiveZonePossessionsStarted || 0,
+            matchResult.stats?.cpu?.exchangeWinsToShotSamePossession || 0,
+            matchResult.stats?.human?.exchangeWinsToShotSamePossession || 0,
+            matchResult.stats?.cpu?.exchangeWinsToTurnoverBeforeShot || 0,
+            matchResult.stats?.human?.exchangeWinsToTurnoverBeforeShot || 0,
+            matchResult.stats?.cpu?.cycleUsesLeadingToShotSoon || 0,
+            matchResult.stats?.human?.cycleUsesLeadingToShotSoon || 0,
+            matchResult.stats?.cpu?.burnUsesLeadingToShotSoon || 0,
+            matchResult.stats?.human?.burnUsesLeadingToShotSoon || 0,
+            matchResult.stats?.cpu?.breakoutsLeadingToShotSoon || 0,
+            matchResult.stats?.human?.breakoutsLeadingToShotSoon || 0,
           ]);
         });
 
@@ -17126,8 +17783,13 @@
         ];
 
         if (batchResult.runSettings) {
+          const modeLabel =
+            String(batchResult.runSettings.cpuMonteCarloMode || "off").replace(
+              /_/g,
+              " ",
+            );
           lines.push(
-            `AI settings: CPU Monte Carlo ${batchResult.runSettings.cpuMonteCarloEnabled ? "ON" : "OFF"} | Opponent heuristic baseline`,
+            `AI settings: CPU Monte Carlo ${modeLabel} | Opponent heuristic baseline`,
           );
         }
 
@@ -17788,6 +18450,7 @@
 
         const overviewRows = getStatsOverviewRows();
         const luckRows = getLuckOverviewRows();
+        const aiDiagnosticsRows = getAiDiagnosticsRows();
         const zoneTimeRows = getZoneTimeComparisonRows();
         const zoneActivityRows = getZoneActivityCompareRows();
         const attackRunLengthRows = getRunLengthCompareRows("attack");
@@ -17822,6 +18485,10 @@
           `<div class="stats-note">${escapeHtml(getLuckStatsNote())}</div>`,
           `<div class="stats-note">${escapeHtml(getLuckBreakdownText("human"))}</div>`,
           `<div class="stats-note">${escapeHtml(getLuckBreakdownText("cpu"))}</div>`,
+          "</div>",
+          '<div class="stats-section">',
+          '<div class="stats-section-title">AI Diagnostics</div>',
+          renderStatsCompareRowsHtml(aiDiagnosticsRows),
           "</div>",
           '<div class="stats-section">',
           '<div class="stats-section-title">Time In Zone</div>',
@@ -18572,7 +19239,7 @@
           icePuckBtn.title = overflowSelectionActive
             ? "Choose a hand-limit discard first"
             : humanCanIce
-              ? "Trim Momentum by 1 for each side, refill both hands, and force an Icing Faceoff in your defensive zone"
+              ? "Reset Momentum on the stoppage, refill both hands, and force an Icing Faceoff in your defensive zone"
               : "Icing is only available to a stuck attacker in their own defensive zone";
         }
 
@@ -18741,6 +19408,7 @@
         state.pendingCycleSelection = false;
         state.pendingOverflowDiscard = null;
         state.stabilizePending = null;
+        state.pressureTracker = null;
         state.pendingEncounterContext = null;
         state.exchangeMeterPulseKey = "";
         state.exchangeMeterPulseUntil = 0;
@@ -19010,12 +19678,14 @@
             );
             const simulationOptions = getDebugSimulationOptionsFromControls();
             const simulationConfig = getDraftConfigFromControls();
-            const cpuMonteCarloEnabled = Boolean(
-              simulationConfig.cpuMonteCarloEnabled,
+            const cpuMonteCarloMode = sanitizeCpuMonteCarloMode(
+              simulationConfig.cpuMonteCarloMode,
             );
+            const cpuMonteCarloEnabled = cpuMonteCarloMode !== "off";
             const baselineOpponentConfig = {
               ...simulationConfig,
               cpuMonteCarloEnabled: false,
+              cpuMonteCarloMode: "off",
             };
 
             if (state.cpuBusy) {
@@ -19043,7 +19713,7 @@
             }
             lastHeadlessBatchResult = null;
             setDebugSimulationOutput(
-              `Running ${simulationOptions.games} headless match${simulationOptions.games === 1 ? "" : "es"} with CPU Monte Carlo ${cpuMonteCarloEnabled ? "ON" : "OFF"}...`,
+              `Running ${simulationOptions.games} headless match${simulationOptions.games === 1 ? "" : "es"} with CPU Monte Carlo ${cpuMonteCarloMode.replace(/_/g, " ")}...`,
             );
 
             try {
@@ -19060,6 +19730,7 @@
               });
               batchResult.runSettings = {
                 cpuMonteCarloEnabled,
+                cpuMonteCarloMode,
                 humanMonteCarloEnabled: false,
               };
               lastHeadlessBatchResult = batchResult;
@@ -19124,6 +19795,7 @@
           "debugCpuMonteCarloRollouts",
           "debugCpuMonteCarloCandidates",
           "debugCpuMonteCarloMaxSteps",
+          "debugCpuMonteCarloTimeBudgetMs",
         ];
 
         cpuDifficultyInput?.addEventListener("input", () => {
