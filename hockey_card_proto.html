@@ -6382,6 +6382,9 @@
       }
 
       function getMomentum(player) {
+        if (!FEATURES.momentumSystem) {
+          return 0;
+        }
         const key = momentumStateKey(player);
         return key ? state[key] : 0;
       }
