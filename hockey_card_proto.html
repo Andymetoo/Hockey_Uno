@@ -4178,6 +4178,8 @@
           goals: 0,
           forceShotGoals: 0,
           shotsOnGoal: 0,
+          momentumEarned: 0,
+          momentumSpent: 0,
           knownPlayAccuracyTotal: 0,
           knownPlayAccuracyCount: 0,
           knownPlayAccuracyBestCount: 0,
@@ -5347,6 +5349,16 @@
             cpuStats.shotsOnGoal,
           ),
           createComparisonRow(
+            "Momentum Earned",
+            humanStats.momentumEarned,
+            cpuStats.momentumEarned,
+          ),
+          createComparisonRow(
+            "Momentum Spent",
+            humanStats.momentumSpent,
+            cpuStats.momentumSpent,
+          ),
+          createComparisonRow(
             "Accuracy",
             getKnownPlayAccuracyDisplay("human"),
             getKnownPlayAccuracyDisplay("cpu"),
@@ -6442,8 +6454,14 @@
           return;
         }
 
+        const delta = next - current;
         state[key] = next;
-        logMomentumChange(player, next - current, current, next, reason);
+        if (delta > 0) {
+          incrementPlayerStat(player, "momentumEarned", delta);
+        } else if (delta < 0) {
+          incrementPlayerStat(player, "momentumSpent", Math.abs(delta));
+        }
+        logMomentumChange(player, delta, current, next, reason);
       }
 
       function changeMomentum(player, delta, reason = "") {
@@ -6461,8 +6479,14 @@
           return;
         }
 
+        const appliedDelta = next - current;
         state[key] = next;
-        logMomentumChange(player, next - current, current, next, reason);
+        if (appliedDelta > 0) {
+          incrementPlayerStat(player, "momentumEarned", appliedDelta);
+        } else if (appliedDelta < 0) {
+          incrementPlayerStat(player, "momentumSpent", Math.abs(appliedDelta));
+        }
+        logMomentumChange(player, appliedDelta, current, next, reason);
       }
 
       function resetMomentum(reason = "") {
