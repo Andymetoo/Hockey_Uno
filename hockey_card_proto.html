@@ -3290,6 +3290,13 @@
                 </select>
               </label>
               <label class="debug-field">
+                <span>Accelerated D-Zone Exit</span>
+                <select id="debugAcceleratedDefensiveZoneExit">
+                  <option value="on" selected>On</option>
+                  <option value="off">Off</option>
+                </select>
+              </label>
+              <label class="debug-field">
                 <span>Breakout Advance</span>
                 <input
                   id="debugMomentumBreakoutZoneAdvanceAmount"
@@ -3689,6 +3696,7 @@
         enableWeakShotsOnOffensiveMargin: false,
         weakShotOffensiveMarginThreshold: 2,
         enableMomentumBreakout: true,
+        acceleratedDefensiveZoneExit: true,
         momentumBreakoutZoneAdvanceAmount: 2,
         humanTeam: "random",
         cpuTeam: "random",
@@ -6830,7 +6838,6 @@
 
         if (player === "human") {
           if (
-            hasHumanPendingTurn() ||
             hasHumanSpecialSelection() ||
             hasPendingOverflowDiscard("human")
           ) {
@@ -6849,7 +6856,8 @@
         if (
           state.attacker !== player ||
           state.roleOfCurrentTurn !== "attacker" ||
-          state.attackerChainCount !== 0
+          state.attackerChainCount !== 0 ||
+          (player === "human" && hasHumanPendingTurn())
         ) {
           return false;
         }
@@ -6865,7 +6873,7 @@
 
       function canPlayerUseBurn(player) {
         return (
-          canPlayerSpendMomentum(player, 2) && playerHand(player).length > 1
+          canPlayerSpendMomentum(player, 2) && playerHand(player).length > 0
         );
       }
 
@@ -7024,7 +7032,6 @@
         if (
           !canPlayerUseCycle("human") ||
           state.cpuBusy ||
-          hasHumanPendingTurn() ||
           hasHumanSpecialSelection() ||
           hasPendingOverflowDiscard("human")
         ) {
@@ -7041,7 +7048,6 @@
         if (
           !canPlayerUseBurn("human") ||
           state.cpuBusy ||
-          hasHumanPendingTurn() ||
           hasHumanSpecialSelection() ||
           hasPendingOverflowDiscard("human")
         ) {
@@ -7074,6 +7080,19 @@
         return true;
       }
 
+      function commitHumanPendingTurnForMomentumAction(actionLabel) {
+        if (!hasHumanPendingTurn()) {
+          return false;
+        }
+
+        const pendingCount = getHumanPendingPlayCount();
+        clearHumanPendingTurn();
+        addLog(
+          `Human commits ${pendingCount} staged card${pendingCount === 1 ? "" : "s"} before using ${actionLabel}. Undo no longer reverses those staged plays.`,
+        );
+        return true;
+      }
+
       function cycleMomentumCard(player, cardIndex) {
         if (!canPlayerUseCycle(player)) {
           return false;
@@ -7090,6 +7109,10 @@
         if (momentumBefore < 1) {
           clearBurnSelection();
           return false;
+        }
+
+        if (player === "human") {
+          commitHumanPendingTurnForMomentumAction("Cycle");
         }
 
         const card = hand.splice(cardIndex, 1)[0];
@@ -7136,7 +7159,7 @@
         }
 
         const hand = playerHand(player);
-        if (cardIndex < 0 || cardIndex >= hand.length || hand.length <= 1) {
+        if (cardIndex < 0 || cardIndex >= hand.length) {
           addLog(`Ignored: invalid Burn card for ${lowerPlayerName(player)}.`);
           clearBurnSelection();
           return false;
@@ -7146,6 +7169,10 @@
         if (momentumBefore < 2) {
           clearBurnSelection();
           return false;
+        }
+
+        if (player === "human") {
+          commitHumanPendingTurnForMomentumAction("Burn");
         }
 
         const card = hand.splice(cardIndex, 1)[0];
@@ -8231,6 +8258,11 @@
               ? DEFAULT_CONFIG.enableMomentumBreakout
               : rawConfig.enableMomentumBreakout === true ||
                 rawConfig.enableMomentumBreakout === "on",
+          acceleratedDefensiveZoneExit:
+            rawConfig.acceleratedDefensiveZoneExit === undefined
+              ? DEFAULT_CONFIG.acceleratedDefensiveZoneExit
+              : rawConfig.acceleratedDefensiveZoneExit === true ||
+                rawConfig.acceleratedDefensiveZoneExit === "on",
           momentumBreakoutZoneAdvanceAmount: clamp(
             Number.parseInt(
               rawConfig.momentumBreakoutZoneAdvanceAmount ??
@@ -8428,6 +8460,9 @@
         );
         const enableMomentumBreakoutInput = document.getElementById(
           "debugEnableMomentumBreakout",
+        );
+        const acceleratedDefensiveZoneExitInput = document.getElementById(
+          "debugAcceleratedDefensiveZoneExit",
         );
         const momentumBreakoutAdvanceInput = document.getElementById(
           "debugMomentumBreakoutZoneAdvanceAmount",
@@ -8735,6 +8770,8 @@
           ),
           enableMomentumBreakout:
             (enableMomentumBreakoutInput?.value || "on") === "on",
+          acceleratedDefensiveZoneExit:
+            (acceleratedDefensiveZoneExitInput?.value || "on") === "on",
           momentumBreakoutZoneAdvanceAmount: clamp(
             Number.parseInt(
               momentumBreakoutAdvanceInput?.value ||
@@ -8850,6 +8887,9 @@
         );
         const enableMomentumBreakoutInput = document.getElementById(
           "debugEnableMomentumBreakout",
+        );
+        const acceleratedDefensiveZoneExitInput = document.getElementById(
+          "debugAcceleratedDefensiveZoneExit",
         );
         const momentumBreakoutAdvanceInput = document.getElementById(
           "debugMomentumBreakoutZoneAdvanceAmount",
@@ -9019,6 +9059,10 @@
             ? "on"
             : "off";
         }
+        if (acceleratedDefensiveZoneExitInput) {
+          acceleratedDefensiveZoneExitInput.value =
+            config.acceleratedDefensiveZoneExit ? "on" : "off";
+        }
         if (momentumBreakoutAdvanceInput) {
           momentumBreakoutAdvanceInput.value = String(
             config.momentumBreakoutZoneAdvanceAmount,
@@ -9048,7 +9092,7 @@
           ? "Momentum/Dump ON"
           : "Momentum/Dump OFF";
         const momentumRulesText = features.momentumSystem
-          ? `gain ${config.momentumGainExchangeMarginThreshold}+, breakout ${config.enableMomentumBreakout ? `on/${config.momentumBreakoutZoneAdvanceAmount}` : "off"}, weak shots ${config.enableWeakShotsOnOffensiveMargin ? `on/${config.weakShotOffensiveMarginThreshold}+` : "off"}`
+          ? `gain ${config.momentumGainExchangeMarginThreshold}+, breakout ${config.enableMomentumBreakout ? `on/${config.momentumBreakoutZoneAdvanceAmount}` : "off"}, accelerated exit ${config.acceleratedDefensiveZoneExit ? "on" : "off"}, weak shots ${config.enableWeakShotsOnOffensiveMargin ? `on/${config.weakShotOffensiveMarginThreshold}+` : "off"}`
           : "momentum disabled";
         const stabilizeText = getStabilizeSandingModeText(
           config.stabilizeSanding,
@@ -11812,8 +11856,23 @@
 
           const previousZone = state.zoneIndex;
           const attackerAdvances = attackerAdvancesOnExchangeWin();
+          const acceleratedExit =
+            attackerAdvances &&
+            Boolean(outcomeContext?.acceleratedDefensiveZoneExit) &&
+            isOwnDefensiveZone(state.attacker, previousZone);
           if (attackerAdvances) {
-            advanceZone();
+            if (acceleratedExit) {
+              state.zoneIndex = clamp(
+                Number(
+                  outcomeContext?.acceleratedDefensiveZoneExit?.targetZone ??
+                    getBreakoutTargetZoneIndex(state.attacker, previousZone, 2),
+                ),
+                0,
+                ZONES.length - 1,
+              );
+            } else {
+              advanceZone();
+            }
           }
           addLog(
             reason ||
@@ -11837,6 +11896,12 @@
             );
           }
 
+          if (acceleratedExit && previousZone !== state.zoneIndex) {
+            addLog(
+              `Accelerated Defensive Zone Exit: ${state.attacker.toUpperCase()} hand-out advances 2 zones from ${zoneLabel(previousZone)} to ${zoneLabel(state.zoneIndex)}.`,
+            );
+          }
+
           if (previousZone !== state.zoneIndex) {
             addLog(
               `${lowerPlayerName(state.attacker)} advances the puck to ${zoneLabel(state.zoneIndex)}.`,
@@ -11856,7 +11921,9 @@
 
           setEvent(
             attackerAdvances
-              ? "Exchange Win (+1 Zone)"
+              ? acceleratedExit
+                ? "Exchange Win (+2 Zones)"
+                : "Exchange Win (+1 Zone)"
               : "Exchange Hold / No Advance",
             attackerAdvances ? "shot" : "contain",
           );
@@ -11878,6 +11945,8 @@
                 attackerAdvances
                   ? previousZone === state.zoneIndex
                     ? `${lowerPlayerName(state.attacker)} was already at the deepest zone, so the win stayed there.`
+                    : acceleratedExit
+                      ? `This hand-out started in ${zoneLabel(previousZone)}, so Accelerated Defensive Zone Exit moved the puck 2 zones instead of 1.`
                     : ""
                   : state.attackerChainCount === state.defenderChainCount
                     ? `Played-card ties do not grant a zone advance.`
@@ -11885,7 +11954,9 @@
               ),
               attackerAdvances
                 ? previousZone !== state.zoneIndex
-                  ? `When the attacker wins the exchange, the puck advances 1 zone.`
+                  ? acceleratedExit
+                    ? `When this toggle is on, an attacker who goes hand-out from their own Defensive Zone advances 2 zones instead of 1.`
+                    : `When the attacker wins the exchange, the puck advances 1 zone.`
                   : `Winning the exchange still keeps possession, but there is no further zone to gain at the deepest end of the ice.`
                 : `If the attacker only holds the exchange without beating the defense, possession stays in place instead of advancing.`,
             ),
@@ -13494,6 +13565,7 @@
             noteExchangeMeterSnapshot(getExchangeMeterState());
             resolveShot(state.attacker, state.defender, lastPlayedCard);
           } else {
+            const handoutStartZone = state.zoneIndex;
             refillHands();
             if (resolvePendingPeriodBreak()) {
               return true;
@@ -13501,6 +13573,20 @@
             resolveExchange(
               player,
               `${lowerPlayerName(player)} empties the hand and wins the exchange.`,
+              state.config.acceleratedDefensiveZoneExit &&
+                state.roleOfCurrentTurn === "attacker" &&
+                isOwnDefensiveZone(player, handoutStartZone)
+                ? {
+                    acceleratedDefensiveZoneExit: {
+                      startZone: handoutStartZone,
+                      targetZone: getBreakoutTargetZoneIndex(
+                        player,
+                        handoutStartZone,
+                        2,
+                      ),
+                    },
+                  }
+                : null,
             );
           }
           return true;
@@ -15183,7 +15269,7 @@
           0,
         );
         const activeValue = state.activeCard?.value ?? bestCurrentLegalValue;
-        return `Cycle trigger | discard ${cycleIndex === null || cycleIndex === undefined ? "none" : cardToText(state.cpuHand[cycleIndex])} | legal ${legalIndexes.length} | best legal ${bestCurrentLegalValue || 0} vs active ${activeValue || 0} | low cards ${lowValueCount}/${state.cpuHand.length} | momentum aggression ${profile.momentumSpendAggression}.`;
+        return `Cycle trigger | role ${state.roleOfCurrentTurn} | discard ${cycleIndex === null || cycleIndex === undefined ? "none" : cardToText(state.cpuHand[cycleIndex])} | legal ${legalIndexes.length} | best legal ${bestCurrentLegalValue || 0} vs active ${activeValue || 0} | low cards ${lowValueCount}/${state.cpuHand.length} | momentum aggression ${profile.momentumSpendAggression}.`;
       }
 
       function describeCpuBurnDecision(
@@ -15212,7 +15298,7 @@
           getRegulationSecondsRemaining() <= profile.lateGamePressureSeconds
             ? 1
             : 0);
-        return `Burn trigger | burn ${burnIndex === null || burnIndex === undefined ? "none" : cardToText(state.cpuHand[burnIndex])} | legal ${legalIndexes.length} | best legal ${bestCurrentLegalValue || 0} | burn follow-ups ${burnFollowUpCount} | low cards ${lowValueCount}/${state.cpuHand.length} | aggression ${aggressionGate}.`;
+        return `Burn trigger | role ${state.roleOfCurrentTurn} | burn ${burnIndex === null || burnIndex === undefined ? "none" : cardToText(state.cpuHand[burnIndex])} | legal ${legalIndexes.length} | best legal ${bestCurrentLegalValue || 0} | burn follow-ups ${burnFollowUpCount} | low cards ${lowValueCount}/${state.cpuHand.length} | hand ${state.cpuHand.length} | aggression ${aggressionGate}.`;
       }
 
       function describeCpuDumpDecision() {
@@ -17134,6 +17220,7 @@
         }
 
         const hand = playerHand(player);
+        const burningLastCard = hand.length === 1;
         const burnFollowUpCount = getBurnFollowUpCount(hand, burnIndex);
         const canDump = canPlayerDumpAndChase(player);
         const defenderTurn = state.roleOfCurrentTurn === "defender";
@@ -17144,6 +17231,9 @@
 
         if (legalIndexes.length === 0) {
           if (defenderTurn) {
+            if (burningLastCard) {
+              return profile.momentumSpendAggression >= 3;
+            }
             return (
               profile.momentumSpendAggression >= 3 &&
               (burnFollowUpCount > 0 ||
@@ -17151,6 +17241,9 @@
             );
           }
           if (canDump && burnFollowUpCount === 0) {
+            return false;
+          }
+          if (burningLastCard) {
             return false;
           }
           return (
@@ -17199,6 +17292,9 @@
           return false;
         }
         if (defenderTurn) {
+          if (burningLastCard) {
+            return aggressionGate >= 5 && legalLooksWeak && defenseMargin <= 0;
+          }
           if (
             upperTier &&
             defenseMargin > 0 &&
@@ -17381,7 +17477,21 @@
           return true;
         }
 
-        if (FEATURES.momentumSystem && shouldAiCycleMomentum(player, legal, profile)) {
+        const cpuCanCycleMomentum =
+          FEATURES.momentumSystem && canPlayerUseCycle(player);
+        const cpuShouldCycleMomentum =
+          cpuCanCycleMomentum && shouldAiCycleMomentum(player, legal, profile);
+        if (
+          player === "cpu" &&
+          state.roleOfCurrentTurn === "defender" &&
+          cpuCanCycleMomentum &&
+          !cpuShouldCycleMomentum
+        ) {
+          addCpuAuditLog(
+            `Cycle skip | defense turn | legal ${legal.length} | hand ${state.cpuHand.length} | momentum ${getMomentum(player)}.`,
+          );
+        }
+        if (cpuShouldCycleMomentum) {
           const cycleIndex = getAiCycleIndex(player);
           if (cycleIndex !== null && cycleIndex !== undefined) {
             if (player === "cpu") {
@@ -17419,7 +17529,21 @@
           }
         }
 
-        if (FEATURES.momentumSystem && shouldAiBurnMomentum(player, legal, profile)) {
+        const cpuCanBurnMomentum =
+          FEATURES.momentumSystem && canPlayerUseBurn(player);
+        const cpuShouldBurnMomentum =
+          cpuCanBurnMomentum && shouldAiBurnMomentum(player, legal, profile);
+        if (
+          player === "cpu" &&
+          state.roleOfCurrentTurn === "defender" &&
+          cpuCanBurnMomentum &&
+          !cpuShouldBurnMomentum
+        ) {
+          addCpuAuditLog(
+            `Burn skip | defense turn | legal ${legal.length} | hand ${state.cpuHand.length} | momentum ${getMomentum(player)}.`,
+          );
+        }
+        if (cpuShouldBurnMomentum) {
           const burnIndex = getAiBurnIndex(player);
           if (burnIndex !== null && burnIndex !== undefined) {
             if (player === "cpu") {
@@ -18968,8 +19092,8 @@
             "human",
             state.activeCard,
           )
-            ? `Human has ${humanPendingCount} staged ${suffix}. Play more, Undo, or tap Deck, tap the pile, or press Submit.`
-            : `Human has ${humanPendingCount} staged ${suffix}. Undo, tap Deck, tap the pile, or press Submit the turn.`;
+            ? `Human has ${humanPendingCount} staged ${suffix}. Play more, use committed Cycle/Burn if needed, or Undo / Submit the staged card plays.`
+            : `Human has ${humanPendingCount} staged ${suffix}. Use committed Cycle/Burn if needed, or Undo / Submit the staged card plays.`;
         } else if (state.faceoffPending) {
           if (isIcingFaceoff()) {
             if (
@@ -19211,9 +19335,9 @@
         const cycleSelectionActive = pendingMomentumAction === "cycle";
         const burnSelectionActive = pendingMomentumAction === "burn";
         const humanCanCycle =
-          canHumanAct && !hasHumanPendingTurn() && canPlayerUseCycle("human");
+          canHumanAct && canPlayerUseCycle("human");
         const humanCanBurn =
-          canHumanAct && !hasHumanPendingTurn() && canPlayerUseBurn("human");
+          canHumanAct && canPlayerUseBurn("human");
         const humanCanPowerShot =
           canHumanAct &&
           !hasHumanPendingTurn() &&
@@ -19377,7 +19501,7 @@
             : overflowSelectionActive
               ? "Choose a hand-limit discard first"
               : humanPendingCount > 0
-                ? "Undo the last staged human play"
+                ? "Undo the last staged human card play only. It does not undo committed Momentum actions."
                 : humanMoveRequiresSubmitConfirmation()
                   ? "Stage a card first"
                   : "No staged human play to undo";
@@ -19416,7 +19540,6 @@
             !FEATURES.momentumSystem ||
             state.faceoffPending ||
             state.shotPending ||
-            hasHumanPendingTurn() ||
             burnSelectionActive ||
             (!cycleSelectionActive && !humanCanCycle);
           cycleMomentumBtn.hidden = !showCycleMomentumBtn;
@@ -19425,8 +19548,8 @@
             : cycleSelectionActive
               ? "Click again to cancel Cycle selection"
               : humanCanCycle
-                ? "Spend 1 Momentum, then choose 1 card to discard and draw 1. This commits immediately and is not undoable through staged plays."
-                : "Cycle is available on your turn with 1+ Momentum and at least 1 card, but only while no staged human plays are pending.";
+                ? "Spend 1 Momentum, then choose 1 card to discard and draw 1. This commits immediately. If staged cards are pending, they become committed and Undo no longer reverses them."
+                : "Cycle is available on your turn with 1+ Momentum and at least 1 card.";
         }
 
         if (burnMomentumBtn) {
@@ -19435,7 +19558,6 @@
             !FEATURES.momentumSystem ||
             state.faceoffPending ||
             state.shotPending ||
-            hasHumanPendingTurn() ||
             cycleSelectionActive ||
             (!burnSelectionActive && !humanCanBurn);
           burnMomentumBtn.hidden = !showBurnMomentumBtn;
@@ -19444,8 +19566,8 @@
             : burnSelectionActive
               ? "Click again to cancel Burn selection"
               : humanCanBurn
-                ? "Spend 2 Momentum, then choose 1 card to Burn out of hand. This commits immediately and is not undoable through staged plays."
-                : "Burn is available on your turn with 2+ Momentum and more than 1 card, but only while no staged human plays are pending.";
+                ? "Spend 2 Momentum, then choose 1 card to Burn out of hand. This commits immediately. Burning the last card never triggers hand-out rewards, and pending staged cards become committed."
+                : "Burn is available on your turn with 2+ Momentum and at least 1 card.";
         }
 
         if (powerShotBtn) {
@@ -19690,7 +19812,7 @@
         addLog("New game started.");
         addLog(`Matchup: ${getMatchupText()}.`);
         addLog(
-          `Config: ${state.config.suitCount} suits, values 1-${state.config.maxValue}, hand size ${state.config.handSize}, wild ${state.config.wildCardCount}, CPU ${getCpuDifficultyProfile().label.toLowerCase()} at ${state.config.cpuSpeedPercent}% speed, ${state.config.decksPerPeriod} deck${state.config.decksPerPeriod === 1 ? "" : "s"} per period, cross river once ${state.config.singleRiverCrossMode ? "on" : "off"}, stabilize ${getStabilizeSandingModeText(state.config.stabilizeSanding)}, momentum gain ${state.config.momentumGainExchangeMarginThreshold}+, breakout ${state.config.enableMomentumBreakout ? `on/${state.config.momentumBreakoutZoneAdvanceAmount}` : "off"}, weak shots ${state.config.enableWeakShotsOnOffensiveMargin ? `on/${state.config.weakShotOffensiveMarginThreshold}+` : "off"}.`,
+          `Config: ${state.config.suitCount} suits, values 1-${state.config.maxValue}, hand size ${state.config.handSize}, wild ${state.config.wildCardCount}, CPU ${getCpuDifficultyProfile().label.toLowerCase()} at ${state.config.cpuSpeedPercent}% speed, ${state.config.decksPerPeriod} deck${state.config.decksPerPeriod === 1 ? "" : "s"} per period, cross river once ${state.config.singleRiverCrossMode ? "on" : "off"}, stabilize ${getStabilizeSandingModeText(state.config.stabilizeSanding)}, momentum gain ${state.config.momentumGainExchangeMarginThreshold}+, breakout ${state.config.enableMomentumBreakout ? `on/${state.config.momentumBreakoutZoneAdvanceAmount}` : "off"}, accelerated exit ${state.config.acceleratedDefensiveZoneExit ? "on" : "off"}, weak shots ${state.config.enableWeakShotsOnOffensiveMargin ? `on/${state.config.weakShotOffensiveMarginThreshold}+` : "off"}.`,
         );
         startFaceoff(CENTER_ICE, "Opening faceoff at center ice.", {
           refillConsumesClock: false,
@@ -20096,6 +20218,7 @@
           "debugEnableWeakShotsOnOffensiveMargin",
           "debugWeakShotOffensiveMarginThreshold",
           "debugEnableMomentumBreakout",
+          "debugAcceleratedDefensiveZoneExit",
           "debugMomentumBreakoutZoneAdvanceAmount",
           "debugStabilizeSanding",
         ].forEach((id) => {
