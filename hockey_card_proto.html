@@ -582,31 +582,31 @@
 
       @keyframes phaseFlashHuman {
         0% {
-          background: rgba(var(--side-human-rgb), 0.05);
-          box-shadow: 0 0 0 0 rgba(var(--side-human-rgb), 0.28) inset;
+          background: rgba(124, 92, 255, 0.05);
+          box-shadow: 0 0 0 0 rgba(124, 92, 255, 0.28) inset;
         }
         40% {
-          background: rgba(var(--side-human-rgb), 0.18);
-          box-shadow: 0 0 0 999px rgba(var(--side-human-rgb), 0.1) inset;
+          background: rgba(124, 92, 255, 0.16);
+          box-shadow: 0 0 0 999px rgba(124, 92, 255, 0.1) inset;
         }
         100% {
-          background: rgba(var(--side-human-rgb), 0.05);
-          box-shadow: 0 0 0 0 rgba(var(--side-human-rgb), 0) inset;
+          background: rgba(124, 92, 255, 0.05);
+          box-shadow: 0 0 0 0 rgba(124, 92, 255, 0) inset;
         }
       }
 
       @keyframes phaseFlashCpu {
         0% {
-          background: rgba(var(--side-cpu-rgb), 0.05);
-          box-shadow: 0 0 0 0 rgba(var(--side-cpu-rgb), 0.24) inset;
+          background: rgba(55, 170, 190, 0.05);
+          box-shadow: 0 0 0 0 rgba(55, 170, 190, 0.24) inset;
         }
         40% {
-          background: rgba(var(--side-cpu-rgb), 0.18);
-          box-shadow: 0 0 0 999px rgba(var(--side-cpu-rgb), 0.09) inset;
+          background: rgba(55, 170, 190, 0.16);
+          box-shadow: 0 0 0 999px rgba(55, 170, 190, 0.09) inset;
         }
         100% {
-          background: rgba(var(--side-cpu-rgb), 0.05);
-          box-shadow: 0 0 0 0 rgba(var(--side-cpu-rgb), 0) inset;
+          background: rgba(55, 170, 190, 0.05);
+          box-shadow: 0 0 0 0 rgba(55, 170, 190, 0) inset;
         }
       }
 
@@ -5697,7 +5697,7 @@
       }
 
       function getShotStatsNote() {
-        return "Shots On Goal already includes Force Shots and rebound shots. Weak Shots are tracked separately. Saves Made already includes rebound saves and successful Weak Shot saves.";
+        return "Shots On Goal already includes Force Shots, rebound shots, and Weak Shots. Weak Shot rows are sub-counts of total Shots On Goal. Saves Made already includes rebound saves and successful Weak Shot saves.";
       }
 
       function getLuckStatsNote() {
@@ -6261,6 +6261,7 @@
           "",
           "Stat Notes",
           getShotStatsNote(),
+          "Weak Shots are included in Shots On Goal totals; the Weak Shot rows below are a subset breakout.",
           "",
           "Luck",
           getLuckStatsNote(),
@@ -6818,10 +6819,30 @@
       function canPlayerSpendMomentum(player, cost) {
         if (
           !FEATURES.momentumSystem ||
+          state.pendingPeriodBreak ||
           state.faceoffPending ||
           state.shotPending ||
+          state.stabilizePending ||
           state.currentTurn !== player
         ) {
+          return false;
+        }
+
+        if (player === "human") {
+          if (
+            hasHumanPendingTurn() ||
+            hasHumanSpecialSelection() ||
+            hasPendingOverflowDiscard("human")
+          ) {
+            return false;
+          }
+        }
+
+        return getMomentum(player) >= cost;
+      }
+
+      function canPlayerSpendOpeningAttackMomentum(player, cost) {
+        if (!canPlayerSpendMomentum(player, cost)) {
           return false;
         }
 
@@ -6833,7 +6854,7 @@
           return false;
         }
 
-        return getMomentum(player) >= cost;
+        return true;
       }
 
       function canPlayerUseCycle(player) {
@@ -6850,7 +6871,7 @@
 
       function canPlayerUsePowerShot(player) {
         return (
-          canPlayerSpendMomentum(player, 3) &&
+          canPlayerSpendOpeningAttackMomentum(player, 3) &&
           playerHand(player).length > 0 &&
           isShotZone(player)
         );
@@ -6881,6 +6902,8 @@
           rejectionReason = "Breakout only works at the start of the attack turn";
         } else if (playerHand(player).length === 0) {
           rejectionReason = "no cards are in hand";
+        } else if (state.stabilizePending) {
+          rejectionReason = "a Stabilize attempt is pending";
         } else if (player === "human" && hasHumanPendingTurn()) {
           rejectionReason = "a staged human turn must be cleared first";
         } else if (player === "human" && hasHumanSpecialSelection()) {
@@ -6903,6 +6926,30 @@
         }
 
         return true;
+      }
+
+      function logMomentumFollowUpState(player, actionLabel) {
+        const legalAfterAction = getLegalCardsForTurn(player).length;
+        const roleLabel =
+          state.roleOfCurrentTurn === "defender" ? "defense" : "turn";
+
+        if (legalAfterAction > 0) {
+          addLog(
+            `${lowerPlayerName(player)} may now keep the ${roleLabel} going after the ${actionLabel}.`,
+          );
+        } else if (state.roleOfCurrentTurn === "attacker" && canPlayerDumpAndChase(player)) {
+          addLog(
+            `${lowerPlayerName(player)} is still stuck after the ${actionLabel} and may draw or Dump Hand.`,
+          );
+        } else if (state.roleOfCurrentTurn === "defender") {
+          addLog(
+            `${lowerPlayerName(player)} is still stuck after the ${actionLabel} and may need to draw or end the defense.`,
+          );
+        } else {
+          addLog(
+            `${lowerPlayerName(player)} is still stuck after the ${actionLabel}.`,
+          );
+        }
       }
 
       function canPlayerDumpAndChase(player) {
@@ -6977,7 +7024,9 @@
         if (
           !canPlayerUseCycle("human") ||
           state.cpuBusy ||
-          hasHumanPendingTurn()
+          hasHumanPendingTurn() ||
+          hasHumanSpecialSelection() ||
+          hasPendingOverflowDiscard("human")
         ) {
           return false;
         }
@@ -6992,7 +7041,9 @@
         if (
           !canPlayerUseBurn("human") ||
           state.cpuBusy ||
-          hasHumanPendingTurn()
+          hasHumanPendingTurn() ||
+          hasHumanSpecialSelection() ||
+          hasPendingOverflowDiscard("human")
         ) {
           return false;
         }
@@ -7074,19 +7125,7 @@
         }
 
         refreshComboWindow();
-
-        const legalAfterCycle = getLegalCardsForTurn(player).length;
-        if (legalAfterCycle > 0) {
-          addLog(
-            `${lowerPlayerName(player)} may now start the attack normally.`,
-          );
-        } else if (canPlayerDumpAndChase(player)) {
-          addLog(
-            `${lowerPlayerName(player)} is still stuck after the Cycle and may draw or Dump Hand.`,
-          );
-        } else {
-          addLog(`${lowerPlayerName(player)} is still stuck after the Cycle.`);
-        }
+        logMomentumFollowUpState(player, "Cycle");
 
         return true;
       }
@@ -7121,21 +7160,7 @@
         notePressureSpecialUse(player, "burn");
         setEvent(`${lowerPlayerName(player)} burns a card`, "contain");
         refreshComboWindow();
-
-        const legalAfterBurn = getLegalCardsForTurn(player).length;
-        if (legalAfterBurn > 0) {
-          addLog(
-            `${lowerPlayerName(player)} may now start the attack normally.`,
-          );
-        } else if (canPlayerDumpAndChase(player)) {
-          addLog(
-            `${lowerPlayerName(player)} is still stuck after the Burn and may either draw or Dump Hand.`,
-          );
-        } else {
-          addLog(
-            `${lowerPlayerName(player)} is still stuck after the Burn and may need to draw.`,
-          );
-        }
+        logMomentumFollowUpState(player, "Burn");
 
         return true;
       }
@@ -9351,8 +9376,8 @@
         );
       }
 
-      function getWeakShotOutcomeRuleText(shotValue) {
-        return `Weak Shot: 1 legal save card answers the chance. Exact value ${shotValue} freezes play, any higher value becomes a Controlled Save, and anything lower fails for a goal.`;
+      function getWeakShotOutcomeRuleText() {
+        return "Weak Shot: 0 legal save cards means a goal, exactly 1 legal save card creates a loose save with offense recovery, and 2 legal save cards create a Controlled Save with defense recovery.";
       }
 
       function getShotCurrentRequiredLength(shot = state.shotPending) {
@@ -9406,21 +9431,21 @@
             : `${lowerPlayerName(shot.attackerPlayer)} scores on shot power ${goalShotValue}.`,
           weakShot
             ? shot.savedCount === 0
-              ? `${lowerPlayerName(shot.defenderPlayer)} could not produce a successful Weak Shot save.`
-              : `${lowerPlayerName(shot.defenderPlayer)} answered the Weak Shot legally but stayed below value ${goalShotValue}.`
+              ? `${lowerPlayerName(shot.defenderPlayer)} could not produce a legal Weak Shot save.`
+              : `${lowerPlayerName(shot.defenderPlayer)} could not complete the two-save Controlled Save on the Weak Shot.`
             : reboundGoal
             ? `${lowerPlayerName(shot.defenderPlayer)} could not match the rebound value of ${shot.reboundShotValue}.`
             : singleNoSaveGoal
               ? `Shot power ${goalShotValue} only needed 1 save card, and ${lowerPlayerName(shot.defenderPlayer)} produced none.`
               : `Shot power ${goalShotValue} required ${shot.requiredLength} save card${shot.requiredLength === 1 ? "" : "s"}, and ${lowerPlayerName(shot.defenderPlayer)} finished ${shortfall} short.`,
           weakShot
-            ? getWeakShotOutcomeRuleText(goalShotValue)
+            ? getWeakShotOutcomeRuleText()
             : reboundGoal
             ? "A failed rebound save becomes a goal immediately."
             : singleNoSaveGoal
               ? "A 1-card shot with no save becomes a goal immediately."
               : "On a normal shot, finishing 2 or more save cards short becomes a goal.",
-          weakShot ? "Weak Shots are tracked separately from normal Shots On Goal." : getShotPowerTableSummary(),
+          weakShot ? "Weak Shots are included in total Shots On Goal, and the Weak Shot rows are sub-counts." : getShotPowerTableSummary(),
         );
       }
 
@@ -9504,14 +9529,18 @@
         }
 
         const weakShot = isWeakShotPending(shot);
+        if (weakShot) {
+          finishWeakShotWithLooseSave(
+            reason ||
+              `${lowerPlayerName(shot.defenderPlayer)} gets one legal save on the Weak Shot, but ${lowerPlayerName(shot.attackerPlayer)} recovers the puck in ${zoneLabel(shot.shotZoneIndex)}.`,
+          );
+          return;
+        }
         const reboundSave = isReboundSavePhase(shot);
         const saveRequirement = getShotCurrentRequiredLength(shot);
         const saveCount = shot.savedCards.length;
         setLastShotSummary(shot, "save", shot.savedCards);
         incrementPlayerStat(shot.defenderPlayer, "savesMade");
-        if (weakShot) {
-          incrementPlayerStat(shot.defenderPlayer, "weakShotLooseSaves");
-        }
         if (reboundSave) {
           incrementPlayerStat(shot.defenderPlayer, "reboundSavesMade");
         }
@@ -9529,17 +9558,8 @@
           "contain",
           1500,
         );
-        const playByPlayText = weakShot
-          ? `${lowerPlayerName(shot.defenderPlayer)} makes the Weak Shot save. Faceoff.`
-          : `${lowerPlayerName(shot.defenderPlayer)} makes the${reboundSave ? " rebound" : ""} save. Faceoff.`;
-        const playByPlayDetails = weakShot
-          ? createPlayByPlayDetails(
-              playByPlayText,
-              "The defender matched the Weak Shot exactly and froze the puck.",
-              `The save card exactly met Weak Shot value ${shot.shotValue}.`,
-              getWeakShotOutcomeRuleText(shot.shotValue),
-            )
-          : reboundSave
+        const playByPlayText = `${lowerPlayerName(shot.defenderPlayer)} makes the${reboundSave ? " rebound" : ""} save. Faceoff.`;
+        const playByPlayDetails = reboundSave
           ? createPlayByPlayDetails(
               playByPlayText,
               "The defender froze the rebound and reset play to a faceoff.",
@@ -9587,13 +9607,13 @@
           createPlayByPlayDetails(
             playByPlayText,
             weakShot
-              ? "The defender beat the Weak Shot value and kept possession instead of stopping for a faceoff."
+              ? "The defender completed a two-save Weak Shot stop and gained possession instead of merely conceding a loose save."
               : "The defender over-covered the shot and kept possession instead of stopping for a faceoff.",
             weakShot
-              ? `The save card exceeded Weak Shot value ${shot.shotValue}, so the stop became a Controlled Save.`
+              ? "Two legal Weak Shot save cards were completed, so the stop became a Controlled Save."
               : `Shot power ${shot.shotValue} required ${shot.requiredLength} save card${shot.requiredLength === 1 ? "" : "s"}, and the goalie exceeded that by ${extraCards} legal save card${extraCards === 1 ? "" : "s"}, so the stop became a Controlled Save.`,
             weakShot
-              ? getWeakShotOutcomeRuleText(shot.shotValue)
+              ? getWeakShotOutcomeRuleText()
               : getNormalSaveRuleSummary(),
           ),
         );
@@ -9664,6 +9684,44 @@
         triggerGoalFlash();
         clearShotPending();
         handleGoalAfterScore(shot.attackerPlayer, goalPlayByPlayDetails);
+      }
+
+      function finishWeakShotWithLooseSave(reason = "") {
+        const shot = state.shotPending;
+        if (!shot || !isWeakShotPending(shot)) {
+          return;
+        }
+
+        setLastShotSummary(shot, "looseSave", shot.savedCards);
+        incrementPlayerStat(shot.defenderPlayer, "savesMade");
+        incrementPlayerStat(shot.defenderPlayer, "weakShotLooseSaves");
+        addLog(
+          reason ||
+            `${lowerPlayerName(shot.defenderPlayer)} gets one legal save on the Weak Shot, but ${lowerPlayerName(shot.attackerPlayer)} recovers the puck in ${zoneLabel(shot.shotZoneIndex)}.`,
+        );
+        setEvent("Loose save / Offense recovery", "shot");
+        showDeckEvent("Loose Weak\nSave", "shot", 1500);
+        setPlayByPlay(
+          `${lowerPlayerName(shot.attackerPlayer)} recovers after the Weak Shot save.`,
+          "shot",
+          createPlayByPlayDetails(
+            `${lowerPlayerName(shot.attackerPlayer)} keeps the play alive after the Weak Shot save.`,
+            `${lowerPlayerName(shot.defenderPlayer)} completed exactly one legal Weak Shot save card, which stopped the goal but did not gain possession.`,
+            getWeakShotOutcomeRuleText(),
+          ),
+        );
+
+        clearShotPending();
+        state.attacker = shot.attackerPlayer;
+        syncDefender();
+        state.zoneIndex = shot.shotZoneIndex;
+
+        if (resolvePendingPeriodBreak()) {
+          return;
+        }
+
+        startAttackerTurn();
+        logTurnDiagnostics(state.currentTurn, "Loose Weak Shot save.");
       }
 
       function finishShotWithRecovery(reboundCard = null, reason = "") {
@@ -10203,6 +10261,26 @@
         return true;
       }
 
+      function resolveWeakShotSaveAttempt(reason = "") {
+        const shot = state.shotPending;
+        if (!shot || !isWeakShotPending(shot)) {
+          return false;
+        }
+
+        if (shot.savedCount >= 2) {
+          finishShotWithControlledSave(reason);
+          return true;
+        }
+
+        if (shot.savedCount === 1) {
+          finishWeakShotWithLooseSave(reason);
+          return true;
+        }
+
+        finishShotAsGoal(reason);
+        return true;
+      }
+
       function playShotSaveCard(player, cardIndex, options = {}) {
         const deferResolution = Boolean(options.deferResolution);
         const shot = state.shotPending;
@@ -10259,21 +10337,28 @@
 
         if (isWeakShotPending(shot)) {
           addLog(
-            `${lowerPlayerName(player)} plays Weak Shot save ${cardToText(card)} against target ${shot.shotValue}.`,
+            `${lowerPlayerName(player)} plays Weak Shot save ${shot.savedCount}/2 with ${cardToText(card)}.`,
             { sequenceLead: true },
           );
           recordShotSequencePlay(player, card, matchDecision);
-          setEvent(`Weak save ${card.value}/${shot.shotValue}`, "contain");
-          showDeckEvent(`Weak Save\n${card.value}/${shot.shotValue}`, "contain", 1400);
-          if (card.value > shot.shotValue) {
-            finishShotWithControlledSave();
-          } else if (card.value === shot.shotValue) {
-            finishShotWithSave();
-          } else {
-            finishShotAsGoal(
-              `${lowerPlayerName(player)} answers the Weak Shot with ${cardToText(card)}, but ${card.value} is below ${shot.shotValue}. GOAL ${lowerPlayerName(shot.attackerPlayer)}.`,
-            );
+          setEvent(`Weak save ${shot.savedCount}/2`, "contain");
+          showDeckEvent(`Weak Save\n${shot.savedCount}/2`, "contain", 1400);
+          if (deferResolution) {
+            logTurnDiagnostics(player, "Weak save continues.");
+            return true;
           }
+
+          if (shot.savedCount >= 2) {
+            finishShotWithControlledSave();
+            return true;
+          }
+
+          if (canExtendWeakShotForControlledSave(player, shot)) {
+            logTurnDiagnostics(player, "Weak save continues.");
+            return true;
+          }
+
+          finishWeakShotWithLooseSave();
           return true;
         }
 
@@ -10522,21 +10607,7 @@
 
         if (pending.origin === "cycle") {
           refreshComboWindow();
-
-          const legalAfterCycle = getLegalCardsForTurn(pending.player).length;
-          if (legalAfterCycle > 0) {
-            addLog(
-              `${lowerPlayerName(pending.player)} may now start the attack normally.`,
-            );
-          } else if (canPlayerDumpAndChase(pending.player)) {
-            addLog(
-              `${lowerPlayerName(pending.player)} is still stuck after the Cycle and may draw or Dump Hand.`,
-            );
-          } else {
-            addLog(
-              `${lowerPlayerName(pending.player)} is still stuck after the Cycle.`,
-            );
-          }
+          logMomentumFollowUpState(pending.player, "Cycle");
           return true;
         }
 
@@ -10945,6 +11016,14 @@
             return;
           }
 
+          if (isWeakShotPending(shot)) {
+            resolveWeakShotSaveAttempt();
+            render();
+            runCpuAuto();
+            render();
+            return;
+          }
+
           resolveNormalShotSaveAttempt();
           render();
           runCpuAuto();
@@ -11304,6 +11383,12 @@
           if (player !== state.shotPending.defenderPlayer) {
             return [];
           }
+          if (
+            isWeakShotPending(state.shotPending) &&
+            state.shotPending.savedCount >= 2
+          ) {
+            return [];
+          }
           return getLegalCards(playerHand(player), state.activeCard);
         }
 
@@ -11346,7 +11431,7 @@
             );
           } else if (isWeakShotPending(shot)) {
             addLog(
-              `${label} ${lowerPlayerName(player)} weak save turn. Must answer ${cardToText(state.activeCard)} with 1 legal save card. Exact ${shot.shotValue} freezes the puck; higher controls it. Hand: ${cardsToText(hand)}.`,
+              `${label} ${lowerPlayerName(player)} weak save turn. Play legal Weak Shot saves on ${cardToText(state.activeCard)}. One legal save creates a loose save and offense recovery; two legal saves create a Controlled Save. Hand: ${cardsToText(hand)}.`,
             );
           } else {
             addLog(
@@ -11810,11 +11895,11 @@
             canTriggerWeakShotOnExchangeWin(
               state.attacker,
               exchangeMargin,
-              state.zoneIndex,
+              previousZone,
             )
           ) {
             resolveWeakShot(state.attacker, state.defender, state.activeCard, {
-              logLine: `${lowerPlayerName(state.attacker)} wins the exchange by ${exchangeMargin} in ${zoneLabel(state.zoneIndex)} and creates a Weak Shot with ${cardToText(state.activeCard)}.`,
+              logLine: `${lowerPlayerName(state.attacker)} wins the exchange by ${exchangeMargin} from ${zoneLabel(previousZone)} and creates a Weak Shot with ${cardToText(state.activeCard)}.`,
             });
             return;
           }
@@ -12896,7 +12981,11 @@
 
         const hand = playerHand(player);
 
-        if (!isReboundRevealPhase(shot) && !isReboundSavePhase(shot)) {
+        if (
+          !isReboundRevealPhase(shot) &&
+          !isReboundSavePhase(shot) &&
+          !isWeakShotPending(shot)
+        ) {
           const remainingRequired = Math.max(
             0,
             shot.requiredLength - shot.savedCount,
@@ -12997,11 +13086,57 @@
         }
 
         if (isWeakShotPending(shot)) {
+          if (shot.savedCount >= 1) {
+            const followUpLegal = getLegalCardsForTurn(player);
+            if (followUpLegal.length === 0) {
+              if (player === "cpu") {
+                addCpuAuditLog(
+                  "weak shot line | one legal Weak Shot save completed and no second legal save exists, so the attacker recovers on a loose save.",
+                );
+              }
+              finishWeakShotWithLooseSave();
+              return true;
+            }
+
+            const idx = chooseLowestValueIndex(hand, followUpLegal);
+            if (player === "cpu") {
+              addCpuAuditLog(
+                `weak shot line | one legal save already completed | follow-up legal ${cardsAtIndexesToText(hand, followUpLegal)} | chooses ${cardToText(hand[idx])} to finish the Controlled Save.`,
+              );
+              state.cpuPreviewIndex = idx;
+            }
+            render();
+            await sleep(getCpuSimDuration(760, 160));
+
+            if (
+              state.currentTurn !== player ||
+              idx < 0 ||
+              idx >= hand.length
+            ) {
+              if (player === "cpu") {
+                state.cpuPreviewIndex = null;
+              }
+              return false;
+            }
+
+            await animatePlayerHandCardToPile(
+              player,
+              idx,
+              hand[idx],
+              getCpuSimDuration(420, 120),
+            );
+            playShotSaveCard(player, idx);
+            if (player === "cpu") {
+              state.cpuPreviewIndex = null;
+            }
+            return true;
+          }
+
           const legal = getLegalCardsForTurn(player);
           if (legal.length === 0) {
             if (player === "cpu") {
               addCpuAuditLog(
-                `weak shot line | no legal Weak Shot save against ${shot.shotValue}, so the chance becomes a goal.`,
+                "weak shot line | no legal Weak Shot save exists, so the chance becomes a goal.",
               );
             }
             finishShotAsGoal(
@@ -13013,7 +13148,7 @@
           const idx = chooseHighestValueIndex(hand, legal);
           if (player === "cpu") {
             addCpuAuditLog(
-              `weak shot line | target ${shot.shotValue} | legal ${cardsAtIndexesToText(hand, legal)} | chooses highest legal ${cardToText(hand[idx])}.`,
+              `weak shot line | first-save legal ${cardsAtIndexesToText(hand, legal)} | chooses ${cardToText(hand[idx])} to stop the goal and look for a Controlled Save.`,
             );
             state.cpuPreviewIndex = idx;
           }
@@ -13246,16 +13381,15 @@
         options = {},
       ) {
         const shotZoneIndex = state.zoneIndex;
-        const shotValue = Number.isFinite(options.shotValueOverride)
-          ? options.shotValueOverride
-          : shotCard.value;
+        const shotValue = 1;
 
         resetRunMatchState();
         markPossessionShot(attackerPlayer);
+        recordShotForStats(attackerPlayer, shotValue, shotZoneIndex);
         incrementPlayerStat(attackerPlayer, "weakShots");
         addLog(
           options.logLine ||
-            `${lowerPlayerName(attackerPlayer)} triggers a Weak Shot from ${zoneLabel(shotZoneIndex)} with ${cardToText(shotCard)} (target ${shotValue}).`,
+            `${lowerPlayerName(attackerPlayer)} triggers a Weak Shot from ${zoneLabel(shotZoneIndex)} with ${cardToText(shotCard)}. Fixed 1-save chance.`,
           { sequenceLead: true },
         );
         setPlayByPlay(
@@ -13263,8 +13397,8 @@
           "shot",
           createPlayByPlayDetails(
             `${lowerPlayerName(attackerPlayer)} pressured the defense into a Weak Shot chance.`,
-            `${lowerPlayerName(defenderPlayer)} must answer ${cardToText(shotCard)} with 1 legal save card.`,
-            getWeakShotOutcomeRuleText(shotValue),
+            `${lowerPlayerName(defenderPlayer)} must answer the Weak Shot with legal save cards instead of a normal save chain.`,
+            getWeakShotOutcomeRuleText(),
           ),
         );
         setEvent(`Weak Shot ${shotValue}`, "shot");
@@ -13290,7 +13424,7 @@
         state.activeCard = shotCard;
 
         addLog(
-          `${lowerPlayerName(defenderPlayer)} must answer the Weak Shot with 1 legal save card. Exact value ${shotValue} freezes the puck; higher value controls it.`,
+          `${lowerPlayerName(defenderPlayer)} must answer the Weak Shot with legal save cards: 1 legal save card creates a loose save and offense recovery; 2 legal save cards create a Controlled Save.`,
         );
         syncShotPendingTurnState("Weak Shot setup.", true);
       }
@@ -14003,6 +14137,19 @@
                 `${index + 1}) ${formatCpuEvaluationAudit(evaluation)}`,
             )
             .join(" || ")}`,
+        );
+      }
+
+      function canExtendWeakShotForControlledSave(
+        player,
+        shot = state.shotPending,
+      ) {
+        return Boolean(
+          shot &&
+          isWeakShotPending(shot) &&
+          shot.defenderPlayer === player &&
+          shot.savedCount === 1 &&
+          getLegalCardsForTurn(player).length > 0,
         );
       }
 
@@ -15397,6 +15544,7 @@
 
         const currentZoneIndex = state.zoneIndex;
         const shotZone = isShotZone(player, currentZoneIndex);
+        const farShotZone = isFarOffensiveZone(player, currentZoneIndex);
         const dangerZone = isDangerZoneFor(player, currentZoneIndex);
         const goalZone = currentZoneIndex === getGoalZoneIndex(player);
         const offensivePush =
@@ -15658,6 +15806,7 @@
         const opponentHand = playerHand(opponent);
         const currentZoneIndex = state.zoneIndex;
         const shotZone = isShotZone(player, currentZoneIndex);
+        const farShotZone = isFarOffensiveZone(player, currentZoneIndex);
         const dangerZone = isDangerZoneFor(player, currentZoneIndex);
         const goalZone = currentZoneIndex === getGoalZoneIndex(player);
         const offensivePush =
@@ -15713,6 +15862,7 @@
         let breakoutScore = 0;
         let emptyHandScore = 0;
         let shotCreationScore = 0;
+        let earlyShotPressureScore = 0;
         let cardValueScore = 0;
         let openerScore = 0;
         let lateHandScore = 0;
@@ -15785,19 +15935,49 @@
               profile.emptyHandShotWeight * 0.55;
           } else if (projected.remainingHand.length === 1) {
             shotCreationScore =
-              3 +
-              profile.shotZoneAggression * 1.2 +
+              (farShotZone ? 4.2 : 3) +
+              profile.shotZoneAggression * (farShotZone ? 1.45 : 1.2) +
               profile.emptyHandShotWeight * 0.45;
           } else if (
             projected.remainingHand.length === 2 &&
             (trailing || latePressure)
           ) {
-            shotCreationScore = 1 + profile.shotZoneAggression * 0.55;
+            shotCreationScore =
+              (farShotZone ? 2.2 : 1) +
+              profile.shotZoneAggression * (farShotZone ? 0.85 : 0.55);
+          } else if (projected.remainingHand.length === 2 && farShotZone) {
+            shotCreationScore =
+              1.2 + profile.shotZoneAggression * 0.45;
           }
           if (upperTier && projected.remainingHand.length <= 1) {
             shotCreationScore += 1 + profile.shotZoneAggression * 0.25;
           }
           score += shotCreationScore;
+
+          if (!immediateResolve) {
+            if (projected.remainingHand.length <= 2) {
+              earlyShotPressureScore +=
+                (farShotZone ? 1.4 : 0.65) +
+                profile.shotZoneAggression * (farShotZone ? 0.28 : 0.14);
+            }
+            if (
+              farShotZone &&
+              projected.remainingHand.length === 3 &&
+              (trailing || latePressure || opponentReplyCount >= 2)
+            ) {
+              earlyShotPressureScore +=
+                0.8 + profile.shotZoneAggression * 0.2;
+            }
+            if (opponentReplyCount >= Math.max(2, opponentHand.length - 1)) {
+              earlyShotPressureScore +=
+                0.8 + profile.shotZoneAggression * 0.16;
+            }
+            if (latePressure || trailing) {
+              earlyShotPressureScore +=
+                0.65 + profile.lateGameRiskAggression * 0.12;
+            }
+            score += earlyShotPressureScore;
+          }
         }
 
         if (!immediateResolve) {
@@ -15921,6 +16101,7 @@
               { label: "breakout", value: breakoutScore },
               { label: "empty-hand", value: emptyHandScore },
               { label: "shot-now", value: shotCreationScore },
+              { label: "shot-pressure", value: earlyShotPressureScore },
               { label: "value", value: cardValueScore },
               { label: "open", value: openerScore },
               { label: "late-hand", value: lateHandScore },
@@ -16550,14 +16731,22 @@
           getRegulationSecondsRemaining() <= profile.lateGamePressureSeconds ||
           state.periodNumber > REGULATION_PERIOD_COUNT;
         const offensivePressure = isPlayerOnOpponentSide(player);
+        const defenderTurn = state.roleOfCurrentTurn === "defender";
         const aggressionGate =
           profile.momentumSpendAggression + (lateNeed ? 1 : 0);
-        if (state.roleOfCurrentTurn !== "attacker") {
+        if (
+          state.roleOfCurrentTurn !== "attacker" &&
+          state.roleOfCurrentTurn !== "defender"
+        ) {
           return false;
         }
         if (
           aggressionGate <
-          (offensivePressure || isDangerZoneFor(player) ? 4 : 6)
+          (offensivePressure || isDangerZoneFor(player)
+            ? 4
+            : defenderTurn
+              ? 4
+              : 6)
         ) {
           return false;
         }
@@ -16579,8 +16768,13 @@
           getAiBestHandValue(player) <= Math.max(lowValueThreshold, activeValue + 1);
         const weakCurrentLine =
           legalIndexes.length <= 1 && bestCurrentLegalValue <= activeValue;
+        const defenseMargin =
+          state.defenderChainCount - state.attackerChainCount;
 
         if (legalIndexes.length === 0) {
+          if (defenderTurn) {
+            return poorHand || defenseMargin <= 0 || lateNeed;
+          }
           return poorHand || offensivePressure || lateNeed;
         }
 
@@ -16592,6 +16786,28 @@
         const upperTier =
           profile.difficultyKey === "allstar" ||
           profile.difficultyKey === "playoff";
+
+        if (defenderTurn) {
+          if (
+            upperTier &&
+            !poorHand &&
+            !lineContext.riskyCurrentLine &&
+            defenseMargin > 0
+          ) {
+            return false;
+          }
+
+          return (
+            aggressionGate >= (isDangerZoneFor(player) ? 3 : 4) &&
+            ((poorHand &&
+              (weakCurrentLine ||
+                lineContext.riskyCurrentLine ||
+                defenseMargin <= 0)) ||
+              (defenseMargin <= 0 &&
+                (weakCurrentLine || lineContext.riskyCurrentLine)) ||
+              (lateNeed && legalIndexes.length <= 1))
+          );
+        }
 
         if (isShotZone(player)) {
           if (
@@ -16920,8 +17136,20 @@
         const hand = playerHand(player);
         const burnFollowUpCount = getBurnFollowUpCount(hand, burnIndex);
         const canDump = canPlayerDumpAndChase(player);
+        const defenderTurn = state.roleOfCurrentTurn === "defender";
+        const lowValueThreshold = Math.max(
+          2,
+          Math.ceil(state.config.maxValue / 2),
+        );
 
         if (legalIndexes.length === 0) {
+          if (defenderTurn) {
+            return (
+              profile.momentumSpendAggression >= 3 &&
+              (burnFollowUpCount > 0 ||
+                getAiBestHandValue(player) <= lowValueThreshold + 1)
+            );
+          }
           if (canDump && burnFollowUpCount === 0) {
             return false;
           }
@@ -16931,10 +17159,6 @@
           );
         }
 
-        const lowValueThreshold = Math.max(
-          2,
-          Math.ceil(state.config.maxValue / 2),
-        );
         const lowValueCount = hand.filter(
           (card) => card.value <= lowValueThreshold,
         ).length;
@@ -16961,6 +17185,8 @@
         const upperTier =
           profile.difficultyKey === "allstar" ||
           profile.difficultyKey === "playoff";
+        const defenseMargin =
+          state.defenderChainCount - state.attackerChainCount;
         if (
           upperTier &&
           state.roleOfCurrentTurn === "attacker" &&
@@ -16971,6 +17197,26 @@
               lineContext.handAfter <= 1))
         ) {
           return false;
+        }
+        if (defenderTurn) {
+          if (
+            upperTier &&
+            defenseMargin > 0 &&
+            !lineContext.riskyCurrentLine &&
+            burnFollowUpCount <= legalIndexes.length
+          ) {
+            return false;
+          }
+
+          return (
+            aggressionGate >= 4 &&
+            mostlyLowValue &&
+            burnFollowUpCount > 0 &&
+            (legalLooksWeak ||
+              burnImprovesOptions ||
+              lineContext.riskyCurrentLine ||
+              defenseMargin <= 0)
+          );
         }
         return (
           aggressionGate >= 4 &&
@@ -18382,13 +18628,15 @@
             shot.shotKind === "powerShot"
               ? `${lowerPlayerName(shot.attackerPlayer)} used Force Shot from ${zoneLabel(shot.shotZoneIndex)} (quality ${shot.shotValue}${shot.powerHandSize ? `, hand ${shot.powerHandSize}` : ""}).`
               : shot.shotKind === "weakShot"
-                ? `${lowerPlayerName(shot.attackerPlayer)} created a Weak Shot from ${zoneLabel(shot.shotZoneIndex)} with ${cardToText(shot.shotCard)} (target ${shot.shotValue}).`
-              : `${lowerPlayerName(shot.attackerPlayer)} played ${cardToText(shot.shotCard)} from ${zoneLabel(shot.shotZoneIndex)} (quality ${shot.shotValue}).`;
+                ? `${lowerPlayerName(shot.attackerPlayer)} created a Weak Shot from ${zoneLabel(shot.shotZoneIndex)} with ${cardToText(shot.shotCard)} (fixed 1-save chance).`
+                : `${lowerPlayerName(shot.attackerPlayer)} played ${cardToText(shot.shotCard)} from ${zoneLabel(shot.shotZoneIndex)} (quality ${shot.shotValue}).`;
           const outcomeText =
             shot.outcome === "save"
               ? "Save / frozen puck"
               : shot.outcome === "controlledSave"
                 ? `Controlled Save for ${lowerPlayerName(shot.defenderPlayer)}`
+                : shot.outcome === "looseSave"
+                  ? `Loose save, offense recovery for ${lowerPlayerName(shot.attackerPlayer)}`
                 : shot.outcome === "recovery"
                   ? `Defensive recovery for ${lowerPlayerName(shot.defenderPlayer)}`
                   : `Goal for ${lowerPlayerName(shot.attackerPlayer)}`;
@@ -18622,7 +18870,7 @@
             : isReboundSavePhase(state.shotPending)
               ? "Rebound Save Must Match"
               : isWeakShotPending(state.shotPending)
-                ? "Weak Save Must Match"
+                ? "Weak Save"
               : "Save Must Match";
         } else {
           activeCardLabel.textContent = "Active Card";
@@ -18653,7 +18901,7 @@
           activeCardMiddle.title = canConfirmPendingHumanTurn
             ? state.shotPending
               ? isWeakShotPending(state.shotPending)
-                ? `Human has ${humanPendingCount} staged Weak Shot save card${humanPendingCount === 1 ? "" : "s"}. Tap the pile, tap Deck, or press Submit to resolve exact save, Controlled Save, or goal.`
+                ? `Human has ${humanPendingCount} staged Weak Shot save card${humanPendingCount === 1 ? "" : "s"}. Tap the pile, tap Deck, or press Submit to resolve loose save, Controlled Save, or goal.`
                 : `Human has ${humanPendingCount} staged save card${humanPendingCount === 1 ? "" : "s"}. Tap the pile, tap Deck, or press Submit to resolve the save chain.`
               : `Human has ${humanPendingCount} staged card${humanPendingCount === 1 ? "" : "s"}. Tap the pile, tap Deck, or press Submit to confirm.`
             : "";
@@ -18753,10 +19001,10 @@
                 ? humanPitySaveDraw
                   ? `Human has ${humanPendingCount} staged save card${humanPendingCount === 1 ? "" : "s"}. Tap Deck, tap the pile, or press Submit to take the pity save draw, or Undo to pull one back.`
                   : isWeakShotPending(state.shotPending)
-                    ? `Human has ${humanPendingCount} staged Weak Shot save card${humanPendingCount === 1 ? "" : "s"}. Undo, or tap Deck, tap the pile, or press Submit to resolve exact save, Controlled Save, or goal.`
-                  : humanShotLegalCount > 0
-                    ? `Human has ${humanPendingCount} staged save card${humanPendingCount === 1 ? "" : "s"}. Play more, Undo, or tap Deck, tap the pile, or press Submit to resolve freeze, Controlled Save, rebound, or goal from the current save count.`
-                    : `Human has ${humanPendingCount} staged save card${humanPendingCount === 1 ? "" : "s"}. Undo, or tap Deck, tap the pile, or press Submit to resolve freeze, Controlled Save, rebound, or goal from the current save count.`
+                    ? `Human has ${humanPendingCount} staged Weak Shot save card${humanPendingCount === 1 ? "" : "s"}. Play a second legal save card for a Controlled Save, or Undo / Submit for the current loose-save or goal result.`
+                    : humanShotLegalCount > 0
+                      ? `Human has ${humanPendingCount} staged save card${humanPendingCount === 1 ? "" : "s"}. Play more, Undo, or tap Deck, tap the pile, or press Submit to resolve freeze, Controlled Save, rebound, or goal from the current save count.`
+                      : `Human has ${humanPendingCount} staged save card${humanPendingCount === 1 ? "" : "s"}. Undo, or tap Deck, tap the pile, or press Submit to resolve freeze, Controlled Save, rebound, or goal from the current save count.`
                 : selectedHumanCard
                   ? `Human staged ${cardToText(selectedHumanCard)} for the ${isReboundRevealPhase(state.shotPending) ? "rebound shot" : isReboundSavePhase(state.shotPending) ? "rebound save" : isWeakShotPending(state.shotPending) ? "Weak Shot save" : "save chain"}. Tap Deck, tap the pile, or press Submit to confirm; Undo clears it.`
                   : humanPitySaveDraw
@@ -18770,8 +19018,10 @@
                             ? `Human must play 1 legal rebound save. If its value is below ${state.shotPending.reboundShotValue}, another rebound occurs. Press Concede to allow the goal.`
                             : "Human has no legal rebound save in hand. Press Rebound Draw to draw 1 top-deck rebound-save card into hand."
                           : isWeakShotPending(state.shotPending)
-                            ? humanShotLegalCount > 0
-                              ? `Human must play 1 legal Weak Shot save. Exact ${state.shotPending.shotValue} freezes the puck; any higher value becomes a Controlled Save. Anything lower allows the goal.`
+                          ? humanShotLegalCount > 0
+                              ? humanPendingCount > 0
+                                ? "Human may submit now for a loose save and offense recovery, or play a second legal Weak Shot save for a Controlled Save."
+                                : "Human must play a legal Weak Shot save. One legal save creates a loose save and offense recovery; a second legal save creates a Controlled Save."
                               : "Human has no legal Weak Shot save in hand. Press End Save to allow the goal."
                           : `Human must build a ${state.shotPending.requiredLength}-card save chain. Exact coverage freezes the puck, 1 extra legal save card becomes a Controlled Save, and a 1-card shot with no save is a goal; otherwise, 1 short is a rebound and 2 or more short is a goal. Press End Save to resolve the current save count.`;
         } else if (state.currentTurn === "human" && canPlayerIcePuck("human")) {
@@ -19078,7 +19328,7 @@
                           : humanCanUsePitySaveDraw
                             ? "Draw 1 pity save card from the deck"
                             : isWeakShotPending(state.shotPending)
-                              ? "Allow the Weak Shot to resolve as exact save, Controlled Save, or goal"
+                              ? "Allow the Weak Shot to resolve as a loose save, Controlled Save, or goal"
                               : "Stop the current save chain and resolve freeze, Controlled Save, rebound, or goal"
                       : humanCanPass
                         ? "Use End Chain to resolve the current exchange"
@@ -19175,8 +19425,8 @@
             : cycleSelectionActive
               ? "Click again to cancel Cycle selection"
               : humanCanCycle
-                ? "Spend 1 Momentum, then choose 1 card to discard and draw 1"
-                : "Cycle is only available to the Human attacker at the start of the turn with 1+ Momentum and at least 1 card";
+                ? "Spend 1 Momentum, then choose 1 card to discard and draw 1. This commits immediately and is not undoable through staged plays."
+                : "Cycle is available on your turn with 1+ Momentum and at least 1 card, but only while no staged human plays are pending.";
         }
 
         if (burnMomentumBtn) {
@@ -19194,8 +19444,8 @@
             : burnSelectionActive
               ? "Click again to cancel Burn selection"
               : humanCanBurn
-                ? "Spend 2 Momentum, then choose 1 card to Burn out of hand"
-                : "Burn is only available to the Human attacker at the start of the turn with 2+ Momentum and more than 1 card";
+                ? "Spend 2 Momentum, then choose 1 card to Burn out of hand. This commits immediately and is not undoable through staged plays."
+                : "Burn is available on your turn with 2+ Momentum and more than 1 card, but only while no staged human plays are pending.";
         }
 
         if (powerShotBtn) {
