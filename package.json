@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --open /ouija-dev.html",
+    "dev:bomber": "vite --open /bomber_command.html",
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit"
