@@ -281,6 +281,34 @@ button.danger {
   gap: 10px;
 }
 
+.toast-stack {
+  position: sticky;
+  top: 10px;
+  z-index: 20;
+  display: grid;
+  gap: 8px;
+  margin: 0 0 14px;
+}
+
+.toast {
+  border: 1px solid rgba(216, 196, 164, 0.26);
+  background: rgba(32, 40, 52, 0.94);
+  border-radius: 12px;
+  padding: 12px 14px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
+}
+
+.toast-report,
+.toast-recon,
+.toast-operations {
+  border-color: rgba(176, 161, 116, 0.4);
+}
+
+.toast-debrief,
+.toast-maintenance {
+  border-color: rgba(132, 174, 133, 0.42);
+}
+
 @media (max-width: 720px) {
   .bomber-shell {
     width: min(100vw, calc(100vw - 12px));

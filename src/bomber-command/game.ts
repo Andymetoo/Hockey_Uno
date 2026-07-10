@@ -15,7 +15,9 @@ import type {
   MissionEvent,
   MissionStage,
   PlanningState,
+  RecoveryJob,
   ReconMission,
+  ReconResultQuality,
   ReconStatus,
   ReconType,
   RepairJob,
@@ -23,16 +25,18 @@ import type {
   RouteRisk,
   SaveState,
   Target,
-  TargetType
+  TargetType,
+  UiNotification
 } from "./types";
 
 export const SAVE_KEY = "bomber-command-save-v1";
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 
 const SHORT_MISSION_MS = 5 * 60 * 1000;
 const MAJOR_MISSION_MS = 10 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const FATIGUE_RECOVERY_MS = 6 * 60 * 1000;
+const TOAST_LIFETIME_MS = 12 * 1000;
 
 const AIRCRAFT_NAMES = [
   "Lucky Lady",
@@ -155,6 +159,39 @@ function addLog(state: SaveState, id: string, at: number, category: string, text
   }
 
   state.campaign.logEntries.unshift({ id, at, category, text });
+}
+
+function addNotification(state: SaveState, id: string, kind: UiNotification["kind"], text: string, now: number): void {
+  if (state.notifications.some((notification) => notification.id === id)) {
+    return;
+  }
+
+  state.notifications.unshift({
+    id,
+    kind,
+    text,
+    createdAt: now,
+    expiresAt: now + TOAST_LIFETIME_MS
+  });
+}
+
+function pruneExpiredNotifications(state: SaveState, now: number): boolean {
+  const remaining = state.notifications.filter((notification) => notification.expiresAt > now);
+  if (remaining.length === state.notifications.length) {
+    return false;
+  }
+  state.notifications = remaining;
+  return true;
+}
+
+function createStationWeather(day: number): string {
+  const outlooks = [
+    "Station weather: fair, but coastal haze is likely by midday.",
+    "Station weather: low cloud is moving in and inland visibility remains uncertain.",
+    "Station weather: a clear start is expected, though staff distrusts older target forecasts.",
+    "Station weather: broken cloud may complicate recon interpretation later in the day."
+  ];
+  return outlooks[(day - 1) % outlooks.length] as string;
 }
 
 export function getEffectiveNow(state: SaveState): number {
@@ -359,6 +396,7 @@ export function createNewGame(now: number): SaveState {
     missionCount: index === 0 ? 11 : index <= 2 ? 6 : 2,
     damageHistory: index === 4 ? ["Minor taxi collision repaired in part; inspection still advised."] : [],
     repairJobId: null,
+    recoveryJobId: null,
     lastOutcomeNote: "No current remarks."
   }));
 
@@ -379,7 +417,10 @@ export function createNewGame(now: number): SaveState {
     connectedTargetIds: [],
     alertLevel: index <= 1 ? "elevated" : "low",
     evidence: ["File photographs are dated and incomplete."],
-    hiddenWeatherRisk: def.weatherRisk
+    hiddenWeatherRisk: def.weatherRisk,
+    latestIntelNote: null,
+    latestIntelRecommendation: null,
+    latestIntelSource: null
   }));
 
   targets[0]!.connectedTargetIds = ["target-2", "target-5"];
@@ -402,7 +443,9 @@ export function createNewGame(now: number): SaveState {
       activeReconId: null,
       lastDebriefMissionId: null,
       logEntries: [],
-      pendingDecisions: ["Choose the first operation target."]
+      pendingDecisions: ["Choose the first operation target."],
+      stationWeather: createStationWeather(1),
+      latestIntelUpdate: null
     },
     aircraft,
     crews,
@@ -410,7 +453,9 @@ export function createNewGame(now: number): SaveState {
     targets,
     missions: [],
     repairJobs: [],
+    recoveryJobs: [],
     reconMissions: [],
+    notifications: [],
     planning: createPlanningState(targets[0]!.id),
     debug: {
       showHiddenValues: false,
@@ -442,11 +487,34 @@ export function loadState(): SaveState | null {
     if (!raw) {
       return null;
     }
-    const parsed = JSON.parse(raw) as SaveState;
-    if (parsed.version !== SAVE_VERSION) {
+    const parsed = JSON.parse(raw) as Partial<SaveState>;
+    if (!parsed || typeof parsed !== "object") {
       return null;
     }
-    return parsed;
+
+    const normalized = parsed as SaveState;
+    if ((normalized.version ?? 1) > SAVE_VERSION) {
+      return null;
+    }
+
+    normalized.version = SAVE_VERSION;
+    normalized.campaign.stationWeather ||= createStationWeather(normalized.campaign.currentDay ?? 1);
+    normalized.campaign.latestIntelUpdate ??= null;
+    normalized.recoveryJobs ??= [];
+    normalized.notifications ??= [];
+    normalized.aircraft.forEach((aircraft) => {
+      aircraft.recoveryJobId ??= null;
+    });
+    normalized.targets.forEach((target) => {
+      target.latestIntelNote ??= null;
+      target.latestIntelRecommendation ??= null;
+      target.latestIntelSource ??= null;
+    });
+    normalized.reconMissions.forEach((recon) => {
+      recon.resultQuality ??= "partial";
+      recon.recommendation ??= "Staff recommends treating the result cautiously.";
+    });
+    return normalized;
   } catch (error) {
     console.warn("Failed to load bomber command save", error);
     return null;
@@ -496,6 +564,72 @@ export function getActiveRecon(state: SaveState): ReconMission | undefined {
     return undefined;
   }
   return state.reconMissions.find((recon) => recon.id === state.campaign.activeReconId);
+}
+
+export function getLatestCompletedRecon(state: SaveState): ReconMission | undefined {
+  return state.reconMissions.find((recon) => recon.completionApplied);
+}
+
+function getActiveRecoveryJobForAircraft(state: SaveState, aircraftId: string): RecoveryJob | undefined {
+  return state.recoveryJobs.find((job) => job.aircraftId === aircraftId && !job.completionApplied);
+}
+
+function getActiveFieldJobForGroundCrew(state: SaveState, groundCrewId: string): RepairJob | RecoveryJob | undefined {
+  return state.repairJobs.find((job) => job.groundCrewId === groundCrewId && !job.completionApplied)
+    ?? state.recoveryJobs.find((job) => job.groundCrewId === groundCrewId && !job.completionApplied);
+}
+
+function updateVisibleTargetAssessment(
+  target: Target,
+  assessment: string,
+  evidence: string[],
+  sourceLabel: string,
+  recommendation?: string
+): void {
+  target.assessedCondition = assessment;
+  target.latestIntelNote = `${sourceLabel}: ${assessment}`;
+  target.latestIntelSource = sourceLabel;
+  target.latestIntelRecommendation = recommendation ?? null;
+  for (const item of evidence) {
+    if (!target.evidence.includes(item)) {
+      target.evidence.unshift(item);
+    }
+  }
+}
+
+function fuzzyTimeUntil(now: number, timestamp: number, exact: boolean): string {
+  if (exact) {
+    return new Date(timestamp).toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+  }
+
+  const diffMinutes = Math.max(0, Math.round((timestamp - now) / 60000));
+  if (diffMinutes <= 1) {
+    return "imminently";
+  }
+  if (diffMinutes <= 4) {
+    return "shortly";
+  }
+  if (diffMinutes <= 9) {
+    return "before long";
+  }
+  return "later today";
+}
+
+function crewReadinessSummary(state: SaveState): string {
+  const rested = state.crews.filter((crew) => crew.fatigue === "rested" && crew.status === "available").length;
+  const tired = state.crews.filter((crew) => crew.fatigue === "tired").length;
+  const exhausted = state.crews.filter((crew) => crew.fatigue === "exhausted").length;
+
+  if (exhausted > 0) {
+    return `${exhausted} crew ${exhausted === 1 ? "is" : "are"} exhausted, while ${rested} remain ready on the field.`;
+  }
+  if (tired > 0) {
+    return `${tired} crew ${tired === 1 ? "is" : "are"} still tired, but ${rested} appear ready enough for prompt orders.`;
+  }
+  return "Crews appear reasonably settled and ready for further tasking.";
 }
 
 export function setSelectedTab(state: SaveState, tab: CampaignTab): void {
@@ -564,6 +698,9 @@ export function getAircraftAvailability(state: SaveState, aircraftId: string): A
 
   if (aircraft.status === "under_repair" || aircraft.repairJobId) {
     return { level: "unavailable", label: "Unavailable", reason: "Aircraft under repair", warnings: [] };
+  }
+  if (aircraft.recoveryJobId) {
+    return { level: "unavailable", label: "Unavailable", reason: "Aircraft still returning from diversion", warnings: [] };
   }
   if (aircraft.status === "lost") {
     return { level: "unavailable", label: "Unavailable", reason: "Aircraft lost", warnings: [] };
@@ -1090,19 +1227,21 @@ function generateDebrief(state: SaveState, mission: Mission): void {
   mission.stage = "complete";
   mission.debriefGenerated = true;
 
-  target.assessedCondition = targetConditionText(target);
+  updateVisibleTargetAssessment(
+    target,
+    mission.hiddenOutcome.targetAssessment,
+    mission.hiddenOutcome.targetEvidence,
+    "Debrief assessment",
+    "Staff recommends weighing a reattack against fresh reconnaissance."
+  );
   target.suspectedEffects = mission.hiddenOutcome.targetSuspectedEffects;
-  for (const evidence of mission.hiddenOutcome.targetEvidence) {
-    if (!target.evidence.includes(evidence)) {
-      target.evidence.unshift(evidence);
-    }
-  }
 
   state.campaign.activeMissionId = null;
   state.campaign.lastDebriefMissionId = mission.id;
   state.campaign.campaignPhase = "Debrief filed. Engineering and intelligence await your next order.";
   state.campaign.commandStanding = "Staff recommends weighing the debrief against the temptation to strike again immediately.";
   state.campaign.pendingDecisions = ["Review damage, start repairs, or order recon."];
+  state.campaign.stationWeather = createStationWeather(state.campaign.currentDay + mission.hiddenOutcome.targetDamage % 3);
   addLog(state, `debrief-${mission.id}`, state.lastReconciledAt, "debrief", mission.debrief);
 }
 
@@ -1117,7 +1256,6 @@ function applyTargetDamage(state: SaveState, mission: Mission): void {
     return;
   }
   target.hiddenActualCondition = newCondition;
-  target.assessedCondition = targetConditionText(target);
   if (target.alertLevel === "low") {
     target.alertLevel = "elevated";
   } else if (chance(0.35)) {
@@ -1155,6 +1293,15 @@ function applyMissionEvent(state: SaveState, mission: Mission, event: MissionEve
     event.revealed = true;
     mission.reports.push(event.publicReportText);
     addLog(state, `report-${event.id}`, event.time, "report", event.publicReportText);
+    addNotification(
+      state,
+      `toast-report-${event.id}`,
+      event.stage === "debrief_ready" ? "debrief" : "report",
+      event.stage === "debrief_ready"
+        ? "Debrief ready"
+        : `New report received: ${event.stage.replaceAll("_", " ")}`,
+      event.time
+    );
   }
 
   if (event.applied) {
@@ -1197,6 +1344,42 @@ function completeRepair(state: SaveState, job: RepairJob): void {
   job.status = "complete";
   job.completionApplied = true;
   addLog(state, `repair-${job.id}`, job.completesAt, "maintenance", job.resultText);
+  addNotification(state, `toast-repair-${job.id}`, "maintenance", `Maintenance complete: ${aircraft.name}`, job.completesAt);
+}
+
+function completeRecovery(state: SaveState, job: RecoveryJob): void {
+  if (job.completionApplied) {
+    return;
+  }
+
+  const aircraft = getAircraftById(state, job.aircraftId);
+  if (!aircraft) {
+    return;
+  }
+
+  aircraft.hiddenCondition = job.hiddenNewCondition;
+  aircraft.status = job.hiddenReturnStatus;
+  aircraft.conditionSummary = job.hiddenConditionSummary;
+  aircraft.recoveryJobId = null;
+  aircraft.lastOutcomeNote = job.resultText;
+  if (!aircraft.damageHistory.includes(job.hiddenDamageNote)) {
+    aircraft.damageHistory.unshift(job.hiddenDamageNote);
+  }
+  if (aircraft.status === "damaged") {
+    aircraft.repairJobId = null;
+  }
+
+  const crew = getCrewById(state, aircraft.assignedCrewId);
+  if (crew) {
+    crew.fatigue = job.hiddenCrewFatigue;
+    crew.status = job.hiddenCrewStatus;
+    crew.notes = job.hiddenCrewNote;
+  }
+
+  job.status = "complete";
+  job.completionApplied = true;
+  addLog(state, `recovery-${job.id}`, job.completesAt, "operations", job.resultText);
+  addNotification(state, `toast-recovery-${job.id}`, "operations", `${aircraft.name} has returned from diversion`, job.completesAt);
 }
 
 function completeRecon(state: SaveState, recon: ReconMission): void {
@@ -1209,16 +1392,31 @@ function completeRecon(state: SaveState, recon: ReconMission): void {
   }
 
   target.intelConfidence = raiseConfidence(target.intelConfidence);
-  target.assessedCondition = recon.hiddenAssessment;
   target.lastReconDay = state.campaign.currentDay;
-  if (!target.evidence.includes(recon.hiddenEvidence)) {
-    target.evidence.unshift(recon.hiddenEvidence);
-  }
   target.alertLevel = recon.enemyAlertEffect;
+  updateVisibleTargetAssessment(
+    target,
+    recon.hiddenAssessment,
+    [recon.hiddenEvidence],
+    "Recon interpretation",
+    recon.recommendation
+  );
   recon.status = "complete";
   recon.completionApplied = true;
   state.campaign.activeReconId = null;
+  state.campaign.latestIntelUpdate = {
+    reconId: recon.id,
+    targetId: target.id,
+    targetName: target.name,
+    resultQuality: recon.resultQuality,
+    assessment: recon.hiddenAssessment,
+    evidence: recon.hiddenEvidence,
+    recommendation: recon.recommendation,
+    alertLevel: recon.enemyAlertEffect,
+    updatedAt: recon.interpretedAt
+  };
   addLog(state, `recon-${recon.id}`, recon.interpretedAt, "recon", recon.resultText);
+  addNotification(state, `toast-recon-${recon.id}`, "recon", "Recon interpretation filed", recon.interpretedAt);
 }
 
 function applyFatigueRecovery(state: SaveState, elapsedMs: number): boolean {
@@ -1257,7 +1455,6 @@ function nudgeTargetRepairs(state: SaveState, elapsedMs: number): boolean {
   for (const target of state.targets) {
     const previous = target.hiddenActualCondition;
     target.hiddenActualCondition = clamp(target.hiddenActualCondition + target.hiddenRepairRate * daySteps, 0, 100);
-    target.assessedCondition = targetConditionText(target);
     if (previous !== target.hiddenActualCondition) {
       changed = true;
     }
@@ -1287,6 +1484,13 @@ export function reconcileState(state: SaveState, now: number): boolean {
     }
   }
 
+  for (const job of state.recoveryJobs) {
+    if (job.status !== "complete" && job.completesAt <= now) {
+      completeRecovery(state, job);
+      changed = true;
+    }
+  }
+
   for (const recon of state.reconMissions) {
     if (!recon.completionApplied && recon.interpretedAt <= now) {
       completeRecon(state, recon);
@@ -1302,6 +1506,8 @@ export function reconcileState(state: SaveState, now: number): boolean {
     changed = applyFatigueRecovery(state, elapsedMs) || changed;
     changed = nudgeTargetRepairs(state, elapsedMs) || changed;
   }
+
+  changed = pruneExpiredNotifications(state, now) || changed;
 
   state.lastReconciledAt = now;
   return changed;
@@ -1322,6 +1528,9 @@ export function startRepair(state: SaveState, aircraftId: string, tier: RepairTi
   const groundCrew = getGroundCrewById(state, aircraft.assignedGroundCrewId);
   if (!groundCrew) {
     return "Ground crew not found.";
+  }
+  if (getActiveFieldJobForGroundCrew(state, groundCrew.id)) {
+    return `${groundCrew.chiefName}'s crew is already occupied and cannot take another field job yet.`;
   }
 
   const speedBonus = groundCrew.specialty === "quick_patch" && tier === "patch"
@@ -1358,10 +1567,10 @@ export function startRepair(state: SaveState, aircraftId: string, tier: RepairTi
     status: "in_progress",
     riskNote:
       tier === "patch"
-        ? "Fastest option. Maintenance warns hidden strain may remain."
+        ? "Fastest option. A patch may return the aircraft sooner, but engineering will not call it fully trusted."
         : tier === "standard"
-          ? "Balanced turnround. Normal hidden risk."
-          : "Slowest field option. Hidden risk should be lower afterward.",
+          ? "Balanced turnround. This will occupy the ground crew for the normal field cycle."
+          : "Safest field option. The aircraft will miss any immediate operation while the crew stays tied up longer.",
     resultText,
     completionApplied: false,
     hiddenNewCondition,
@@ -1382,6 +1591,77 @@ export function startRepair(state: SaveState, aircraftId: string, tier: RepairTi
   return null;
 }
 
+export function startRecovery(state: SaveState, aircraftId: string, now: number): string | null {
+  const aircraft = getAircraftById(state, aircraftId);
+  if (!aircraft) {
+    return "Aircraft not found.";
+  }
+  if (aircraft.status !== "diverted") {
+    return "Aircraft is not currently away from station.";
+  }
+  if (aircraft.recoveryJobId) {
+    return "Recovery from diversion is already under way.";
+  }
+
+  const groundCrew = getGroundCrewById(state, aircraft.assignedGroundCrewId);
+  if (!groundCrew) {
+    return "Ground crew not found.";
+  }
+  if (getActiveFieldJobForGroundCrew(state, groundCrew.id)) {
+    return `${groundCrew.chiefName}'s crew is already occupied and cannot arrange the recovery yet.`;
+  }
+
+  const crew = getCrewById(state, aircraft.assignedCrewId);
+  const duration = Math.round((groundCrew.specialty === "quick_patch" ? 3 : 4.5) * 60 * 1000);
+  const rolled = Math.random();
+  const hiddenNewCondition = clamp(
+    aircraft.hiddenCondition + (rolled < 0.33 ? 12 : rolled < 0.72 ? 6 : 0),
+    24,
+    84
+  );
+  const hiddenReturnStatus: Aircraft["status"] =
+    rolled < 0.33
+      ? "serviceable"
+      : rolled < 0.72
+        ? "damaged"
+        : "damaged";
+  const resultText =
+    hiddenReturnStatus === "serviceable"
+      ? `${aircraft.name} has returned from diversion. It is back on station, though engineering still wants a closer look.`
+      : `${aircraft.name} has returned from diversion and now requires inspection before further use.`;
+  const crewStatus = crew?.status === "wounded" ? "wounded" : "resting";
+  const job: RecoveryJob = {
+    id: nextId(state, "recovery"),
+    aircraftId,
+    groundCrewId: groundCrew.id,
+    startedAt: now,
+    completesAt: now + duration,
+    status: "in_progress",
+    summary: `${aircraft.name} is down at an outlying field. Ferry arrangements are being made.`,
+    resultText,
+    completionApplied: false,
+    hiddenNewCondition,
+    hiddenReturnStatus,
+    hiddenConditionSummary: conditionSummary(hiddenNewCondition, hiddenReturnStatus),
+    hiddenDamageNote:
+      hiddenReturnStatus === "serviceable"
+        ? "Returned from diversion worn but usable after a careful ferry flight."
+        : "Returned from diversion needing engineering attention before another operation.",
+    hiddenCrewFatigue: "exhausted",
+    hiddenCrewStatus: crewStatus,
+    hiddenCrewNote:
+      crewStatus === "wounded"
+        ? "The crew made it back from the diversion, but medical staff still has them under care."
+        : "The crew has finally returned from the diversion and looks spent."
+  };
+
+  aircraft.recoveryJobId = job.id;
+  aircraft.lastOutcomeNote = "Recovery from diversion is being arranged.";
+  state.recoveryJobs.unshift(job);
+  addLog(state, `recovery-start-${job.id}`, now, "operations", `Recovery from diversion has been ordered for ${aircraft.name}.`);
+  return null;
+}
+
 export function startRecon(state: SaveState, targetId: string, type: ReconType, now: number): string | null {
   if (state.campaign.activeReconId) {
     return "Recon section already occupied.";
@@ -1393,6 +1673,12 @@ export function startRecon(state: SaveState, targetId: string, type: ReconType, 
   }
 
   const duration = type === "post_strike" ? 3.5 * 60 * 1000 : 2.5 * 60 * 1000;
+  const resultQuality: ReconResultQuality =
+    target.hiddenActualCondition < 45
+      ? "clear"
+      : target.hiddenActualCondition < 72
+        ? "partial"
+        : "inconclusive";
   const recon: ReconMission = {
     id: nextId(state, "recon"),
     targetId,
@@ -1417,7 +1703,14 @@ export function startRecon(state: SaveState, targetId: string, type: ReconType, 
     hiddenEvidence:
       target.hiddenActualCondition < 45
         ? "Fresh photography shows obvious disturbance in the target area."
-        : "Recon photographs provide partial but usable new evidence."
+        : "Recon photographs provide partial but usable new evidence.",
+    resultQuality,
+    recommendation:
+      resultQuality === "clear"
+        ? "Staff recommends either exploiting the damage or shifting attention elsewhere."
+        : resultQuality === "partial"
+          ? "Staff recommends weighing a follow-up attack against the value of more observation."
+          : "Staff recommends caution. The latest run did not settle the question."
   };
 
   state.reconMissions.unshift(recon);
@@ -1430,6 +1723,7 @@ export function advanceCampaignDay(state: SaveState): void {
   state.campaign.currentDay += 1;
   state.debug.clockOffsetMs += DAY_MS;
   state.campaign.commandStanding = "A new day of pressure has begun. Staff believes the enemy has had some time to recover its balance.";
+  state.campaign.stationWeather = createStationWeather(state.campaign.currentDay);
   addLog(
     state,
     `day-${state.campaign.currentDay}`,
@@ -1479,10 +1773,14 @@ export function completeCurrentRecon(state: SaveState, now: number): string | nu
 
 export function completeAllRepairs(state: SaveState, now: number): string | null {
   const jobs = state.repairJobs.filter((job) => !job.completionApplied);
-  if (jobs.length === 0) {
+  const recoveryJobs = state.recoveryJobs.filter((job) => !job.completionApplied);
+  if (jobs.length === 0 && recoveryJobs.length === 0) {
     return "No active repairs.";
   }
   jobs.forEach((job) => {
+    job.completesAt = now - 1000;
+  });
+  recoveryJobs.forEach((job) => {
     job.completesAt = now - 1000;
   });
   return null;
@@ -1502,6 +1800,88 @@ export function getCurrentOperationSummary(state: SaveState): string {
     return "All known mission reports have arrived. Debrief should be reviewed.";
   }
   return `Current stage is ${mission.stage.replaceAll("_", " ")}. Next report is expected after some delay.`;
+}
+
+export function getOperationsDeskSummary(state: SaveState): string[] {
+  const now = getEffectiveNow(state);
+  const exact = state.debug.showHiddenValues;
+  const lines: string[] = [];
+  const mission = getActiveMission(state);
+  const recon = getActiveRecon(state);
+  const activeRepairs = state.repairJobs.filter((job) => !job.completionApplied);
+  const activeRecoveries = state.recoveryJobs.filter((job) => !job.completionApplied);
+  const diverted = state.aircraft.filter((aircraft) => aircraft.status === "diverted" && !aircraft.recoveryJobId);
+
+  if (mission) {
+    const target = getTargetById(state, mission.plan.targetId);
+    lines.push(`Current mission: ${target?.name ?? "Selected target"} remains under way. The next word is expected ${fuzzyTimeUntil(now, mission.timelineEvents.filter((event) => !event.revealed).sort((a, b) => a.time - b.time)[0]?.time ?? now, exact)}.`);
+  } else if (state.campaign.lastDebriefMissionId) {
+    lines.push("Current mission: no operation is airborne. Staff is working from the latest debrief.");
+  } else {
+    lines.push("Current mission: no operation is airborne. The board is waiting on your next order.");
+  }
+
+  if (recon) {
+    const target = getTargetById(state, recon.targetId);
+    const nextStep = recon.status === "airborne" ? recon.returnsAt : recon.interpretedAt;
+    lines.push(`Recon: ${target?.name ?? "Target"} is still being checked. Interpretation is expected ${fuzzyTimeUntil(now, nextStep, exact)}.`);
+  } else if (state.campaign.latestIntelUpdate) {
+    lines.push(`Recon: latest intelligence concerns ${state.campaign.latestIntelUpdate.targetName} and remains ${state.campaign.latestIntelUpdate.resultQuality}.`);
+  } else {
+    lines.push("Recon: no active sortie is out. Existing assessments are aging in place.");
+  }
+
+  if (activeRepairs.length > 0) {
+    const nextRepair = activeRepairs.slice().sort((a, b) => a.completesAt - b.completesAt)[0]!;
+    const aircraft = getAircraftById(state, nextRepair.aircraftId);
+    lines.push(`Repairs: ${activeRepairs.length} field job${activeRepairs.length === 1 ? "" : "s"} active. ${aircraft?.name ?? "An aircraft"} is due back ${fuzzyTimeUntil(now, nextRepair.completesAt, exact)}.`);
+  } else {
+    lines.push("Repairs: no current field work is open on station.");
+  }
+
+  if (activeRecoveries.length > 0) {
+    lines.push(`Diversions: ${activeRecoveries.length} recovery arrangement${activeRecoveries.length === 1 ? " is" : "s are"} in progress away from station.`);
+  } else if (diverted.length > 0) {
+    lines.push(`Diversions: ${diverted.length} aircraft ${diverted.length === 1 ? "is" : "are"} still away at outlying fields and awaiting recovery orders.`);
+  } else {
+    lines.push("Diversions: all accounted aircraft are either on station or already lost.");
+  }
+
+  lines.push(`Crew readiness: ${crewReadinessSummary(state)}`);
+  lines.push(`Weather outlook: ${state.campaign.stationWeather}`);
+  return lines;
+}
+
+export function getGroundCrewPressureNote(state: SaveState, aircraftId: string, tier?: RepairTier): string | null {
+  const aircraft = getAircraftById(state, aircraftId);
+  if (!aircraft) {
+    return null;
+  }
+  const groundCrew = getGroundCrewById(state, aircraft.assignedGroundCrewId);
+  if (!groundCrew) {
+    return null;
+  }
+
+  const waitingAircraft = state.aircraft.filter((candidate) =>
+    candidate.assignedGroundCrewId === groundCrew.id
+    && candidate.id !== aircraft.id
+    && (candidate.status === "damaged" || candidate.status === "diverted")
+    && !candidate.repairJobId
+    && !candidate.recoveryJobId
+  );
+  if (waitingAircraft.length === 0) {
+    return tier === "thorough"
+      ? "A thorough inspection is safest, but the aircraft will miss any immediate operation."
+      : null;
+  }
+
+  if (tier === "patch") {
+    return `This crew still has ${waitingAircraft.length} other aircraft waiting. A patch would return this one sooner, but it will not be fully trusted.`;
+  }
+  if (tier === "thorough") {
+    return `This will occupy ${groundCrew.chiefName}'s crew and may delay ${waitingAircraft.length} other waiting aircraft.`;
+  }
+  return `${groundCrew.chiefName}'s crew still has ${waitingAircraft.length} other aircraft waiting for attention.`;
 }
 
 export function getDisabledReasonForLaunch(state: SaveState): string | null {

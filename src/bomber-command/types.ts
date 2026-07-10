@@ -47,6 +47,8 @@ export type RepairStatus = "pending" | "in_progress" | "complete";
 export type ReconType = "pre_strike" | "post_strike" | "weather_route" | "focused_followup";
 export type ReconStatus = "planned" | "airborne" | "awaiting_interpretation" | "complete";
 export type AvailabilityLevel = "available" | "marginal" | "unavailable";
+export type ReconResultQuality = "clear" | "partial" | "inconclusive";
+export type NotificationKind = "report" | "debrief" | "recon" | "maintenance" | "operations";
 
 export interface CampaignState {
   currentDay: number;
@@ -58,6 +60,8 @@ export interface CampaignState {
   lastDebriefMissionId: string | null;
   logEntries: LogEntry[];
   pendingDecisions: string[];
+  stationWeather: string;
+  latestIntelUpdate: LatestIntelUpdate | null;
 }
 
 export interface LogEntry {
@@ -78,6 +82,7 @@ export interface Aircraft {
   missionCount: number;
   damageHistory: string[];
   repairJobId: string | null;
+  recoveryJobId: string | null;
   lastOutcomeNote: string;
 }
 
@@ -120,6 +125,9 @@ export interface Target {
   alertLevel: AlertLevel;
   evidence: string[];
   hiddenWeatherRisk: number;
+  latestIntelNote: string | null;
+  latestIntelRecommendation: string | null;
+  latestIntelSource: string | null;
 }
 
 export interface MissionPlan {
@@ -236,6 +244,20 @@ export interface ReconMission {
   completionApplied: boolean;
   hiddenAssessment: string;
   hiddenEvidence: string;
+  resultQuality: ReconResultQuality;
+  recommendation: string;
+}
+
+export interface LatestIntelUpdate {
+  reconId: string;
+  targetId: string;
+  targetName: string;
+  resultQuality: ReconResultQuality;
+  assessment: string;
+  evidence: string;
+  recommendation: string;
+  alertLevel: AlertLevel;
+  updatedAt: number;
 }
 
 export interface PlanningState {
@@ -252,6 +274,33 @@ export interface DebugState {
   clockOffsetMs: number;
 }
 
+export interface RecoveryJob {
+  id: string;
+  aircraftId: string;
+  groundCrewId: string;
+  startedAt: number;
+  completesAt: number;
+  status: RepairStatus;
+  summary: string;
+  resultText: string;
+  completionApplied: boolean;
+  hiddenNewCondition: number;
+  hiddenReturnStatus: AircraftStatus;
+  hiddenConditionSummary: string;
+  hiddenDamageNote: string;
+  hiddenCrewFatigue: CrewFatigue;
+  hiddenCrewStatus: CrewStatus;
+  hiddenCrewNote: string;
+}
+
+export interface UiNotification {
+  id: string;
+  kind: NotificationKind;
+  text: string;
+  createdAt: number;
+  expiresAt: number;
+}
+
 export interface SaveState {
   version: number;
   lastReconciledAt: number;
@@ -264,7 +313,9 @@ export interface SaveState {
   targets: Target[];
   missions: Mission[];
   repairJobs: RepairJob[];
+  recoveryJobs: RecoveryJob[];
   reconMissions: ReconMission[];
+  notifications: UiNotification[];
   planning: PlanningState;
   debug: DebugState;
 }

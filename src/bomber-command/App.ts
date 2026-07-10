@@ -12,7 +12,10 @@ import {
   getCurrentOperationSummary,
   getDisabledReasonForLaunch,
   getEffectiveNow,
+  getGroundCrewPressureNote,
   getLatestDebriefMission,
+  getLatestCompletedRecon,
+  getOperationsDeskSummary,
   getTargetById,
   getTargetOperationalSummary,
   launchMission,
@@ -28,6 +31,7 @@ import {
   setShowHiddenValues,
   skipToDebrief,
   skipToNextReport,
+  startRecovery,
   startRecon,
   startRepair,
   toggleAssignedAircraft,
@@ -74,6 +78,40 @@ function hiddenBlock(show: boolean, lines: string[]): string {
   return `<div class="hidden-panel"><strong>Hidden:</strong> ${lines.map((line) => escapeHtml(line)).join(" | ")}</div>`;
 }
 
+function renderDueTime(state: SaveState, timestamp: number): string {
+  if (state.debug.showHiddenValues) {
+    return formatTimestamp(state, timestamp);
+  }
+
+  const diffMinutes = Math.max(0, Math.round((timestamp - getEffectiveNow(state)) / 60000));
+  if (diffMinutes <= 1) {
+    return "imminently";
+  }
+  if (diffMinutes <= 4) {
+    return "shortly";
+  }
+  if (diffMinutes <= 9) {
+    return "before long";
+  }
+  return "later today";
+}
+
+function renderNotifications(state: SaveState): string {
+  if (state.notifications.length === 0) {
+    return "";
+  }
+
+  return `
+    <section class="toast-stack" aria-live="polite">
+      ${state.notifications.slice(0, 4).map((notification) => `
+        <div class="toast toast-${badgeClass(notification.kind)}">
+          ${escapeHtml(notification.text)}
+        </div>
+      `).join("")}
+    </section>
+  `;
+}
+
 function renderHeader(state: SaveState): string {
   return `
     <header class="hero panel">
@@ -103,12 +141,19 @@ function renderNav(state: SaveState): string {
 }
 
 function renderCommandPanel(state: SaveState): string {
+  const opsLines = getOperationsDeskSummary(state);
   return `
     <section class="panel stack">
       <h2>Command</h2>
       <p>${escapeHtml(state.campaign.commandDirective)}</p>
       <p>${escapeHtml(state.campaign.commandStanding)}</p>
       <p>${escapeHtml(state.campaign.campaignPhase)}</p>
+      <div class="note">
+        <strong>Operations Desk</strong>
+        <div class="stack compact">
+          ${opsLines.map((line) => `<p>${escapeHtml(line)}</p>`).join("")}
+        </div>
+      </div>
       <div class="note">
         <strong>Pending:</strong> ${state.campaign.pendingDecisions.length > 0 ? escapeHtml(state.campaign.pendingDecisions.join(" ")) : "No outstanding command note."}
       </div>
@@ -135,6 +180,8 @@ function renderTargetCard(state: SaveState, target: Target): string {
       <p>${escapeHtml(getTargetOperationalSummary(target))}</p>
       <p><strong>Weather:</strong> ${escapeHtml(target.weatherOutlook)}</p>
       <p><strong>Suspected Effect:</strong> ${escapeHtml(target.suspectedEffects)}</p>
+      ${target.latestIntelNote ? `<p><strong>Latest Intelligence:</strong> ${escapeHtml(target.latestIntelNote)}</p>` : ""}
+      ${target.latestIntelRecommendation ? `<p class="muted">${escapeHtml(target.latestIntelRecommendation)}</p>` : ""}
       <p><strong>Evidence:</strong> ${escapeHtml(target.evidence.slice(0, 3).join(" "))}</p>
       ${hiddenBlock(state.debug.showHiddenValues, [
         `actual condition ${target.hiddenActualCondition}`,
@@ -297,7 +344,7 @@ function renderCurrentOperation(state: SaveState): string {
       </div>
       <p><strong>Target:</strong> ${escapeHtml(getTargetById(state, mission.plan.targetId)?.name ?? "Unknown")}</p>
       <p><strong>Launch:</strong> ${escapeHtml(formatTimestamp(state, mission.plan.scheduledLaunchTime))}</p>
-      <p><strong>Next report:</strong> ${nextReport ? escapeHtml(formatTimestamp(state, nextReport.time)) : "No further reports pending."}</p>
+      <p><strong>Next report:</strong> ${nextReport ? escapeHtml(renderDueTime(state, nextReport.time)) : "No further reports pending."}</p>
       <div class="report-list">
         ${mission.timelineEvents.filter((event) => event.revealed).map((event) => `
           <div class="report-item">
@@ -341,6 +388,7 @@ function renderDebrief(state: SaveState): string {
 
 function renderMaintenance(state: SaveState): string {
   const damagedAircraft = state.aircraft.filter((aircraft) => aircraft.status === "damaged" || aircraft.status === "under_repair");
+  const divertedAircraft = state.aircraft.filter((aircraft) => aircraft.status === "diverted" || aircraft.recoveryJobId);
   return `
     <section class="panel stack">
       <h2>Maintenance</h2>
@@ -349,6 +397,7 @@ function renderMaintenance(state: SaveState): string {
         <div class="disabled-reason">No damaged aircraft selected</div>
       ` : damagedAircraft.map((aircraft) => {
         const activeJob = state.repairJobs.find((job) => job.aircraftId === aircraft.id && !job.completionApplied);
+        const pressureNote = getGroundCrewPressureNote(state, aircraft.id, activeJob?.repairTier);
         return `
           <div class="row-card">
             <div>
@@ -359,7 +408,7 @@ function renderMaintenance(state: SaveState): string {
             ${activeJob ? `
               <div class="stack compact">
                 ${renderBadge("Repair", activeJob.repairTier)}
-                <span class="muted">Due ${escapeHtml(formatTimestamp(state, activeJob.completesAt))}</span>
+                <span class="muted">Due ${escapeHtml(renderDueTime(state, activeJob.completesAt))}</span>
                 <span class="muted">${escapeHtml(activeJob.riskNote)}</span>
               </div>
             ` : `
@@ -369,27 +418,75 @@ function renderMaintenance(state: SaveState): string {
                 <button data-action="repair" data-payload="${aircraft.id}:thorough">Thorough Inspection</button>
               </div>
             `}
+            ${pressureNote ? `<div class="warning">${escapeHtml(pressureNote)}</div>` : ""}
             ${hiddenBlock(state.debug.showHiddenValues, [`condition ${aircraft.hiddenCondition}`])}
           </div>
         `;
       }).join("")}
+      <div class="stack">
+        <h3>Away From Station</h3>
+        ${divertedAircraft.length === 0 ? `
+          <p class="muted">No aircraft are currently away at another field.</p>
+        ` : divertedAircraft.map((aircraft) => {
+          const activeRecovery = state.recoveryJobs.find((job) => job.aircraftId === aircraft.id && !job.completionApplied);
+          const pressureNote = getGroundCrewPressureNote(state, aircraft.id);
+          return `
+            <div class="row-card">
+              <div>
+                <strong>${escapeHtml(aircraft.name)}</strong>
+                <div class="muted">${escapeHtml(aircraft.conditionSummary)}</div>
+                <div class="muted">${escapeHtml(aircraft.lastOutcomeNote)}</div>
+              </div>
+              ${activeRecovery ? `
+                <div class="stack compact">
+                  ${renderBadge("Status", "recovering")}
+                  <span class="muted">${escapeHtml(activeRecovery.summary)}</span>
+                  <span class="muted">Due ${escapeHtml(renderDueTime(state, activeRecovery.completesAt))}</span>
+                </div>
+              ` : `
+                <div class="button-row">
+                  <button data-action="recover-aircraft" data-payload="${aircraft.id}">Recover from diversion</button>
+                </div>
+              `}
+              ${pressureNote ? `<div class="warning">${escapeHtml(pressureNote)}</div>` : ""}
+              ${hiddenBlock(state.debug.showHiddenValues, [`condition ${aircraft.hiddenCondition}`])}
+            </div>
+          `;
+        }).join("")}
+      </div>
     </section>
   `;
 }
 
 function renderRecon(state: SaveState): string {
   const activeRecon = getActiveRecon(state);
+  const latestRecon = getLatestCompletedRecon(state);
+  const latestIntel = state.campaign.latestIntelUpdate;
   const selectedTarget = getTargetById(state, state.planning.selectedTargetId);
   return `
     <section class="panel stack">
       <h2>Recon / Intelligence</h2>
+      ${latestIntel ? `
+        <div class="row-card">
+          <strong>Latest Intelligence Update</strong>
+          <div class="badge-row">
+            ${renderBadge("Target", latestIntel.targetName)}
+            ${renderBadge("Result", latestIntel.resultQuality)}
+            ${renderBadge("Alert", latestIntel.alertLevel)}
+          </div>
+          <p>${escapeHtml(latestIntel.assessment)}</p>
+          <p><strong>Evidence:</strong> ${escapeHtml(latestIntel.evidence)}</p>
+          <p class="muted">${escapeHtml(latestIntel.recommendation)}</p>
+          ${state.debug.showHiddenValues ? `<p class="muted">Filed ${escapeHtml(formatTimestamp(state, latestIntel.updatedAt))}</p>` : ""}
+        </div>
+      ` : `<p class="muted">No recent intelligence update has been filed yet.</p>`}
       ${activeRecon ? `
         <p>${escapeHtml(activeRecon.resultText)}</p>
         <div class="badge-row">
           ${renderBadge("Status", activeRecon.status)}
           ${renderBadge("Type", activeRecon.type.replaceAll("_", " "))}
         </div>
-        <p><strong>Interpretation due:</strong> ${escapeHtml(formatTimestamp(state, activeRecon.interpretedAt))}</p>
+        <p><strong>Interpretation due:</strong> ${escapeHtml(renderDueTime(state, activeRecon.interpretedAt))}</p>
       ` : `
         <p>No active recon.</p>
         <div class="button-row">
@@ -399,6 +496,7 @@ function renderRecon(state: SaveState): string {
         </div>
       `}
       ${selectedTarget ? `<p class="muted">Current recon focus: ${escapeHtml(selectedTarget.name)}</p>` : ""}
+      ${latestRecon ? `<p class="muted">Latest completed sortie: ${escapeHtml(latestRecon.type.replaceAll("_", " "))}.</p>` : ""}
     </section>
   `;
 }
@@ -438,6 +536,9 @@ function renderDebug(state: SaveState): string {
       </label>
       <div class="note">
         <strong>Clock offset:</strong> ${Math.round(state.debug.clockOffsetMs / 60000)} minutes advanced for testing.
+      </div>
+      <div class="note">
+        <strong>Simulation audit:</strong> Mission stage timing is fixed by target type. Mission, recon, repair, and diversion-recovery outcomes are generated when they begin and then stored. Aircraft outcomes still depend on hidden condition, fatigue, defenses, route risk, visibility, and randomness.
       </div>
     </section>
   `;
@@ -536,6 +637,11 @@ export function mountBomberCommand(root: HTMLElement): void {
           error = startRepair(state, aircraftId ?? "", (tier ?? "standard") as RepairTier, now);
         }
         break;
+      case "recover-aircraft":
+        if (payload) {
+          error = startRecovery(state, payload, now);
+        }
+        break;
       case "recon":
         if (payload) {
           const [targetId, type] = payload.split(":");
@@ -605,6 +711,7 @@ export function mountBomberCommand(root: HTMLElement): void {
     root.innerHTML = `
       <main class="bomber-shell">
         ${renderHeader(state)}
+        ${renderNotifications(state)}
         ${renderNav(state)}
         ${renderActivePanel(state)}
       </main>
