@@ -34,6 +34,8 @@ export type DirectiveRelevance = "low" | "medium" | "high";
 export type IntelConfidence = "poor" | "fair" | "good";
 export type AlertLevel = "low" | "elevated" | "high";
 export type RouteRisk = "cautious" | "standard" | "direct";
+export type OperationType = "main_strike" | "reduced_strike" | "support_raid" | "follow_up_attack" | "harassment_diversion";
+export type AttackDoctrine = "single_pass" | "repeat_if_needed" | "abort_unless_visual" | "bomb_through_cloud";
 export type MissionPlanStatus = "planned" | "scheduled" | "launched" | "recovering" | "complete";
 export type MissionStage =
   | "scheduled"
@@ -78,6 +80,14 @@ export type StaffActionType =
   | "go_target_board"
   | "go_mission_planning"
   | "start_recon";
+export type StrategicEffectCategory =
+  | "fighter_pressure"
+  | "replacement_flow"
+  | "repair_capacity"
+  | "warning_coordination"
+  | "approach_danger"
+  | "directive_progress"
+  | "command_patience";
 
 export interface CampaignState {
   currentDay: number;
@@ -91,6 +101,8 @@ export interface CampaignState {
   pendingDecisions: string[];
   stationWeather: string;
   latestIntelUpdate: LatestIntelUpdate | null;
+  latestStrategicIntelNote: string | null;
+  directiveState: DirectiveState;
 }
 
 export interface StaffRecommendation {
@@ -110,6 +122,29 @@ export interface LogEntry {
   at: number;
   category: string;
   text: string;
+}
+
+export interface StrategicEffectRecord {
+  id: string;
+  at: number;
+  targetId: string;
+  category: StrategicEffectCategory;
+  summary: string;
+  visibleHint: string;
+  followUpPending: boolean;
+  followUpDeliveredAt: number | null;
+}
+
+export interface DirectiveState {
+  fighterPressure: number;
+  fighterReplacementFlow: number;
+  regionalRepairCapacity: number;
+  warningCoordination: number;
+  approachDanger: number;
+  commandPatience: number;
+  directiveProgress: number;
+  operationsElapsed: number;
+  recentStrategicEffects: StrategicEffectRecord[];
 }
 
 export interface Aircraft {
@@ -216,9 +251,13 @@ export interface MissionAircraftCrewSnapshot {
 
 export interface MissionPlan {
   targetId: string;
+  operationType: OperationType;
+  secondaryTargetId: string | null;
+  leadAircraftId: string | null;
   assignedAircraftIds: string[];
   scheduledLaunchTime: number;
   routeRisk: RouteRisk;
+  attackDoctrine: AttackDoctrine;
   standingOrders: {
     useSecondaryIfObscured: boolean;
     abortIfFormationBelow: boolean;
@@ -227,6 +266,7 @@ export interface MissionPlan {
   };
   status: MissionPlanStatus;
   launchCrewManifests: MissionAircraftCrewSnapshot[];
+  staffWarningsAtLaunch: string[];
 }
 
 export interface MissionCrewEffect {
@@ -259,6 +299,12 @@ export interface MissionHiddenOutcome {
   targetAssessment: string;
   targetEvidence: string[];
   targetSuspectedEffects: string;
+  attackedTargetId: string;
+  attackedTargetName: string;
+  attackedSecondary: boolean;
+  doctrineNote: string;
+  leadNote: string;
+  commandAssessment: string;
   aircraftOutcomes: AircraftMissionOutcome[];
 }
 
@@ -356,8 +402,12 @@ export interface LatestIntelUpdate {
 
 export interface PlanningState {
   selectedTargetId: string;
+  operationType: OperationType;
+  secondaryTargetId: string | null;
+  leadAircraftId: string | null;
   assignedAircraftIds: string[];
   routeRisk: RouteRisk;
+  attackDoctrine: AttackDoctrine;
   standingOrders: MissionPlan["standingOrders"];
   launchMode: "now" | "schedule";
   scheduleDelayMs: number;

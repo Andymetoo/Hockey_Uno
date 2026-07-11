@@ -1,5 +1,5 @@
 export const SAVE_KEY = "bomber-command-save-v1";
-export const SAVE_VERSION = 3;
+export const SAVE_VERSION = 5;
 const SHORT_MISSION_MS = 5 * 60 * 1000;
 const MAJOR_MISSION_MS = 10 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -210,6 +210,19 @@ function createStationWeather(day) {
     ];
     return outlooks[(day - 1) % outlooks.length];
 }
+function createInitialDirectiveState() {
+    return {
+        fighterPressure: 78,
+        fighterReplacementFlow: 74,
+        regionalRepairCapacity: 71,
+        warningCoordination: 69,
+        approachDanger: 73,
+        commandPatience: 67,
+        directiveProgress: 14,
+        operationsElapsed: 0,
+        recentStrategicEffects: []
+    };
+}
 function randomName() {
     return `${pick(FIRST_NAMES)} ${pick(LAST_NAMES)}`;
 }
@@ -344,8 +357,12 @@ function missionDurationForTarget(target) {
 function createPlanningState(targetId) {
     return {
         selectedTargetId: targetId,
+        operationType: "main_strike",
+        secondaryTargetId: null,
+        leadAircraftId: "aircraft-1",
         assignedAircraftIds: ["aircraft-1", "aircraft-2", "aircraft-3", "aircraft-4"],
         routeRisk: "standard",
+        attackDoctrine: "single_pass",
         standingOrders: {
             useSecondaryIfObscured: true,
             abortIfFormationBelow: false,
@@ -569,7 +586,9 @@ export function createNewGame(now) {
             logEntries: [],
             pendingDecisions: ["Choose the first operation target."],
             stationWeather: createStationWeather(1),
-            latestIntelUpdate: null
+            latestIntelUpdate: null,
+            latestStrategicIntelNote: null,
+            directiveState: createInitialDirectiveState()
         },
         aircraft: [],
         crews: [],
@@ -690,6 +709,21 @@ function migrateLegacyState(parsed) {
     state.campaign ||= baseline.campaign;
     state.campaign.stationWeather ||= createStationWeather(state.campaign.currentDay ?? 1);
     state.campaign.latestIntelUpdate ??= null;
+    state.campaign.latestStrategicIntelNote ??= null;
+    state.campaign.directiveState ??= createInitialDirectiveState();
+    state.campaign.directiveState.fighterPressure ??= baseline.campaign.directiveState.fighterPressure;
+    state.campaign.directiveState.fighterReplacementFlow ??= baseline.campaign.directiveState.fighterReplacementFlow;
+    state.campaign.directiveState.regionalRepairCapacity ??= baseline.campaign.directiveState.regionalRepairCapacity;
+    state.campaign.directiveState.warningCoordination ??= baseline.campaign.directiveState.warningCoordination;
+    state.campaign.directiveState.approachDanger ??= baseline.campaign.directiveState.approachDanger;
+    state.campaign.directiveState.commandPatience ??= baseline.campaign.directiveState.commandPatience;
+    state.campaign.directiveState.directiveProgress ??= baseline.campaign.directiveState.directiveProgress;
+    state.campaign.directiveState.operationsElapsed ??= 0;
+    state.campaign.directiveState.recentStrategicEffects ??= [];
+    for (const effect of state.campaign.directiveState.recentStrategicEffects) {
+        effect.followUpPending ??= false;
+        effect.followUpDeliveredAt ??= null;
+    }
     state.notifications ??= [];
     state.recoveryJobs ??= [];
     state.targets ??= baseline.targets;
@@ -748,7 +782,18 @@ function migrateLegacyState(parsed) {
     }
     for (const mission of state.missions ?? []) {
         mission.debriefCasualtyLines ??= [];
+        mission.plan.operationType ??= "main_strike";
+        mission.plan.secondaryTargetId ??= null;
+        mission.plan.leadAircraftId ??= mission.plan.assignedAircraftIds[0] ?? null;
+        mission.plan.attackDoctrine ??= mission.plan.standingOrders.allowRepeatBombRun ? "repeat_if_needed" : "single_pass";
+        mission.plan.staffWarningsAtLaunch ??= [];
         mission.plan.launchCrewManifests ??= [];
+        mission.hiddenOutcome.attackedTargetId ??= mission.plan.targetId;
+        mission.hiddenOutcome.attackedTargetName ??= getTargetById(state, mission.plan.targetId)?.name ?? "Unknown target";
+        mission.hiddenOutcome.attackedSecondary ??= false;
+        mission.hiddenOutcome.doctrineNote ??= "The attack followed the standing orders in effect at launch.";
+        mission.hiddenOutcome.leadNote ??= "Lead influence was not separately logged in this earlier order.";
+        mission.hiddenOutcome.commandAssessment ??= "Command is still weighing the broader meaning of the operation.";
         for (const outcome of mission.hiddenOutcome.aircraftOutcomes) {
             outcome.launchManifest ??= {
                 aircraftId: outcome.aircraftId,
@@ -759,6 +804,10 @@ function migrateLegacyState(parsed) {
             outcome.casualtySummary ??= [];
         }
     }
+    state.planning.operationType ??= "main_strike";
+    state.planning.secondaryTargetId ??= null;
+    state.planning.leadAircraftId ??= state.planning.assignedAircraftIds?.[0] ?? state.aircraft[0]?.id ?? null;
+    state.planning.attackDoctrine ??= state.planning.standingOrders?.allowRepeatBombRun ? "repeat_if_needed" : "single_pass";
     for (const recon of state.reconMissions ?? []) {
         recon.resultQuality ??= "partial";
         recon.recommendation ??= "Staff recommends treating the result cautiously.";
@@ -912,6 +961,10 @@ export function setSelectedTab(state, tab) {
 }
 export function setPlanningTarget(state, targetId) {
     state.planning.selectedTargetId = targetId;
+    const secondaryOptions = getSecondaryTargetOptions(state, targetId);
+    if (state.planning.secondaryTargetId && !secondaryOptions.some((target) => target.id === state.planning.secondaryTargetId)) {
+        state.planning.secondaryTargetId = null;
+    }
 }
 export function toggleAssignedAircraft(state, aircraftId) {
     const availability = getAircraftAvailability(state, aircraftId);
@@ -920,12 +973,42 @@ export function toggleAssignedAircraft(state, aircraftId) {
     }
     if (state.planning.assignedAircraftIds.includes(aircraftId)) {
         state.planning.assignedAircraftIds = state.planning.assignedAircraftIds.filter((id) => id !== aircraftId);
+        if (state.planning.leadAircraftId === aircraftId) {
+            state.planning.leadAircraftId = state.planning.assignedAircraftIds[0] ?? null;
+        }
         return;
     }
     state.planning.assignedAircraftIds = [...state.planning.assignedAircraftIds, aircraftId];
+    if (!state.planning.leadAircraftId) {
+        state.planning.leadAircraftId = aircraftId;
+    }
 }
 export function setRouteRisk(state, routeRisk) {
     state.planning.routeRisk = routeRisk;
+}
+export function setOperationType(state, operationType) {
+    state.planning.operationType = operationType;
+}
+export function setSecondaryTarget(state, targetId) {
+    if (!targetId) {
+        state.planning.secondaryTargetId = null;
+        return;
+    }
+    const options = getSecondaryTargetOptions(state, state.planning.selectedTargetId);
+    state.planning.secondaryTargetId = options.some((target) => target.id === targetId) ? targetId : null;
+}
+export function setLeadAircraft(state, aircraftId) {
+    if (!state.planning.assignedAircraftIds.includes(aircraftId)) {
+        return;
+    }
+    state.planning.leadAircraftId = aircraftId;
+}
+export function setAttackDoctrine(state, doctrine) {
+    state.planning.attackDoctrine = doctrine;
+    state.planning.standingOrders.allowRepeatBombRun = doctrine === "repeat_if_needed";
+    if (doctrine === "repeat_if_needed") {
+        state.planning.standingOrders.useSecondaryIfObscured = true;
+    }
 }
 export function toggleStandingOrder(state, key) {
     state.planning.standingOrders[key] = !state.planning.standingOrders[key];
@@ -1095,6 +1178,164 @@ function crewReadinessSummary(state) {
     }
     return `${fit} crew member${fit === 1 ? "" : "s"} appear fit. ${reserve} replacements remain in reserve.`;
 }
+function operationTypeLabel(operationType) {
+    return operationType.replaceAll("_", " ");
+}
+function doctrineLabel(doctrine) {
+    return doctrine.replaceAll("_", " ");
+}
+export function getSecondaryTargetOptions(state, primaryTargetId) {
+    const primary = getTargetById(state, primaryTargetId);
+    if (!primary) {
+        return [];
+    }
+    const connected = primary.connectedTargetIds
+        .map((id) => getTargetById(state, id))
+        .filter((target) => target !== undefined && target.id !== primary.id);
+    if (connected.length > 0) {
+        return connected;
+    }
+    return state.targets.filter((target) => target.id !== primary.id && target.region === primary.region);
+}
+export function getLeadAircraftAssessment(state, aircraftId) {
+    if (!aircraftId) {
+        return {
+            label: "No lead selected",
+            summary: "Operations has not yet named a lead aircraft for this order.",
+            warnings: ["No lead aircraft selected."]
+        };
+    }
+    const aircraft = getAircraftById(state, aircraftId);
+    if (!aircraft) {
+        return {
+            label: "Unavailable",
+            summary: "The nominated lead aircraft cannot be found on the board.",
+            warnings: ["Lead aircraft record missing."]
+        };
+    }
+    const pilot = getCrewMembersForAircraft(state, aircraftId).find((member) => member.currentAssignmentRole === "pilot");
+    const navigator = getCrewMembersForAircraft(state, aircraftId).find((member) => member.currentAssignmentRole === "navigator");
+    const warnings = [];
+    let score = 0;
+    if (pilot?.experience === "veteran") {
+        score += 2;
+    }
+    else if (pilot?.experience === "green") {
+        score -= 2;
+        warnings.push("Pilot is still green for a formation lead.");
+    }
+    if (pilot?.fatigue === "exhausted") {
+        score -= 2;
+        warnings.push("Pilot is badly fatigued.");
+    }
+    else if (pilot?.fatigue === "tired") {
+        score -= 1;
+        warnings.push("Pilot is experienced but tired.");
+    }
+    if (aircraft.hiddenCondition >= 80) {
+        score += 1;
+    }
+    else if (aircraft.hiddenCondition < 66) {
+        score -= 1;
+        warnings.push("Maintenance still considers the aircraft worn.");
+    }
+    if (aircraft.crewCohesion.includes("strained") || aircraft.crewCohesion.includes("reduced")) {
+        score -= 1;
+        warnings.push("Crew cohesion is reduced.");
+    }
+    if (navigator?.isReplacement) {
+        score -= 1;
+        warnings.push("Replacement navigator makes this a questionable lead choice.");
+    }
+    const keyReplacements = getCrewMembersForAircraft(state, aircraftId).filter((member) => member.isReplacement && ["pilot", "copilot", "navigator", "bombardier"].includes(member.currentAssignmentRole ?? "")).length;
+    if (keyReplacements >= 2) {
+        score -= 2;
+        warnings.push("Several key crew stations are filled by replacements.");
+    }
+    if (score >= 2) {
+        return {
+            label: "Trusted lead",
+            summary: "Operations trusts this crew as lead.",
+            warnings
+        };
+    }
+    if (score >= 0) {
+        return {
+            label: "Workable lead",
+            summary: warnings[0] ?? "This lead choice is workable, though not ideal.",
+            warnings
+        };
+    }
+    return {
+        label: "Questionable lead",
+        summary: warnings[0] ?? "Operations doubts this aircraft should carry the lead.",
+        warnings
+    };
+}
+function operationTypeCommandCredit(operationType, target) {
+    switch (operationType) {
+        case "main_strike":
+            return target.directiveRelevance === "high"
+                ? "Command would likely regard a useful result here as meaningful progress."
+                : "Command will expect a clear return if the group commits a full main strike.";
+        case "reduced_strike":
+            return "Command may accept this as prudent, but it will credit the result cautiously.";
+        case "support_raid":
+            return "Command will view this as setup work unless it clearly enables a later direct strike.";
+        case "follow_up_attack":
+            return "Command will value this more if the earlier damage was real and worth exploiting.";
+        case "harassment_diversion":
+            return "Command sees this as a stopgap rather than a decisive answer.";
+        default:
+            return "Command interest remains qualified.";
+    }
+}
+export function getPlanningStaffPreview(state) {
+    const target = getTargetById(state, state.planning.selectedTargetId);
+    const selectedAircraft = state.planning.assignedAircraftIds
+        .map((id) => ({ aircraft: getAircraftById(state, id), availability: getAircraftAvailability(state, id) }))
+        .filter((entry) => entry.aircraft);
+    const lead = getLeadAircraftAssessment(state, state.planning.leadAircraftId);
+    const marginalCount = selectedAircraft.filter((entry) => entry.availability.level === "marginal").length;
+    const unavailableCount = selectedAircraft.filter((entry) => entry.availability.level === "unavailable").length;
+    const intelAge = target ? getTargetIntelAgeLabel(state, target.id) : "unknown";
+    const warnings = [
+        ...(lead.warnings),
+        ...selectedAircraft.flatMap((entry) => entry.availability.warnings.slice(0, 1))
+    ].filter((warning, index, array) => array.indexOf(warning) === index).slice(0, 5);
+    const operations = !target
+        ? "Operations cannot frame the order until a primary target is chosen."
+        : state.planning.operationType === "reduced_strike"
+            ? "Operations considers this package suitable for a reduced strike if expectations stay modest."
+            : state.planning.operationType === "support_raid"
+                ? "Operations sees this as a support action intended to shape the next larger effort."
+                : state.planning.operationType === "follow_up_attack"
+                    ? "Operations believes this order is trying to exploit earlier disruption before the enemy settles."
+                    : state.planning.operationType === "harassment_diversion"
+                        ? "Operations reads this as a crisis option meant to keep pressure on without staking the whole group."
+                        : "Operations considers this a direct strike order and will expect the formation to behave like one.";
+    const intelligence = !target
+        ? "Intelligence has no target file in front of it."
+        : intelAge === "stale"
+            ? "Intelligence warns that the target file is stale and should not be treated as firm."
+            : intelAge === "aging"
+                ? "Intelligence considers the file usable, but it is already beginning to age."
+                : "Intelligence considers the latest file serviceable for planning, though not exact.";
+    const engineering = unavailableCount > 0
+        ? "Engineering warns that not every selected aircraft is truly ready for the order as written."
+        : marginalCount >= 2
+            ? "Engineering notes that several aircraft are serviceable but worn."
+            : "Engineering does not object strongly, though it still distrusts some airframes.";
+    const personnel = lead.summary.includes("Replacement navigator")
+        ? "Personnel warns the nominated lead crew contains a replacement in a key station."
+        : lead.label === "Questionable lead"
+            ? `Personnel shares Operations' concern: ${lead.summary}`
+            : "Personnel sees no overwhelming crew objection beyond the usual fatigue concerns.";
+    const command = !target
+        ? "Command cannot judge the value of the order without a target."
+        : operationTypeCommandCredit(state.planning.operationType, target);
+    return { warnings, operations, intelligence, engineering, personnel, command };
+}
 function updateVisibleTargetAssessment(target, assessment, evidence, sourceLabel, recommendation, at) {
     target.assessedCondition = assessment;
     target.latestIntelNote = `${sourceLabel}: ${assessment}`;
@@ -1205,6 +1446,18 @@ function createCrewEffectsForOutcome(state, snapshot, participation, outcomeRisk
     }
     return { effects, casualtySummary: summary };
 }
+function degradeConfidence(confidence) {
+    switch (confidence) {
+        case "confirmed":
+            return "probable";
+        case "probable":
+            return "estimated";
+        case "estimated":
+            return "fragmentary";
+        default:
+            return confidence;
+    }
+}
 function buildMission(state, now) {
     if (state.campaign.activeMissionId) {
         return null;
@@ -1213,10 +1466,16 @@ function buildMission(state, now) {
     if (!target) {
         return null;
     }
+    const secondaryTarget = state.planning.secondaryTargetId ? getTargetById(state, state.planning.secondaryTargetId) : undefined;
     const assignedAircraftIds = state.planning.assignedAircraftIds.filter((id) => getAircraftAvailability(state, id).level !== "unavailable");
     if (assignedAircraftIds.length === 0) {
         return null;
     }
+    const leadAircraftId = state.planning.leadAircraftId && assignedAircraftIds.includes(state.planning.leadAircraftId)
+        ? state.planning.leadAircraftId
+        : assignedAircraftIds[0] ?? null;
+    const leadAssessment = getLeadAircraftAssessment(state, leadAircraftId);
+    const staffPreview = getPlanningStaffPreview(state);
     const launchTime = state.planning.launchMode === "schedule" ? now + state.planning.scheduleDelayMs : now;
     const duration = missionDurationForTarget(target);
     const stageTimes = {
@@ -1228,7 +1487,10 @@ function buildMission(state, now) {
         recovery: launchTime + duration * 0.9,
         debrief_ready: launchTime + duration
     };
-    const visibility = chance((target.hiddenWeatherRisk + (state.planning.standingOrders.useSecondaryIfObscured ? -5 : 5)) / 100)
+    const doctrineVisibilityMod = state.planning.attackDoctrine === "abort_unless_visual" ? 8
+        : state.planning.attackDoctrine === "bomb_through_cloud" ? -6
+            : 0;
+    const visibility = chance((target.hiddenWeatherRisk + (state.planning.standingOrders.useSecondaryIfObscured ? -5 : 5) + doctrineVisibilityMod) / 100)
         ? "obscured"
         : chance(0.45)
             ? "broken"
@@ -1238,7 +1500,23 @@ function buildMission(state, now) {
         const manifest = getCrewMembersForAircraft(state, aircraftId);
         return sum + manifest.reduce((inner, member) => inner + (member.fatigue === "exhausted" ? 2 : member.fatigue === "tired" ? 1 : 0), 0) / Math.max(1, manifest.length);
     }, 0) / assignedAircraftIds.length;
-    const riskBase = target.hiddenDefenseLevel + (state.planning.routeRisk === "cautious" ? -9 : state.planning.routeRisk === "direct" ? 11 : 0) + (100 - avgCondition) * 0.35 + avgFatigue * 7;
+    const doctrineRisk = state.planning.attackDoctrine === "repeat_if_needed" ? 8
+        : state.planning.attackDoctrine === "abort_unless_visual" ? -6
+            : state.planning.attackDoctrine === "bomb_through_cloud" ? 3
+                : 0;
+    const operationRisk = state.planning.operationType === "main_strike" ? 4
+        : state.planning.operationType === "reduced_strike" ? -3
+            : state.planning.operationType === "support_raid" ? -2
+                : state.planning.operationType === "follow_up_attack" ? 2
+                    : -4;
+    const leadRisk = leadAssessment.label === "Trusted lead" ? -5 : leadAssessment.label === "Questionable lead" ? 7 : 0;
+    const riskBase = target.hiddenDefenseLevel
+        + (state.planning.routeRisk === "cautious" ? -9 : state.planning.routeRisk === "direct" ? 11 : 0)
+        + (100 - avgCondition) * 0.35
+        + avgFatigue * 7
+        + doctrineRisk
+        + operationRisk
+        + leadRisk;
     const launchCrewManifests = assignedAircraftIds.map((aircraftId) => snapshotAircraftCrew(state, aircraftId));
     const outcomes = [];
     let contributed = 0;
@@ -1310,26 +1588,86 @@ function buildMission(state, now) {
         }
     }
     const visibilityPenalty = visibility === "obscured" ? 0.45 : visibility === "broken" ? 0.72 : 1;
-    const targetDamage = clamp(Math.round(contributed * (8 + Math.random() * 5) * visibilityPenalty), 6, 42);
-    const targetAssessment = visibility === "obscured"
-        ? "Crews report fires near the objective, but smoke and cloud make useful damage difficult to confirm."
-        : targetDamage >= 24
-            ? "Several crews believe the aiming area was struck with probable effect."
-            : "Bombing was carried out, though the visible operational effect remains uncertain.";
-    const targetEvidence = visibility === "obscured"
+    const doctrineDamageMod = state.planning.attackDoctrine === "repeat_if_needed" ? 1.18
+        : state.planning.attackDoctrine === "abort_unless_visual" ? 0.78
+            : state.planning.attackDoctrine === "bomb_through_cloud" ? 0.92
+                : 1;
+    const leadDamageMod = leadAssessment.label === "Trusted lead" ? 1.08 : leadAssessment.label === "Questionable lead" ? 0.88 : 1;
+    const operationDamageMod = state.planning.operationType === "main_strike" ? 1.14
+        : state.planning.operationType === "reduced_strike" ? 0.85
+            : state.planning.operationType === "support_raid" ? 0.76
+                : state.planning.operationType === "follow_up_attack"
+                    ? (target.lastDebriefAt || target.lastMissionAt ? 1.12 : 0.96)
+                    : 0.62;
+    const secondaryShift = Boolean(secondaryTarget
+        && visibility === "obscured"
+        && state.planning.standingOrders.useSecondaryIfObscured
+        && state.planning.attackDoctrine !== "abort_unless_visual");
+    const noEffectiveAttack = visibility === "obscured" && state.planning.attackDoctrine === "abort_unless_visual";
+    const attackedTarget = secondaryShift ? (secondaryTarget ?? target) : target;
+    const computedDamage = Math.round(contributed * (8 + Math.random() * 5) * visibilityPenalty * doctrineDamageMod * leadDamageMod * operationDamageMod);
+    const targetDamage = noEffectiveAttack || contributed === 0 ? 0 : clamp(computedDamage, 1, 42);
+    const targetAssessment = noEffectiveAttack
+        ? "Crews report that cloud and visibility denied any attack the force could trust."
+        : secondaryShift
+            ? `Crews believe the primary was obscured and that the force turned its effort toward ${attackedTarget.name}, though the result remains hazy.`
+            : visibility === "obscured"
+                ? "Crews report fires near the objective, but smoke and cloud make useful damage difficult to confirm."
+                : targetDamage >= 24
+                    ? "Several crews believe the aiming area was struck with probable effect."
+                    : "Bombing was carried out, though the visible operational effect remains uncertain.";
+    const targetEvidence = noEffectiveAttack
         ? [
-            "Crews report smoke over part of the target area.",
-            "Intelligence notes that cloud probably masked the main impact zone."
+            "Lead crews report the target never presented clearly enough for a trusted attack.",
+            "Returning aircraft disagree on whether any bombs were released effectively."
         ]
-        : targetDamage >= 24
+        : secondaryShift
             ? [
-                "Multiple crews report bursts and fire near the intended works.",
-                "Returning aircraft describe visible smoke columns over the target."
+                `Crews report the primary was obscured and that bombs were redirected toward ${attackedTarget.name}.`,
+                "Exact impact points remain difficult to confirm from the returning accounts."
             ]
-            : [
-                "Bombing was observed, but exact impact points are disputed.",
-                "At least one crew reports near misses around the target approaches."
-            ];
+            : visibility === "obscured"
+                ? [
+                    "Crews report smoke over part of the target area.",
+                    "Intelligence notes that cloud probably masked the main impact zone."
+                ]
+                : targetDamage >= 24
+                    ? [
+                        "Multiple crews report bursts and fire near the intended works.",
+                        "Returning aircraft describe visible smoke columns over the target."
+                    ]
+                    : [
+                        "Bombing was observed, but exact impact points are disputed.",
+                        "At least one crew reports near misses around the target approaches."
+                    ];
+    const doctrineNote = state.planning.attackDoctrine === "repeat_if_needed"
+        ? "Doctrine allowed repeated effort where crews thought it necessary, increasing exposure in return for a firmer strike."
+        : state.planning.attackDoctrine === "abort_unless_visual"
+            ? "Doctrine required a clear view before committing to the attack."
+            : state.planning.attackDoctrine === "bomb_through_cloud"
+                ? "Doctrine favored preserving tempo through cloud, even at the cost of certainty."
+                : "Doctrine favored a single disciplined pass over the target.";
+    const leadOutcome = leadAircraftId ? outcomes.find((outcome) => outcome.aircraftId === leadAircraftId) : undefined;
+    const leadNote = !leadAircraftId
+        ? "No separate lead aircraft was logged for this order."
+        : leadOutcome?.participation === "lost" || leadOutcome?.participation === "diverted"
+            ? "Trouble to the lead aircraft appears to have contributed to formation confusion."
+            : leadAssessment.label === "Trusted lead"
+                ? "The lead aircraft appears to have held the formation together reasonably well."
+                : leadAssessment.label === "Questionable lead"
+                    ? "Lead-aircraft quality may have contributed to a more uncertain run."
+                    : "Lead influence appears mixed rather than decisive.";
+    const commandAssessment = state.planning.operationType === "main_strike"
+        ? targetDamage >= 18 ? "Command is likely to regard this as a meaningful main effort if later evidence holds up." : "Command will probably judge the main effort harshly unless later evidence improves."
+        : state.planning.operationType === "support_raid"
+            ? targetDamage >= 12 ? "Command may accept this as useful setup work, though not as a decisive answer." : "Command is unlikely to find this support action satisfying by itself."
+            : state.planning.operationType === "reduced_strike"
+                ? targetDamage >= 12 ? "Command may see this as prudent limited progress." : "Command will likely see this as cautious but thin."
+                : state.planning.operationType === "follow_up_attack"
+                    ? targetDamage >= 14 ? "Command may view the follow-up as a worthwhile exploitation of earlier disruption." : "Command may doubt that the follow-up justified the effort."
+                    : targetDamage >= 8
+                        ? "Command may accept the diversion as buying time, though not solving the directive."
+                        : "Command is unlikely to see the diversion as more than a temporary gesture.";
     const stages = [
         "takeoff",
         "assembly",
@@ -1351,7 +1689,7 @@ function buildMission(state, now) {
             });
         }
         if (stage === "target_area") {
-            hiddenEffects.push({ kind: "apply_target_damage", targetId: target.id });
+            hiddenEffects.push({ kind: "apply_target_damage", targetId: attackedTarget.id });
         }
         if (stage === "recovery") {
             outcomes.forEach((outcome, index) => {
@@ -1376,8 +1714,14 @@ function buildMission(state, now) {
             targetId: target.id,
             severity: stage === "target_area" || stage === "recovery" ? "heavy" : "moderate",
             hiddenEffects,
-            publicReportText: report.text,
-            confidence: report.confidence,
+            publicReportText: stage === "target_area" && secondaryShift
+                ? `${report.text} Some crews believe a secondary objective was used instead.`
+                : stage === "target_area" && noEffectiveAttack
+                    ? `${report.text} Lead reports suggest the force may have withheld a confident attack.`
+                    : report.text,
+            confidence: leadAssessment.label === "Questionable lead" && (stage === "assembly" || stage === "target_area")
+                ? degradeConfidence(report.confidence)
+                : report.confidence,
             source: report.source,
             applied: false,
             revealed: false
@@ -1387,12 +1731,17 @@ function buildMission(state, now) {
         id: nextId(state, "mission"),
         plan: {
             targetId: target.id,
+            operationType: state.planning.operationType,
+            secondaryTargetId: state.planning.secondaryTargetId,
+            leadAircraftId,
             assignedAircraftIds,
             scheduledLaunchTime: launchTime,
             routeRisk: state.planning.routeRisk,
+            attackDoctrine: state.planning.attackDoctrine,
             standingOrders: { ...state.planning.standingOrders },
             status: launchTime > now ? "scheduled" : "launched",
-            launchCrewManifests
+            launchCrewManifests,
+            staffWarningsAtLaunch: staffPreview.warnings
         },
         stage: launchTime > now ? "scheduled" : "takeoff",
         timelineEvents,
@@ -1408,9 +1757,17 @@ function buildMission(state, now) {
             visibility,
             targetAssessment,
             targetEvidence,
-            targetSuspectedEffects: targetDamage >= 24
-                ? "Staff believes the target may be materially hindered for a time."
-                : "Some disruption is possible, though the operational effect is still uncertain.",
+            attackedTargetId: attackedTarget.id,
+            attackedTargetName: attackedTarget.name,
+            attackedSecondary: secondaryShift,
+            doctrineNote,
+            leadNote,
+            commandAssessment,
+            targetSuspectedEffects: noEffectiveAttack
+                ? "Little strategic effect is presently expected from the mission."
+                : targetDamage >= 24
+                    ? "Staff believes the target may be materially hindered for a time."
+                    : "Some disruption is possible, though the operational effect is still uncertain.",
             aircraftOutcomes: outcomes
         }
     };
@@ -1441,7 +1798,7 @@ export function launchMission(state, now) {
     state.campaign.pendingDecisions = ["Await timed reports and the returning crews."];
     state.selectedTab = "current-operation";
     const target = getTargetById(state, mission.plan.targetId);
-    addLog(state, `mission-launch-${mission.id}`, now, "operations", `A strike has been ordered against ${target?.name ?? "the selected target"} with ${mission.plan.assignedAircraftIds.length} aircraft.`);
+    addLog(state, `mission-launch-${mission.id}`, now, "operations", `A ${operationTypeLabel(mission.plan.operationType)} has been ordered against ${target?.name ?? "the selected target"} with ${mission.plan.assignedAircraftIds.length} aircraft.${mission.plan.leadAircraftId ? ` ${getAircraftById(state, mission.plan.leadAircraftId)?.name ?? "Lead aircraft"} is marked as lead.` : ""}`);
     for (const aircraftId of mission.plan.assignedAircraftIds) {
         const aircraft = getAircraftById(state, aircraftId);
         if (aircraft) {
@@ -1462,7 +1819,7 @@ function applyAircraftOutcome(state, mission, outcomeIndex) {
         return;
     }
     const aircraft = getAircraftById(state, outcome.aircraftId);
-    if (!aircraft || aircraft.lastOutcomeNote === outcome.note) {
+    if (!aircraft) {
         return;
     }
     if (outcome.finalStatus === "lost") {
@@ -1492,7 +1849,7 @@ function applyCrewOutcome(state, mission, outcomeIndex) {
     }
     for (const effect of outcome.crewEffects) {
         const member = getCrewMemberById(state, effect.crewMemberId);
-        if (!member || member.notes === effect.note) {
+        if (!member) {
             continue;
         }
         member.status = effect.status;
@@ -1512,32 +1869,51 @@ function generateDebrief(state, mission) {
     if (!target) {
         return;
     }
+    const attackedTarget = getTargetById(state, mission.hiddenOutcome.attackedTargetId) ?? target;
     const lostCount = mission.hiddenOutcome.aircraftOutcomes.filter((outcome) => outcome.finalStatus === "lost").length;
     const damagedCount = mission.hiddenOutcome.aircraftOutcomes.filter((outcome) => outcome.finalStatus === "damaged").length;
     const divertedCount = mission.hiddenOutcome.aircraftOutcomes.filter((outcome) => outcome.finalStatus === "diverted").length;
-    mission.resultSummary = `${severityFromDamage(mission.hiddenOutcome.targetDamage)} strike effect reported against ${target.name}; ${damagedCount} damaged, ${divertedCount} diverted, ${lostCount} missing or lost.`;
+    mission.resultSummary = mission.hiddenOutcome.targetDamage <= 0
+        ? `${operationTypeLabel(mission.plan.operationType)} produced no clearly effective attack; ${damagedCount} damaged, ${divertedCount} diverted, ${lostCount} missing or lost.`
+        : `${severityFromDamage(mission.hiddenOutcome.targetDamage)} ${operationTypeLabel(mission.plan.operationType)} effect reported against ${attackedTarget.name}; ${damagedCount} damaged, ${divertedCount} diverted, ${lostCount} missing or lost.`;
     mission.debriefCasualtyLines = mission.hiddenOutcome.aircraftOutcomes.flatMap((outcome) => {
         const aircraft = getAircraftById(state, outcome.aircraftId);
         return outcome.casualtySummary.map((line) => `${aircraft?.name ?? outcome.aircraftId}: ${line}`);
     });
     mission.debrief = [
+        `Operation order called for a ${operationTypeLabel(mission.plan.operationType)} against ${target.name}${mission.plan.secondaryTargetId ? ` with ${getTargetById(state, mission.plan.secondaryTargetId)?.name ?? "a secondary target"} held in reserve` : ""}.`,
+        mission.hiddenOutcome.attackedSecondary
+            ? `Crews believe the primary was obscured and that the effort shifted toward ${attackedTarget.name}.`
+            : mission.hiddenOutcome.targetDamage <= 0
+                ? "Crews do not agree that any clearly effective attack was made."
+                : `Crews believe the main effort fell against ${attackedTarget.name}.`,
         `Crews report ${mission.hiddenOutcome.targetAssessment}`,
         `Aircraft accounting remains imperfect, but current reports indicate ${damagedCount} damaged return${damagedCount === 1 ? "" : "s"}, ${divertedCount} diverted, and ${lostCount} missing or lost.`,
+        mission.hiddenOutcome.doctrineNote,
+        mission.hiddenOutcome.leadNote,
+        mission.hiddenOutcome.commandAssessment,
         target.suspectedEffects
     ].join(" ");
     mission.debriefGenerated = true;
     mission.status = "complete";
     mission.stage = "complete";
+    applyStrategicDirectiveEffects(state, mission, attackedTarget, state.lastReconciledAt);
     updateVisibleTargetAssessment(target, mission.hiddenOutcome.targetAssessment, mission.hiddenOutcome.targetEvidence, "Debrief assessment", "Staff recommends weighing a reattack against fresh reconnaissance.", state.lastReconciledAt);
-    target.suspectedEffects = mission.hiddenOutcome.targetSuspectedEffects;
-    target.lastMissionSummary = mission.resultSummary;
-    target.lastMissionAt = state.lastReconciledAt;
-    target.lastDebriefSummary = mission.debrief;
-    target.lastDebriefAt = state.lastReconciledAt;
+    attackedTarget.suspectedEffects = mission.hiddenOutcome.targetSuspectedEffects;
+    attackedTarget.lastMissionSummary = mission.resultSummary;
+    attackedTarget.lastMissionAt = state.lastReconciledAt;
+    attackedTarget.lastDebriefSummary = mission.debrief;
+    attackedTarget.lastDebriefAt = state.lastReconciledAt;
+    if (attackedTarget.id !== target.id) {
+        target.lastMissionSummary = `Primary target obscured during ${operationTypeLabel(mission.plan.operationType)}; crews report the effort shifted elsewhere.`;
+        target.lastMissionAt = state.lastReconciledAt;
+        target.lastDebriefSummary = mission.debrief;
+        target.lastDebriefAt = state.lastReconciledAt;
+    }
     state.campaign.activeMissionId = null;
     state.campaign.lastDebriefMissionId = mission.id;
     state.campaign.campaignPhase = "Debrief filed. Engineering and intelligence await your next order.";
-    state.campaign.commandStanding = "Staff recommends weighing the debrief against the temptation to strike again immediately.";
+    state.campaign.commandStanding = getDirectiveProgressSummary(state).patience.replace("Command patience: ", "");
     state.campaign.pendingDecisions = ["Review damage, start repairs, or order recon."];
     state.campaign.stationWeather = createStationWeather(state.campaign.currentDay + mission.hiddenOutcome.targetDamage % 3);
     addLog(state, `debrief-${mission.id}`, state.lastReconciledAt, "debrief", mission.debrief);
@@ -1552,7 +1928,7 @@ function severityFromDamage(damage) {
     return "limited";
 }
 function applyTargetDamage(state, mission) {
-    const target = getTargetById(state, mission.plan.targetId);
+    const target = getTargetById(state, mission.hiddenOutcome.attackedTargetId);
     if (!target) {
         return;
     }
@@ -1699,6 +2075,7 @@ function completeRecon(state, recon) {
         alertLevel: recon.enemyAlertEffect,
         updatedAt: recon.interpretedAt
     };
+    deliverStrategicIntelDrip(state, recon.interpretedAt, recon.targetId);
     addLog(state, `recon-${recon.id}`, recon.interpretedAt, "recon", recon.resultText);
     addNotification(state, `toast-recon-${recon.id}`, "recon", "Recon interpretation filed", recon.interpretedAt);
 }
@@ -1735,9 +2112,11 @@ function nudgeTargetRepairs(state, elapsedMs) {
         return false;
     }
     let changed = false;
+    const repairScale = clamp(state.campaign.directiveState.regionalRepairCapacity / 70, 0.4, 1.15);
     for (const target of state.targets) {
         const previous = target.hiddenActualCondition;
-        target.hiddenActualCondition = clamp(target.hiddenActualCondition + target.hiddenRepairRate * daySteps, 0, 100);
+        const repairLift = Math.max(1, Math.round(target.hiddenRepairRate * repairScale));
+        target.hiddenActualCondition = clamp(target.hiddenActualCondition + repairLift * daySteps, 0, 100);
         if (previous !== target.hiddenActualCondition) {
             changed = true;
         }
@@ -1955,8 +2334,9 @@ export function startRecon(state, targetId, type, now) {
 export function advanceCampaignDay(state) {
     state.campaign.currentDay += 1;
     state.debug.clockOffsetMs += DAY_MS;
-    state.campaign.commandStanding = "A new day of pressure has begun. Staff believes the enemy has had some time to recover its balance.";
+    state.campaign.commandStanding = getDirectiveProgressSummary(state).patience.replace("Command patience: ", "");
     state.campaign.stationWeather = createStationWeather(state.campaign.currentDay);
+    deliverStrategicIntelDrip(state, getEffectiveNow(state));
     addLog(state, `day-${state.campaign.currentDay}`, getEffectiveNow(state), "command", `Campaign day ${state.campaign.currentDay} has begun. Routine rest and repair time have accrued.`);
 }
 export function skipToNextReport(state, now) {
@@ -2005,6 +2385,260 @@ export function completeAllRepairs(state, now) {
         job.completesAt = now - 1000;
     }
     return null;
+}
+function strategicBand(value, high, mid, low) {
+    if (value >= 70) {
+        return high;
+    }
+    if (value >= 45) {
+        return mid;
+    }
+    return low;
+}
+function targetStrategicRoleText(target) {
+    switch (target.type) {
+        case "factory":
+            return "direct aviation progress";
+        case "airfield":
+            return "immediate fighter suppression";
+        case "rail":
+            return "slows repairs and reinforcement";
+        case "radar":
+            return "weakens warning and interception coordination";
+        case "defense":
+            return "support target for future Bremen approaches";
+        default:
+            return "supporting pressure against the sector";
+    }
+}
+function targetCommandValueText(target) {
+    switch (target.type) {
+        case "factory":
+            return "High command regards this as decisive if the strike is effective.";
+        case "airfield":
+            return "Command values this as useful near-term pressure, though not the full answer.";
+        case "rail":
+            return "Command sees this as indirect unless it clearly supports later aviation strikes.";
+        case "radar":
+            return "Command treats this as a useful setup target, but not a headline result.";
+        case "defense":
+            return "Command values this only if it visibly helps a later Bremen attack.";
+        default:
+            return "Command interest remains qualified.";
+    }
+}
+function targetOperationalEffectText(target) {
+    switch (target.type) {
+        case "factory":
+            return "Success here may weaken longer-term fighter replacement rather than immediate response.";
+        case "airfield":
+            return "Success here may soften fighter response on the next operation or two.";
+        case "rail":
+            return "Success here may make earlier target damage stick by slowing repair movement.";
+        case "radar":
+            return "Success here may leave later interceptions and warnings less coordinated.";
+        case "defense":
+            return "Success here may slightly ease the approach to deeper Bremen targets.";
+        default:
+            return "Operational effect is likely indirect and difficult to read quickly.";
+    }
+}
+export function getTargetStrategicContext(state, targetId) {
+    const target = getTargetById(state, targetId);
+    if (!target) {
+        return {
+            strategicRole: "Strategic Role: unknown",
+            commandValue: "Likely Command Value: unknown",
+            operationalEffect: "Likely Operational Effect: unknown",
+            connections: "Connections: none filed"
+        };
+    }
+    const connectedNames = target.connectedTargetIds
+        .map((id) => getTargetById(state, id)?.name)
+        .filter((name) => Boolean(name));
+    return {
+        strategicRole: `Strategic Role: ${targetStrategicRoleText(target)}`,
+        commandValue: `Likely Command Value: ${targetCommandValueText(target)}`,
+        operationalEffect: `Likely Operational Effect: ${targetOperationalEffectText(target)}`,
+        connections: connectedNames.length > 0
+            ? `Connections: likely linked to ${connectedNames.join(", ")}.`
+            : "Connections: no clear supporting links are filed."
+    };
+}
+function strategicEffectVisibleHint(category, target) {
+    switch (category) {
+        case "fighter_pressure":
+            return `${target.name} may have softened immediate fighter pressure, though the effect is still being judged.`;
+        case "replacement_flow":
+            return `${target.name} may have disturbed longer-term fighter production more than immediate response.`;
+        case "repair_capacity":
+            return `${target.name} may have slowed repair and movement around the Bremen network.`;
+        case "warning_coordination":
+            return `${target.name} may have unsettled warning and interception coordination on later routes.`;
+        case "approach_danger":
+            return `${target.name} may have made a later Bremen approach somewhat easier to force through.`;
+        case "directive_progress":
+            return `Staff believes the strike on ${target.name} contributed at least some real directive progress.`;
+        case "command_patience":
+            return "Command has registered the latest operation, though its enthusiasm remains qualified.";
+        default:
+            return "Staff is still sorting the wider effect of the latest operation.";
+    }
+}
+function appendStrategicEffect(state, target, at, category, summary) {
+    const id = `strategic-${target.id}-${category}-${state.campaign.directiveState.operationsElapsed}`;
+    if (state.campaign.directiveState.recentStrategicEffects.some((effect) => effect.id === id)) {
+        return;
+    }
+    state.campaign.directiveState.recentStrategicEffects.unshift({
+        id,
+        at,
+        targetId: target.id,
+        category,
+        summary,
+        visibleHint: strategicEffectVisibleHint(category, target),
+        followUpPending: true,
+        followUpDeliveredAt: null
+    });
+    state.campaign.directiveState.recentStrategicEffects = state.campaign.directiveState.recentStrategicEffects.slice(0, 8);
+}
+function applyStrategicDirectiveEffects(state, mission, target, at) {
+    const directive = state.campaign.directiveState;
+    directive.operationsElapsed += 1;
+    const severity = mission.hiddenOutcome.targetDamage >= 26 ? "serious" : mission.hiddenOutcome.targetDamage >= 14 ? "useful" : mission.hiddenOutcome.targetDamage > 0 ? "limited" : "poor";
+    const baseImpact = mission.hiddenOutcome.targetDamage >= 26 ? 16 : mission.hiddenOutcome.targetDamage >= 14 ? 10 : mission.hiddenOutcome.targetDamage > 0 ? 5 : 1;
+    const impactMod = mission.plan.operationType === "main_strike" ? 1.18
+        : mission.plan.operationType === "reduced_strike" ? 0.82
+            : mission.plan.operationType === "support_raid" ? 0.72
+                : mission.plan.operationType === "follow_up_attack" ? 1.1
+                    : 0.58;
+    const impact = Math.max(1, Math.round(baseImpact * impactMod));
+    const costly = mission.hiddenOutcome.aircraftOutcomes.filter((outcome) => outcome.finalStatus === "lost").length > 0;
+    if (severity === "poor") {
+        directive.commandPatience = clamp(directive.commandPatience - (mission.plan.operationType === "main_strike" ? 10 : 7), 0, 100);
+        appendStrategicEffect(state, target, at, "command_patience", `The strike on ${target.name} appears to have yielded little strategic value.`);
+        return;
+    }
+    switch (target.type) {
+        case "factory":
+            directive.fighterReplacementFlow = clamp(directive.fighterReplacementFlow - impact, 0, 100);
+            directive.directiveProgress = clamp(directive.directiveProgress + impact + (mission.plan.operationType === "main_strike" ? 6 : 3), 0, 100);
+            appendStrategicEffect(state, target, at, "replacement_flow", `${target.name} is thought to have disrupted fighter replacement flow in a way that may matter later.`);
+            appendStrategicEffect(state, target, at, "directive_progress", `Staff judges the attack on ${target.name} as ${severity} direct progress against the Bremen directive.`);
+            break;
+        case "airfield":
+            directive.fighterPressure = clamp(directive.fighterPressure - (impact + 5), 0, 100);
+            directive.directiveProgress = clamp(directive.directiveProgress + impact + (mission.plan.operationType === "reduced_strike" ? -1 : 1), 0, 100);
+            appendStrategicEffect(state, target, at, "fighter_pressure", `${target.name} is believed to have reduced near-term fighter pressure around the sector.`);
+            break;
+        case "rail":
+            directive.regionalRepairCapacity = clamp(directive.regionalRepairCapacity - (impact + 3), 0, 100);
+            directive.directiveProgress = clamp(directive.directiveProgress + Math.max(2, impact - 1), 0, 100);
+            for (const connectedId of target.connectedTargetIds) {
+                const connected = getTargetById(state, connectedId);
+                if (!connected) {
+                    continue;
+                }
+                connected.hiddenRepairRate = clamp(connected.hiddenRepairRate - (severity === "serious" ? 3 : 2), 2, 20);
+            }
+            appendStrategicEffect(state, target, at, "repair_capacity", `${target.name} may have slowed the repair tempo supporting connected Bremen targets.`);
+            break;
+        case "radar":
+            directive.warningCoordination = clamp(directive.warningCoordination - (impact + 2), 0, 100);
+            directive.directiveProgress = clamp(directive.directiveProgress + Math.max(1, impact - 2), 0, 100);
+            for (const connectedId of target.connectedTargetIds) {
+                const connected = getTargetById(state, connectedId);
+                if (!connected) {
+                    continue;
+                }
+                connected.hiddenDefenseLevel = clamp(connected.hiddenDefenseLevel - 4, 18, 100);
+            }
+            appendStrategicEffect(state, target, at, "warning_coordination", `${target.name} may have weakened warning coordination along related approach routes.`);
+            break;
+        case "defense":
+            directive.approachDanger = clamp(directive.approachDanger - (impact + 1), 0, 100);
+            directive.directiveProgress = clamp(directive.directiveProgress + Math.max(1, impact - 2), 0, 100);
+            for (const connectedId of target.connectedTargetIds) {
+                const connected = getTargetById(state, connectedId);
+                if (!connected) {
+                    continue;
+                }
+                connected.hiddenDefenseLevel = clamp(connected.hiddenDefenseLevel - 3, 18, 100);
+            }
+            appendStrategicEffect(state, target, at, "approach_danger", `${target.name} may have eased the approach to connected Bremen objectives.`);
+            break;
+        default:
+            directive.directiveProgress = clamp(directive.directiveProgress + impact, 0, 100);
+            appendStrategicEffect(state, target, at, "directive_progress", `${target.name} may have contributed some indirect pressure in the sector.`);
+            break;
+    }
+    if (mission.plan.operationType === "harassment_diversion") {
+        directive.commandPatience = clamp(directive.commandPatience - 5, 0, 100);
+    }
+    else if (mission.plan.operationType === "support_raid" && target.directiveRelevance !== "high") {
+        directive.commandPatience = clamp(directive.commandPatience - 3, 0, 100);
+    }
+    else if (target.type !== "factory" && target.directiveRelevance === "low") {
+        directive.commandPatience = clamp(directive.commandPatience - 4, 0, 100);
+    }
+    else {
+        directive.commandPatience = clamp(directive.commandPatience + (severity === "serious" ? 5 : 2) - (costly ? 5 : 0) + (mission.plan.operationType === "main_strike" ? 1 : 0), 0, 100);
+    }
+}
+function createStrategicIntelFollowUp(state, effect) {
+    const target = getTargetById(state, effect.targetId);
+    const targetName = target?.name ?? "the latest target";
+    switch (effect.category) {
+        case "fighter_pressure":
+            return `Later intelligence suggests fighter activity around ${targetName} may be softer than before, though the picture is not yet settled.`;
+        case "replacement_flow":
+            return `Staff believes repair and production around ${targetName} may be recovering more slowly than expected.`;
+        case "repair_capacity":
+            return `Rail and workshop traffic linked to ${targetName} appears slower than before, though not fully stopped.`;
+        case "warning_coordination":
+            return `Interception along the northern route may be less coordinated after the disturbance around ${targetName}.`;
+        case "approach_danger":
+            return `Approach reporting suggests the belt around ${targetName} may be less cohesive than earlier estimates implied.`;
+        case "directive_progress":
+            return `Command believes the latest strike may have added some real pressure in the Bremen sector, even if the full effect remains uncertain.`;
+        case "command_patience":
+            return "Command is not yet convinced the latest effort materially advanced the directive.";
+        default:
+            return "Later intelligence remains cautious and does not fully settle the strategic picture.";
+    }
+}
+function deliverStrategicIntelDrip(state, now, preferredTargetId) {
+    const pending = state.campaign.directiveState.recentStrategicEffects.find((effect) => effect.followUpPending && (!preferredTargetId || effect.targetId === preferredTargetId)) ?? state.campaign.directiveState.recentStrategicEffects.find((effect) => effect.followUpPending);
+    if (!pending) {
+        return;
+    }
+    pending.followUpPending = false;
+    pending.followUpDeliveredAt = now;
+    const text = createStrategicIntelFollowUp(state, pending);
+    state.campaign.latestStrategicIntelNote = text;
+    addLog(state, `strategic-intel-${pending.id}`, now, "command", text);
+}
+export function getDirectiveProgressSummary(state) {
+    const directive = state.campaign.directiveState;
+    const progress = strategicBand(directive.directiveProgress, "Progress: meaningful. Staff believes fighter pressure in the sector is beginning to bend.", "Progress: limited. Staff sees some useful disruption, but not a solved Bremen problem.", "Progress: slight. Staff does not yet believe the sector has been materially eased.");
+    const patience = strategicBand(directive.commandPatience, "Command patience: still serviceable. Headquarters sees enough to remain patient for now.", "Command patience: narrowing. Another indirect result may draw sharper questions.", "Command patience: strained. Command is pressing for clearer direct progress.");
+    let nextNeed = "Suggested next need: keep the target file current and prepare a useful follow-on strike.";
+    if (directive.fighterReplacementFlow >= 65) {
+        nextNeed = "Suggested next need: confirm the factory picture or prepare a direct aviation strike.";
+    }
+    else if (directive.fighterPressure >= 65) {
+        nextNeed = "Suggested next need: soften near-term fighter pressure before attempting a deeper effort.";
+    }
+    else if (directive.approachDanger >= 65 || directive.warningCoordination >= 65) {
+        nextNeed = "Suggested next need: reduce route danger or warning cohesion before committing the whole group.";
+    }
+    return {
+        progress,
+        patience,
+        nextNeed,
+        recentEffects: state.campaign.directiveState.recentStrategicEffects.slice(0, 3).map((effect) => effect.visibleHint),
+        latestIntel: state.campaign.latestStrategicIntelNote
+    };
 }
 export function getTargetOperationalSummary(target) {
     return `${target.assessedCondition} Defense is believed ${defenseText(target.hiddenDefenseLevel)}, alert appears ${alertText(target.alertLevel)}, and intelligence is ${target.intelConfidence}.`;
@@ -2117,6 +2751,7 @@ export function getStaffBriefingRecommendations(state) {
     const latestDebrief = getLatestDebriefMission(state);
     const recon = getActiveRecon(state);
     const selectedTarget = getTargetById(state, state.planning.selectedTargetId);
+    const directive = state.campaign.directiveState;
     const assignedAvailability = state.planning.assignedAircraftIds.map((aircraftId) => ({
         aircraft: getAircraftById(state, aircraftId),
         availability: getAircraftAvailability(state, aircraftId)
@@ -2212,7 +2847,11 @@ export function getStaffBriefingRecommendations(state) {
         recommendations.push(createStaffRecommendation({
             sourceOfficer: "Operations Officer",
             title: "A workable package is on hand",
-            body: "Operations believes the current board can support another strike, provided intelligence is acceptable and engineering does not raise fresh objections.",
+            body: selectedTarget.type === "factory" && (directive.fighterPressure >= 65 || directive.approachDanger >= 65)
+                ? "Operations believes a direct factory effort is possible, but the route and fighter picture still argue for caution."
+                : selectedTarget.type === "airfield"
+                    ? "Operations believes an airfield strike could reduce near-term fighter pressure before a deeper Bremen effort."
+                    : "Operations believes the current board can support another strike, provided intelligence is acceptable and engineering does not raise fresh objections.",
             urgency: "low",
             relatedActionType: "go_mission_planning",
             relatedTargetId: selectedTarget.id,
@@ -2237,7 +2876,9 @@ export function getStaffBriefingRecommendations(state) {
         recommendations.push(createStaffRecommendation({
             sourceOfficer: "Intelligence Officer",
             title: "Selected target file is going stale",
-            body: `The picture on ${selectedTarget.name} is aging and still rests on incomplete evidence. Intelligence advises another look before a major strike.`,
+            body: selectedTarget.type === "factory"
+                ? `The factory remains the decisive aviation target, but the file on ${selectedTarget.name} is aging. Intelligence advises recon before committing veteran crews.`
+                : `The picture on ${selectedTarget.name} is aging and still rests on incomplete evidence. Intelligence advises another look before a major strike.`,
             urgency: "urgent",
             relatedActionType: "start_recon",
             relatedTargetId: selectedTarget.id,
@@ -2251,6 +2892,18 @@ export function getStaffBriefingRecommendations(state) {
             title: "Latest assessment remains qualified",
             body: `The latest file on ${selectedTarget.name} is still only ${state.campaign.latestIntelUpdate.resultQuality}. Intelligence recommends treating the evidence as useful but not final.`,
             urgency: state.campaign.latestIntelUpdate.resultQuality === "inconclusive" ? "normal" : "low",
+            relatedActionType: "go_target_board",
+            relatedTargetId: selectedTarget.id,
+            relatedAircraftId: null,
+            relatedCrewMemberId: null
+        }));
+    }
+    else if (selectedTarget && state.campaign.latestStrategicIntelNote) {
+        recommendations.push(createStaffRecommendation({
+            sourceOfficer: "Intelligence Officer",
+            title: "Strategic reading remains incomplete",
+            body: state.campaign.latestStrategicIntelNote,
+            urgency: "low",
             relatedActionType: "go_target_board",
             relatedTargetId: selectedTarget.id,
             relatedAircraftId: null,
@@ -2316,8 +2969,12 @@ export function getStaffBriefingRecommendations(state) {
         recommendations.push(createStaffRecommendation({
             sourceOfficer: "Command Liaison",
             title: "Higher command expects visible progress",
-            body: "Command will tolerate caution, but not drift. Another purely administrative pause may not satisfy the directive for long.",
-            urgency: selectedTarget.directiveRelevance === "high" ? "urgent" : "normal",
+            body: directive.commandPatience < 40
+                ? "Command is pressing for clearer direct progress. Another indirect support action may be taken badly."
+                : selectedTarget.directiveRelevance === "high"
+                    ? "Command will tolerate setup only briefly and expects visible progress against aviation targets."
+                    : "Command will tolerate caution, but not drift. Another purely administrative pause may not satisfy the directive for long.",
+            urgency: selectedTarget.directiveRelevance === "high" || directive.commandPatience < 40 ? "urgent" : "normal",
             relatedActionType: selectedTarget.directiveRelevance === "high" ? "go_mission_planning" : "go_target_board",
             relatedTargetId: selectedTarget.id,
             relatedAircraftId: null,
@@ -2332,6 +2989,20 @@ export function getStaffBriefingRecommendations(state) {
             urgency: "low",
             relatedActionType: "go_target_board",
             relatedTargetId: selectedTarget?.id ?? null,
+            relatedAircraftId: null,
+            relatedCrewMemberId: null
+        }));
+    }
+    if (!mission && selectedTarget && recommendations.length < 5) {
+        recommendations.push(createStaffRecommendation({
+            sourceOfficer: "Executive Officer",
+            title: "Decide whether to set up or strike now",
+            body: directive.fighterReplacementFlow >= 65 && selectedTarget.type !== "factory"
+                ? "The executive view is that we still need to decide whether we are setting up the Bremen strike or attempting it directly."
+                : "The executive view is that the next order should either exploit the current opening or deliberately prepare a better one.",
+            urgency: "normal",
+            relatedActionType: selectedTarget.type === "factory" ? "go_mission_planning" : "go_target_board",
+            relatedTargetId: selectedTarget.id,
             relatedAircraftId: null,
             relatedCrewMemberId: null
         }));
@@ -2371,6 +3042,9 @@ export function getDisabledReasonForLaunch(state) {
     }
     if (state.planning.assignedAircraftIds.length === 0) {
         return "No aircraft assigned";
+    }
+    if (!state.planning.leadAircraftId || !state.planning.assignedAircraftIds.includes(state.planning.leadAircraftId)) {
+        return "No lead aircraft selected";
     }
     const target = getTargetById(state, state.planning.selectedTargetId);
     if (!target) {

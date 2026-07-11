@@ -207,6 +207,13 @@ button.danger {
   font-weight: 700;
 }
 
+.assignment-toggle-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
 .assignment-meta,
 .warning {
   color: #c8baa6;
@@ -218,8 +225,26 @@ button.danger {
 }
 
 .target-card.selected {
-  border-color: rgba(219, 181, 120, 0.48);
-  box-shadow: 0 0 0 1px rgba(219, 181, 120, 0.24) inset;
+  border-color: rgba(229, 194, 122, 0.8);
+  background:
+    radial-gradient(circle at top right, rgba(190, 145, 84, 0.16), transparent 35%),
+    rgba(255, 255, 255, 0.05);
+  box-shadow:
+    0 0 0 2px rgba(219, 181, 120, 0.28) inset,
+    0 0 28px rgba(186, 138, 74, 0.16);
+}
+
+.selected-target-button {
+  background: rgba(166, 134, 86, 0.34);
+  border-color: rgba(229, 194, 122, 0.72);
+  box-shadow: 0 0 0 1px rgba(229, 194, 122, 0.2) inset;
+}
+
+.directive-progress-card {
+  border-color: rgba(219, 181, 120, 0.22);
+  background:
+    linear-gradient(180deg, rgba(87, 64, 34, 0.14), rgba(255, 255, 255, 0.03)),
+    rgba(255, 255, 255, 0.025);
 }
 
 .briefing-card {

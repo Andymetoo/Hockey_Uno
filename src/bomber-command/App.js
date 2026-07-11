@@ -1,4 +1,4 @@
-import { advanceCampaignDay, assignReplacementCrewMember, completeAllRepairs, completeCurrentRecon, createNewGame, formatTimestamp, getActiveMission, getActiveMissionCrewIds, getActiveRecon, getAircraftAvailability, getCrewById, getCrewMembersForAircraft, getCurrentOperationSummary, getDisabledReasonForLaunch, getEffectiveNow, getGroundCrewPressureNote, getLatestDebriefMission, getLatestCompletedRecon, getOperationsDeskSummary, getReplacementPool, getStaffBriefingRecommendations, getTargetById, getTargetContextSummary, getTargetOperationalSummary, getUnavailablePersonnel, launchMission, loadState, markReplacementPermanent, reconcileState, removeReplacementCrewMember, resetState, saveState, setLaunchMode, setPlanningTarget, setRouteRisk, setScheduleDelay, setSelectedTab, setShowHiddenValues, skipToDebrief, skipToNextReport, startRecovery, startRecon, startRepair, toggleAssignedAircraft, toggleStandingOrder } from "./game.js";
+import { advanceCampaignDay, assignReplacementCrewMember, completeAllRepairs, completeCurrentRecon, createNewGame, formatTimestamp, getActiveMission, getActiveMissionCrewIds, getActiveRecon, getAircraftAvailability, getAircraftById, getCrewById, getCrewMembersForAircraft, getCurrentOperationSummary, getDirectiveProgressSummary, getDisabledReasonForLaunch, getEffectiveNow, getGroundCrewPressureNote, getLeadAircraftAssessment, getLatestDebriefMission, getLatestCompletedRecon, getOperationsDeskSummary, getPlanningStaffPreview, getReplacementPool, getSecondaryTargetOptions, getStaffBriefingRecommendations, getTargetById, getTargetContextSummary, getTargetOperationalSummary, getTargetStrategicContext, getUnavailablePersonnel, launchMission, loadState, markReplacementPermanent, reconcileState, removeReplacementCrewMember, resetState, saveState, setAttackDoctrine, setLeadAircraft, setLaunchMode, setOperationType, setPlanningTarget, setRouteRisk, setScheduleDelay, setSecondaryTarget, setSelectedTab, setShowHiddenValues, skipToDebrief, skipToNextReport, startRecovery, startRecon, startRepair, toggleAssignedAircraft, toggleStandingOrder } from "./game.js";
 const TABS = [
     { id: "command", label: "Command" },
     { id: "target-board", label: "Target Board" },
@@ -157,6 +157,7 @@ function renderStaffRecommendation(recommendation) {
 function renderCommandPanel(state) {
     const opsLines = getOperationsDeskSummary(state);
     const briefing = getStaffBriefingRecommendations(state);
+    const directive = getDirectiveProgressSummary(state);
     return `
     <section class="panel stack">
       <h2>Command</h2>
@@ -167,6 +168,19 @@ function renderCommandPanel(state) {
         <strong>Operations Desk</strong>
         <div class="stack compact">
           ${opsLines.map((line) => `<p>${escapeHtml(line)}</p>`).join("")}
+        </div>
+      </div>
+      <div class="note directive-progress-card">
+        <strong>Directive Progress</strong>
+        <div class="stack compact">
+          <p><strong>Current directive:</strong> ${escapeHtml(state.campaign.commandDirective)}</p>
+          <p>${escapeHtml(directive.progress)}</p>
+          <p>${escapeHtml(directive.patience)}</p>
+          <p>${escapeHtml(directive.nextNeed)}</p>
+          ${directive.latestIntel ? `<p class="muted">${escapeHtml(directive.latestIntel)}</p>` : ""}
+          ${directive.recentEffects.length > 0
+        ? directive.recentEffects.map((line) => `<p class="muted">${escapeHtml(line)}</p>`).join("")
+        : `<p class="muted">No wider strategic read has been filed yet.</p>`}
         </div>
       </div>
       <div class="stack">
@@ -187,6 +201,7 @@ function renderCommandPanel(state) {
 function renderTargetCard(state, target) {
     const selected = target.id === state.planning.selectedTargetId;
     const context = getTargetContextSummary(state, target.id);
+    const strategic = getTargetStrategicContext(state, target.id);
     return `
     <article class="target-card ${selected ? "selected" : ""}">
       <div class="target-header">
@@ -194,7 +209,7 @@ function renderTargetCard(state, target) {
           <h3>${escapeHtml(target.name)}</h3>
           <p class="muted">${escapeHtml(target.region)} • ${escapeHtml(target.type)} target</p>
         </div>
-        <button data-action="select-target" data-payload="${target.id}">${selected ? "Selected" : "Select Target"}</button>
+        <button class="${selected ? "selected-target-button" : ""}" data-action="select-target" data-payload="${target.id}">${selected ? "Selected Target" : "Select Target"}</button>
       </div>
       <div class="badge-row">
         ${renderBadge("Directive", target.directiveRelevance)}
@@ -202,6 +217,10 @@ function renderTargetCard(state, target) {
         ${renderBadge("Alert", target.alertLevel)}
       </div>
       <p>${escapeHtml(getTargetOperationalSummary(target))}</p>
+      <p><strong>Strategic Role:</strong> ${escapeHtml(strategic.strategicRole.replace("Strategic Role: ", ""))}</p>
+      <p><strong>Likely Command Value:</strong> ${escapeHtml(strategic.commandValue.replace("Likely Command Value: ", ""))}</p>
+      <p><strong>Likely Operational Effect:</strong> ${escapeHtml(strategic.operationalEffect.replace("Likely Operational Effect: ", ""))}</p>
+      <p><strong>Connections:</strong> ${escapeHtml(strategic.connections.replace("Connections: ", ""))}</p>
       <p><strong>Weather:</strong> ${escapeHtml(target.weatherOutlook)}</p>
       <p><strong>Suspected Effect:</strong> ${escapeHtml(target.suspectedEffects)}</p>
       <p><strong>Evidence Basis:</strong> ${escapeHtml(target.evidence.slice(0, 2).join(" "))}</p>
@@ -358,10 +377,44 @@ function renderAircraftCrews(state) {
 function renderPlanning(state) {
     const selectedTarget = getTargetById(state, state.planning.selectedTargetId);
     const launchDisabled = getDisabledReasonForLaunch(state);
+    const secondaryOptions = selectedTarget ? getSecondaryTargetOptions(state, selectedTarget.id) : [];
+    const leadAssessment = getLeadAircraftAssessment(state, state.planning.leadAircraftId);
+    const staffPreview = getPlanningStaffPreview(state);
     return `
     <section class="panel stack">
       <h2>Mission Planning</h2>
       <p>${escapeHtml(selectedTarget ? `Selected target: ${selectedTarget.name}. ${selectedTarget.assessedCondition}` : "No target selected.")}</p>
+      <div class="control-group">
+        <span class="label">Operation Type</span>
+        <div class="button-row">
+          ${["main_strike", "reduced_strike", "support_raid", "follow_up_attack", "harassment_diversion"].map((operationType) => `
+            <button data-action="operation-type" data-payload="${operationType}" class="${state.planning.operationType === operationType ? "active" : ""}">
+              ${escapeHtml(operationType.replaceAll("_", " "))}
+            </button>
+          `).join("")}
+        </div>
+      </div>
+      <div class="control-group">
+        <span class="label">Secondary Target</span>
+        <div class="button-row">
+          <button data-action="secondary-target" data-payload="" class="${state.planning.secondaryTargetId === null ? "active" : ""}">No Secondary</button>
+          ${secondaryOptions.map((target) => `
+            <button data-action="secondary-target" data-payload="${target.id}" class="${state.planning.secondaryTargetId === target.id ? "active" : ""}">
+              ${escapeHtml(target.name)}
+            </button>
+          `).join("") || `<span class="disabled-reason">No connected or same-region secondary target is currently suitable.</span>`}
+        </div>
+      </div>
+      <div class="control-group">
+        <span class="label">Attack Doctrine</span>
+        <div class="button-row">
+          ${["single_pass", "repeat_if_needed", "abort_unless_visual", "bomb_through_cloud"].map((doctrine) => `
+            <button data-action="attack-doctrine" data-payload="${doctrine}" class="${state.planning.attackDoctrine === doctrine ? "active" : ""}">
+              ${escapeHtml(doctrine.replaceAll("_", " "))}
+            </button>
+          `).join("")}
+        </div>
+      </div>
       <div class="control-group">
         <span class="label">Route Risk</span>
         <div class="button-row">
@@ -375,7 +428,7 @@ function renderPlanning(state) {
       <div class="control-group">
         <span class="label">Standing Orders</span>
         <div class="check-grid">
-          ${Object.entries(state.planning.standingOrders).map(([key, value]) => `
+          ${Object.entries(state.planning.standingOrders).filter(([key]) => key !== "allowRepeatBombRun").map(([key, value]) => `
             <label class="check-row">
               <input type="checkbox" data-action="standing-order" data-payload="${key}" ${value ? "checked" : ""} />
               <span>${escapeHtml(key.replaceAll(/([A-Z])/g, " $1").replace(/^./, (char) => char.toUpperCase()))}</span>
@@ -390,8 +443,11 @@ function renderPlanning(state) {
         const crew = getCrewById(state, aircraft.assignedCrewId);
         const availability = getAircraftAvailability(state, aircraft.id);
         const checked = state.planning.assignedAircraftIds.includes(aircraft.id);
+        const leadSelected = state.planning.leadAircraftId === aircraft.id;
+        const aircraftLead = getLeadAircraftAssessment(state, aircraft.id);
         return `
-              <label class="assignment-row ${availability.level}">
+              <div class="assignment-row ${availability.level}">
+                <div class="assignment-toggle-row">
                 <input
                   type="checkbox"
                   data-action="toggle-aircraft"
@@ -400,13 +456,32 @@ function renderPlanning(state) {
                   ${availability.level === "unavailable" ? "disabled" : ""}
                 />
                 <span class="assignment-title">${escapeHtml(aircraft.name)} • ${escapeHtml(crew?.pilotName ?? "Unknown crew")}</span>
+                <button type="button" data-action="lead-aircraft" data-payload="${aircraft.id}" ${checked ? "" : "disabled"} class="${leadSelected ? "active" : ""}">
+                  ${leadSelected ? "Lead Aircraft" : "Set Lead"}
+                </button>
+                </div>
                 <span class="assignment-meta">${escapeHtml(availability.reason)}</span>
                 <span class="assignment-meta">${escapeHtml(aircraft.crewCohesion)}</span>
+                <span class="assignment-meta">${escapeHtml(aircraftLead.summary)}</span>
                 ${availability.warnings.length > 0 ? `<span class="warning">${escapeHtml(availability.warnings.join(" "))}</span>` : ""}
-              </label>
+              </div>
             `;
     }).join("")}
         </div>
+      </div>
+      <div class="note">
+        <strong>Lead Aircraft</strong>
+        <p>${escapeHtml(leadAssessment.summary)}</p>
+        ${leadAssessment.warnings.length > 0 ? leadAssessment.warnings.map((line) => `<p class="muted">${escapeHtml(line)}</p>`).join("") : ""}
+      </div>
+      <div class="note">
+        <strong>Staff Preview</strong>
+        <p><strong>Operations:</strong> ${escapeHtml(staffPreview.operations)}</p>
+        <p><strong>Intelligence:</strong> ${escapeHtml(staffPreview.intelligence)}</p>
+        <p><strong>Engineering:</strong> ${escapeHtml(staffPreview.engineering)}</p>
+        <p><strong>Personnel:</strong> ${escapeHtml(staffPreview.personnel)}</p>
+        <p><strong>Command:</strong> ${escapeHtml(staffPreview.command)}</p>
+        ${staffPreview.warnings.length > 0 ? staffPreview.warnings.map((line) => `<p class="warning">${escapeHtml(line)}</p>`).join("") : ""}
       </div>
       <div class="control-group">
         <span class="label">Launch Timing</span>
@@ -442,10 +517,14 @@ function renderCurrentOperation(state) {
       <p>${escapeHtml(getCurrentOperationSummary(state))}</p>
       <div class="badge-row">
         ${renderBadge("Stage", mission.stage.replaceAll("_", " "))}
+        ${renderBadge("Operation", mission.plan.operationType.replaceAll("_", " "))}
         ${renderBadge("Route", mission.plan.routeRisk)}
+        ${renderBadge("Doctrine", mission.plan.attackDoctrine.replaceAll("_", " "))}
         ${renderBadge("Assigned", String(mission.plan.assignedAircraftIds.length))}
       </div>
       <p><strong>Target:</strong> ${escapeHtml(getTargetById(state, mission.plan.targetId)?.name ?? "Unknown")}</p>
+      ${mission.plan.secondaryTargetId ? `<p><strong>Secondary:</strong> ${escapeHtml(getTargetById(state, mission.plan.secondaryTargetId)?.name ?? "Unknown")}</p>` : ""}
+      ${mission.plan.leadAircraftId ? `<p><strong>Lead aircraft:</strong> ${escapeHtml(getAircraftById(state, mission.plan.leadAircraftId)?.name ?? "Unknown")}</p>` : ""}
       <p><strong>Launch:</strong> ${escapeHtml(formatTimestamp(state, mission.plan.scheduledLaunchTime))}</p>
       <p><strong>Next report:</strong> ${nextReport ? escapeHtml(renderDueTime(state, nextReport.time)) : "No further reports pending."}</p>
       <div class="report-list">
@@ -472,20 +551,36 @@ function renderDebrief(state) {
     `;
     }
     const target = getTargetById(state, mission.plan.targetId);
+    const attackedTarget = getTargetById(state, mission.hiddenOutcome.attackedTargetId) ?? target;
     return `
     <section class="panel stack">
+      <p class="eyebrow">Debrief Target</p>
       <h2>Debrief: ${escapeHtml(target?.name ?? "Unknown target")}</h2>
+      <div class="badge-row">
+        ${renderBadge("Operation", mission.plan.operationType.replaceAll("_", " "))}
+        ${renderBadge("Doctrine", mission.plan.attackDoctrine.replaceAll("_", " "))}
+      </div>
       <p><strong>Mission time:</strong> ${escapeHtml(formatTimestamp(state, mission.plan.scheduledLaunchTime))}</p>
+      <p><strong>Planned primary:</strong> ${escapeHtml(target?.name ?? "Unknown target")}</p>
+      ${mission.plan.secondaryTargetId ? `<p><strong>Planned secondary:</strong> ${escapeHtml(getTargetById(state, mission.plan.secondaryTargetId)?.name ?? "Unknown")}</p>` : ""}
+      ${mission.plan.leadAircraftId ? `<p><strong>Lead aircraft:</strong> ${escapeHtml(getAircraftById(state, mission.plan.leadAircraftId)?.name ?? "Unknown")}</p>` : ""}
+      <p><strong>Attack result:</strong> ${escapeHtml(mission.hiddenOutcome.targetDamage <= 0 ? "No clearly effective attack confirmed." : mission.hiddenOutcome.attackedSecondary ? `Crews believe the attack shifted to ${attackedTarget?.name ?? "the secondary target"}.` : `Crews believe the main effort hit ${attackedTarget?.name ?? "the primary target"}.`)}</p>
       <p><strong>Mission summary:</strong> ${escapeHtml(mission.resultSummary)}</p>
       <p>${escapeHtml(mission.debrief)}</p>
+      ${mission.plan.staffWarningsAtLaunch.length > 0 ? `
+        <div class="stack compact">
+          <strong>Staff Warnings At Launch</strong>
+          ${mission.plan.staffWarningsAtLaunch.map((line) => `<p class="muted">${escapeHtml(line)}</p>`).join("")}
+        </div>
+      ` : ""}
       ${mission.debriefCasualtyLines.length > 0 ? `
         <div class="stack compact">
           <strong>Crew Consequences</strong>
           ${mission.debriefCasualtyLines.map((line) => `<p>${escapeHtml(line)}</p>`).join("")}
         </div>
       ` : `<p class="muted">No specific crew casualties have been filed beyond fatigue and strain.</p>`}
-      <p><strong>Target assessment:</strong> ${escapeHtml(target?.assessedCondition ?? "No reliable assessment.")}</p>
-      <p><strong>Evidence:</strong> ${escapeHtml(target?.evidence.slice(0, 4).join(" ") ?? "No evidence filed.")}</p>
+      <p><strong>Target assessment:</strong> ${escapeHtml(attackedTarget?.assessedCondition ?? "No reliable assessment.")}</p>
+      <p><strong>Evidence:</strong> ${escapeHtml(attackedTarget?.evidence.slice(0, 4).join(" ") ?? "No evidence filed.")}</p>
       <div class="button-row">
         <button data-action="quick-recon" data-payload="${target?.id ?? ""}" ${state.campaign.activeReconId ? "disabled" : ""}>Order Post-Strike Recon</button>
         ${state.campaign.activeReconId ? `<span class="disabled-reason">Recon section already occupied</span>` : ""}
@@ -733,6 +828,24 @@ export function mountBomberCommand(root) {
             case "route":
                 if (payload === "cautious" || payload === "standard" || payload === "direct") {
                     setRouteRisk(state, payload);
+                }
+                break;
+            case "operation-type":
+                if (payload) {
+                    setOperationType(state, payload);
+                }
+                break;
+            case "secondary-target":
+                setSecondaryTarget(state, payload);
+                break;
+            case "lead-aircraft":
+                if (payload) {
+                    setLeadAircraft(state, payload);
+                }
+                break;
+            case "attack-doctrine":
+                if (payload) {
+                    setAttackDoctrine(state, payload);
                 }
                 break;
             case "standing-order":
