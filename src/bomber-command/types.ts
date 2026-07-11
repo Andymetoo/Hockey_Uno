@@ -14,7 +14,20 @@ export type AircraftStatus = "serviceable" | "damaged" | "under_repair" | "lost"
 export type CrewExperience = "green" | "regular" | "veteran";
 export type CrewFatigue = "rested" | "tired" | "exhausted";
 export type CrewMorale = "steady" | "shaken" | "brittle";
-export type CrewStatus = "available" | "wounded" | "missing" | "resting";
+export type CrewStatus = "fit" | "resting" | "lightly_wounded" | "seriously_wounded" | "missing" | "kia" | "pow" | "unassigned";
+export type InjurySeverity = "none" | "light" | "serious" | "permanent";
+export type CrewRole =
+  | "pilot"
+  | "copilot"
+  | "navigator"
+  | "bombardier"
+  | "engineer_top_turret"
+  | "radio_operator"
+  | "ball_turret"
+  | "left_waist"
+  | "right_waist"
+  | "tail_gunner";
+export type CrewSpecialty = CrewRole | "enlisted_airman";
 export type GroundCrewSpecialty = "engines" | "structure" | "quick_patch" | "careful_inspection";
 export type TargetType = "factory" | "airfield" | "rail" | "radar" | "port" | "defense";
 export type DirectiveRelevance = "low" | "medium" | "high";
@@ -49,6 +62,22 @@ export type ReconStatus = "planned" | "airborne" | "awaiting_interpretation" | "
 export type AvailabilityLevel = "available" | "marginal" | "unavailable";
 export type ReconResultQuality = "clear" | "partial" | "inconclusive";
 export type NotificationKind = "report" | "debrief" | "recon" | "maintenance" | "operations";
+export type ReplacementStatusAtLaunch = "original" | "temporary_replacement" | "permanent_replacement";
+export type StaffOfficer =
+  | "Executive Officer"
+  | "Operations Officer"
+  | "Intelligence Officer"
+  | "Engineering Officer"
+  | "Medical/Personnel Officer"
+  | "Command Liaison";
+export type StaffUrgency = "low" | "normal" | "urgent";
+export type StaffActionType =
+  | "go_debrief"
+  | "go_maintenance"
+  | "go_aircraft_crews"
+  | "go_target_board"
+  | "go_mission_planning"
+  | "start_recon";
 
 export interface CampaignState {
   currentDay: number;
@@ -62,6 +91,18 @@ export interface CampaignState {
   pendingDecisions: string[];
   stationWeather: string;
   latestIntelUpdate: LatestIntelUpdate | null;
+}
+
+export interface StaffRecommendation {
+  id: string;
+  sourceOfficer: StaffOfficer;
+  title: string;
+  body: string;
+  urgency: StaffUrgency;
+  relatedActionType: StaffActionType | null;
+  relatedTargetId: string | null;
+  relatedAircraftId: string | null;
+  relatedCrewMemberId: string | null;
 }
 
 export interface LogEntry {
@@ -78,16 +119,20 @@ export interface Aircraft {
   conditionSummary: string;
   hiddenCondition: number;
   assignedCrewId: string;
+  assignedCrewMemberIds: string[];
   assignedGroundCrewId: string;
   missionCount: number;
   damageHistory: string[];
   repairJobId: string | null;
   recoveryJobId: string | null;
   lastOutcomeNote: string;
+  crewCohesion: string;
+  lastCrewIssueNote: string;
 }
 
 export interface Aircrew {
   id: string;
+  assignedAircraftId: string;
   pilotName: string;
   experience: CrewExperience;
   fatigue: CrewFatigue;
@@ -95,6 +140,26 @@ export interface Aircrew {
   status: CrewStatus;
   missionCount: number;
   familiarityAircraftId: string;
+  notes: string;
+}
+
+export interface CrewMember {
+  id: string;
+  name: string;
+  rank: string;
+  role: CrewSpecialty;
+  currentAssignmentRole: CrewRole | null;
+  status: CrewStatus;
+  fatigue: CrewFatigue;
+  morale: CrewMorale;
+  experience: CrewExperience;
+  missionsFlown: number;
+  assignedAircraftId: string | null;
+  originalAircraftId: string | null;
+  isReplacement: boolean;
+  isPermanentReplacement: boolean;
+  injurySeverity: InjurySeverity;
+  recoveryAvailableAt: number | null;
   notes: string;
 }
 
@@ -119,6 +184,8 @@ export interface Target {
   assessedCondition: string;
   intelConfidence: IntelConfidence;
   lastReconDay: number | null;
+  lastReconAt: number | null;
+  lastReconSummary: string | null;
   weatherOutlook: string;
   suspectedEffects: string;
   connectedTargetIds: string[];
@@ -128,6 +195,23 @@ export interface Target {
   latestIntelNote: string | null;
   latestIntelRecommendation: string | null;
   latestIntelSource: string | null;
+  latestIntelUpdatedAt: number | null;
+  lastMissionSummary: string | null;
+  lastMissionAt: number | null;
+  lastDebriefSummary: string | null;
+  lastDebriefAt: number | null;
+}
+
+export interface MissionCrewSnapshotMember {
+  crewMemberId: string;
+  roleAtLaunch: CrewRole;
+  replacementStatusAtLaunch: ReplacementStatusAtLaunch;
+}
+
+export interface MissionAircraftCrewSnapshot {
+  aircraftId: string;
+  crewMemberIds: string[];
+  members: MissionCrewSnapshotMember[];
 }
 
 export interface MissionPlan {
@@ -142,20 +226,31 @@ export interface MissionPlan {
     allowRepeatBombRun: boolean;
   };
   status: MissionPlanStatus;
+  launchCrewManifests: MissionAircraftCrewSnapshot[];
+}
+
+export interface MissionCrewEffect {
+  crewMemberId: string;
+  roleAtLaunch: CrewRole;
+  status: CrewStatus;
+  fatigue: CrewFatigue;
+  morale: CrewMorale;
+  injurySeverity: InjurySeverity;
+  recoveryAvailableAt: number | null;
+  note: string;
 }
 
 export interface AircraftMissionOutcome {
   aircraftId: string;
-  crewId: string;
   participation: "full" | "aborted" | "diverted" | "lost";
   damageDelta: number;
   finalStatus: AircraftStatus;
   conditionSummary: string;
-  crewFatigue: CrewFatigue;
-  crewMorale: CrewMorale;
-  crewStatus: CrewStatus;
   note: string;
   contributedToStrike: boolean;
+  launchManifest: MissionAircraftCrewSnapshot;
+  crewEffects: MissionCrewEffect[];
+  casualtySummary: string[];
 }
 
 export interface MissionHiddenOutcome {
@@ -176,7 +271,6 @@ export interface HiddenEffect {
     | "set_campaign_phase"
     | "mark_mission_complete";
   aircraftId?: string;
-  crewId?: string;
   targetId?: string;
   outcomeIndex?: number;
   phaseText?: string;
@@ -188,7 +282,6 @@ export interface MissionEvent {
   stage: MissionStage;
   type: string;
   aircraftId?: string;
-  crewId?: string;
   targetId?: string;
   severity: MissionEventSeverity;
   hiddenEffects: HiddenEffect[];
@@ -208,6 +301,7 @@ export interface Mission {
   reports: string[];
   resultSummary: string;
   debrief: string;
+  debriefCasualtyLines: string[];
   status: MissionPlanStatus;
   debriefGenerated: boolean;
   hiddenOutcome: MissionHiddenOutcome;
@@ -274,6 +368,15 @@ export interface DebugState {
   clockOffsetMs: number;
 }
 
+export interface RecoveryCrewUpdate {
+  crewMemberId: string;
+  status: CrewStatus;
+  fatigue: CrewFatigue;
+  injurySeverity: InjurySeverity;
+  recoveryAvailableAt: number | null;
+  note: string;
+}
+
 export interface RecoveryJob {
   id: string;
   aircraftId: string;
@@ -288,9 +391,7 @@ export interface RecoveryJob {
   hiddenReturnStatus: AircraftStatus;
   hiddenConditionSummary: string;
   hiddenDamageNote: string;
-  hiddenCrewFatigue: CrewFatigue;
-  hiddenCrewStatus: CrewStatus;
-  hiddenCrewNote: string;
+  hiddenCrewUpdates: RecoveryCrewUpdate[];
 }
 
 export interface UiNotification {
@@ -309,6 +410,7 @@ export interface SaveState {
   campaign: CampaignState;
   aircraft: Aircraft[];
   crews: Aircrew[];
+  crewMembers: CrewMember[];
   groundCrews: GroundCrew[];
   targets: Target[];
   missions: Mission[];

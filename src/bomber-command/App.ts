@@ -1,14 +1,17 @@
 import {
   advanceCampaignDay,
+  assignReplacementCrewMember,
   completeAllRepairs,
   completeCurrentRecon,
   createNewGame,
   formatTimestamp,
   getActiveMission,
+  getActiveMissionCrewIds,
   getActiveRecon,
   getAircraftAvailability,
   getAircraftById,
   getCrewById,
+  getCrewMembersForAircraft,
   getCurrentOperationSummary,
   getDisabledReasonForLaunch,
   getEffectiveNow,
@@ -16,11 +19,18 @@ import {
   getLatestDebriefMission,
   getLatestCompletedRecon,
   getOperationsDeskSummary,
+  getReplacementPool,
+  getStaffBriefingRecommendations,
   getTargetById,
+  getTargetContextSummary,
+  getTargetIntelAgeLabel,
   getTargetOperationalSummary,
+  getUnavailablePersonnel,
   launchMission,
   loadState,
+  markReplacementPermanent,
   reconcileState,
+  removeReplacementCrewMember,
   resetState,
   saveState,
   setLaunchMode,
@@ -36,8 +46,8 @@ import {
   startRepair,
   toggleAssignedAircraft,
   toggleStandingOrder
-} from "./game";
-import type { CampaignTab, ReconType, RepairTier, SaveState, Target } from "./types";
+} from "./game.js";
+import type { CampaignTab, CrewMember, CrewRole, ReconType, RepairTier, SaveState, StaffRecommendation, Target } from "./types";
 
 type ActionHandler = (action: string, payload: string | null) => void;
 
@@ -112,6 +122,39 @@ function renderNotifications(state: SaveState): string {
   `;
 }
 
+function renderCrewRow(state: SaveState, aircraftId: string, member: CrewMember, airborneIds: Set<string>): string {
+  const airborne = airborneIds.has(member.id) ? `<span class="muted">Airborne with current operation</span>` : "";
+  const replacementActions = member.isReplacement && member.assignedAircraftId === aircraftId
+    ? `
+      <div class="button-row">
+        <button data-action="mark-permanent" data-payload="${member.id}" ${member.isPermanentReplacement ? "disabled" : ""}>Mark Permanent</button>
+        <button data-action="remove-replacement" data-payload="${member.id}">Remove Replacement</button>
+      </div>
+    `
+    : "";
+  return `
+    <div class="manifest-row">
+      <div>
+        <strong>${escapeHtml(member.rank)} ${escapeHtml(member.name.replace(`${member.rank} `, ""))}</strong>
+        <div class="muted">${escapeHtml(member.currentAssignmentRole ? member.currentAssignmentRole.replaceAll("_", " ") : roleOrSpecialty(member.role))}</div>
+        <div class="muted">${escapeHtml(member.notes)}</div>
+        ${airborne}
+      </div>
+      <div class="badge-row">
+        ${renderBadge("Status", member.status.replaceAll("_", " "))}
+        ${renderBadge("Fatigue", member.fatigue)}
+        ${renderBadge("Morale", member.morale)}
+        ${renderBadge("Experience", member.experience)}
+      </div>
+      ${replacementActions}
+    </div>
+  `;
+}
+
+function roleOrSpecialty(role: CrewMember["role"]): string {
+  return role.replaceAll("_", " ");
+}
+
 function renderHeader(state: SaveState): string {
   return `
     <header class="hero panel">
@@ -140,8 +183,47 @@ function renderNav(state: SaveState): string {
   `;
 }
 
+function renderStaffActionButton(recommendation: StaffRecommendation): string {
+  switch (recommendation.relatedActionType) {
+    case "go_debrief":
+      return `<button data-action="tab" data-payload="debrief">Go to Debrief</button>`;
+    case "go_maintenance":
+      return `<button data-action="tab" data-payload="maintenance">Go to Maintenance</button>`;
+    case "go_aircraft_crews":
+      return `<button data-action="tab" data-payload="aircraft-crews">Go to Aircraft &amp; Crews</button>`;
+    case "go_target_board":
+      return `<button data-action="briefing-target-board" data-payload="${escapeHtml(recommendation.relatedTargetId ?? "")}">Go to Target Board</button>`;
+    case "go_mission_planning":
+      return `<button data-action="briefing-mission-planning" data-payload="${escapeHtml(recommendation.relatedTargetId ?? "")}">Go to Mission Planning</button>`;
+    case "start_recon":
+      if (!recommendation.relatedTargetId) {
+        return "";
+      }
+      return `<button data-action="briefing-start-recon" data-payload="${escapeHtml(recommendation.relatedTargetId)}">Start Recon</button>`;
+    default:
+      return "";
+  }
+}
+
+function renderStaffRecommendation(recommendation: StaffRecommendation): string {
+  return `
+    <article class="briefing-card urgency-${recommendation.urgency}">
+      <div class="briefing-header">
+        <div>
+          <p class="eyebrow">${escapeHtml(recommendation.sourceOfficer)}</p>
+          <h3>${escapeHtml(recommendation.title)}</h3>
+        </div>
+        ${renderBadge("Urgency", recommendation.urgency)}
+      </div>
+      <p>${escapeHtml(recommendation.body)}</p>
+      ${recommendation.relatedActionType ? `<div class="button-row briefing-actions">${renderStaffActionButton(recommendation)}</div>` : ""}
+    </article>
+  `;
+}
+
 function renderCommandPanel(state: SaveState): string {
   const opsLines = getOperationsDeskSummary(state);
+  const briefing = getStaffBriefingRecommendations(state);
   return `
     <section class="panel stack">
       <h2>Command</h2>
@@ -154,6 +236,15 @@ function renderCommandPanel(state: SaveState): string {
           ${opsLines.map((line) => `<p>${escapeHtml(line)}</p>`).join("")}
         </div>
       </div>
+      <div class="stack">
+        <div>
+          <strong>Staff Briefing / Commander's Desk</strong>
+          <p class="muted">Recommendations are qualitative and occasionally competing. They are meant to frame the next decision, not solve it for you.</p>
+        </div>
+        <div class="briefing-grid">
+          ${briefing.map((recommendation) => renderStaffRecommendation(recommendation)).join("")}
+        </div>
+      </div>
       <div class="note">
         <strong>Pending:</strong> ${state.campaign.pendingDecisions.length > 0 ? escapeHtml(state.campaign.pendingDecisions.join(" ")) : "No outstanding command note."}
       </div>
@@ -163,6 +254,7 @@ function renderCommandPanel(state: SaveState): string {
 
 function renderTargetCard(state: SaveState, target: Target): string {
   const selected = target.id === state.planning.selectedTargetId;
+  const context = getTargetContextSummary(state, target.id);
   return `
     <article class="target-card ${selected ? "selected" : ""}">
       <div class="target-header">
@@ -180,9 +272,13 @@ function renderTargetCard(state: SaveState, target: Target): string {
       <p>${escapeHtml(getTargetOperationalSummary(target))}</p>
       <p><strong>Weather:</strong> ${escapeHtml(target.weatherOutlook)}</p>
       <p><strong>Suspected Effect:</strong> ${escapeHtml(target.suspectedEffects)}</p>
+      <p><strong>Evidence Basis:</strong> ${escapeHtml(target.evidence.slice(0, 2).join(" "))}</p>
+      <p class="muted">${escapeHtml(context.lastRecon)}</p>
+      <p class="muted">${escapeHtml(context.lastMission)}</p>
+      <p class="muted">${escapeHtml(context.lastDebrief)}</p>
+      <p class="muted">${escapeHtml(context.intelAge)}</p>
       ${target.latestIntelNote ? `<p><strong>Latest Intelligence:</strong> ${escapeHtml(target.latestIntelNote)}</p>` : ""}
       ${target.latestIntelRecommendation ? `<p class="muted">${escapeHtml(target.latestIntelRecommendation)}</p>` : ""}
-      <p><strong>Evidence:</strong> ${escapeHtml(target.evidence.slice(0, 3).join(" "))}</p>
       ${hiddenBlock(state.debug.showHiddenValues, [
         `actual condition ${target.hiddenActualCondition}`,
         `defense ${target.hiddenDefenseLevel}`,
@@ -206,42 +302,123 @@ function renderTargetBoard(state: SaveState): string {
 }
 
 function renderAircraftCrews(state: SaveState): string {
+  const replacementPool = getReplacementPool(state);
+  const unavailablePersonnel = getUnavailablePersonnel(state);
+  const airborneIds = new Set(getActiveMissionCrewIds(state));
   return `
     <section class="panel stack">
       <h2>Aircraft & Crews</h2>
-      <div class="two-col">
-        <div class="stack">
-          ${state.aircraft.map((aircraft) => {
-            const crew = getCrewById(state, aircraft.assignedCrewId);
-            const availability = getAircraftAvailability(state, aircraft.id);
-            return `
-              <div class="row-card">
+      <div class="stack">
+        <h3>Aircraft</h3>
+        ${state.aircraft.map((aircraft) => {
+          const crew = getCrewById(state, aircraft.assignedCrewId);
+          const manifest = getCrewMembersForAircraft(state, aircraft.id);
+          const availability = getAircraftAvailability(state, aircraft.id);
+          const wounded = manifest.filter((member) => member.status === "lightly_wounded" || member.status === "seriously_wounded").length;
+          const replacements = manifest.filter((member) => member.isReplacement).length;
+          const missing = manifest.filter((member) => member.status === "missing" || member.status === "kia" || member.status === "pow").length;
+          const missingRoles: CrewRole[] = [
+            "pilot",
+            "copilot",
+            "navigator",
+            "bombardier",
+            "engineer_top_turret",
+            "radio_operator",
+            "ball_turret",
+            "left_waist",
+            "right_waist",
+            "tail_gunner"
+          ].filter((role) => !manifest.some((member) => member.currentAssignmentRole === role && !["missing", "kia", "pow", "seriously_wounded"].includes(member.status))) as CrewRole[];
+          return `
+            <details class="row-card aircraft-detail" open>
+              <summary class="aircraft-summary">
                 <div>
                   <strong>${escapeHtml(aircraft.name)}</strong>
-                  <div class="muted">${escapeHtml(aircraft.conditionSummary)}</div>
-                  <div class="muted">Assigned crew: ${escapeHtml(crew?.pilotName ?? "Unknown")}</div>
+                  <div class="muted">${escapeHtml(crew?.pilotName ?? "No pilot assigned")} • ${escapeHtml(aircraft.lastCrewIssueNote)}</div>
+                  <div class="muted">${wounded} wounded • ${missing} unavailable • ${replacements} replacements</div>
+                  <div class="muted">Full crew manifest shown below.</div>
                 </div>
-                <div class="stack compact">
+                <div class="badge-row">
                   ${renderBadge("Status", aircraft.status)}
-                  ${renderBadge("Assignment", availability.label)}
+                  ${renderBadge("Availability", availability.label)}
                 </div>
+              </summary>
+              <div class="stack compact">
+                <div class="aircraft-info-block">
+                  <strong>Aircraft Status</strong>
+                  <p class="muted">${escapeHtml(aircraft.conditionSummary)}</p>
+                  <p class="muted">${escapeHtml(aircraft.crewCohesion)}</p>
+                  <p class="muted">Ground crew: ${escapeHtml(aircraft.assignedGroundCrewId)}</p>
+                </div>
+                <div class="crew-manifest-block">
+                  <strong>Crew Manifest</strong>
+                  <p class="muted">The following crew are currently assigned to this aircraft.</p>
+                  ${manifest.sort((a, b) => (a.currentAssignmentRole ?? "").localeCompare(b.currentAssignmentRole ?? "")).map((member) => renderCrewRow(state, aircraft.id, member, airborneIds)).join("")}
+                </div>
+                ${missingRoles.length > 0 ? `
+                  <div class="stack compact crew-problem-block">
+                    <strong>Open Crew Problems</strong>
+                    ${missingRoles.map((role) => `
+                      <div class="manifest-row">
+                        <div>
+                          <strong>${escapeHtml(role.replaceAll("_", " "))}</strong>
+                          <div class="muted">No fit crew member currently covers this position.</div>
+                        </div>
+                        <div class="button-row">
+                          ${replacementPool
+                            .filter((member) =>
+                              member.assignedAircraftId === null
+                              && ((member.role === "pilot" && (role === "pilot" || role === "copilot"))
+                                || (member.role === "copilot" && role === "copilot")
+                                || member.role === role
+                                || (member.role === "enlisted_airman" && ["engineer_top_turret", "radio_operator", "ball_turret", "left_waist", "right_waist", "tail_gunner"].includes(role)))
+                            )
+                            .map((member) => `
+                              <button data-action="assign-replacement" data-payload="${member.id}:${aircraft.id}:${role}">
+                                Assign ${escapeHtml(member.name)}
+                              </button>
+                            `).join("") || `<span class="disabled-reason">No suitable replacement available.</span>`}
+                        </div>
+                      </div>
+                    `).join("")}
+                  </div>
+                ` : ""}
                 ${hiddenBlock(state.debug.showHiddenValues, [`condition ${aircraft.hiddenCondition}`])}
               </div>
-            `;
-          }).join("")}
-        </div>
+            </details>
+          `;
+        }).join("")}
+      </div>
+      <div class="two-col">
         <div class="stack">
-          ${state.crews.map((crew) => `
+          <h3>Replacement Pool</h3>
+          ${replacementPool.length === 0 ? `<p class="muted">No replacement crew members are currently unassigned.</p>` : replacementPool.map((member) => `
             <div class="row-card">
               <div>
-                <strong>${escapeHtml(crew.pilotName)}</strong>
-                <div class="muted">${escapeHtml(crew.notes)}</div>
+                <strong>${escapeHtml(member.name)}</strong>
+                <div class="muted">${escapeHtml(roleOrSpecialty(member.role))}</div>
+                <div class="muted">${escapeHtml(member.notes)}</div>
               </div>
               <div class="badge-row">
-                ${renderBadge("Experience", crew.experience)}
-                ${renderBadge("Fatigue", crew.fatigue)}
-                ${renderBadge("Morale", crew.morale)}
-                ${renderBadge("Status", crew.status)}
+                ${renderBadge("Status", member.status.replaceAll("_", " "))}
+                ${renderBadge("Experience", member.experience)}
+              </div>
+            </div>
+          `).join("")}
+        </div>
+        <div class="stack">
+          <h3>Medical / Unavailable Personnel</h3>
+          ${unavailablePersonnel.length === 0 ? `<p class="muted">No crew members are currently unavailable.</p>` : unavailablePersonnel.map((member) => `
+            <div class="row-card">
+              <div>
+                <strong>${escapeHtml(member.name)}</strong>
+                <div class="muted">${escapeHtml(member.currentAssignmentRole ? member.currentAssignmentRole.replaceAll("_", " ") : roleOrSpecialty(member.role))}</div>
+                <div class="muted">${escapeHtml(member.notes)}</div>
+              </div>
+              <div class="badge-row">
+                ${renderBadge("Status", member.status.replaceAll("_", " "))}
+                ${renderBadge("Fatigue", member.fatigue)}
+                ${renderBadge("Morale", member.morale)}
               </div>
             </div>
           `).join("")}
@@ -297,6 +474,7 @@ function renderPlanning(state: SaveState): string {
                 />
                 <span class="assignment-title">${escapeHtml(aircraft.name)} • ${escapeHtml(crew?.pilotName ?? "Unknown crew")}</span>
                 <span class="assignment-meta">${escapeHtml(availability.reason)}</span>
+                <span class="assignment-meta">${escapeHtml(aircraft.crewCohesion)}</span>
                 ${availability.warnings.length > 0 ? `<span class="warning">${escapeHtml(availability.warnings.join(" "))}</span>` : ""}
               </label>
             `;
@@ -373,9 +551,16 @@ function renderDebrief(state: SaveState): string {
   const target = getTargetById(state, mission.plan.targetId);
   return `
     <section class="panel stack">
-      <h2>Debrief / Assessment</h2>
+      <h2>Debrief: ${escapeHtml(target?.name ?? "Unknown target")}</h2>
+      <p><strong>Mission time:</strong> ${escapeHtml(formatTimestamp(state, mission.plan.scheduledLaunchTime))}</p>
       <p><strong>Mission summary:</strong> ${escapeHtml(mission.resultSummary)}</p>
       <p>${escapeHtml(mission.debrief)}</p>
+      ${mission.debriefCasualtyLines.length > 0 ? `
+        <div class="stack compact">
+          <strong>Crew Consequences</strong>
+          ${mission.debriefCasualtyLines.map((line) => `<p>${escapeHtml(line)}</p>`).join("")}
+        </div>
+      ` : `<p class="muted">No specific crew casualties have been filed beyond fatigue and strain.</p>`}
       <p><strong>Target assessment:</strong> ${escapeHtml(target?.assessedCondition ?? "No reliable assessment.")}</p>
       <p><strong>Evidence:</strong> ${escapeHtml(target?.evidence.slice(0, 4).join(" ") ?? "No evidence filed.")}</p>
       <div class="button-row">
@@ -466,6 +651,9 @@ function renderRecon(state: SaveState): string {
   return `
     <section class="panel stack">
       <h2>Recon / Intelligence</h2>
+      <p><strong>Current recon focus:</strong> ${escapeHtml(selectedTarget?.name ?? "No target selected")}</p>
+      ${selectedTarget ? `<p class="muted">${escapeHtml(selectedTarget.assessedCondition)}</p>` : ""}
+      <p class="muted">Recon section can service one group priority at a time. Other theater reconnaissance continues outside your direct control.</p>
       ${latestIntel ? `
         <div class="row-card">
           <strong>Latest Intelligence Update</strong>
@@ -603,6 +791,27 @@ export function mountBomberCommand(root: HTMLElement): void {
           state.selectedTab = "mission-planning";
         }
         break;
+      case "briefing-target-board":
+        if (payload) {
+          setPlanningTarget(state, payload);
+        }
+        state.selectedTab = "target-board";
+        break;
+      case "briefing-mission-planning":
+        if (payload) {
+          setPlanningTarget(state, payload);
+        }
+        state.selectedTab = "mission-planning";
+        break;
+      case "briefing-start-recon":
+        if (payload) {
+          setPlanningTarget(state, payload);
+          error = startRecon(state, payload, "pre_strike", now);
+          if (!error) {
+            state.selectedTab = "recon";
+          }
+        }
+        break;
       case "toggle-aircraft":
         if (payload) {
           toggleAssignedAircraft(state, payload);
@@ -635,6 +844,22 @@ export function mountBomberCommand(root: HTMLElement): void {
         if (payload) {
           const [aircraftId, tier] = payload.split(":");
           error = startRepair(state, aircraftId ?? "", (tier ?? "standard") as RepairTier, now);
+        }
+        break;
+      case "assign-replacement":
+        if (payload) {
+          const [crewMemberId, aircraftId, role] = payload.split(":");
+          error = assignReplacementCrewMember(state, crewMemberId ?? "", aircraftId ?? "", (role ?? "pilot") as CrewRole);
+        }
+        break;
+      case "remove-replacement":
+        if (payload) {
+          error = removeReplacementCrewMember(state, payload);
+        }
+        break;
+      case "mark-permanent":
+        if (payload) {
+          error = markReplacementPermanent(state, payload);
         }
         break;
       case "recover-aircraft":

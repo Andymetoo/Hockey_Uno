@@ -111,6 +111,12 @@ button.danger {
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
 }
 
+.briefing-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
 .kv,
 .target-card,
 .row-card,
@@ -216,6 +222,45 @@ button.danger {
   box-shadow: 0 0 0 1px rgba(219, 181, 120, 0.24) inset;
 }
 
+.briefing-card {
+  display: grid;
+  gap: 12px;
+  border: 1px solid rgba(216, 196, 164, 0.16);
+  border-radius: 14px;
+  padding: 14px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02)),
+    rgba(255, 255, 255, 0.02);
+}
+
+.briefing-card.urgency-urgent {
+  border-color: rgba(196, 125, 92, 0.46);
+  box-shadow: 0 0 0 1px rgba(196, 125, 92, 0.14) inset;
+}
+
+.briefing-card.urgency-normal {
+  border-color: rgba(204, 173, 104, 0.34);
+}
+
+.briefing-card.urgency-low {
+  border-color: rgba(129, 163, 142, 0.28);
+}
+
+.briefing-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.briefing-header h3 {
+  margin: 0;
+}
+
+.briefing-actions {
+  margin-top: auto;
+}
+
 .target-header {
   display: flex;
   justify-content: space-between;
@@ -231,6 +276,51 @@ button.danger {
 .row-card {
   display: grid;
   gap: 12px;
+}
+
+.aircraft-detail summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.aircraft-detail summary::-webkit-details-marker {
+  display: none;
+}
+
+.aircraft-summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.aircraft-info-block,
+.crew-manifest-block,
+.crew-problem-block {
+  display: grid;
+  gap: 10px;
+  border: 1px solid rgba(216, 196, 164, 0.14);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.035);
+  padding: 12px;
+}
+
+.crew-manifest-block {
+  border-color: rgba(219, 181, 120, 0.24);
+  background: rgba(87, 64, 34, 0.08);
+}
+
+.crew-problem-block {
+  border-color: rgba(190, 146, 90, 0.2);
+}
+
+.manifest-row {
+  display: grid;
+  gap: 10px;
+  border: 1px solid rgba(216, 196, 164, 0.12);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.025);
+  padding: 12px;
 }
 
 .badge {
