@@ -4,6 +4,7 @@ import {
   completeAllRepairs,
   completeCurrentRecon,
   createNewGame,
+  dismissActiveTutorialStep,
   formatTimestamp,
   getActiveMission,
   getActiveMissionCrewIds,
@@ -14,6 +15,7 @@ import {
   getCrewById,
   getCrewMembersForAircraft,
   getCurrentOperationSummary,
+  getActiveTutorialStep,
   getDirectiveProgressSummary,
   getDisabledReasonForLaunch,
   getEffectiveNow,
@@ -138,6 +140,29 @@ function renderNotifications(state: SaveState): string {
           ${escapeHtml(notification.text)}
         </div>
       `).join("")}
+    </section>
+  `;
+}
+
+function renderTutorialModal(state: SaveState): string {
+  const step = getActiveTutorialStep(state);
+  if (!step) {
+    return "";
+  }
+  const openTabButton = step.suggestedTab && step.suggestedTab !== state.selectedTab
+    ? `<button data-action="tutorial-open-tab" data-payload="${step.suggestedTab}">Open ${escapeHtml(step.suggestedTabLabel ?? "Suggested Panel")}</button>`
+    : "";
+  return `
+    <section class="tutorial-overlay" role="presentation">
+      <article class="tutorial-modal panel" role="dialog" aria-modal="true" aria-label="Gameplay tutorial">
+        <p class="eyebrow">Guided Tutorial</p>
+        <h2>${escapeHtml(step.title)}</h2>
+        <p class="subcopy">${escapeHtml(step.body)}</p>
+        <div class="button-row">
+          ${openTabButton}
+          <button class="active" data-action="tutorial-dismiss">Dismiss</button>
+        </div>
+      </article>
     </section>
   `;
 }
@@ -1110,6 +1135,14 @@ export function mountBomberCommand(root: HTMLElement): void {
         resetState();
         state = createNewGame(Date.now());
         break;
+      case "tutorial-dismiss":
+        dismissActiveTutorialStep(state);
+        break;
+      case "tutorial-open-tab":
+        if (payload) {
+          setSelectedTab(state, payload as CampaignTab);
+        }
+        break;
     }
 
     if (error) {
@@ -1146,6 +1179,7 @@ export function mountBomberCommand(root: HTMLElement): void {
         ${renderNotifications(state)}
         ${renderNav(state)}
         ${renderActivePanel(state)}
+        ${renderTutorialModal(state)}
       </main>
     `;
     bind();

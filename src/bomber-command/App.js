@@ -1,4 +1,4 @@
-import { advanceCampaignDay, assignReplacementCrewMember, completeAllRepairs, completeCurrentRecon, createNewGame, formatTimestamp, getActiveMission, getActiveMissionCrewIds, getActiveRecon, getAircraftAttentionState, getAircraftAvailability, getAircraftById, getCrewById, getCrewMembersForAircraft, getCurrentOperationSummary, getDirectiveProgressSummary, getDisabledReasonForLaunch, getEffectiveNow, getGroundCrewPressureNote, getHardUnavailablePersonnel, getLeadAircraftAssessment, getLatestDebriefMission, getLatestCompletedRecon, getMedicalPersonnel, getOperationsDeskSummary, getPersonnelDecisionsForAircraft, getPlanningStaffPreview, getReplacementPool, getRestingPersonnel, getRoleCoverageProblems, getSecondaryTargetOptions, getStaffBriefingRecommendations, getTargetById, getTargetContextSummary, getTargetOperationalSummary, getTargetStrategicContext, keepReplacementTemporary, letCurrentWorkFinish, launchMission, loadState, markReplacementPermanent, markReplacementPermanentFromDecision, reconcileState, restoreOriginalCrewMember, removeReplacementCrewMember, resetState, saveState, setAttackDoctrine, setLeadAircraft, setLaunchMode, setOperationType, setPlanningTarget, setRouteRisk, setScheduleDelay, setSecondaryTarget, setSelectedTab, setShowHiddenValues, skipToDebrief, skipToNextReport, startRecovery, startRecon, startRepair, standDownUntilMorning, toggleAssignedAircraft, toggleStandingOrder, waitUntilNextEvent } from "./game.js";
+import { advanceCampaignDay, assignReplacementCrewMember, completeAllRepairs, completeCurrentRecon, createNewGame, dismissActiveTutorialStep, formatTimestamp, getActiveMission, getActiveMissionCrewIds, getActiveRecon, getActiveTutorialStep, getAircraftAttentionState, getAircraftAvailability, getAircraftById, getCrewById, getCrewMembersForAircraft, getCurrentOperationSummary, getDirectiveProgressSummary, getDisabledReasonForLaunch, getEffectiveNow, getGroundCrewPressureNote, getHardUnavailablePersonnel, getLeadAircraftAssessment, getLatestDebriefMission, getLatestCompletedRecon, getMedicalPersonnel, getOperationsDeskSummary, getPersonnelDecisionsForAircraft, getPlanningStaffPreview, getReplacementPool, getRestingPersonnel, getRoleCoverageProblems, getSecondaryTargetOptions, getStaffBriefingRecommendations, getTargetById, getTargetContextSummary, getTargetOperationalSummary, getTargetStrategicContext, keepReplacementTemporary, letCurrentWorkFinish, launchMission, loadState, markReplacementPermanent, markReplacementPermanentFromDecision, reconcileState, restoreOriginalCrewMember, removeReplacementCrewMember, resetState, saveState, setAttackDoctrine, setLeadAircraft, setLaunchMode, setOperationType, setPlanningTarget, setRouteRisk, setScheduleDelay, setSecondaryTarget, setSelectedTab, setShowHiddenValues, skipToDebrief, skipToNextReport, startRecovery, startRecon, startRepair, standDownUntilMorning, toggleAssignedAircraft, toggleStandingOrder, waitUntilNextEvent } from "./game.js";
 const TABS = [
     { id: "command", label: "Command" },
     { id: "target-board", label: "Target Board" },
@@ -58,6 +58,28 @@ function renderNotifications(state) {
           ${escapeHtml(notification.text)}
         </div>
       `).join("")}
+    </section>
+  `;
+}
+function renderTutorialModal(state) {
+    const step = getActiveTutorialStep(state);
+    if (!step) {
+        return "";
+    }
+    const openTabButton = step.suggestedTab && step.suggestedTab !== state.selectedTab
+        ? `<button data-action="tutorial-open-tab" data-payload="${step.suggestedTab}">Open ${escapeHtml(step.suggestedTabLabel ?? "Suggested Panel")}</button>`
+        : "";
+    return `
+    <section class="tutorial-overlay" role="presentation">
+      <article class="tutorial-modal panel" role="dialog" aria-modal="true" aria-label="Gameplay tutorial">
+        <p class="eyebrow">Guided Tutorial</p>
+        <h2>${escapeHtml(step.title)}</h2>
+        <p class="subcopy">${escapeHtml(step.body)}</p>
+        <div class="button-row">
+          ${openTabButton}
+          <button class="active" data-action="tutorial-dismiss">Dismiss</button>
+        </div>
+      </article>
     </section>
   `;
 }
@@ -1003,6 +1025,14 @@ export function mountBomberCommand(root) {
                 resetState();
                 state = createNewGame(Date.now());
                 break;
+            case "tutorial-dismiss":
+              dismissActiveTutorialStep(state);
+              break;
+            case "tutorial-open-tab":
+              if (payload) {
+                setSelectedTab(state, payload);
+              }
+              break;
         }
         if (error) {
             state.campaign.logEntries.unshift({
@@ -1034,6 +1064,7 @@ export function mountBomberCommand(root) {
         ${renderNotifications(state)}
         ${renderNav(state)}
         ${renderActivePanel(state)}
+        ${renderTutorialModal(state)}
       </main>
     `;
         bind();

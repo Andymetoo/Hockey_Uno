@@ -435,6 +435,32 @@ button.danger {
   border-color: rgba(132, 174, 133, 0.42);
 }
 
+.tutorial-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(5, 8, 14, 0.66);
+}
+
+.tutorial-modal {
+  width: min(640px, calc(100vw - 24px));
+  border-color: rgba(229, 194, 122, 0.52);
+  background:
+    linear-gradient(180deg, rgba(87, 64, 34, 0.2), rgba(15, 18, 24, 0.92) 35%),
+    rgba(15, 18, 24, 0.94);
+  box-shadow:
+    0 0 0 1px rgba(219, 181, 120, 0.32) inset,
+    0 24px 62px rgba(0, 0, 0, 0.45);
+}
+
+.tutorial-modal h2 {
+  margin: 0 0 10px;
+  font-size: clamp(1.15rem, 2.2vw, 1.6rem);
+}
+
 @media (max-width: 720px) {
   .bomber-shell {
     width: min(100vw, calc(100vw - 12px));
@@ -448,5 +474,13 @@ button.danger {
   .tab-btn {
     min-width: 0;
     flex: 1 1 140px;
+  }
+
+  .tutorial-overlay {
+    padding: 10px;
+  }
+
+  .tutorial-modal {
+    width: calc(100vw - 16px);
   }
 }

@@ -1,5 +1,5 @@
 export const SAVE_KEY = "bomber-command-save-v1";
-export const SAVE_VERSION = 6;
+export const SAVE_VERSION = 7;
 const SHORT_MISSION_MS = 5 * 60 * 1000;
 const MAJOR_MISSION_MS = 10 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -153,6 +153,211 @@ const TARGET_DEFS = [
         weatherOutlook: "Scattered cloud with likely flak markers visible through breaks."
     }
 ];
+const TAB_LABELS = {
+    command: "Command",
+    "target-board": "Target Board",
+    "aircraft-crews": "Aircraft & Crews",
+    "mission-planning": "Mission Planning",
+    "current-operation": "Current Operation",
+    debrief: "Debrief / Assessment",
+    maintenance: "Maintenance",
+    recon: "Recon / Intelligence",
+    "event-log": "Event Log",
+    debug: "Debug"
+};
+const TUTORIAL_STEPS = [
+    {
+        id: "welcome",
+        title: "Welcome to the First Operation",
+        body: "Start on Command, then move to Target Board and Mission Planning. Pick one target, assign serviceable aircraft, and launch a first strike so the operation loop can begin.",
+        suggestedTab: "command",
+        trigger: (state) => state.missions.length === 0 && state.campaign.currentDay === 1
+    },
+    {
+        id: "planning-basics",
+        title: "Build a Mission Plan",
+        body: "On Mission Planning, confirm target, route risk, doctrine, and lead aircraft. Lead quality and route choice strongly affect the hidden mission risk profile.",
+        suggestedTab: "mission-planning",
+        prerequisites: ["welcome"],
+        trigger: (state) => state.missions.length === 0 && state.campaign.activeMissionId === null
+    },
+    {
+        id: "mission-launched",
+        title: "Operation Launched",
+        body: "Reports now arrive over time. Use Current Operation to watch stage updates, or use wait controls to jump to the next report when testing.",
+        suggestedTab: "current-operation",
+        prerequisites: ["planning-basics"],
+        trigger: (state) => Boolean(getActiveMission(state))
+    },
+    {
+        id: "mission-reporting",
+        title: "Read Incoming Reports",
+        body: "Mission events are revealed in sequence. Early reports can be fragmentary, so wait for debrief before committing to major follow-up decisions.",
+        suggestedTab: "current-operation",
+        prerequisites: ["mission-launched"],
+        trigger: (state) => {
+            const mission = getActiveMission(state);
+            return Boolean(mission && mission.reports.length > 0);
+        }
+    },
+    {
+        id: "debrief-review",
+        title: "Debrief Is Ready",
+        body: "Review Debrief / Assessment now. This is where target effect, aircraft status, and crew casualties are consolidated for your next order.",
+        suggestedTab: "debrief",
+        prerequisites: ["mission-reporting"],
+        trigger: (state) => state.campaign.lastDebriefMissionId !== null
+    },
+    {
+        id: "maintenance-follow-up",
+        title: "Follow Up with Maintenance",
+        body: "After each debrief, inspect Maintenance for damaged or diverted aircraft. Start repairs quickly to restore sortie capacity for the next operation.",
+        suggestedTab: "maintenance",
+        prerequisites: ["debrief-review"],
+        trigger: (state) => state.aircraft.some((aircraft) => aircraft.status === "damaged" || aircraft.status === "diverted")
+    },
+    {
+        id: "recon-follow-up",
+        title: "Order Post-Strike Recon",
+        body: "A follow-up recon helps confirm target condition and updates confidence. Recon is valuable before committing to another strike on the same target.",
+        suggestedTab: "recon",
+        prerequisites: ["debrief-review"],
+        trigger: (state) => state.campaign.lastDebriefMissionId !== null && state.reconMissions.length === 0 && !state.campaign.activeReconId
+    },
+    {
+        id: "recon-results",
+        title: "Use Recon Interpretation",
+        body: "Recon interpretation is now filed. Re-check target confidence, defense outlook, and alert level before selecting your next operation profile.",
+        suggestedTab: "target-board",
+        prerequisites: ["recon-follow-up"],
+        trigger: (state) => state.campaign.latestIntelUpdate !== null
+    },
+    {
+        id: "advance-day",
+        title: "Advance the Campaign Day",
+        body: "When no immediate action is pending, advance day to accrue rest and continue campaign tempo. Avoid long idle gaps if command patience is slipping.",
+        suggestedTab: "command",
+        prerequisites: ["debrief-review"],
+        trigger: (state) => state.campaign.lastDebriefMissionId !== null && state.campaign.currentDay === 1 && !state.campaign.activeMissionId
+    },
+    {
+        id: "first-loop-complete",
+        title: "First Loop Complete",
+        body: "You have completed the core loop: plan, launch, debrief, and follow-up decisions. Continue cycling missions while balancing fatigue, repairs, recon, and directive pressure.",
+        suggestedTab: "command",
+        prerequisites: ["advance-day"],
+        trigger: (state) => state.campaign.currentDay > 1 && state.missions.some((mission) => mission.debriefGenerated)
+    },
+    {
+        id: "personnel-decisions",
+        title: "Personnel Decision Pending",
+        body: "A recovered original crew member can reclaim a seat from a temporary replacement. Resolve the personnel decision to stabilize crew cohesion.",
+        suggestedTab: "aircraft-crews",
+        prerequisites: ["debrief-review"],
+        trigger: (state) => state.campaign.personnelDecisions.some((decision) => !decision.resolved)
+    },
+    {
+        id: "replacement-crew",
+        title: "Replacement Crew in Use",
+        body: "Replacements keep aircraft flying, but too many substitutions can strain cohesion. Keep an eye on role coverage and fatigue before launch.",
+        suggestedTab: "aircraft-crews",
+        prerequisites: ["debrief-review"],
+        trigger: (state) => state.crewMembers.some((member) => member.isReplacement && member.assignedAircraftId !== null)
+    },
+    {
+        id: "command-patience",
+        title: "Command Patience Is Dropping",
+        body: "Command pressure is increasing. Prioritize operations that support the directive while keeping enough aircraft serviceable for sustained tempo.",
+        suggestedTab: "command",
+        prerequisites: ["first-loop-complete"],
+        trigger: (state) => state.campaign.directiveState.commandPatience < 58
+    }
+];
+const TUTORIAL_STEP_MAP = new Map(TUTORIAL_STEPS.map((step) => [step.id, step]));
+function createInitialTutorialState() {
+    return {
+        enabled: true,
+        activeStepId: null,
+        completedStepIds: [],
+        firstLoopCompleted: false
+    };
+}
+function hasCompletedTutorialStep(state, stepId) {
+    return state.tutorial.completedStepIds.includes(stepId);
+}
+function prerequisitesMet(state, step) {
+    if (!step.prerequisites || step.prerequisites.length === 0) {
+        return true;
+    }
+    return step.prerequisites.every((required) => hasCompletedTutorialStep(state, required));
+}
+function updateFirstLoopTutorialFlag(state) {
+    const shouldBeComplete = state.campaign.currentDay > 1 && state.missions.some((mission) => mission.debriefGenerated);
+    if (state.tutorial.firstLoopCompleted === shouldBeComplete) {
+        return false;
+    }
+    state.tutorial.firstLoopCompleted = shouldBeComplete;
+    return true;
+}
+function findNextTutorialStep(state) {
+    for (const step of TUTORIAL_STEPS) {
+        if (hasCompletedTutorialStep(state, step.id)) {
+            continue;
+        }
+        if (!prerequisitesMet(state, step)) {
+            continue;
+        }
+        if (!step.trigger(state)) {
+            continue;
+        }
+        return step;
+    }
+    return null;
+}
+export function evaluateTutorial(state) {
+    if (!state.tutorial.enabled) {
+        return false;
+    }
+    let changed = updateFirstLoopTutorialFlag(state);
+    if (state.tutorial.activeStepId) {
+        return changed;
+    }
+    const nextStep = findNextTutorialStep(state);
+    if (!nextStep) {
+        return changed;
+    }
+    state.tutorial.activeStepId = nextStep.id;
+    return true;
+}
+export function dismissActiveTutorialStep(state) {
+    const activeStepId = state.tutorial.activeStepId;
+    if (!activeStepId) {
+        return false;
+    }
+    if (!state.tutorial.completedStepIds.includes(activeStepId)) {
+        state.tutorial.completedStepIds.push(activeStepId);
+    }
+    state.tutorial.activeStepId = null;
+    evaluateTutorial(state);
+    return true;
+}
+export function getActiveTutorialStep(state) {
+    if (!state.tutorial.enabled || !state.tutorial.activeStepId) {
+        return null;
+    }
+    const definition = TUTORIAL_STEP_MAP.get(state.tutorial.activeStepId);
+    if (!definition) {
+        return null;
+    }
+    const suggestedTab = definition.suggestedTab ?? null;
+    return {
+        id: definition.id,
+        title: definition.title,
+        body: definition.body,
+        suggestedTab,
+        suggestedTabLabel: suggestedTab ? TAB_LABELS[suggestedTab] : null
+    };
+}
 function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
 }
@@ -652,6 +857,7 @@ export function createNewGame(now) {
         reconMissions: [],
         notifications: [],
         planning: createPlanningState("target-1"),
+        tutorial: createInitialTutorialState(),
         debug: {
             showHiddenValues: false,
             clockOffsetMs: 0
@@ -733,6 +939,7 @@ export function createNewGame(now) {
     }
     syncDerivedCrews(state);
     state.planning = createPlanningState(state.targets[0].id);
+    evaluateTutorial(state);
     addLog(state, "boot-directive", now, "command", "Group Headquarters has received a directive to ease fighter pressure around Bremen.");
     addLog(state, "boot-warning", now, "operations", "Intelligence reminds staff that current target folders are incomplete and should not be treated as exact.");
     return state;
@@ -845,6 +1052,15 @@ function migrateLegacyState(parsed) {
     state.planning.secondaryTargetId ??= null;
     state.planning.leadAircraftId ??= state.planning.assignedAircraftIds?.[0] ?? state.aircraft[0]?.id ?? null;
     state.planning.attackDoctrine ??= state.planning.standingOrders?.allowRepeatBombRun ? "repeat_if_needed" : "single_pass";
+    state.tutorial ??= createInitialTutorialState();
+    state.tutorial.enabled ??= true;
+    state.tutorial.activeStepId ??= null;
+    state.tutorial.completedStepIds ??= [];
+    state.tutorial.firstLoopCompleted ??= false;
+    state.tutorial.completedStepIds = state.tutorial.completedStepIds.filter((stepId) => TUTORIAL_STEP_MAP.has(stepId));
+    if (state.tutorial.activeStepId && !TUTORIAL_STEP_MAP.has(state.tutorial.activeStepId)) {
+        state.tutorial.activeStepId = null;
+    }
     for (const recon of state.reconMissions ?? []) {
         recon.resultQuality ??= "partial";
         recon.recommendation ??= "Staff recommends treating the result cautiously.";
@@ -855,6 +1071,7 @@ function migrateLegacyState(parsed) {
     }
     syncDerivedCrews(state);
     syncPendingDecisionNotes(state);
+    evaluateTutorial(state);
     return state;
 }
 export function loadState() {
@@ -2382,6 +2599,7 @@ export function reconcileState(state, now) {
         changed = nudgeTargetRepairs(state, elapsedMs) || changed;
     }
     changed = pruneExpiredNotifications(state, now) || changed;
+    changed = evaluateTutorial(state) || changed;
     state.lastReconciledAt = now;
     return changed;
 }

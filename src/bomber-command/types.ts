@@ -65,6 +65,20 @@ export type AvailabilityLevel = "available" | "marginal" | "unavailable";
 export type ReconResultQuality = "clear" | "partial" | "inconclusive";
 export type NotificationKind = "report" | "debrief" | "recon" | "maintenance" | "operations";
 export type ReplacementStatusAtLaunch = "original" | "temporary_replacement" | "permanent_replacement";
+export type TutorialStepId =
+  | "welcome"
+  | "planning-basics"
+  | "mission-launched"
+  | "mission-reporting"
+  | "debrief-review"
+  | "maintenance-follow-up"
+  | "recon-follow-up"
+  | "recon-results"
+  | "advance-day"
+  | "first-loop-complete"
+  | "personnel-decisions"
+  | "replacement-crew"
+  | "command-patience";
 export type StaffOfficer =
   | "Executive Officer"
   | "Operations Officer"
@@ -432,6 +446,21 @@ export interface DebugState {
   clockOffsetMs: number;
 }
 
+export interface TutorialState {
+  enabled: boolean;
+  activeStepId: TutorialStepId | null;
+  completedStepIds: TutorialStepId[];
+  firstLoopCompleted: boolean;
+}
+
+export interface TutorialStepDisplay {
+  id: TutorialStepId;
+  title: string;
+  body: string;
+  suggestedTab: CampaignTab | null;
+  suggestedTabLabel: string | null;
+}
+
 export interface RecoveryCrewUpdate {
   crewMemberId: string;
   status: CrewStatus;
@@ -483,6 +512,7 @@ export interface SaveState {
   reconMissions: ReconMission[];
   notifications: UiNotification[];
   planning: PlanningState;
+  tutorial: TutorialState;
   debug: DebugState;
 }
 
