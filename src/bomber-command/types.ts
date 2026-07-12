@@ -91,9 +91,21 @@ export type StaffActionType =
   | "go_debrief"
   | "go_maintenance"
   | "go_aircraft_crews"
+  | "go_recon"
   | "go_target_board"
   | "go_mission_planning"
-  | "start_recon";
+  | "start_recon"
+  | "wait_next_event"
+  | "stand_down_morning"
+  | "let_work_finish";
+
+export type CampaignSpinePhase =
+  | "opening_assessment"
+  | "fighter_pressure"
+  | "bremen_preparation"
+  | "direct_strike_pressure"
+  | "assessment_followup"
+  | "crisis_recovery";
 
 export type PersonnelDecisionAction = "restore_original" | "keep_replacement_temporary" | "mark_replacement_permanent";
 export type StrategicEffectCategory =
@@ -142,6 +154,26 @@ export interface StaffRecommendation {
   relatedTargetId: string | null;
   relatedAircraftId: string | null;
   relatedCrewMemberId: string | null;
+  planOperationType?: OperationType;
+  planRouteRisk?: RouteRisk;
+  planAttackDoctrine?: AttackDoctrine;
+  planSecondaryTargetId?: string | null;
+  planReconType?: ReconType;
+}
+
+export interface StaffConference {
+  phaseId: CampaignSpinePhase;
+  phaseLabel: string;
+  summary: string;
+  executiveComment: string;
+  operationsComment: string;
+  intelligenceComment: string;
+  engineeringComment: string;
+  personnelComment: string;
+  commandComment: string;
+  recommendedAction: StaffRecommendation;
+  alternateActions: StaffRecommendation[];
+  riskIfIgnored: string | null;
 }
 
 export interface LogEntry {
@@ -451,6 +483,7 @@ export interface TutorialState {
   activeStepId: TutorialStepId | null;
   completedStepIds: TutorialStepId[];
   firstLoopCompleted: boolean;
+  suppressModalUntilAt: number | null;
 }
 
 export interface TutorialStepDisplay {

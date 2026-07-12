@@ -247,6 +247,19 @@ button.danger {
     rgba(255, 255, 255, 0.025);
 }
 
+.staff-conference-card {
+  border-color: rgba(148, 176, 198, 0.28);
+  background:
+    radial-gradient(circle at top left, rgba(88, 114, 142, 0.16), transparent 35%),
+    linear-gradient(180deg, rgba(20, 35, 47, 0.3), rgba(255, 255, 255, 0.03)),
+    rgba(255, 255, 255, 0.025);
+}
+
+.conference-comments {
+  border-left: 2px solid rgba(148, 176, 198, 0.28);
+  padding-left: 12px;
+}
+
 .briefing-card {
   display: grid;
   gap: 12px;

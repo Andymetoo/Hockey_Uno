@@ -1,5 +1,5 @@
 export const SAVE_KEY = "bomber-command-save-v1";
-export const SAVE_VERSION = 7;
+export const SAVE_VERSION = 8;
 const SHORT_MISSION_MS = 5 * 60 * 1000;
 const MAJOR_MISSION_MS = 10 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -279,7 +279,8 @@ function createInitialTutorialState() {
         enabled: true,
         activeStepId: null,
         completedStepIds: [],
-        firstLoopCompleted: false
+        firstLoopCompleted: false,
+        suppressModalUntilAt: null
     };
 }
 function hasCompletedTutorialStep(state, stepId) {
@@ -316,6 +317,9 @@ function findNextTutorialStep(state) {
 }
 export function evaluateTutorial(state) {
     if (!state.tutorial.enabled) {
+        return false;
+    }
+    if (state.tutorial.suppressModalUntilAt && getEffectiveNow(state) < state.tutorial.suppressModalUntilAt) {
         return false;
     }
     let changed = updateFirstLoopTutorialFlag(state);
@@ -1023,6 +1027,7 @@ function migrateLegacyState(parsed) {
         member.injurySeverity ??= member.status === "seriously_wounded" ? "serious" : member.status === "lightly_wounded" ? "light" : "none";
         member.recoveryAvailableAt ??= null;
         member.currentAssignmentRole ??= member.role === "enlisted_airman" ? null : member.role;
+        normalizeSeriousWoundMember(member);
     }
     for (const mission of state.missions ?? []) {
         mission.debriefCasualtyLines ??= [];
@@ -1057,6 +1062,7 @@ function migrateLegacyState(parsed) {
     state.tutorial.activeStepId ??= null;
     state.tutorial.completedStepIds ??= [];
     state.tutorial.firstLoopCompleted ??= false;
+    state.tutorial.suppressModalUntilAt ??= null;
     state.tutorial.completedStepIds = state.tutorial.completedStepIds.filter((stepId) => TUTORIAL_STEP_MAP.has(stepId));
     if (state.tutorial.activeStepId && !TUTORIAL_STEP_MAP.has(state.tutorial.activeStepId)) {
         state.tutorial.activeStepId = null;
@@ -1066,6 +1072,7 @@ function migrateLegacyState(parsed) {
         recon.recommendation ??= "Staff recommends treating the result cautiously.";
     }
     ensureAircraftRoleAssignments(state);
+    cleanupPlanningState(state);
     for (const aircraft of state.aircraft) {
         aircraft.lastCrewIssueNote = buildAircraftIssueNote(state, aircraft);
     }
@@ -1244,6 +1251,116 @@ export function getRoleCoverageProblems(state, aircraftId) {
 function getCompatibleReplacements(state, role) {
     return getReplacementPool(state).filter((member) => isRoleCompatible(member, role) && member.status === "unassigned");
 }
+const LEAD_INVALID_WARNING = "Lead aircraft is no longer valid. Select a new lead before launch.";
+function syncPlanningWarnings(state) {
+    state.campaign.pendingDecisions = state.campaign.pendingDecisions.filter((entry) => entry !== LEAD_INVALID_WARNING);
+    if (!state.planning.leadAircraftId && state.planning.assignedAircraftIds.length > 0) {
+        state.campaign.pendingDecisions.push(LEAD_INVALID_WARNING);
+    }
+}
+function normalizeSeriousWoundMember(member) {
+    if (member.status !== "seriously_wounded") {
+        return;
+    }
+    member.recoveryAvailableAt = null;
+    member.injurySeverity = "serious";
+    if (/recover|later today|tomorrow|soon|brief medical recovery/i.test(member.notes) || member.notes.trim().length === 0) {
+        member.notes = "Seriously wounded; replacement required. Not expected back during this operation cycle.";
+    }
+}
+function cleanupPlanningState(state) {
+    const validAircraftIds = new Set(state.aircraft.map((aircraft) => aircraft.id));
+    const previousAssigned = state.planning.assignedAircraftIds;
+    const previousWarnings = state.campaign.pendingDecisions.join("|");
+    state.planning.assignedAircraftIds = state.planning.assignedAircraftIds.filter((aircraftId) => validAircraftIds.has(aircraftId));
+    let changed = previousAssigned.length !== state.planning.assignedAircraftIds.length;
+    const hadLead = state.planning.leadAircraftId;
+    if (hadLead
+        && (!state.planning.assignedAircraftIds.includes(hadLead)
+            || getAircraftAvailability(state, hadLead).level === "unavailable")) {
+        state.planning.leadAircraftId = null;
+        changed = true;
+    }
+    syncPlanningWarnings(state);
+    return changed || previousWarnings !== state.campaign.pendingDecisions.join("|");
+}
+export function getCrewAircraftLabel(state, member) {
+    if (!member.assignedAircraftId) {
+        return member.isReplacement ? "Aircraft: Replacement pool" : "Aircraft: Unassigned";
+    }
+    return `Aircraft: ${getAircraftById(state, member.assignedAircraftId)?.name ?? "Unknown aircraft"}`;
+}
+export function getCrewSeatLabel(member) {
+    const normalRole = member.role === "enlisted_airman" ? "Enlisted replacement" : roleLabel(member.role);
+    const currentSeat = member.currentAssignmentRole ? roleLabel(member.currentAssignmentRole) : "No active seat";
+    return `Seat: ${currentSeat}. Specialty: ${normalRole}.`;
+}
+export function getMedicalRecoveryLabel(member, now) {
+    if (member.status === "fit") {
+        return "Recovery: Fit for duty";
+    }
+    if (member.status === "resting") {
+        return "Recovery: Resting; returns when fatigue clears";
+    }
+    if (member.status === "lightly_wounded") {
+        if (!member.recoveryAvailableAt) {
+            return "Recovery: Recovering; medical has not filed a firm time";
+        }
+        const diff = member.recoveryAvailableAt - now;
+        const fuzzy = diff <= 6 * 60 * 60 * 1000
+            ? "later today"
+            : diff <= 24 * 60 * 60 * 1000
+                ? "tomorrow"
+                : "soon";
+        return `Recovery: passive, expected ${fuzzy}`;
+    }
+    if (member.status === "seriously_wounded") {
+        return "Recovery: Seriously wounded; out indefinitely for this campaign slice";
+    }
+    if (member.status === "missing" || member.status === "pow" || member.status === "kia") {
+        return "Recovery: Not available";
+    }
+    if (member.status === "unassigned" && member.isReplacement) {
+        return "Recovery: Available in replacement pool";
+    }
+    return "Recovery: No firm medical note filed";
+}
+export function getReplacementCoveringMember(state, member) {
+    if (!member.assignedAircraftId) {
+        return undefined;
+    }
+    const decision = state.campaign.personnelDecisions.find((entry) => !entry.resolved && entry.crewMemberId === member.id);
+    const expectedRole = member.currentAssignmentRole ?? decision?.role ?? getRoleForRecoveredOriginal(member);
+    if (!expectedRole) {
+        return undefined;
+    }
+    return getCrewMembersForAircraft(state, member.assignedAircraftId).find((candidate) => candidate.id !== member.id
+        && candidate.currentAssignmentRole === expectedRole
+        && candidate.isReplacement
+        && canRoleFly(candidate));
+}
+export function getMedicalActionLabel(state, member) {
+    if (member.status === "lightly_wounded") {
+        return "Action: none";
+    }
+    if (member.status === "seriously_wounded") {
+        return "Action: replacement required";
+    }
+    if (member.status === "resting") {
+        return "Action: none";
+    }
+    if (member.status === "missing" || member.status === "pow" || member.status === "kia") {
+        return "Action: none";
+    }
+    if (state.campaign.personnelDecisions.some((entry) => !entry.resolved && entry.crewMemberId === member.id)) {
+        return "Action: resolve personnel decision";
+    }
+    const covering = getReplacementCoveringMember(state, member);
+    if (covering) {
+        return "Action: none";
+    }
+    return member.isReplacement && member.assignedAircraftId === null ? "Action: available for assignment" : "Action: none";
+}
 function syncAircraftCrewNotes(state, aircraftId) {
     const aircraft = getAircraftById(state, aircraftId);
     if (!aircraft) {
@@ -1268,6 +1385,7 @@ function updateAllDerivedCrewState(state) {
         syncAircraftCrewNotes(state, aircraft.id);
     }
     syncDerivedCrews(state);
+    cleanupPlanningState(state);
 }
 export function getActiveMission(state) {
     if (!state.campaign.activeMissionId) {
@@ -1312,21 +1430,23 @@ export function setPlanningTarget(state, targetId) {
     }
 }
 export function toggleAssignedAircraft(state, aircraftId) {
-    const availability = getAircraftAvailability(state, aircraftId);
-    if (availability.level === "unavailable") {
-        return;
-    }
     if (state.planning.assignedAircraftIds.includes(aircraftId)) {
         state.planning.assignedAircraftIds = state.planning.assignedAircraftIds.filter((id) => id !== aircraftId);
         if (state.planning.leadAircraftId === aircraftId) {
-            state.planning.leadAircraftId = state.planning.assignedAircraftIds[0] ?? null;
+            state.planning.leadAircraftId = null;
         }
+        cleanupPlanningState(state);
+        return;
+    }
+    const availability = getAircraftAvailability(state, aircraftId);
+    if (availability.level === "unavailable") {
         return;
     }
     state.planning.assignedAircraftIds = [...state.planning.assignedAircraftIds, aircraftId];
     if (!state.planning.leadAircraftId) {
         state.planning.leadAircraftId = aircraftId;
     }
+    cleanupPlanningState(state);
 }
 export function setRouteRisk(state, routeRisk) {
     state.planning.routeRisk = routeRisk;
@@ -1347,6 +1467,7 @@ export function setLeadAircraft(state, aircraftId) {
         return;
     }
     state.planning.leadAircraftId = aircraftId;
+    cleanupPlanningState(state);
 }
 export function setAttackDoctrine(state, doctrine) {
     state.planning.attackDoctrine = doctrine;
@@ -1386,12 +1507,29 @@ export function assignReplacementCrewMember(state, crewMemberId, aircraftId, rol
         .filter((assigned) => assigned.currentAssignmentRole === role && !canRoleFly(assigned));
     for (const occupant of roleOccupants) {
         occupant.currentAssignmentRole = null;
-        occupant.notes = `${occupant.name} is no longer covering ${roleLabel(role)} while unfit for duty.`;
+        occupant.notes = `Attached to ${getAircraftById(state, aircraftId)?.name ?? "this crew"}; not currently occupying ${roleLabel(role)} seat while recovering or unfit for duty.`;
     }
     assignCrewMemberToAircraft(member, aircraftId, role);
     member.notes = `Assigned as ${roleLabel(role)} replacement on ${getAircraftById(state, aircraftId)?.name ?? "the aircraft"}.`;
+    state.tutorial.suppressModalUntilAt = getEffectiveNow(state) + 15000;
     updateAllDerivedCrewState(state);
+    const aircraft = getAircraftById(state, aircraftId);
+    const displaced = roleOccupants[0];
+    const confirmation = displaced
+        ? `${member.name} assigned as ${roleLabel(role)} on ${aircraft?.name ?? "the aircraft"}. ${displaced.name} remains attached to the crew but is not covering the ${roleLabel(role)} seat.`
+        : `${member.name} assigned as ${roleLabel(role)} on ${aircraft?.name ?? "the aircraft"}.`;
+    addLog(state, `replacement-assign-${member.id}-${aircraftId}-${role}`, getEffectiveNow(state), "personnel", confirmation);
+    addNotification(state, `toast-replacement-${member.id}-${aircraftId}-${role}`, "operations", confirmation, getEffectiveNow(state));
     return null;
+}
+function findRestorableOriginalForRole(state, aircraftId, role, excludedMemberId) {
+    return getCrewMembersForAircraft(state, aircraftId).find((candidate) => {
+        if (candidate.id === excludedMemberId || candidate.isReplacement || !canRoleFly(candidate)) {
+            return false;
+        }
+        const decisionRole = state.campaign.personnelDecisions.find((entry) => !entry.resolved && entry.crewMemberId === candidate.id)?.role;
+        return getRoleForRecoveredOriginal(candidate) === role || decisionRole === role;
+    });
 }
 export function removeReplacementCrewMember(state, crewMemberId) {
     const member = getCrewMemberById(state, crewMemberId);
@@ -1405,10 +1543,18 @@ export function removeReplacementCrewMember(state, crewMemberId) {
         return "This replacement is currently airborne with the active mission and cannot be removed yet.";
     }
     const previousAircraftId = member.assignedAircraftId;
+    const vacatedRole = member.currentAssignmentRole;
     member.assignedAircraftId = null;
     member.currentAssignmentRole = null;
     member.status = "unassigned";
     member.notes = "Returned to the replacement pool.";
+    if (previousAircraftId && vacatedRole && !getEffectiveRoleOccupant(state, previousAircraftId, vacatedRole)) {
+        const original = findRestorableOriginalForRole(state, previousAircraftId, vacatedRole, member.id);
+        if (original && !getEffectiveRoleOccupant(state, previousAircraftId, vacatedRole)) {
+            original.currentAssignmentRole = vacatedRole;
+            original.notes = `Attached to ${getAircraftById(state, previousAircraftId)?.name ?? "this crew"} and restored to the ${roleLabel(vacatedRole)} seat after replacement removal.`;
+        }
+    }
     updateAllDerivedCrewState(state);
     if (previousAircraftId) {
         syncAircraftCrewNotes(state, previousAircraftId);
@@ -1814,9 +1960,58 @@ function crewDamageBias(role) {
     }
     return 1.1;
 }
+function chooseCrewCasualtyBudget(snapshot, participation, outcomeRisk) {
+    if (participation === "lost") {
+        return snapshot.members.map((member) => ({ crewMemberId: member.crewMemberId, severity: "loss" }));
+    }
+    let slots = 0;
+    let seriousSlots = 0;
+    if (participation === "diverted") {
+        slots = chance(0.22) ? 1 : 0;
+    }
+    else if (outcomeRisk >= 0.92) {
+        slots = chance(0.7) ? 2 : 1;
+        seriousSlots = chance(0.35) ? 1 : 0;
+    }
+    else if (outcomeRisk >= 0.72) {
+        slots = chance(0.55) ? 1 : 0;
+        seriousSlots = chance(0.18) && slots > 0 ? 1 : 0;
+    }
+    else if (outcomeRisk >= 0.5) {
+        slots = chance(0.28) ? 1 : 0;
+    }
+    else {
+        slots = chance(0.08) ? 1 : 0;
+    }
+    const candidates = snapshot.members
+        .map((member) => ({
+        crewMemberId: member.crewMemberId,
+        weight: crewDamageBias(member.roleAtLaunch)
+    }))
+        .sort((left, right) => right.weight - left.weight);
+    const chosen = [];
+    for (const candidate of candidates) {
+        if (chosen.length >= slots) {
+            break;
+        }
+        if (chance(Math.min(0.85, candidate.weight / 1.15))) {
+            const severity = seriousSlots > 0 ? "serious" : "light";
+            if (seriousSlots > 0) {
+                seriousSlots -= 1;
+            }
+            chosen.push({ crewMemberId: candidate.crewMemberId, severity });
+        }
+    }
+    if (slots > 0 && chosen.length === 0 && candidates.length > 0) {
+        chosen.push({ crewMemberId: candidates[0].crewMemberId, severity: seriousSlots > 0 ? "serious" : "light" });
+    }
+    return chosen;
+}
 function createCrewEffectsForOutcome(state, snapshot, participation, outcomeRisk, now) {
     const effects = [];
     const summary = [];
+    const casualtyBudget = chooseCrewCasualtyBudget(snapshot, participation, outcomeRisk);
+    const casualtyMap = new Map(casualtyBudget.map((entry) => [entry.crewMemberId, entry.severity]));
     for (const memberSnapshot of snapshot.members) {
         const member = getCrewMemberById(state, memberSnapshot.crewMemberId);
         if (!member) {
@@ -1824,7 +2019,8 @@ function createCrewEffectsForOutcome(state, snapshot, participation, outcomeRisk
         }
         const effect = defaultCrewEffect(member, memberSnapshot.roleAtLaunch);
         effect.note = `${member.name} returned tired but available for debrief.`;
-        if (participation === "lost") {
+        const severity = casualtyMap.get(member.id);
+        if (severity === "loss") {
             const rolled = Math.random();
             effect.status = rolled < 0.25 ? "kia" : rolled < 0.55 ? "pow" : "missing";
             effect.injurySeverity = "permanent";
@@ -1834,16 +2030,16 @@ function createCrewEffectsForOutcome(state, snapshot, participation, outcomeRisk
             effect.note = `${member.name} is now listed as ${effect.status.replaceAll("_", " ")} after the aircraft failed to return.`;
             summary.push(`${roleLabel(memberSnapshot.roleAtLaunch)} ${member.name} ${effect.status.replaceAll("_", " ")}.`);
         }
-        else if (chance(outcomeRisk * 0.1 * crewDamageBias(memberSnapshot.roleAtLaunch))) {
+        else if (severity === "serious") {
             effect.status = "seriously_wounded";
             effect.injurySeverity = "serious";
             effect.fatigue = "exhausted";
             effect.morale = lowerMorale(effect.morale);
-            effect.recoveryAvailableAt = now + LIGHT_WOUND_RECOVERY_MS * 4;
-            effect.note = `${member.name} was seriously wounded during the mission.`;
+            effect.recoveryAvailableAt = null;
+            effect.note = `${member.name} was seriously wounded during the mission and is not expected back during this operation cycle.`;
             summary.push(`${roleLabel(memberSnapshot.roleAtLaunch)} ${member.name} seriously wounded.`);
         }
-        else if (chance(outcomeRisk * 0.18 * crewDamageBias(memberSnapshot.roleAtLaunch))) {
+        else if (severity === "light") {
             effect.status = "lightly_wounded";
             effect.injurySeverity = "light";
             effect.fatigue = "tired";
@@ -2282,6 +2478,7 @@ function applyCrewOutcome(state, mission, outcomeIndex) {
         member.injurySeverity = effect.injurySeverity;
         member.recoveryAvailableAt = effect.recoveryAvailableAt;
         member.notes = effect.note;
+        normalizeSeriousWoundMember(member);
     }
     updateAllDerivedCrewState(state);
 }
@@ -2530,6 +2727,7 @@ function applyFatigueRecovery(state, elapsedMs, now) {
             member.notes = "Recovered from light wounds and returned to duty.";
             recoveredMembers.push(member);
         }
+        normalizeSeriousWoundMember(member);
         if (previousFatigue !== member.fatigue || previousStatus !== member.status) {
             changed = true;
         }
@@ -2599,6 +2797,7 @@ export function reconcileState(state, now) {
         changed = nudgeTargetRepairs(state, elapsedMs) || changed;
     }
     changed = pruneExpiredNotifications(state, now) || changed;
+    changed = cleanupPlanningState(state) || changed;
     changed = evaluateTutorial(state) || changed;
     state.lastReconciledAt = now;
     return changed;
@@ -3297,6 +3496,393 @@ export function getOperationsDeskSummary(state) {
     lines.push(`Weather outlook: ${state.campaign.stationWeather}`);
     return lines;
 }
+function phaseLabel(phase) {
+    switch (phase) {
+        case "opening_assessment":
+            return "Opening Assessment";
+        case "fighter_pressure":
+            return "Fighter Pressure";
+        case "bremen_preparation":
+            return "Bremen Preparation";
+        case "direct_strike_pressure":
+            return "Direct Strike Pressure";
+        case "assessment_followup":
+            return "Assessment Follow-Up";
+        case "crisis_recovery":
+            return "Crisis Recovery";
+        default:
+            return "Campaign Assessment";
+    }
+}
+function hasCompletedFirstLoop(state) {
+    return state.tutorial.firstLoopCompleted
+        || (state.missions.some((mission) => mission.debriefGenerated) && (state.reconMissions.length > 0 || state.repairJobs.length > 0 || state.recoveryJobs.length > 0));
+}
+function countAvailableAircraft(state) {
+    return state.aircraft.filter((aircraft) => getAircraftAvailability(state, aircraft.id).level === "available").length;
+}
+function countMarginalAircraft(state) {
+    return state.aircraft.filter((aircraft) => getAircraftAvailability(state, aircraft.id).level === "marginal").length;
+}
+function hasReadinessCrisis(state) {
+    const available = countAvailableAircraft(state);
+    const keyRoleProblems = state.aircraft.filter((aircraft) => getAircraftAvailability(state, aircraft.id).level === "unavailable").length;
+    const activeFieldWork = state.repairJobs.filter((job) => !job.completionApplied).length + state.recoveryJobs.filter((job) => !job.completionApplied).length;
+    const wounded = state.crewMembers.filter((member) => member.status === "lightly_wounded" || member.status === "seriously_wounded").length;
+    const tired = state.crewMembers.filter((member) => member.fatigue === "tired" || member.fatigue === "exhausted").length;
+    const unresolvedPersonnel = state.campaign.personnelDecisions.filter((entry) => !entry.resolved).length;
+    return available < 3 || keyRoleProblems >= 3 || activeFieldWork >= 2 || wounded >= 3 || tired >= 8 || unresolvedPersonnel >= 2;
+}
+export function getCampaignSpinePhase(state) {
+    const missionCount = state.missions.length;
+    const latestDebrief = getLatestDebriefMission(state);
+    const latestRecon = getLatestCompletedRecon(state);
+    const directive = state.campaign.directiveState;
+    if (hasReadinessCrisis(state)) {
+        return { phaseId: "crisis_recovery", phaseLabel: phaseLabel("crisis_recovery") };
+    }
+    if (!hasCompletedFirstLoop(state)) {
+        return { phaseId: "opening_assessment", phaseLabel: phaseLabel("opening_assessment") };
+    }
+    if (latestDebrief && (!latestRecon || (state.campaign.latestIntelUpdate && state.campaign.latestIntelUpdate.updatedAt < (latestDebrief.plan.scheduledLaunchTime ?? 0)))) {
+        return { phaseId: "assessment_followup", phaseLabel: phaseLabel("assessment_followup") };
+    }
+    if (directive.commandPatience < 45 || directive.directiveProgress >= 55) {
+        return { phaseId: "direct_strike_pressure", phaseLabel: phaseLabel("direct_strike_pressure") };
+    }
+    if (directive.fighterPressure >= 60) {
+        return { phaseId: "fighter_pressure", phaseLabel: phaseLabel("fighter_pressure") };
+    }
+    if (missionCount >= 1) {
+        return { phaseId: "bremen_preparation", phaseLabel: phaseLabel("bremen_preparation") };
+    }
+    return { phaseId: "opening_assessment", phaseLabel: phaseLabel("opening_assessment") };
+}
+function findPreferredOperationalTarget(state, phase) {
+    const selected = getTargetById(state, state.planning.selectedTargetId);
+    const factory = state.targets.find((target) => target.type === "factory");
+    const airfield = state.targets.find((target) => target.type === "airfield");
+    const radar = state.targets.find((target) => target.type === "radar");
+    const rail = state.targets.find((target) => target.type === "rail");
+    const defense = state.targets.find((target) => target.type === "defense");
+    switch (phase) {
+        case "opening_assessment":
+            return airfield ?? factory ?? selected;
+        case "fighter_pressure":
+            return airfield ?? radar ?? selected ?? factory;
+        case "bremen_preparation":
+            return rail ?? radar ?? defense ?? factory ?? selected;
+        case "direct_strike_pressure":
+            return factory ?? selected ?? airfield;
+        case "assessment_followup":
+            return selected ?? factory ?? airfield;
+        case "crisis_recovery":
+            return selected ?? airfield ?? factory;
+        default:
+            return selected ?? factory;
+    }
+}
+function hasOperationalPackage(state) {
+    const assigned = state.planning.assignedAircraftIds.filter((aircraftId) => getAircraftAvailability(state, aircraftId).level !== "unavailable");
+    return assigned.length > 0;
+}
+function createOperationalRecommendation(state, title, body, urgency, target, operationType, routeRisk, attackDoctrine, secondaryTargetId = null) {
+    return createStaffRecommendation({
+        sourceOfficer: "Operations Officer",
+        title,
+        body,
+        urgency,
+        relatedActionType: "go_mission_planning",
+        relatedTargetId: target?.id ?? null,
+        relatedAircraftId: null,
+        relatedCrewMemberId: null,
+        planOperationType: operationType,
+        planRouteRisk: routeRisk,
+        planAttackDoctrine: attackDoctrine,
+        planSecondaryTargetId: secondaryTargetId
+    });
+}
+function createAdministrativeRecommendation(sourceOfficer, title, body, urgency, action, targetId = null, aircraftId = null) {
+    return createStaffRecommendation({
+        sourceOfficer,
+        title,
+        body,
+        urgency,
+        relatedActionType: action,
+        relatedTargetId: targetId,
+        relatedAircraftId: aircraftId,
+        relatedCrewMemberId: null
+    });
+}
+function chooseConferenceRecommendations(state, phase) {
+    const target = findPreferredOperationalTarget(state, phase);
+    const selected = getTargetById(state, state.planning.selectedTargetId);
+    const mission = getActiveMission(state);
+    const activeRepairs = state.repairJobs.filter((job) => !job.completionApplied);
+    const activeRecon = getActiveRecon(state);
+    const latestDebrief = getLatestDebriefMission(state);
+    const staleIntel = target ? getTargetIntelAgeLabel(state, target.id) === "stale" : false;
+    const noPackage = !hasOperationalPackage(state);
+    const unresolvedPersonnel = state.campaign.personnelDecisions.some((entry) => !entry.resolved);
+    if (mission) {
+        return {
+            recommended: createAdministrativeRecommendation("Executive Officer", "Wait for the next report", "The operation is still under way. Staff recommends letting the next report arrive before changing the board again.", "normal", "wait_next_event", mission.plan.targetId),
+            alternates: [
+                createAdministrativeRecommendation("Executive Officer", "Review Command", "Use the pause to review what each department is worried about before the crews return.", "low", "go_target_board", mission.plan.targetId),
+                createAdministrativeRecommendation("Engineering Officer", "Prepare the line quietly", "Engineering would use the wait to review likely repair priorities without committing new work yet.", "low", "go_maintenance")
+            ],
+            riskIfIgnored: "Trying to plan around partial reports risks reacting to noise instead of the mission that is still unfolding."
+        };
+    }
+    if (activeRecon && !latestDebrief) {
+        return {
+            recommended: createAdministrativeRecommendation("Intelligence Officer", "Let recon finish", "Intelligence is already gathering the next clue. Staff recommends waiting for interpretation before hardening the next plan.", "normal", "let_work_finish", activeRecon.targetId),
+            alternates: [
+                createAdministrativeRecommendation("Executive Officer", "Review the board", "Use the pause to review the broader target picture while the latest run is interpreted.", "low", "go_target_board", activeRecon.targetId),
+                createAdministrativeRecommendation("Engineering Officer", "Inspect the line", "Engineering would use the pause to clear low-level maintenance concerns before the next order.", "low", "go_maintenance")
+            ],
+            riskIfIgnored: "Moving before the recon is interpreted wastes the very clarity the sortie was sent to buy."
+        };
+    }
+    if (phase === "crisis_recovery") {
+        const recommended = activeRepairs.length > 0
+            ? createAdministrativeRecommendation("Engineering Officer", "Let the line settle", "Engineering recommends letting current work finish before risking another major operation.", "urgent", "let_work_finish")
+            : createAdministrativeRecommendation("Medical/Personnel Officer", "Stand down until morning", "Personnel and engineering both argue the group needs recovery time before another full effort.", "urgent", "stand_down_morning");
+        return {
+            recommended,
+            alternates: [
+                createAdministrativeRecommendation("Medical/Personnel Officer", "Resolve personnel strains", "Recovered originals and replacements should be sorted before the next operation.", "normal", "go_aircraft_crews"),
+                createAdministrativeRecommendation("Engineering Officer", "Go to Maintenance", "Review damaged aircraft and ground-crew bottlenecks before asking for more tempo.", "normal", "go_maintenance"),
+                createOperationalRecommendation(state, "Consider a reduced strike later", "Operations sees only a reduced or support effort as sensible once the group steadies.", "low", target, "reduced_strike", "cautious", "abort_unless_visual")
+            ],
+            riskIfIgnored: "Trying to force a full operation now risks compounding crew strain and grounding more aircraft."
+        };
+    }
+    if (!hasCompletedFirstLoop(state)) {
+        const recommended = createOperationalRecommendation(state, target?.type === "airfield" ? "Open with Jever Airfield" : "Open with Bremen", target?.type === "airfield"
+            ? "Staff sees Jever as the cleaner opening move: it may soften immediate fighter pressure without staking everything on uncertain factory results."
+            : "Staff sees Bremen as the decisive target, but warns that the first run may be hard to interpret cleanly.", "normal", target, "reduced_strike", "standard", "single_pass");
+        return {
+            recommended,
+            alternates: [
+                createOperationalRecommendation(state, "Open aggressively", "Operations would accept an early direct commitment against Bremen if command pressure matters more than caution.", "low", state.targets.find((entry) => entry.type === "factory"), "main_strike", "direct", "single_pass"),
+                createAdministrativeRecommendation("Executive Officer", "Review the target board", "Executive staff recommends comparing the first objective files before committing the group.", "low", "go_target_board")
+            ],
+            riskIfIgnored: "Delaying too long leaves the board directionless, but rushing blind may waste the first useful effort."
+        };
+    }
+    if (latestDebrief && latestDebrief.debriefGenerated && !activeRecon && staleIntel) {
+        return {
+            recommended: createAdministrativeRecommendation("Intelligence Officer", "Order post-strike recon", "Intelligence recommends fresh photography before treating the latest strike assessment as settled.", "urgent", "start_recon", target?.id ?? selected?.id ?? null),
+            alternates: [
+                createAdministrativeRecommendation("Engineering Officer", "Review repairs first", "Engineering would use the pause to clear aircraft damage before the next commitment.", "normal", "go_maintenance"),
+                createOperationalRecommendation(state, "Prepare a follow-up strike", "Operations would begin shaping a second effort now, though Intelligence will object to stale evidence.", "low", target, "follow_up_attack", "standard", "repeat_if_needed")
+            ],
+            riskIfIgnored: "Reattacking without fresher evidence risks chasing a result crews only half understand."
+        };
+    }
+    if (unresolvedPersonnel) {
+        return {
+            recommended: createAdministrativeRecommendation("Medical/Personnel Officer", "Resolve personnel decisions", "Recovered originals and temporary replacements are beginning to complicate the next roster decisions.", "normal", "go_aircraft_crews"),
+            alternates: [
+                createAdministrativeRecommendation("Engineering Officer", "Let current work finish", "Engineering would accept a brief pause while the line and roster settle.", "low", "let_work_finish"),
+                createOperationalRecommendation(state, "Fly a cautious reduced strike", "Operations believes a reduced effort is still possible if the personnel strain is accepted for one more turn.", "low", target, "reduced_strike", "cautious", "abort_unless_visual")
+            ],
+            riskIfIgnored: "Leaving crew-seat questions to drift will not stop flight immediately, but it will steadily erode confidence and cohesion."
+        };
+    }
+    if (noPackage) {
+        return {
+            recommended: createAdministrativeRecommendation("Engineering Officer", "Restore the package first", "There is no credible aircraft package on hand for the recommendation staff would otherwise make.", "urgent", activeRepairs.length > 0 ? "go_maintenance" : "go_aircraft_crews"),
+            alternates: [
+                createAdministrativeRecommendation("Executive Officer", "Review the board", "Executive staff recommends reassessing targets while the squadron is put back together.", "low", "go_target_board"),
+                createAdministrativeRecommendation("Command Liaison", "Hold Command's patience", "Command will tolerate a pause more readily if the next package looks real rather than improvised.", "low", "go_mission_planning")
+            ],
+            riskIfIgnored: "Pretending a package exists when it does not will only create another false start."
+        };
+    }
+    if (phase === "fighter_pressure") {
+        return {
+            recommended: createOperationalRecommendation(state, "Prepare a reduced strike against Jever", "Operations recommends an airfield effort to soften immediate fighter response before committing to a deeper Bremen problem.", "normal", state.targets.find((entry) => entry.type === "airfield"), "reduced_strike", "standard", "single_pass"),
+            alternates: [
+                createOperationalRecommendation(state, "Probe with support raid", "A lighter radar or defense attack could shape the route picture without demanding a full commitment.", "low", state.targets.find((entry) => entry.type === "radar") ?? state.targets.find((entry) => entry.type === "defense"), "support_raid", "cautious", "abort_unless_visual"),
+                createOperationalRecommendation(state, "Push directly at Bremen", "Command Liaison would accept a direct Bremen effort sooner than the rest of staff prefers.", "low", state.targets.find((entry) => entry.type === "factory"), "main_strike", "direct", "single_pass")
+            ],
+            riskIfIgnored: "Ignoring the fighter picture may leave the next direct strike paying full price on the route and over the target."
+        };
+    }
+    if (phase === "bremen_preparation") {
+        return {
+            recommended: createOperationalRecommendation(state, "Prepare Bremen first", "Staff leans toward a shaping raid against rail, radar, or defenses before asking for a clearer factory result.", "normal", target, "support_raid", "cautious", "abort_unless_visual"),
+            alternates: [
+                createOperationalRecommendation(state, "Commit directly to Bremen", "Operations could still carry a direct strike if Command's appetite for progress outweighs the uncertainty.", "low", state.targets.find((entry) => entry.type === "factory"), "main_strike", "standard", "single_pass"),
+                createAdministrativeRecommendation("Intelligence Officer", "Revisit target folders", "Intelligence would review the competing target files once more before a commitment.", "low", "go_target_board")
+            ],
+            riskIfIgnored: "Committing directly now may still work, but it gives up the chance to arrive over Bremen under slightly better conditions."
+        };
+    }
+    if (phase === "direct_strike_pressure") {
+        return {
+            recommended: createOperationalRecommendation(state, "Commit to Bremen", "Command patience is narrowing. Staff believes the next useful move should show direct pressure on the aviation target itself.", "urgent", state.targets.find((entry) => entry.type === "factory"), "main_strike", "standard", "single_pass"),
+            alternates: [
+                createOperationalRecommendation(state, "Use a reduced direct strike", "A smaller direct effort may satisfy command better than another purely indirect move.", "normal", state.targets.find((entry) => entry.type === "factory"), "reduced_strike", "standard", "bomb_through_cloud"),
+                createAdministrativeRecommendation("Engineering Officer", "Stand down only if necessary", "Engineering would still prefer repairs first, though it understands command pressure is tightening.", "low", "stand_down_morning")
+            ],
+            riskIfIgnored: "Another indirect turn may deepen command dissatisfaction even if it is tactically sensible."
+        };
+    }
+    return {
+        recommended: createOperationalRecommendation(state, "Review and follow up", "Staff recommends weighing the latest damage, recon confidence, and readiness before deciding whether to reattack or shift focus.", "normal", target ?? selected, "follow_up_attack", "standard", "repeat_if_needed"),
+        alternates: [
+            createAdministrativeRecommendation("Intelligence Officer", "Go to Recon", "Intelligence would rather settle the target picture before another major commitment.", "normal", "go_recon"),
+            createAdministrativeRecommendation("Engineering Officer", "Go to Maintenance", "Engineering prefers using the pause to recover the line before another large effort.", "low", "go_maintenance"),
+            createOperationalRecommendation(state, "Shift to a support target", "Operations could redirect effort to a support target if the latest evidence on the main objective remains thin.", "low", state.targets.find((entry) => entry.type === "rail") ?? state.targets.find((entry) => entry.type === "radar"), "support_raid", "cautious", "abort_unless_visual")
+        ],
+        riskIfIgnored: "Acting without settling what the last operation achieved may waste either the opening or the recovery window."
+    };
+}
+function sanitizeConferenceRecommendation(state, recommendation) {
+    if (!recommendation.relatedTargetId && recommendation.relatedActionType === "go_target_board") {
+        return recommendation;
+    }
+    if (recommendation.relatedTargetId && !getTargetById(state, recommendation.relatedTargetId)) {
+        return createAdministrativeRecommendation("Executive Officer", "Review the board", "The specific objective staff had in mind is no longer current. Recheck the Command and target folders before acting.", "normal", "go_target_board");
+    }
+    if (recommendation.relatedAircraftId && !getAircraftById(state, recommendation.relatedAircraftId)) {
+        return createAdministrativeRecommendation("Executive Officer", "Resolve the situation first", "The aircraft staff had in mind is no longer available to discuss directly.", "normal", "go_aircraft_crews");
+    }
+    return recommendation;
+}
+export function getStaffConference(state) {
+    const phase = getCampaignSpinePhase(state);
+    const directive = state.campaign.directiveState;
+    const target = findPreferredOperationalTarget(state, phase.phaseId);
+    const latestDebrief = getLatestDebriefMission(state);
+    const activeRecon = getActiveRecon(state);
+    const available = countAvailableAircraft(state);
+    const marginal = countMarginalAircraft(state);
+    const crisis = hasReadinessCrisis(state);
+    const recs = chooseConferenceRecommendations(state, phase.phaseId);
+    const recommended = sanitizeConferenceRecommendation(state, recs.recommended);
+    const alternates = recs.alternates.map((entry) => sanitizeConferenceRecommendation(state, entry)).slice(0, 3);
+    const summary = phase.phaseId === "opening_assessment"
+        ? "The group is still finding its footing. Staff wants the first operation to teach something useful without squandering the squadron."
+        : phase.phaseId === "crisis_recovery"
+            ? "Readiness has become the main story. Staff is arguing about how much risk the group can absorb before it starts breaking itself."
+            : phase.phaseId === "fighter_pressure"
+                ? "The immediate fighter picture still shapes every larger decision. Staff is weighing whether to soften that problem before anything ambitious."
+                : phase.phaseId === "bremen_preparation"
+                    ? "The board is turning toward Bremen, but staff is split on whether to prepare the strike or commit directly."
+                    : phase.phaseId === "direct_strike_pressure"
+                        ? "Command wants clearer direct progress now, even if some departments would rather keep shaping the problem."
+                        : "Staff is in follow-up mode, trying to decide whether the latest evidence argues for recon, reattack, or a shift in focus.";
+    const executiveComment = latestDebrief && latestDebrief.debriefGenerated
+        ? `So basically: the last operation gave us ${latestDebrief.resultSummary.toLowerCase()}, and the next decision matters more than the last headline.`
+        : "So basically: we need a sane next move that matches what the squadron can actually sustain.";
+    const operationsComment = crisis
+        ? "Operations can still sketch reduced options, but it does not believe the group is ready for a confident full effort."
+        : phase.phaseId === "direct_strike_pressure"
+            ? "Operations believes a direct strike can be flown if the board accepts the remaining uncertainty."
+            : target
+                ? `Operations reads ${target.name} as the next practical objective, though it is not pretending the route or picture are clean.`
+                : "Operations wants a target chosen before it starts talking as if a real order exists.";
+    const intelligenceComment = activeRecon
+        ? "Intelligence is already waiting on fresh interpretation and does not want the next big decision to outrun the evidence."
+        : target
+            ? `${target.name} still sits under a ${getTargetIntelAgeLabel(state, target.id)} file. Intelligence is willing to advise, but not to pretend certainty.`
+            : "Intelligence has no target file in front of it worth pretending is settled.";
+    const engineeringComment = state.repairJobs.some((job) => !job.completionApplied) || state.recoveryJobs.some((job) => !job.completionApplied)
+        ? "Engineering would like the current queue cleared before anyone starts speaking as if the line is fresh again."
+        : marginal > 0
+            ? "Engineering can support another effort, but it does not endorse acting as if every aircraft is equally trustworthy."
+            : "Engineering has fewer objections than usual, which it takes as permission for caution rather than bravado.";
+    const personnelComment = state.campaign.personnelDecisions.some((entry) => !entry.resolved)
+        ? "Personnel notes that recovered originals and temporary replacements are now creating real seat-friction even where the manifest still functions."
+        : state.crewMembers.some((member) => member.status === "lightly_wounded" || member.status === "seriously_wounded")
+            ? "Personnel is tracking wounded and fatigue carefully and does not want the next order to assume the roster is whole when it is not."
+            : "Personnel sees a workable roster, but not one that should be pushed carelessly just because it still looks functional on paper.";
+    const commandComment = directive.commandPatience < 45
+        ? "Command Liaison is blunt: headquarters wants visible progress soon and may not admire another purely preparatory answer."
+        : directive.commandPatience < 60
+            ? "Command Liaison says patience is narrowing, though not yet gone."
+            : "Command Liaison says the board still has room to choose the next move deliberately, provided it looks purposeful.";
+    return {
+        phaseId: phase.phaseId,
+        phaseLabel: phase.phaseLabel,
+        summary,
+        executiveComment,
+        operationsComment,
+        intelligenceComment,
+        engineeringComment,
+        personnelComment,
+        commandComment,
+        recommendedAction: recommended,
+        alternateActions: alternates,
+        riskIfIgnored: recs.riskIfIgnored
+    };
+}
+export function applyRecommendedPlan(state, now) {
+    const conference = getStaffConference(state);
+    const recommendation = conference.recommendedAction;
+    switch (recommendation.relatedActionType) {
+        case "go_target_board":
+            if (recommendation.relatedTargetId && getTargetById(state, recommendation.relatedTargetId)) {
+                setPlanningTarget(state, recommendation.relatedTargetId);
+            }
+            state.selectedTab = "target-board";
+            return null;
+        case "go_aircraft_crews":
+            state.selectedTab = "aircraft-crews";
+            return null;
+        case "go_maintenance":
+            state.selectedTab = "maintenance";
+            return null;
+        case "go_debrief":
+            state.selectedTab = "debrief";
+            return null;
+        case "start_recon":
+            if (!recommendation.relatedTargetId || !getTargetById(state, recommendation.relatedTargetId)) {
+                state.selectedTab = "target-board";
+                return null;
+            }
+            setPlanningTarget(state, recommendation.relatedTargetId);
+            state.selectedTab = "recon";
+            return startRecon(state, recommendation.relatedTargetId, "pre_strike", now);
+        case "wait_next_event":
+            return waitUntilNextEvent(state, now);
+        case "stand_down_morning":
+            return standDownUntilMorning(state, now);
+        case "let_work_finish":
+            return letCurrentWorkFinish(state, now);
+        case "go_mission_planning":
+        default: {
+            if (!recommendation.relatedTargetId || !getTargetById(state, recommendation.relatedTargetId) || !hasOperationalPackage(state)) {
+                state.selectedTab = state.repairJobs.some((job) => !job.completionApplied) ? "maintenance" : "aircraft-crews";
+                return null;
+            }
+            setPlanningTarget(state, recommendation.relatedTargetId);
+            const plan = recommendation;
+            if (plan.planOperationType) {
+                setOperationType(state, plan.planOperationType);
+            }
+            if (plan.planRouteRisk) {
+                setRouteRisk(state, plan.planRouteRisk);
+            }
+            if (plan.planAttackDoctrine) {
+                setAttackDoctrine(state, plan.planAttackDoctrine);
+            }
+            const validSecondary = plan.planSecondaryTargetId && getSecondaryTargetOptions(state, recommendation.relatedTargetId).some((target) => target.id === plan.planSecondaryTargetId)
+                ? plan.planSecondaryTargetId
+                : null;
+            setSecondaryTarget(state, validSecondary);
+            if (state.planning.leadAircraftId && getAircraftAvailability(state, state.planning.leadAircraftId).level === "unavailable") {
+                state.planning.leadAircraftId = null;
+            }
+            state.selectedTab = "mission-planning";
+            return null;
+        }
+    }
+}
 function staffUrgencyRank(urgency) {
     switch (urgency) {
         case "urgent":
@@ -3378,11 +3964,13 @@ export function getStaffBriefingRecommendations(state) {
         recommendations.push(createStaffRecommendation({
             sourceOfficer: "Operations Officer",
             title: "Operation board not yet ready",
-            body: launchDisabledReason === "No aircraft assigned"
-                ? "No aircraft are currently committed to the board. Operations recommends building a tentative package before the next decision window passes."
-                : launchDisabledReason === "No target selected"
-                    ? "No target is selected for the next operation. Operations wants a clear objective before crews are held on readiness."
-                    : "Operations is already committed elsewhere. The board should remain focused on the running task.",
+            body: launchDisabledReason === LEAD_INVALID_WARNING
+                ? "The nominated lead aircraft is no longer valid for the current package. Operations needs a new lead named before the order can stand."
+                : launchDisabledReason === "No aircraft assigned"
+                    ? "No aircraft are currently committed to the board. Operations recommends building a tentative package before the next decision window passes."
+                    : launchDisabledReason === "No target selected"
+                        ? "No target is selected for the next operation. Operations wants a clear objective before crews are held on readiness."
+                        : "Operations is already committed elsewhere. The board should remain focused on the running task.",
             urgency: launchDisabledReason === "Operation already in progress" ? "normal" : "urgent",
             relatedActionType: launchDisabledReason === "No target selected" ? "go_target_board" : "go_mission_planning",
             relatedTargetId: selectedTarget?.id ?? null,
@@ -3622,7 +4210,7 @@ export function getDisabledReasonForLaunch(state) {
         return `${getAircraftById(state, unavailableAssigned)?.name ?? "An assigned aircraft"} is unavailable`;
     }
     if (!state.planning.leadAircraftId || !state.planning.assignedAircraftIds.includes(state.planning.leadAircraftId)) {
-        return "No lead aircraft selected";
+        return state.campaign.pendingDecisions.includes(LEAD_INVALID_WARNING) ? LEAD_INVALID_WARNING : "No lead aircraft selected";
     }
     if (getAircraftAvailability(state, state.planning.leadAircraftId).level === "unavailable") {
         return "Selected lead aircraft is unavailable";

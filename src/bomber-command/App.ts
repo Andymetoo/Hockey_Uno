@@ -1,6 +1,7 @@
 import {
   advanceCampaignDay,
   assignReplacementCrewMember,
+  applyRecommendedPlan,
   completeAllRepairs,
   completeCurrentRecon,
   createNewGame,
@@ -12,8 +13,10 @@ import {
   getAircraftAttentionState,
   getAircraftAvailability,
   getAircraftById,
+  getCrewAircraftLabel,
   getCrewById,
   getCrewMembersForAircraft,
+  getCrewSeatLabel,
   getCurrentOperationSummary,
   getActiveTutorialStep,
   getDirectiveProgressSummary,
@@ -24,15 +27,19 @@ import {
   getLeadAircraftAssessment,
   getLatestDebriefMission,
   getLatestCompletedRecon,
+  getMedicalActionLabel,
+  getMedicalRecoveryLabel,
   getMedicalPersonnel,
   getOperationsDeskSummary,
   getPersonnelDecisionsForAircraft,
   getPlanningStaffPreview,
+  getReplacementCoveringMember,
   getReplacementPool,
   getRestingPersonnel,
   getRoleCoverageProblems,
   getSecondaryTargetOptions,
   getStaffBriefingRecommendations,
+  getStaffConference,
   getTargetById,
   getTargetContextSummary,
   getTargetIntelAgeLabel,
@@ -69,7 +76,7 @@ import {
   toggleStandingOrder,
   waitUntilNextEvent
 } from "./game.js";
-import type { AttackDoctrine, CampaignTab, CrewMember, CrewRole, OperationType, ReconType, RepairTier, SaveState, StaffRecommendation, Target } from "./types";
+import type { AttackDoctrine, CampaignTab, CrewMember, CrewRole, OperationType, ReconType, RepairTier, SaveState, StaffConference, StaffRecommendation, Target } from "./types";
 
 type ActionHandler = (action: string, payload: string | null) => void;
 
@@ -196,6 +203,29 @@ function renderCrewRow(state: SaveState, aircraftId: string, member: CrewMember,
   `;
 }
 
+function renderPersonnelStatusRow(state: SaveState, member: CrewMember): string {
+  const now = getEffectiveNow(state);
+  const covering = getReplacementCoveringMember(state, member);
+  return `
+    <div class="row-card">
+      <div>
+        <strong>${escapeHtml(member.name)}</strong>
+        <div class="muted">${escapeHtml(getCrewAircraftLabel(state, member))}</div>
+        <div class="muted">${escapeHtml(getCrewSeatLabel(member))}</div>
+        <div class="muted">${escapeHtml(getMedicalRecoveryLabel(member, now))}</div>
+        <div class="muted">${escapeHtml(covering ? `Replacement covering: ${covering.name}` : "Replacement covering: none")}</div>
+        <div class="muted">${escapeHtml(getMedicalActionLabel(state, member))}</div>
+        <div class="muted">${escapeHtml(member.notes)}</div>
+      </div>
+      <div class="badge-row">
+        ${renderBadge("Status", member.status.replaceAll("_", " "))}
+        ${renderBadge("Fatigue", member.fatigue)}
+        ${renderBadge("Morale", member.morale)}
+      </div>
+    </div>
+  `;
+}
+
 function roleOrSpecialty(role: CrewMember["role"]): string {
   return role.replaceAll("_", " ");
 }
@@ -236,17 +266,52 @@ function renderStaffActionButton(recommendation: StaffRecommendation): string {
       return `<button data-action="tab" data-payload="maintenance">Go to Maintenance</button>`;
     case "go_aircraft_crews":
       return `<button data-action="tab" data-payload="aircraft-crews">Go to Aircraft &amp; Crews</button>`;
+    case "go_recon":
+      return `<button data-action="tab" data-payload="recon">Go to Recon</button>`;
     case "go_target_board":
       return `<button data-action="briefing-target-board" data-payload="${escapeHtml(recommendation.relatedTargetId ?? "")}">Go to Target Board</button>`;
     case "go_mission_planning":
       return `<button data-action="briefing-mission-planning" data-payload="${escapeHtml(recommendation.relatedTargetId ?? "")}">Go to Mission Planning</button>`;
+    case "wait_next_event":
+      return `<button data-action="wait-next-event">Wait until next event</button>`;
+    case "stand_down_morning":
+      return `<button data-action="stand-down-morning">Stand down until morning</button>`;
+    case "let_work_finish":
+      return `<button data-action="let-work-finish">Let current work finish</button>`;
     case "start_recon":
       if (!recommendation.relatedTargetId) {
         return "";
       }
-      return `<button data-action="briefing-start-recon" data-payload="${escapeHtml(recommendation.relatedTargetId)}">Start Recon</button>`;
+      return `<button data-action="briefing-start-recon" data-payload="${escapeHtml(`${recommendation.relatedTargetId}:${recommendation.planReconType ?? "pre_strike"}`)}">Start Recon</button>`;
     default:
       return "";
+  }
+}
+
+function getStaffConferencePrimaryLabel(recommendation: StaffRecommendation): string {
+  switch (recommendation.relatedActionType) {
+    case "go_debrief":
+      return "Go to Debrief";
+    case "go_maintenance":
+      return "Go to Maintenance";
+    case "go_aircraft_crews":
+      return "Go to Aircraft & Crews";
+    case "go_recon":
+      return "Go to Recon";
+    case "go_target_board":
+      return "Go to Target Board";
+    case "go_mission_planning":
+      return "Go to Mission Planning";
+    case "start_recon":
+      return "Start Recon";
+    case "wait_next_event":
+      return "Wait until next event";
+    case "stand_down_morning":
+      return "Stand down until morning";
+    case "let_work_finish":
+      return "Let current work finish";
+    default:
+      return "Use Recommended Plan";
   }
 }
 
@@ -266,8 +331,52 @@ function renderStaffRecommendation(recommendation: StaffRecommendation): string 
   `;
 }
 
+function renderStaffConference(state: SaveState, conference: StaffConference): string {
+  return `
+    <section class="note staff-conference-card">
+      <div class="briefing-header">
+        <div>
+          <p class="eyebrow">Staff Conference</p>
+          <h3>${escapeHtml(conference.phaseLabel)}</h3>
+        </div>
+        ${renderBadge("Phase", conference.phaseLabel)}
+      </div>
+      <p>${escapeHtml(conference.summary)}</p>
+      <div class="stack compact conference-comments">
+        <p><strong>Executive Officer:</strong> ${escapeHtml(conference.executiveComment)}</p>
+        <p><strong>Operations Officer:</strong> ${escapeHtml(conference.operationsComment)}</p>
+        <p><strong>Intelligence Officer:</strong> ${escapeHtml(conference.intelligenceComment)}</p>
+        <p><strong>Engineering Officer:</strong> ${escapeHtml(conference.engineeringComment)}</p>
+        <p><strong>Personnel / Medical Officer:</strong> ${escapeHtml(conference.personnelComment)}</p>
+        <p><strong>Command Liaison:</strong> ${escapeHtml(conference.commandComment)}</p>
+      </div>
+      <div class="briefing-card urgency-${conference.recommendedAction.urgency}">
+        <div class="briefing-header">
+          <div>
+            <p class="eyebrow">Recommended</p>
+            <h3>${escapeHtml(conference.recommendedAction.title)}</h3>
+          </div>
+          ${renderBadge("Urgency", conference.recommendedAction.urgency)}
+        </div>
+        <p>${escapeHtml(conference.recommendedAction.body)}</p>
+        ${conference.riskIfIgnored ? `<p class="warning">${escapeHtml(conference.riskIfIgnored)}</p>` : ""}
+        <div class="button-row briefing-actions">
+          <button class="active" data-action="use-recommended-plan">${escapeHtml(getStaffConferencePrimaryLabel(conference.recommendedAction))}</button>
+        </div>
+      </div>
+      <div class="stack compact">
+        <strong>Alternatives</strong>
+        <div class="briefing-grid">
+          ${conference.alternateActions.map((recommendation) => renderStaffRecommendation(recommendation)).join("")}
+        </div>
+      </div>
+    </section>
+  `;
+}
+
 function renderCommandPanel(state: SaveState): string {
   const opsLines = getOperationsDeskSummary(state);
+  const conference = getStaffConference(state);
   const briefing = getStaffBriefingRecommendations(state);
   const directive = getDirectiveProgressSummary(state);
   return `
@@ -287,6 +396,7 @@ function renderCommandPanel(state: SaveState): string {
           <button data-action="let-work-finish">Let current work finish</button>
         </div>
       </div>
+      ${renderStaffConference(state, conference)}
       <div class="note directive-progress-card">
         <strong>Directive Progress</strong>
         <div class="stack compact">
@@ -477,64 +587,21 @@ function renderAircraftCrews(state: SaveState): string {
         <div class="stack">
           <h3>Replacement Pool</h3>
           ${replacementPool.length === 0 ? `<p class="muted">No replacement crew members are currently unassigned.</p>` : replacementPool.map((member) => `
-            <div class="row-card">
-              <div>
-                <strong>${escapeHtml(member.name)}</strong>
-                <div class="muted">${escapeHtml(roleOrSpecialty(member.role))}</div>
-                <div class="muted">${escapeHtml(member.notes)}</div>
-              </div>
-              <div class="badge-row">
-                ${renderBadge("Status", member.status.replaceAll("_", " "))}
-                ${renderBadge("Experience", member.experience)}
-              </div>
-            </div>
+            ${renderPersonnelStatusRow(state, member)}
           `).join("")}
         </div>
         <div class="stack">
           <h3>Medical Personnel</h3>
           ${medicalPersonnel.length === 0 ? `<p class="muted">No crew members are currently under medical restriction.</p>` : medicalPersonnel.map((member) => `
-            <div class="row-card">
-              <div>
-                <strong>${escapeHtml(member.name)}</strong>
-                <div class="muted">${escapeHtml(member.currentAssignmentRole ? member.currentAssignmentRole.replaceAll("_", " ") : roleOrSpecialty(member.role))}</div>
-                <div class="muted">${escapeHtml(member.notes)}</div>
-              </div>
-              <div class="badge-row">
-                ${renderBadge("Status", member.status.replaceAll("_", " "))}
-                ${renderBadge("Fatigue", member.fatigue)}
-                ${renderBadge("Morale", member.morale)}
-              </div>
-            </div>
+            ${renderPersonnelStatusRow(state, member)}
           `).join("")}
           <h3>Resting / Recovering</h3>
           ${restingPersonnel.length === 0 ? `<p class="muted">No crew members are currently resting off the flight schedule.</p>` : restingPersonnel.map((member) => `
-            <div class="row-card">
-              <div>
-                <strong>${escapeHtml(member.name)}</strong>
-                <div class="muted">${escapeHtml(member.currentAssignmentRole ? member.currentAssignmentRole.replaceAll("_", " ") : roleOrSpecialty(member.role))}</div>
-                <div class="muted">${escapeHtml(member.notes)}</div>
-              </div>
-              <div class="badge-row">
-                ${renderBadge("Status", member.status.replaceAll("_", " "))}
-                ${renderBadge("Fatigue", member.fatigue)}
-                ${renderBadge("Morale", member.morale)}
-              </div>
-            </div>
+            ${renderPersonnelStatusRow(state, member)}
           `).join("")}
           <h3>Unavailable / Missing</h3>
           ${unavailablePersonnel.length === 0 ? `<p class="muted">No crew members are currently missing or otherwise hard unavailable.</p>` : unavailablePersonnel.map((member) => `
-            <div class="row-card">
-              <div>
-                <strong>${escapeHtml(member.name)}</strong>
-                <div class="muted">${escapeHtml(member.currentAssignmentRole ? member.currentAssignmentRole.replaceAll("_", " ") : roleOrSpecialty(member.role))}</div>
-                <div class="muted">${escapeHtml(member.notes)}</div>
-              </div>
-              <div class="badge-row">
-                ${renderBadge("Status", member.status.replaceAll("_", " "))}
-                ${renderBadge("Fatigue", member.fatigue)}
-                ${renderBadge("Morale", member.morale)}
-              </div>
-            </div>
+            ${renderPersonnelStatusRow(state, member)}
           `).join("")}
         </div>
       </div>
@@ -621,7 +688,7 @@ function renderPlanning(state: SaveState): string {
                   data-action="toggle-aircraft"
                   data-payload="${aircraft.id}"
                   ${checked ? "checked" : ""}
-                  ${availability.level === "unavailable" ? "disabled" : ""}
+                  ${availability.level === "unavailable" && !checked ? "disabled" : ""}
                 />
                 <span class="assignment-title">${escapeHtml(aircraft.name)} • ${escapeHtml(crew?.pilotName ?? "Unknown crew")}</span>
                 <button type="button" data-action="lead-aircraft" data-payload="${aircraft.id}" ${checked ? "" : "disabled"} class="${leadSelected ? "active" : ""}">
@@ -995,8 +1062,9 @@ export function mountBomberCommand(root: HTMLElement): void {
         break;
       case "briefing-start-recon":
         if (payload) {
-          setPlanningTarget(state, payload);
-          error = startRecon(state, payload, "pre_strike", now);
+          const [targetId, type] = payload.split(":");
+          setPlanningTarget(state, targetId);
+          error = startRecon(state, targetId, (type ?? "pre_strike") as ReconType, now);
           if (!error) {
             state.selectedTab = "recon";
           }
@@ -1085,6 +1153,9 @@ export function mountBomberCommand(root: HTMLElement): void {
         if (payload) {
           error = startRecon(state, payload, "post_strike", now);
         }
+        break;
+      case "use-recommended-plan":
+        error = applyRecommendedPlan(state, now);
         break;
       case "wait-next-event":
         error = waitUntilNextEvent(state, now);
