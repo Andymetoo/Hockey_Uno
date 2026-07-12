@@ -1,4 +1,4 @@
-import { advanceCampaignDay, assignReplacementCrewMember, completeAllRepairs, completeCurrentRecon, createNewGame, formatTimestamp, getActiveMission, getActiveMissionCrewIds, getActiveRecon, getAircraftAvailability, getAircraftById, getCrewById, getCrewMembersForAircraft, getCurrentOperationSummary, getDirectiveProgressSummary, getDisabledReasonForLaunch, getEffectiveNow, getGroundCrewPressureNote, getLeadAircraftAssessment, getLatestDebriefMission, getLatestCompletedRecon, getOperationsDeskSummary, getPlanningStaffPreview, getReplacementPool, getSecondaryTargetOptions, getStaffBriefingRecommendations, getTargetById, getTargetContextSummary, getTargetOperationalSummary, getTargetStrategicContext, getUnavailablePersonnel, launchMission, loadState, markReplacementPermanent, reconcileState, removeReplacementCrewMember, resetState, saveState, setAttackDoctrine, setLeadAircraft, setLaunchMode, setOperationType, setPlanningTarget, setRouteRisk, setScheduleDelay, setSecondaryTarget, setSelectedTab, setShowHiddenValues, skipToDebrief, skipToNextReport, startRecovery, startRecon, startRepair, toggleAssignedAircraft, toggleStandingOrder } from "./game.js";
+import { advanceCampaignDay, assignReplacementCrewMember, completeAllRepairs, completeCurrentRecon, createNewGame, formatTimestamp, getActiveMission, getActiveMissionCrewIds, getActiveRecon, getAircraftAttentionState, getAircraftAvailability, getAircraftById, getCrewById, getCrewMembersForAircraft, getCurrentOperationSummary, getDirectiveProgressSummary, getDisabledReasonForLaunch, getEffectiveNow, getGroundCrewPressureNote, getHardUnavailablePersonnel, getLeadAircraftAssessment, getLatestDebriefMission, getLatestCompletedRecon, getMedicalPersonnel, getOperationsDeskSummary, getPersonnelDecisionsForAircraft, getPlanningStaffPreview, getReplacementPool, getRestingPersonnel, getRoleCoverageProblems, getSecondaryTargetOptions, getStaffBriefingRecommendations, getTargetById, getTargetContextSummary, getTargetOperationalSummary, getTargetStrategicContext, keepReplacementTemporary, letCurrentWorkFinish, launchMission, loadState, markReplacementPermanent, markReplacementPermanentFromDecision, reconcileState, restoreOriginalCrewMember, removeReplacementCrewMember, resetState, saveState, setAttackDoctrine, setLeadAircraft, setLaunchMode, setOperationType, setPlanningTarget, setRouteRisk, setScheduleDelay, setSecondaryTarget, setSelectedTab, setShowHiddenValues, skipToDebrief, skipToNextReport, startRecovery, startRecon, startRepair, standDownUntilMorning, toggleAssignedAircraft, toggleStandingOrder, waitUntilNextEvent } from "./game.js";
 const TABS = [
     { id: "command", label: "Command" },
     { id: "target-board", label: "Target Board" },
@@ -169,6 +169,11 @@ function renderCommandPanel(state) {
         <div class="stack compact">
           ${opsLines.map((line) => `<p>${escapeHtml(line)}</p>`).join("")}
         </div>
+        <div class="button-row">
+          <button data-action="wait-next-event">Wait until next event</button>
+          <button data-action="stand-down-morning">Stand down until morning</button>
+          <button data-action="let-work-finish">Let current work finish</button>
+        </div>
       </div>
       <div class="note directive-progress-card">
         <strong>Directive Progress</strong>
@@ -252,7 +257,9 @@ function renderTargetBoard(state) {
 }
 function renderAircraftCrews(state) {
     const replacementPool = getReplacementPool(state);
-    const unavailablePersonnel = getUnavailablePersonnel(state);
+    const medicalPersonnel = getMedicalPersonnel(state);
+    const restingPersonnel = getRestingPersonnel(state);
+    const unavailablePersonnel = getHardUnavailablePersonnel(state);
     const airborneIds = new Set(getActiveMissionCrewIds(state));
     return `
     <section class="panel stack">
@@ -263,29 +270,20 @@ function renderAircraftCrews(state) {
         const crew = getCrewById(state, aircraft.assignedCrewId);
         const manifest = getCrewMembersForAircraft(state, aircraft.id);
         const availability = getAircraftAvailability(state, aircraft.id);
+        const attention = getAircraftAttentionState(state, aircraft.id);
         const wounded = manifest.filter((member) => member.status === "lightly_wounded" || member.status === "seriously_wounded").length;
         const replacements = manifest.filter((member) => member.isReplacement).length;
         const missing = manifest.filter((member) => member.status === "missing" || member.status === "kia" || member.status === "pow").length;
-        const missingRoles = [
-            "pilot",
-            "copilot",
-            "navigator",
-            "bombardier",
-            "engineer_top_turret",
-            "radio_operator",
-            "ball_turret",
-            "left_waist",
-            "right_waist",
-            "tail_gunner"
-        ].filter((role) => !manifest.some((member) => member.currentAssignmentRole === role && !["missing", "kia", "pow", "seriously_wounded"].includes(member.status)));
+        const coverageProblems = getRoleCoverageProblems(state, aircraft.id);
+        const personnelDecisions = getPersonnelDecisionsForAircraft(state, aircraft.id);
         return `
-            <details class="row-card aircraft-detail" open>
+            <details class="row-card aircraft-detail ${attention.needsAttention ? "needs-attention" : ""}" ${attention.shouldStartOpen ? "open" : ""}>
               <summary class="aircraft-summary">
                 <div>
                   <strong>${escapeHtml(aircraft.name)}</strong>
                   <div class="muted">${escapeHtml(crew?.pilotName ?? "No pilot assigned")} • ${escapeHtml(aircraft.lastCrewIssueNote)}</div>
                   <div class="muted">${wounded} wounded • ${missing} unavailable • ${replacements} replacements</div>
-                  <div class="muted">Full crew manifest shown below.</div>
+                  <div class="muted">${escapeHtml(attention.needsAttention ? attention.reasons[0] ?? "Attention required." : "Open for the full crew manifest.")}</div>
                 </div>
                 <div class="badge-row">
                   ${renderBadge("Status", aircraft.status)}
@@ -304,24 +302,46 @@ function renderAircraftCrews(state) {
                   <p class="muted">The following crew are currently assigned to this aircraft.</p>
                   ${manifest.sort((a, b) => (a.currentAssignmentRole ?? "").localeCompare(b.currentAssignmentRole ?? "")).map((member) => renderCrewRow(state, aircraft.id, member, airborneIds)).join("")}
                 </div>
-                ${missingRoles.length > 0 ? `
+                ${personnelDecisions.length > 0 ? `
+                  <div class="stack compact crew-problem-block">
+                    <strong>Recovered Originals Awaiting Decision</strong>
+                    ${personnelDecisions.map((decision) => {
+            const original = state.crewMembers.find((member) => member.id === decision.crewMemberId);
+            const replacement = state.crewMembers.find((member) => member.id === decision.replacementCrewMemberId);
+            return `
+                        <div class="manifest-row">
+                          <div>
+                            <strong>${escapeHtml(decision.role.replaceAll("_", " "))}</strong>
+                            <div class="muted">${escapeHtml(original?.name ?? "Original crewman")} has recovered while ${escapeHtml(replacement?.name ?? "the replacement")} is still covering the seat.</div>
+                          </div>
+                          <div class="button-row">
+                            <button data-action="restore-original" data-payload="${decision.id}">Restore original</button>
+                            <button data-action="keep-replacement-temporary" data-payload="${decision.id}">Keep replacement temporary</button>
+                            <button data-action="resolve-mark-permanent" data-payload="${decision.id}">Mark replacement permanent</button>
+                          </div>
+                        </div>
+                      `;
+        }).join("")}
+                  </div>
+                ` : ""}
+                ${coverageProblems.length > 0 ? `
                   <div class="stack compact crew-problem-block">
                     <strong>Open Crew Problems</strong>
-                    ${missingRoles.map((role) => `
+                    ${coverageProblems.map((problem) => `
                       <div class="manifest-row">
                         <div>
-                          <strong>${escapeHtml(role.replaceAll("_", " "))}</strong>
-                          <div class="muted">No fit crew member currently covers this position.</div>
+                          <strong>${escapeHtml(problem.role.replaceAll("_", " "))}</strong>
+                          <div class="muted">${escapeHtml(problem.hasConflict ? "Multiple crew claim this station and the fit occupant needs sorting out." : "No fit crew member currently covers this position.")}</div>
                         </div>
                         <div class="button-row">
                           ${replacementPool
             .filter((member) => member.assignedAircraftId === null
-            && ((member.role === "pilot" && (role === "pilot" || role === "copilot"))
-                || (member.role === "copilot" && role === "copilot")
-                || member.role === role
-                || (member.role === "enlisted_airman" && ["engineer_top_turret", "radio_operator", "ball_turret", "left_waist", "right_waist", "tail_gunner"].includes(role))))
+            && ((member.role === "pilot" && (problem.role === "pilot" || problem.role === "copilot"))
+                || (member.role === "copilot" && problem.role === "copilot")
+                || member.role === problem.role
+                || (member.role === "enlisted_airman" && ["engineer_top_turret", "radio_operator", "ball_turret", "left_waist", "right_waist", "tail_gunner"].includes(problem.role))))
             .map((member) => `
-                              <button data-action="assign-replacement" data-payload="${member.id}:${aircraft.id}:${role}">
+                              <button data-action="assign-replacement" data-payload="${member.id}:${aircraft.id}:${problem.role}">
                                 Assign ${escapeHtml(member.name)}
                               </button>
                             `).join("") || `<span class="disabled-reason">No suitable replacement available.</span>`}
@@ -354,8 +374,38 @@ function renderAircraftCrews(state) {
           `).join("")}
         </div>
         <div class="stack">
-          <h3>Medical / Unavailable Personnel</h3>
-          ${unavailablePersonnel.length === 0 ? `<p class="muted">No crew members are currently unavailable.</p>` : unavailablePersonnel.map((member) => `
+          <h3>Medical Personnel</h3>
+          ${medicalPersonnel.length === 0 ? `<p class="muted">No crew members are currently under medical restriction.</p>` : medicalPersonnel.map((member) => `
+            <div class="row-card">
+              <div>
+                <strong>${escapeHtml(member.name)}</strong>
+                <div class="muted">${escapeHtml(member.currentAssignmentRole ? member.currentAssignmentRole.replaceAll("_", " ") : roleOrSpecialty(member.role))}</div>
+                <div class="muted">${escapeHtml(member.notes)}</div>
+              </div>
+              <div class="badge-row">
+                ${renderBadge("Status", member.status.replaceAll("_", " "))}
+                ${renderBadge("Fatigue", member.fatigue)}
+                ${renderBadge("Morale", member.morale)}
+              </div>
+            </div>
+          `).join("")}
+          <h3>Resting / Recovering</h3>
+          ${restingPersonnel.length === 0 ? `<p class="muted">No crew members are currently resting off the flight schedule.</p>` : restingPersonnel.map((member) => `
+            <div class="row-card">
+              <div>
+                <strong>${escapeHtml(member.name)}</strong>
+                <div class="muted">${escapeHtml(member.currentAssignmentRole ? member.currentAssignmentRole.replaceAll("_", " ") : roleOrSpecialty(member.role))}</div>
+                <div class="muted">${escapeHtml(member.notes)}</div>
+              </div>
+              <div class="badge-row">
+                ${renderBadge("Status", member.status.replaceAll("_", " "))}
+                ${renderBadge("Fatigue", member.fatigue)}
+                ${renderBadge("Morale", member.morale)}
+              </div>
+            </div>
+          `).join("")}
+          <h3>Unavailable / Missing</h3>
+          ${unavailablePersonnel.length === 0 ? `<p class="muted">No crew members are currently missing or otherwise hard unavailable.</p>` : unavailablePersonnel.map((member) => `
             <div class="row-card">
               <div>
                 <strong>${escapeHtml(member.name)}</strong>
@@ -582,7 +632,7 @@ function renderDebrief(state) {
       <p><strong>Target assessment:</strong> ${escapeHtml(attackedTarget?.assessedCondition ?? "No reliable assessment.")}</p>
       <p><strong>Evidence:</strong> ${escapeHtml(attackedTarget?.evidence.slice(0, 4).join(" ") ?? "No evidence filed.")}</p>
       <div class="button-row">
-        <button data-action="quick-recon" data-payload="${target?.id ?? ""}" ${state.campaign.activeReconId ? "disabled" : ""}>Order Post-Strike Recon</button>
+        <button data-action="quick-recon" data-payload="${attackedTarget?.id ?? target?.id ?? ""}" ${state.campaign.activeReconId ? "disabled" : ""}>Order Post-Strike Recon</button>
         ${state.campaign.activeReconId ? `<span class="disabled-reason">Recon section already occupied</span>` : ""}
       </div>
     </section>
@@ -902,6 +952,30 @@ export function mountBomberCommand(root) {
             case "quick-recon":
                 if (payload) {
                     error = startRecon(state, payload, "post_strike", now);
+                }
+                break;
+            case "wait-next-event":
+                error = waitUntilNextEvent(state, now);
+                break;
+            case "stand-down-morning":
+                error = standDownUntilMorning(state, now);
+                break;
+            case "let-work-finish":
+                error = letCurrentWorkFinish(state, now);
+                break;
+            case "restore-original":
+                if (payload) {
+                    error = restoreOriginalCrewMember(state, payload);
+                }
+                break;
+            case "keep-replacement-temporary":
+                if (payload) {
+                    error = keepReplacementTemporary(state, payload);
+                }
+                break;
+            case "resolve-mark-permanent":
+                if (payload) {
+                    error = markReplacementPermanentFromDecision(state, payload);
                 }
                 break;
             case "save-now":

@@ -319,6 +319,17 @@ button.danger {
   align-items: flex-start;
 }
 
+.aircraft-detail.needs-attention {
+  border-color: rgba(219, 181, 120, 0.42);
+  box-shadow:
+    0 0 0 1px rgba(219, 181, 120, 0.12) inset,
+    0 14px 34px rgba(87, 64, 34, 0.14);
+}
+
+.aircraft-detail.needs-attention .aircraft-summary {
+  padding-bottom: 4px;
+}
+
 .aircraft-info-block,
 .crew-manifest-block,
 .crew-problem-block {

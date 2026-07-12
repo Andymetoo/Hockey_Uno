@@ -1,5 +1,5 @@
 export const SAVE_KEY = "bomber-command-save-v1";
-export const SAVE_VERSION = 5;
+export const SAVE_VERSION = 6;
 const SHORT_MISSION_MS = 5 * 60 * 1000;
 const MAJOR_MISSION_MS = 10 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -299,6 +299,33 @@ function defenseText(level) {
         [40, "noticeable"]
     ], "light");
 }
+function defaultVisibleDefenseAssessment(intelConfidence, alertLevel) {
+    if (intelConfidence === "poor") {
+        return "The defense picture is incomplete and may already be out of date.";
+    }
+    if (alertLevel === "high") {
+        return "Defenses are believed alert and potentially stubborn around the target.";
+    }
+    if (alertLevel === "elevated") {
+        return "Some organized defense is expected, though the exact weight remains uncertain.";
+    }
+    return "Only a modest public defense estimate is on file.";
+}
+function buildVisibleDefenseAssessment(target, assessment, sourceLabel) {
+    if (/obscured|no reliable|contradictory|uncertain/i.test(assessment) || /Debrief note/i.test(sourceLabel)) {
+        return "The defense estimate remains stale and uncertain after the latest reports.";
+    }
+    if (target.intelConfidence === "poor") {
+        return "The public defense estimate remains rough and should not be treated as settled.";
+    }
+    if (target.alertLevel === "high") {
+        return "Crews believe the target defenses remain alert and difficult to read cleanly.";
+    }
+    if (target.alertLevel === "elevated") {
+        return "Crews report noticeable defenses, though the exact strength is still uncertain.";
+    }
+    return "The latest file suggests lighter organized defense than the older folders implied.";
+}
 function alertText(level) {
     if (level === "high") {
         return "high";
@@ -484,6 +511,12 @@ function assignCrewMemberToAircraft(member, aircraftId, role) {
         ? "Assigned from the replacement pool and still settling with the crew."
         : member.notes;
 }
+function getRoleForRecoveredOriginal(member) {
+    if (member.role === "enlisted_airman") {
+        return null;
+    }
+    return member.role;
+}
 function ensureAircraftRoleAssignments(state) {
     for (const aircraft of state.aircraft) {
         aircraft.assignedCrewMemberIds = state.crewMembers
@@ -585,6 +618,7 @@ export function createNewGame(now) {
             lastDebriefMissionId: null,
             logEntries: [],
             pendingDecisions: ["Choose the first operation target."],
+            personnelDecisions: [],
             stationWeather: createStationWeather(1),
             latestIntelUpdate: null,
             latestStrategicIntelNote: null,
@@ -652,6 +686,7 @@ export function createNewGame(now) {
         hiddenDefenseLevel: def.defense,
         hiddenRepairRate: 8 + index * 2,
         assessedCondition: def.assessedCondition,
+        assessedDefense: defaultVisibleDefenseAssessment(index === 0 ? "fair" : "poor", index <= 1 ? "elevated" : "low"),
         intelConfidence: index === 0 ? "fair" : "poor",
         lastReconDay: null,
         lastReconAt: null,
@@ -710,6 +745,7 @@ function migrateLegacyState(parsed) {
     state.campaign.stationWeather ||= createStationWeather(state.campaign.currentDay ?? 1);
     state.campaign.latestIntelUpdate ??= null;
     state.campaign.latestStrategicIntelNote ??= null;
+    state.campaign.personnelDecisions ??= [];
     state.campaign.directiveState ??= createInitialDirectiveState();
     state.campaign.directiveState.fighterPressure ??= baseline.campaign.directiveState.fighterPressure;
     state.campaign.directiveState.fighterReplacementFlow ??= baseline.campaign.directiveState.fighterReplacementFlow;
@@ -728,6 +764,7 @@ function migrateLegacyState(parsed) {
     state.recoveryJobs ??= [];
     state.targets ??= baseline.targets;
     for (const target of state.targets) {
+        target.assessedDefense ??= defaultVisibleDefenseAssessment(target.intelConfidence ?? "poor", target.alertLevel ?? "low");
         target.lastReconAt ??= null;
         target.lastReconSummary ??= null;
         target.latestIntelNote ??= null;
@@ -817,6 +854,7 @@ function migrateLegacyState(parsed) {
         aircraft.lastCrewIssueNote = buildAircraftIssueNote(state, aircraft);
     }
     syncDerivedCrews(state);
+    syncPendingDecisionNotes(state);
     return state;
 }
 export function loadState() {
@@ -864,7 +902,16 @@ export function getReplacementPool(state) {
     return state.crewMembers.filter((member) => member.isReplacement && member.assignedAircraftId === null);
 }
 export function getUnavailablePersonnel(state) {
-    return state.crewMembers.filter((member) => member.status !== "fit" && member.status !== "unassigned");
+    return state.crewMembers.filter((member) => member.status !== "fit" && member.status !== "resting" && member.status !== "unassigned");
+}
+export function getRestingPersonnel(state) {
+    return state.crewMembers.filter((member) => member.status === "resting");
+}
+export function getMedicalPersonnel(state) {
+    return state.crewMembers.filter((member) => member.status === "lightly_wounded" || member.status === "seriously_wounded");
+}
+export function getHardUnavailablePersonnel(state) {
+    return state.crewMembers.filter((member) => member.status === "missing" || member.status === "kia" || member.status === "pow");
 }
 function canRoleFly(member) {
     return member.status === "fit" || member.status === "resting";
@@ -890,11 +937,92 @@ function isRoleCompatible(member, role) {
 function getMemberAssignedToRole(state, aircraftId, role) {
     return getCrewMembersForAircraft(state, aircraftId).find((member) => member.currentAssignmentRole === role);
 }
-function getMissingRoles(state, aircraftId) {
-    return CREW_ROLES.filter((role) => {
-        const member = getMemberAssignedToRole(state, aircraftId, role);
-        return !member || !canRoleFly(member);
+export function getEffectiveRoleOccupant(state, aircraftId, role) {
+    const candidates = getCrewMembersForAircraft(state, aircraftId)
+        .filter((member) => member.currentAssignmentRole === role);
+    const flyable = candidates.filter((member) => canRoleFly(member));
+    if (flyable.length === 0) {
+        return undefined;
+    }
+    return flyable.sort((left, right) => {
+        const leftReplacementPenalty = left.isReplacement ? 1 : 0;
+        const rightReplacementPenalty = right.isReplacement ? 1 : 0;
+        const leftExperienceScore = left.experience === "veteran" ? 2 : left.experience === "regular" ? 1 : 0;
+        const rightExperienceScore = right.experience === "veteran" ? 2 : right.experience === "regular" ? 1 : 0;
+        const leftFatiguePenalty = left.fatigue === "exhausted" ? 2 : left.fatigue === "tired" ? 1 : 0;
+        const rightFatiguePenalty = right.fatigue === "exhausted" ? 2 : right.fatigue === "tired" ? 1 : 0;
+        return (leftReplacementPenalty + leftFatiguePenalty - leftExperienceScore)
+            - (rightReplacementPenalty + rightFatiguePenalty - rightExperienceScore);
+    })[0];
+}
+export function getPersonnelDecisionsForAircraft(state, aircraftId) {
+    return state.campaign.personnelDecisions.filter((decision) => !decision.resolved && decision.aircraftId === aircraftId);
+}
+function syncPendingDecisionNotes(state) {
+    const unresolved = state.campaign.personnelDecisions.filter((decision) => !decision.resolved);
+    state.campaign.pendingDecisions = state.campaign.pendingDecisions.filter((entry) => !entry.startsWith("Personnel: "));
+    if (unresolved.length > 0) {
+        state.campaign.pendingDecisions.push(unresolved.length === 1
+            ? "Personnel: one recovered original is awaiting a crew-seat decision."
+            : `Personnel: ${unresolved.length} recovered originals are awaiting crew-seat decisions.`);
+    }
+}
+function maybeCreateRecoveredOriginalDecision(state, member, now) {
+    if (member.isReplacement || member.assignedAircraftId === null) {
+        return;
+    }
+    const role = getRoleForRecoveredOriginal(member);
+    if (!role) {
+        return;
+    }
+    const replacement = getCrewMembersForAircraft(state, member.assignedAircraftId).find((candidate) => candidate.id !== member.id
+        && candidate.isReplacement
+        && !candidate.isPermanentReplacement
+        && candidate.currentAssignmentRole === role
+        && canRoleFly(candidate));
+    if (!replacement) {
+        return;
+    }
+    const existing = state.campaign.personnelDecisions.find((decision) => decision.crewMemberId === member.id
+        && decision.replacementCrewMemberId === replacement.id
+        && decision.aircraftId === member.assignedAircraftId
+        && decision.role === role);
+    if (existing) {
+        return;
+    }
+    state.campaign.personnelDecisions.push({
+        id: nextId(state, "personnel"),
+        crewMemberId: member.id,
+        replacementCrewMemberId: replacement.id,
+        aircraftId: member.assignedAircraftId,
+        role,
+        createdAt: now,
+        resolved: false
     });
+    member.notes = `${member.name} has recovered, but ${replacement.name} is still covering ${roleLabel(role)}.`;
+    syncPendingDecisionNotes(state);
+}
+export function getEffectiveRoleCoverage(state, aircraftId) {
+    return CREW_ROLES.map((role) => {
+        const candidates = getCrewMembersForAircraft(state, aircraftId)
+            .filter((member) => member.currentAssignmentRole === role);
+        const occupant = getEffectiveRoleOccupant(state, aircraftId, role);
+        return {
+            role,
+            occupant,
+            candidates,
+            hasConflict: candidates.length > 1
+        };
+    });
+}
+export function getRoleCoverageProblems(state, aircraftId) {
+    return getEffectiveRoleCoverage(state, aircraftId)
+        .filter((entry) => !entry.occupant || entry.hasConflict)
+        .map((entry) => ({
+        role: entry.role,
+        occupant: entry.occupant,
+        hasConflict: entry.hasConflict
+    }));
 }
 function getCompatibleReplacements(state, role) {
     return getReplacementPool(state).filter((member) => isRoleCompatible(member, role) && member.status === "unassigned");
@@ -1033,9 +1161,15 @@ export function assignReplacementCrewMember(state, crewMemberId, aircraftId, rol
     if (!isRoleCompatible(member, role)) {
         return `No suitable ${roleLabel(member.role)} can fill ${roleLabel(role)}.`;
     }
-    const existing = getMemberAssignedToRole(state, aircraftId, role);
-    if (existing && canRoleFly(existing) && existing.status !== "unassigned") {
+    const existing = getEffectiveRoleOccupant(state, aircraftId, role);
+    if (existing && existing.status !== "unassigned") {
         return `${roleLabel(role)} is already covered on this aircraft.`;
+    }
+    const roleOccupants = getCrewMembersForAircraft(state, aircraftId)
+        .filter((assigned) => assigned.currentAssignmentRole === role && !canRoleFly(assigned));
+    for (const occupant of roleOccupants) {
+        occupant.currentAssignmentRole = null;
+        occupant.notes = `${occupant.name} is no longer covering ${roleLabel(role)} while unfit for duty.`;
     }
     assignCrewMemberToAircraft(member, aircraftId, role);
     member.notes = `Assigned as ${roleLabel(role)} replacement on ${getAircraftById(state, aircraftId)?.name ?? "the aircraft"}.`;
@@ -1077,6 +1211,72 @@ export function markReplacementPermanent(state, crewMemberId) {
     updateAllDerivedCrewState(state);
     return null;
 }
+function resolvePersonnelDecision(state, decisionId) {
+    const decision = state.campaign.personnelDecisions.find((entry) => entry.id === decisionId && !entry.resolved);
+    if (decision) {
+        decision.resolved = true;
+    }
+    syncPendingDecisionNotes(state);
+    return decision;
+}
+export function restoreOriginalCrewMember(state, decisionId) {
+    const decision = state.campaign.personnelDecisions.find((entry) => entry.id === decisionId && !entry.resolved);
+    if (!decision) {
+        return "Personnel decision no longer available.";
+    }
+    const original = getCrewMemberById(state, decision.crewMemberId);
+    const replacement = getCrewMemberById(state, decision.replacementCrewMemberId);
+    if (!original || !replacement) {
+        resolvePersonnelDecision(state, decisionId);
+        return "Crew records for that personnel decision are incomplete.";
+    }
+    original.currentAssignmentRole = decision.role;
+    original.status = original.status === "unassigned" ? "fit" : original.status;
+    original.notes = `Returned to the ${roleLabel(decision.role)} seat after recovering.`;
+    replacement.currentAssignmentRole = null;
+    replacement.notes = `Kept with ${getAircraftById(state, decision.aircraftId)?.name ?? "the crew"} temporarily after the original returned to ${roleLabel(decision.role)}.`;
+    resolvePersonnelDecision(state, decisionId);
+    updateAllDerivedCrewState(state);
+    return null;
+}
+export function keepReplacementTemporary(state, decisionId) {
+    const decision = state.campaign.personnelDecisions.find((entry) => entry.id === decisionId && !entry.resolved);
+    if (!decision) {
+        return "Personnel decision no longer available.";
+    }
+    const original = getCrewMemberById(state, decision.crewMemberId);
+    const replacement = getCrewMemberById(state, decision.replacementCrewMemberId);
+    if (!original || !replacement) {
+        resolvePersonnelDecision(state, decisionId);
+        return "Crew records for that personnel decision are incomplete.";
+    }
+    original.currentAssignmentRole = null;
+    original.notes = `${replacement.name} remains on the ${roleLabel(decision.role)} seat for now while ${original.name} stays available on the crew.`;
+    resolvePersonnelDecision(state, decisionId);
+    updateAllDerivedCrewState(state);
+    return null;
+}
+export function markReplacementPermanentFromDecision(state, decisionId) {
+    const decision = state.campaign.personnelDecisions.find((entry) => entry.id === decisionId && !entry.resolved);
+    if (!decision) {
+        return "Personnel decision no longer available.";
+    }
+    const original = getCrewMemberById(state, decision.crewMemberId);
+    const replacement = getCrewMemberById(state, decision.replacementCrewMemberId);
+    if (!original || !replacement) {
+        resolvePersonnelDecision(state, decisionId);
+        return "Crew records for that personnel decision are incomplete.";
+    }
+    const error = markReplacementPermanent(state, replacement.id);
+    if (error) {
+        return error;
+    }
+    original.currentAssignmentRole = null;
+    original.notes = `${replacement.name} has been retained permanently in the ${roleLabel(decision.role)} seat.`;
+    resolvePersonnelDecision(state, decisionId);
+    updateAllDerivedCrewState(state);
+    return null;
+}
 function currentIntelAge(state, target) {
     const latest = target.latestIntelUpdatedAt ?? target.lastDebriefAt ?? target.lastMissionAt ?? target.lastReconAt;
     if (!latest) {
@@ -1102,7 +1302,7 @@ function countMissingGunners(state, aircraftId) {
         "right_waist",
         "tail_gunner"
     ].filter((role) => {
-        const member = getMemberAssignedToRole(state, aircraftId, role);
+        const member = getEffectiveRoleOccupant(state, aircraftId, role);
         return !member || !canRoleFly(member);
     }).length;
 }
@@ -1125,7 +1325,8 @@ export function getAircraftAvailability(state, aircraftId) {
     }
     const warnings = [];
     for (const role of REQUIRED_ROLES) {
-        const member = getMemberAssignedToRole(state, aircraftId, role);
+        const coverage = getEffectiveRoleCoverage(state, aircraftId).find((entry) => entry.role === role);
+        const member = coverage.occupant;
         if (!member) {
             return { level: "unavailable", label: "Unavailable", reason: `No ${roleLabel(role)} assigned`, warnings: [] };
         }
@@ -1141,8 +1342,11 @@ export function getAircraftAvailability(state, aircraftId) {
         if (member.isReplacement) {
             warnings.push(`Replacement ${roleLabel(role)} assigned.`);
         }
+        if (coverage.hasConflict) {
+            warnings.push(`${roleLabel(role)} station has duplicate occupants and needs sorting out.`);
+        }
     }
-    const engineer = getMemberAssignedToRole(state, aircraftId, "engineer_top_turret");
+    const engineer = getEffectiveRoleOccupant(state, aircraftId, "engineer_top_turret");
     if (!engineer || engineer.isReplacement || !canRoleFly(engineer)) {
         warnings.push("Engineer coverage is compromised.");
     }
@@ -1213,8 +1417,8 @@ export function getLeadAircraftAssessment(state, aircraftId) {
             warnings: ["Lead aircraft record missing."]
         };
     }
-    const pilot = getCrewMembersForAircraft(state, aircraftId).find((member) => member.currentAssignmentRole === "pilot");
-    const navigator = getCrewMembersForAircraft(state, aircraftId).find((member) => member.currentAssignmentRole === "navigator");
+    const pilot = getEffectiveRoleOccupant(state, aircraftId, "pilot");
+    const navigator = getEffectiveRoleOccupant(state, aircraftId, "navigator");
     const warnings = [];
     let score = 0;
     if (pilot?.experience === "veteran") {
@@ -1338,6 +1542,7 @@ export function getPlanningStaffPreview(state) {
 }
 function updateVisibleTargetAssessment(target, assessment, evidence, sourceLabel, recommendation, at) {
     target.assessedCondition = assessment;
+    target.assessedDefense = buildVisibleDefenseAssessment(target, assessment, sourceLabel);
     target.latestIntelNote = `${sourceLabel}: ${assessment}`;
     target.latestIntelSource = sourceLabel;
     target.latestIntelRecommendation = recommendation ?? null;
@@ -1350,7 +1555,7 @@ function updateVisibleTargetAssessment(target, assessment, evidence, sourceLabel
 }
 function snapshotAircraftCrew(state, aircraftId) {
     const members = CREW_ROLES.map((role) => {
-        const assigned = getMemberAssignedToRole(state, aircraftId, role);
+        const assigned = getEffectiveRoleOccupant(state, aircraftId, role);
         if (!assigned) {
             return null;
         }
@@ -1467,13 +1672,14 @@ function buildMission(state, now) {
         return null;
     }
     const secondaryTarget = state.planning.secondaryTargetId ? getTargetById(state, state.planning.secondaryTargetId) : undefined;
-    const assignedAircraftIds = state.planning.assignedAircraftIds.filter((id) => getAircraftAvailability(state, id).level !== "unavailable");
+    const assignedAircraftIds = [...state.planning.assignedAircraftIds];
     if (assignedAircraftIds.length === 0) {
         return null;
     }
-    const leadAircraftId = state.planning.leadAircraftId && assignedAircraftIds.includes(state.planning.leadAircraftId)
-        ? state.planning.leadAircraftId
-        : assignedAircraftIds[0] ?? null;
+    if (!state.planning.leadAircraftId || !assignedAircraftIds.includes(state.planning.leadAircraftId)) {
+        return null;
+    }
+    const leadAircraftId = state.planning.leadAircraftId;
     const leadAssessment = getLeadAircraftAssessment(state, leadAircraftId);
     const staffPreview = getPlanningStaffPreview(state);
     const launchTime = state.planning.launchMode === "schedule" ? now + state.planning.scheduleDelayMs : now;
@@ -1796,6 +2002,7 @@ export function launchMission(state, now) {
         : "An operation is now under way.";
     state.campaign.commandStanding = "High command expects a useful result, but the details will remain uncertain for some time.";
     state.campaign.pendingDecisions = ["Await timed reports and the returning crews."];
+    syncPendingDecisionNotes(state);
     state.selectedTab = "current-operation";
     const target = getTargetById(state, mission.plan.targetId);
     addLog(state, `mission-launch-${mission.id}`, now, "operations", `A ${operationTypeLabel(mission.plan.operationType)} has been ordered against ${target?.name ?? "the selected target"} with ${mission.plan.assignedAircraftIds.length} aircraft.${mission.plan.leadAircraftId ? ` ${getAircraftById(state, mission.plan.leadAircraftId)?.name ?? "Lead aircraft"} is marked as lead.` : ""}`);
@@ -1898,7 +2105,13 @@ function generateDebrief(state, mission) {
     mission.status = "complete";
     mission.stage = "complete";
     applyStrategicDirectiveEffects(state, mission, attackedTarget, state.lastReconciledAt);
-    updateVisibleTargetAssessment(target, mission.hiddenOutcome.targetAssessment, mission.hiddenOutcome.targetEvidence, "Debrief assessment", "Staff recommends weighing a reattack against fresh reconnaissance.", state.lastReconciledAt);
+    if (attackedTarget.id !== target.id) {
+        updateVisibleTargetAssessment(attackedTarget, mission.hiddenOutcome.targetAssessment, mission.hiddenOutcome.targetEvidence, "Debrief assessment", "Staff recommends weighing a reattack against fresh reconnaissance.", state.lastReconciledAt);
+        updateVisibleTargetAssessment(target, "Primary target remained obscured. No reliable strike assessment could be filed.", ["Returning crews report the primary target stayed obscured during the attack run."], "Debrief note", "Staff recommends fresh reconnaissance before relying on the primary target file again.", state.lastReconciledAt);
+    }
+    else {
+        updateVisibleTargetAssessment(target, mission.hiddenOutcome.targetAssessment, mission.hiddenOutcome.targetEvidence, "Debrief assessment", "Staff recommends weighing a reattack against fresh reconnaissance.", state.lastReconciledAt);
+    }
     attackedTarget.suspectedEffects = mission.hiddenOutcome.targetSuspectedEffects;
     attackedTarget.lastMissionSummary = mission.resultSummary;
     attackedTarget.lastMissionAt = state.lastReconciledAt;
@@ -1915,6 +2128,7 @@ function generateDebrief(state, mission) {
     state.campaign.campaignPhase = "Debrief filed. Engineering and intelligence await your next order.";
     state.campaign.commandStanding = getDirectiveProgressSummary(state).patience.replace("Command patience: ", "");
     state.campaign.pendingDecisions = ["Review damage, start repairs, or order recon."];
+    syncPendingDecisionNotes(state);
     state.campaign.stationWeather = createStationWeather(state.campaign.currentDay + mission.hiddenOutcome.targetDamage % 3);
     addLog(state, `debrief-${mission.id}`, state.lastReconciledAt, "debrief", mission.debrief);
 }
@@ -2082,6 +2296,7 @@ function completeRecon(state, recon) {
 function applyFatigueRecovery(state, elapsedMs, now) {
     const steps = Math.floor(elapsedMs / FATIGUE_RECOVERY_MS);
     let changed = false;
+    const recoveredMembers = [];
     for (const member of state.crewMembers) {
         const previousFatigue = member.fatigue;
         const previousStatus = member.status;
@@ -2096,6 +2311,7 @@ function applyFatigueRecovery(state, elapsedMs, now) {
             member.injurySeverity = "none";
             member.recoveryAvailableAt = null;
             member.notes = "Recovered from light wounds and returned to duty.";
+            recoveredMembers.push(member);
         }
         if (previousFatigue !== member.fatigue || previousStatus !== member.status) {
             changed = true;
@@ -2103,6 +2319,9 @@ function applyFatigueRecovery(state, elapsedMs, now) {
     }
     if (changed) {
         updateAllDerivedCrewState(state);
+        for (const member of recoveredMembers) {
+            maybeCreateRecoveredOriginalDecision(state, member, now);
+        }
     }
     return changed;
 }
@@ -2247,16 +2466,19 @@ export function startRecovery(state, aircraftId, now) {
         return `${groundCrew.chiefName}'s crew is already occupied and cannot arrange the recovery yet.`;
     }
     const manifest = getCrewMembersForAircraft(state, aircraft.id);
-    const hiddenCrewUpdates = manifest.map((member) => ({
-        crewMemberId: member.id,
-        status: chance(0.15) ? "lightly_wounded" : "resting",
-        fatigue: "exhausted",
-        injurySeverity: chance(0.15) ? "light" : "none",
-        recoveryAvailableAt: chance(0.15) ? now + LIGHT_WOUND_RECOVERY_MS : null,
-        note: chance(0.15)
-            ? `${member.name} returned from diversion lightly wounded.`
-            : `${member.name} has finally returned from the diversion and looks spent.`
-    }));
+    const hiddenCrewUpdates = manifest.map((member) => {
+        const wounded = chance(0.15);
+        return {
+            crewMemberId: member.id,
+            status: wounded ? "lightly_wounded" : "resting",
+            fatigue: "exhausted",
+            injurySeverity: wounded ? "light" : "none",
+            recoveryAvailableAt: wounded ? now + LIGHT_WOUND_RECOVERY_MS : null,
+            note: wounded
+                ? `${member.name} returned from diversion lightly wounded.`
+                : `${member.name} has finally returned from the diversion and looks spent.`
+        };
+    });
     const rolled = Math.random();
     const hiddenNewCondition = clamp(aircraft.hiddenCondition + (rolled < 0.33 ? 12 : rolled < 0.72 ? 6 : 0), 24, 84);
     const hiddenReturnStatus = rolled < 0.33 ? "serviceable" : "damaged";
@@ -2338,6 +2560,7 @@ export function advanceCampaignDay(state) {
     state.campaign.stationWeather = createStationWeather(state.campaign.currentDay);
     deliverStrategicIntelDrip(state, getEffectiveNow(state));
     addLog(state, `day-${state.campaign.currentDay}`, getEffectiveNow(state), "command", `Campaign day ${state.campaign.currentDay} has begun. Routine rest and repair time have accrued.`);
+    syncPendingDecisionNotes(state);
 }
 export function skipToNextReport(state, now) {
     const mission = getActiveMission(state);
@@ -2616,6 +2839,10 @@ function deliverStrategicIntelDrip(state, now, preferredTargetId) {
     pending.followUpDeliveredAt = now;
     const text = createStrategicIntelFollowUp(state, pending);
     state.campaign.latestStrategicIntelNote = text;
+    const target = getTargetById(state, pending.targetId);
+    if (target) {
+        target.assessedDefense = buildVisibleDefenseAssessment(target, target.assessedCondition, "Strategic follow-up");
+    }
     addLog(state, `strategic-intel-${pending.id}`, now, "command", text);
 }
 export function getDirectiveProgressSummary(state) {
@@ -2641,7 +2868,136 @@ export function getDirectiveProgressSummary(state) {
     };
 }
 export function getTargetOperationalSummary(target) {
-    return `${target.assessedCondition} Defense is believed ${defenseText(target.hiddenDefenseLevel)}, alert appears ${alertText(target.alertLevel)}, and intelligence is ${target.intelConfidence}.`;
+    return `${target.assessedCondition} ${target.assessedDefense} Alert appears ${alertText(target.alertLevel)}, and intelligence is ${target.intelConfidence}.`;
+}
+export function getAircraftAttentionState(state, aircraftId) {
+    const aircraft = getAircraftById(state, aircraftId);
+    if (!aircraft) {
+        return { needsAttention: false, shouldStartOpen: false, reasons: [] };
+    }
+    const manifest = getCrewMembersForAircraft(state, aircraftId);
+    const reasons = [];
+    if (aircraft.status !== "serviceable" || aircraft.repairJobId || aircraft.recoveryJobId) {
+        reasons.push("Aircraft status needs attention.");
+    }
+    if (manifest.some((member) => member.status === "lightly_wounded" || member.status === "seriously_wounded")) {
+        reasons.push("Crew recovery still in progress.");
+    }
+    if (manifest.some((member) => member.isReplacement && member.currentAssignmentRole)) {
+        reasons.push("Replacement crew are covering active stations.");
+    }
+    if (getRoleCoverageProblems(state, aircraftId).length > 0) {
+        reasons.push("Crew role coverage is incomplete.");
+    }
+    if (getPersonnelDecisionsForAircraft(state, aircraftId).length > 0) {
+        reasons.push("Recovered-original personnel decision pending.");
+    }
+    return {
+        needsAttention: reasons.length > 0,
+        shouldStartOpen: reasons.length > 0,
+        reasons
+    };
+}
+function getNextMissionEventTime(state) {
+    const mission = getActiveMission(state);
+    if (!mission) {
+        return null;
+    }
+    const nextEvent = mission.timelineEvents.filter((event) => !event.revealed).sort((a, b) => a.time - b.time)[0];
+    return nextEvent?.time ?? null;
+}
+function getNextNonMissionCompletionTime(state) {
+    const candidates = [];
+    for (const job of state.repairJobs) {
+        if (!job.completionApplied) {
+            candidates.push(job.completesAt);
+        }
+    }
+    for (const job of state.recoveryJobs) {
+        if (!job.completionApplied) {
+            candidates.push(job.completesAt);
+        }
+    }
+    for (const recon of state.reconMissions) {
+        if (!recon.completionApplied) {
+            candidates.push(recon.interpretedAt);
+        }
+    }
+    if (candidates.length === 0) {
+        return null;
+    }
+    return Math.min(...candidates);
+}
+function advanceClockTo(state, now, targetTime) {
+    state.debug.clockOffsetMs += Math.max(0, targetTime - now + 1000);
+}
+export function waitUntilNextEvent(state, now) {
+    const candidates = [
+        getNextMissionEventTime(state),
+        getNextNonMissionCompletionTime(state),
+        ...state.reconMissions
+            .filter((recon) => !recon.completionApplied && recon.status === "airborne")
+            .map((recon) => recon.returnsAt)
+    ].filter((value) => value !== null);
+    if (candidates.length === 0) {
+        return "No timed event is currently pending.";
+    }
+    advanceClockTo(state, now, Math.min(...candidates));
+    return null;
+}
+export function letCurrentWorkFinish(state, now) {
+    const targetTime = getNextNonMissionCompletionTime(state);
+    if (!targetTime) {
+        return "No station-side work is currently pending.";
+    }
+    advanceClockTo(state, now, targetTime);
+    return null;
+}
+export function standDownUntilMorning(state, now) {
+    const targetTime = now + DAY_MS;
+    reconcileState(state, targetTime);
+    state.campaign.currentDay += 1;
+    state.debug.clockOffsetMs += DAY_MS;
+    state.campaign.commandStanding = getDirectiveProgressSummary(state).patience.replace("Command patience: ", "");
+    state.campaign.stationWeather = createStationWeather(state.campaign.currentDay);
+    deliverStrategicIntelDrip(state, getEffectiveNow(state));
+    addLog(state, `day-${state.campaign.currentDay}`, getEffectiveNow(state), "command", `Campaign day ${state.campaign.currentDay} has begun. Routine rest and repair time have accrued.`);
+    syncPendingDecisionNotes(state);
+    return null;
+}
+export function getAircraftHistorySummary(state, aircraftId) {
+    const aircraft = getAircraftById(state, aircraftId);
+    if (!aircraft) {
+        return [];
+    }
+    const history = [
+        `${aircraft.name} has flown ${aircraft.missionCount} logged operation${aircraft.missionCount === 1 ? "" : "s"}.`,
+        aircraft.lastOutcomeNote,
+        aircraft.conditionSummary
+    ];
+    if (aircraft.damageHistory.length > 0) {
+        history.push(...aircraft.damageHistory.slice(0, 3));
+    }
+    return history;
+}
+export function getCrewHistorySummary(state, crewMemberId) {
+    const member = getCrewMemberById(state, crewMemberId);
+    if (!member) {
+        return [];
+    }
+    const lines = [
+        `${member.name} has flown ${member.missionsFlown} mission${member.missionsFlown === 1 ? "" : "s"}.`,
+        `Current status: ${member.status.replaceAll("_", " ")}.`,
+        `Replacement status: ${member.isReplacement ? member.isPermanentReplacement ? "permanent replacement" : "temporary replacement" : "original crew"}.`,
+        member.notes
+    ];
+    if (member.injurySeverity !== "none") {
+        lines.push(`Injury note: ${member.injurySeverity} injury record remains on file.`);
+    }
+    if (getActiveMissionCrewIds(state).includes(member.id)) {
+        lines.push("This crew member is airborne with the current operation snapshot.");
+    }
+    return lines;
 }
 export function getTargetContextSummary(state, targetId) {
     const target = getTargetById(state, targetId);
@@ -3043,8 +3399,15 @@ export function getDisabledReasonForLaunch(state) {
     if (state.planning.assignedAircraftIds.length === 0) {
         return "No aircraft assigned";
     }
+    const unavailableAssigned = state.planning.assignedAircraftIds.find((aircraftId) => getAircraftAvailability(state, aircraftId).level === "unavailable");
+    if (unavailableAssigned) {
+        return `${getAircraftById(state, unavailableAssigned)?.name ?? "An assigned aircraft"} is unavailable`;
+    }
     if (!state.planning.leadAircraftId || !state.planning.assignedAircraftIds.includes(state.planning.leadAircraftId)) {
         return "No lead aircraft selected";
+    }
+    if (getAircraftAvailability(state, state.planning.leadAircraftId).level === "unavailable") {
+        return "Selected lead aircraft is unavailable";
     }
     const target = getTargetById(state, state.planning.selectedTargetId);
     if (!target) {

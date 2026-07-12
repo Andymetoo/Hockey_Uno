@@ -80,6 +80,8 @@ export type StaffActionType =
   | "go_target_board"
   | "go_mission_planning"
   | "start_recon";
+
+export type PersonnelDecisionAction = "restore_original" | "keep_replacement_temporary" | "mark_replacement_permanent";
 export type StrategicEffectCategory =
   | "fighter_pressure"
   | "replacement_flow"
@@ -99,10 +101,21 @@ export interface CampaignState {
   lastDebriefMissionId: string | null;
   logEntries: LogEntry[];
   pendingDecisions: string[];
+  personnelDecisions: PersonnelDecision[];
   stationWeather: string;
   latestIntelUpdate: LatestIntelUpdate | null;
   latestStrategicIntelNote: string | null;
   directiveState: DirectiveState;
+}
+
+export interface PersonnelDecision {
+  id: string;
+  crewMemberId: string;
+  replacementCrewMemberId: string;
+  aircraftId: string;
+  role: CrewRole;
+  createdAt: number;
+  resolved: boolean;
 }
 
 export interface StaffRecommendation {
@@ -217,6 +230,7 @@ export interface Target {
   hiddenDefenseLevel: number;
   hiddenRepairRate: number;
   assessedCondition: string;
+  assessedDefense: string;
   intelConfidence: IntelConfidence;
   lastReconDay: number | null;
   lastReconAt: number | null;
