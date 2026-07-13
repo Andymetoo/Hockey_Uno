@@ -64,6 +64,14 @@ export type ReconStatus = "planned" | "airborne" | "awaiting_interpretation" | "
 export type AvailabilityLevel = "available" | "marginal" | "unavailable";
 export type ReconResultQuality = "clear" | "partial" | "inconclusive";
 export type NotificationKind = "report" | "debrief" | "recon" | "maintenance" | "operations";
+export type TimeAdvanceKind = "passive" | "wait_next_event" | "let_work_finish" | "stand_down" | "offline_return" | "day_advance";
+export type OperationalRhythm =
+  | "morning_conference"
+  | "planning_window"
+  | "operation_underway"
+  | "debrief_window"
+  | "evening_assessment"
+  | "stand_down";
 export type ReplacementStatusAtLaunch = "original" | "temporary_replacement" | "permanent_replacement";
 export type TutorialStepId =
   | "welcome"
@@ -131,7 +139,26 @@ export interface CampaignState {
   stationWeather: string;
   latestIntelUpdate: LatestIntelUpdate | null;
   latestStrategicIntelNote: string | null;
+  latestWaitNote: string | null;
+  pendingTimeAdvanceKind: TimeAdvanceKind | null;
+  consequenceLedger: ConsequenceLedgerEntry[];
   directiveState: DirectiveState;
+}
+
+export interface ConsequenceLedgerEntry {
+  id: string;
+  createdAt: number;
+  day: number;
+  missionId: string | null;
+  reconId: string | null;
+  targetId: string | null;
+  title: string;
+  staffRead: string;
+  commandRead: string;
+  targetRead: string;
+  groupCost: string;
+  strategicConsequence: string;
+  recommendedPosture: string;
 }
 
 export interface PersonnelDecision {

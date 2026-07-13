@@ -30,9 +30,11 @@ import {
   getMedicalActionLabel,
   getMedicalRecoveryLabel,
   getMedicalPersonnel,
+  getOperationalRhythm,
   getOperationsDeskSummary,
   getPersonnelDecisionsForAircraft,
   getPlanningStaffPreview,
+  getRecentConsequenceLedger,
   getReplacementCoveringMember,
   getReplacementPool,
   getRestingPersonnel,
@@ -379,6 +381,8 @@ function renderCommandPanel(state: SaveState): string {
   const conference = getStaffConference(state);
   const briefing = getStaffBriefingRecommendations(state);
   const directive = getDirectiveProgressSummary(state);
+  const rhythm = getOperationalRhythm(state);
+  const ledger = getRecentConsequenceLedger(state);
   return `
     <section class="panel stack">
       <h2>Command</h2>
@@ -388,6 +392,7 @@ function renderCommandPanel(state: SaveState): string {
       <div class="note">
         <strong>Operations Desk</strong>
         <div class="stack compact">
+          <p><strong>Current rhythm:</strong> ${escapeHtml(rhythm.label)}</p>
           ${opsLines.map((line) => `<p>${escapeHtml(line)}</p>`).join("")}
         </div>
         <div class="button-row">
@@ -401,6 +406,10 @@ function renderCommandPanel(state: SaveState): string {
         <strong>Directive Progress</strong>
         <div class="stack compact">
           <p><strong>Current directive:</strong> ${escapeHtml(state.campaign.commandDirective)}</p>
+          <p>${escapeHtml(directive.momentum)}</p>
+          <p>${escapeHtml(directive.directiveState)}</p>
+          <p>${escapeHtml(directive.groupCondition)}</p>
+          <p>${escapeHtml(directive.commandView)}</p>
           <p>${escapeHtml(directive.progress)}</p>
           <p>${escapeHtml(directive.patience)}</p>
           <p>${escapeHtml(directive.nextNeed)}</p>
@@ -409,6 +418,23 @@ function renderCommandPanel(state: SaveState): string {
             ? directive.recentEffects.map((line) => `<p class="muted">${escapeHtml(line)}</p>`).join("")
             : `<p class="muted">No wider strategic read has been filed yet.</p>`}
         </div>
+      </div>
+      <div class="note">
+        <strong>Consequence Ledger</strong>
+        ${ledger.length === 0 ? `
+          <p class="muted">No formal consequence read has been filed yet.</p>
+        ` : `
+          <div class="stack compact">
+            ${ledger.map((entry) => `
+              <div class="row-card">
+                <strong>${escapeHtml(entry.title)}</strong>
+                <p>${escapeHtml(entry.staffRead)}</p>
+                <p class="muted">${escapeHtml(entry.groupCost)}</p>
+                <p class="muted">${escapeHtml(entry.recommendedPosture)}</p>
+              </div>
+            `).join("")}
+          </div>
+        `}
       </div>
       <div class="stack">
         <div>
@@ -501,6 +527,7 @@ function renderAircraftCrews(state: SaveState): string {
           const missing = manifest.filter((member) => member.status === "missing" || member.status === "kia" || member.status === "pow").length;
           const coverageProblems = getRoleCoverageProblems(state, aircraft.id);
           const personnelDecisions = getPersonnelDecisionsForAircraft(state, aircraft.id);
+          const isLost = aircraft.status === "lost";
           return `
             <details class="row-card aircraft-detail ${attention.needsAttention ? "needs-attention" : ""}" ${attention.shouldStartOpen ? "open" : ""}>
               <summary class="aircraft-summary">
@@ -519,6 +546,10 @@ function renderAircraftCrews(state: SaveState): string {
                 <div class="aircraft-info-block">
                   <strong>Aircraft Status</strong>
                   <p class="muted">${escapeHtml(aircraft.conditionSummary)}</p>
+                  ${isLost ? `
+                    <p class="warning">This aircraft has been struck from the board. No replacement aircraft are available in this prototype slice.</p>
+                    <p class="muted">${escapeHtml(aircraft.lastOutcomeNote)}</p>
+                  ` : ""}
                   <p class="muted">${escapeHtml(aircraft.crewCohesion)}</p>
                   <p class="muted">Ground crew: ${escapeHtml(aircraft.assignedGroundCrewId)}</p>
                 </div>
@@ -791,6 +822,7 @@ function renderDebrief(state: SaveState): string {
 
   const target = getTargetById(state, mission.plan.targetId);
   const attackedTarget = getTargetById(state, mission.hiddenOutcome.attackedTargetId) ?? target;
+  const ledger = getRecentConsequenceLedger(state).find((entry) => entry.missionId === mission.id);
   return `
     <section class="panel stack">
       <p class="eyebrow">Debrief Target</p>
@@ -818,6 +850,17 @@ function renderDebrief(state: SaveState): string {
           ${mission.debriefCasualtyLines.map((line) => `<p>${escapeHtml(line)}</p>`).join("")}
         </div>
       ` : `<p class="muted">No specific crew casualties have been filed beyond fatigue and strain.</p>`}
+      ${ledger ? `
+        <div class="note">
+          <strong>Post-Operation Consequence Ledger</strong>
+          <p><strong>Staff read:</strong> ${escapeHtml(ledger.staffRead)}</p>
+          <p><strong>Command read:</strong> ${escapeHtml(ledger.commandRead)}</p>
+          <p><strong>Target read:</strong> ${escapeHtml(ledger.targetRead)}</p>
+          <p><strong>Group cost:</strong> ${escapeHtml(ledger.groupCost)}</p>
+          <p><strong>Strategic consequence:</strong> ${escapeHtml(ledger.strategicConsequence)}</p>
+          <p><strong>Recommended posture:</strong> ${escapeHtml(ledger.recommendedPosture)}</p>
+        </div>
+      ` : ""}
       <p><strong>Target assessment:</strong> ${escapeHtml(attackedTarget?.assessedCondition ?? "No reliable assessment.")}</p>
       <p><strong>Evidence:</strong> ${escapeHtml(attackedTarget?.evidence.slice(0, 4).join(" ") ?? "No evidence filed.")}</p>
       <div class="button-row">
@@ -938,6 +981,11 @@ function renderRecon(state: SaveState): string {
           <button data-action="recon" data-payload="${selectedTarget?.id ?? ""}:pre_strike" ${selectedTarget ? "" : "disabled"}>Pre-Strike Recon</button>
           <button data-action="recon" data-payload="${selectedTarget?.id ?? ""}:weather_route" ${selectedTarget ? "" : "disabled"}>Weather / Route Recon</button>
           <button data-action="recon" data-payload="${selectedTarget?.id ?? ""}:focused_followup" ${selectedTarget ? "" : "disabled"}>Focused Follow-Up</button>
+        </div>
+        <div class="stack compact">
+          <p class="muted">Pre-strike recon checks target activity and worth, but is more likely to stir alertness.</p>
+          <p class="muted">Weather / route recon favors flying conditions and doctrine advice with less target-alert risk.</p>
+          <p class="muted">Focused follow-up is slower, but aims at one unresolved question rather than a general look.</p>
         </div>
       `}
       ${selectedTarget ? `<p class="muted">Current recon focus: ${escapeHtml(selectedTarget.name)}</p>` : ""}

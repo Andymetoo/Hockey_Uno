@@ -13,6 +13,7 @@ import type {
   CrewRole,
   CrewSpecialty,
   CrewStatus,
+  ConsequenceLedgerEntry,
   DirectiveState,
   DirectiveRelevance,
   GroundCrew,
@@ -43,13 +44,14 @@ import type {
   StaffConference,
   Target,
   TargetType,
+  TimeAdvanceKind,
   TutorialStepDisplay,
   TutorialStepId,
   UiNotification
 } from "./types";
 
 export const SAVE_KEY = "bomber-command-save-v1";
-export const SAVE_VERSION = 8;
+export const SAVE_VERSION = 9;
 
 const SHORT_MISSION_MS = 5 * 60 * 1000;
 const MAJOR_MISSION_MS = 10 * 60 * 1000;
@@ -57,6 +59,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const FATIGUE_RECOVERY_MS = 6 * 60 * 1000;
 const LIGHT_WOUND_RECOVERY_MS = 12 * 60 * 60 * 1000;
 const TOAST_LIFETIME_MS = 12 * 1000;
+const SHORT_WAIT_DRIFT_THRESHOLD_MS = 8 * 60 * 1000;
 
 const AIRCRAFT_NAMES = [
   "Lucky Lady",
@@ -747,48 +750,98 @@ function stageReport(
   stage: MissionStage,
   target: Target,
   riskWord: string,
-  visibility: string
+  visibility: string,
+  context: {
+    operationType: OperationType;
+    weather: string;
+    targetType: TargetType;
+    leadLabel: string;
+    aircraftCount: number;
+    hasLossRisk: boolean;
+    hasDiversionRisk: boolean;
+  }
 ): { text: string; source: MissionEvent["source"]; confidence: MissionEvent["confidence"] } {
   switch (stage) {
     case "takeoff":
       return {
-        text: "Tower reports the force has begun departing in sequence. Visibility over the field is serviceable, though exact assembly timing remains uncertain.",
+        text: pickOne([
+          "Tower reports the force has begun departing in sequence. Visibility over the field is serviceable, though exact assembly timing remains uncertain.",
+          context.aircraftCount >= 4
+            ? "Tower reports a steady stream leaving the field. Ground staff cautions that assembly may take time with a package this large."
+            : "Tower reports the smaller force lifting cleanly enough, though the full order of departure is still being sorted."
+        ]),
         source: "tower",
         confidence: "confirmed"
       };
     case "assembly":
       return {
-        text: "Group Operations believes the formation is climbing into place. Some gaps have been reported, but the overall picture remains fragmentary.",
+        text: pickOne([
+          context.leadLabel === "Trusted lead"
+            ? "Group Operations believes the formation is climbing into place in reasonably good order, though the picture remains fragmentary."
+            : "Group Operations believes the formation is climbing into place. Some gaps have been reported, but the overall picture remains fragmentary.",
+          context.operationType === "reduced_strike"
+            ? "Assembly reports suggest the reduced force is forming without much drama, though no one is claiming a perfectly tidy picture."
+            : "Wireless traffic suggests the formation is still sorting itself out above the field. Staff is withholding judgment on cohesion."
+        ]),
         source: "group_operations",
         confidence: "fragmentary"
       };
     case "outbound":
       return {
-        text: `Observers judge the route ${riskWord}. Wireless traffic suggests the force is approaching the enemy coast, though direct contact is incomplete.`,
+        text: pickOne([
+          `Observers judge the route ${riskWord}. Wireless traffic suggests the force is approaching the enemy coast, though direct contact is incomplete.`,
+          `Operations reports ${context.weather.toLowerCase()} on the route. The outbound stream is believed to be holding together, but only in fragments.`,
+          context.operationType === "support_raid"
+            ? "The lighter raid appears to be outbound on schedule. Staff believes the route is manageable, though the enemy picture is not yet firm."
+            : "Observers believe the force is nearing the enemy coast. Radio traffic remains patchy enough that staff is avoiding tidy conclusions."
+        ]),
         source: "group_operations",
         confidence: "estimated"
       };
     case "target_area":
       return {
-        text: `Lead crews report ${visibility} over ${target.name}. Bombing is believed to have been carried out, but the exact aiming point cannot yet be confirmed.`,
+        text: pickOne([
+          `Lead crews report ${visibility} over ${target.name}. Bombing is believed to have been carried out, but the exact aiming point cannot yet be confirmed.`,
+          context.targetType === "airfield"
+            ? `Crews report ${visibility} over the airfield approaches. Bombing is believed to have gone in, though the visible effect is still disputed.`
+            : `Target-area reports remain hazy. Crews describe ${visibility} conditions over ${target.name}, with no clean agreement yet on the fall of bombs.`,
+          context.leadLabel === "Questionable lead"
+            ? `Wireless traffic from the target area is confused. Staff believes an attack was attempted under ${visibility} conditions, but the picture is uneven.`
+            : `Lead elements report ${visibility} over ${target.name}. A strike appears to have been pressed, though no firm assessment is yet trusted.`
+        ]),
         source: "lead_aircraft",
         confidence: "probable"
       };
     case "withdrawal":
       return {
-        text: "Coastal watchers report the stream breaking up on the homeward leg. Several aircraft appear separated, and at least one return is uncertain.",
+        text: pickOne([
+          context.hasLossRisk || context.hasDiversionRisk
+            ? "Coastal watchers report the stream returning in fragments. Counting is unreliable, and at least one aircraft may be overdue."
+            : "The homeward stream is scattered but moving. Tower has been warned to expect staggered arrivals rather than a neat return.",
+          "Wireless traffic suggests confusion near the coast. Staff is withholding judgment until landings begin.",
+          "Group Operations has no clean count yet on the withdrawing force. Several elements appear separated on the return."
+        ]),
         source: "coastal_observer",
         confidence: "estimated"
       };
     case "recovery":
       return {
-        text: "Aircraft are reported landing or diverting in ones and twos. Engineering is beginning to sort rumor from fact.",
+        text: pickOne([
+          "Aircraft are reported landing or diverting in ones and twos. Engineering is beginning to sort rumor from fact.",
+          context.hasDiversionRisk
+            ? "Recovery reports remain uneven. Some aircraft are landing normally, while others appear to be straggling or diverting."
+            : "Landing reports are coming in steadily, though staff still lacks a perfectly trusted count of every aircraft."
+        ]),
         source: "tower",
         confidence: "confirmed"
       };
     case "debrief_ready":
       return {
-        text: "Crews are available for debrief. Intelligence requests a provisional assessment before recommending the next move.",
+        text: pickOne([
+          "Crews are available for debrief. Intelligence requests a provisional assessment before recommending the next move.",
+          "Returning crews are now in position to be heard. Staff expects the next useful judgment to come from debrief rather than rumor.",
+          "Debrief can begin. Operations and intelligence both warn that the broad meaning of the sortie may still be hazy."
+        ]),
         source: "crew_debrief",
         confidence: "confirmed"
       };
@@ -831,6 +884,10 @@ function fuzzyTimeUntil(now: number, timestamp: number, exact: boolean): string 
     return "before long";
   }
   return "later today";
+}
+
+function pickOne<T>(options: T[]): T {
+  return options[Math.floor(Math.random() * options.length)]!;
 }
 
 function createCrewMember(
@@ -997,6 +1054,9 @@ export function createNewGame(now: number): SaveState {
       stationWeather: createStationWeather(1),
       latestIntelUpdate: null,
       latestStrategicIntelNote: null,
+      latestWaitNote: null,
+      pendingTimeAdvanceKind: null,
+      consequenceLedger: [],
       directiveState: createInitialDirectiveState()
     },
     aircraft: [] as Aircraft[],
@@ -1129,6 +1189,9 @@ function migrateLegacyState(parsed: Partial<SaveState>): SaveState {
   state.campaign.stationWeather ||= createStationWeather(state.campaign.currentDay ?? 1);
   state.campaign.latestIntelUpdate ??= null;
   state.campaign.latestStrategicIntelNote ??= null;
+  state.campaign.latestWaitNote ??= null;
+  state.campaign.pendingTimeAdvanceKind ??= null;
+  state.campaign.consequenceLedger ??= [];
   state.campaign.personnelDecisions ??= [];
   state.campaign.directiveState ??= createInitialDirectiveState();
   state.campaign.directiveState.fighterPressure ??= baseline.campaign.directiveState.fighterPressure;
@@ -1266,7 +1329,14 @@ export function loadState(): SaveState | null {
     if (!parsed || typeof parsed !== "object") {
       return null;
     }
-    return migrateLegacyState(parsed);
+    const state = migrateLegacyState(parsed);
+    const rawNow = getEffectiveNow(state);
+    const boundedNow = getBoundedOperationalNow(state, rawNow);
+    if (boundedNow < rawNow) {
+      state.debug.clockOffsetMs -= rawNow - boundedNow;
+      state.campaign.pendingTimeAdvanceKind = "offline_return";
+    }
+    return state;
   } catch (error) {
     console.warn("Failed to load bomber command save", error);
     return null;
@@ -1910,10 +1980,13 @@ function currentIntelAge(state: SaveState, target: Target): string {
     return "No recent filing";
   }
   const diff = getEffectiveNow(state) - latest;
-  if (diff < 8 * 60 * 1000) {
+  if (diff < 12 * 60 * 1000) {
     return "current";
   }
-  if (diff < 18 * 60 * 1000) {
+  if (diff < DAY_MS) {
+    return "still useful";
+  }
+  if (diff < 2 * DAY_MS) {
     return "aging";
   }
   return "stale";
@@ -2626,8 +2699,18 @@ function buildMission(state: SaveState, now: number): Mission | null {
     "debrief_ready"
   ];
   const riskWord = defenseText(target.hiddenDefenseLevel);
+  const hasLossRisk = outcomes.some((outcome) => outcome.finalStatus === "lost");
+  const hasDiversionRisk = outcomes.some((outcome) => outcome.finalStatus === "diverted");
   const timelineEvents: MissionEvent[] = stages.map((stage) => {
-    const report = stageReport(stage, target, riskWord, visibility);
+    const report = stageReport(stage, target, riskWord, visibility, {
+      operationType: state.planning.operationType,
+      weather: state.campaign.stationWeather,
+      targetType: target.type,
+      leadLabel: leadAssessment.label,
+      aircraftCount: state.planning.assignedAircraftIds.length,
+      hasLossRisk,
+      hasDiversionRisk
+    });
     const hiddenEffects: HiddenEffect[] = [];
     if (stage === "assembly") {
       outcomes.forEach((outcome, index) => {
@@ -2791,12 +2874,17 @@ function applyAircraftOutcome(state: SaveState, mission: Mission, outcomeIndex: 
     aircraft.status = outcome.finalStatus;
   }
   aircraft.conditionSummary = conditionSummary(aircraft.hiddenCondition, aircraft.status);
-  aircraft.lastOutcomeNote = outcome.note;
+  aircraft.lastOutcomeNote = aircraft.status === "lost"
+    ? `${outcome.note} No replacement aircraft are available in this prototype slice.`
+    : outcome.note;
   if (outcome.damageDelta > 0 && !aircraft.damageHistory.includes(outcome.note)) {
     aircraft.damageHistory.unshift(outcome.note);
   }
   if (aircraft.status === "damaged" || aircraft.status === "diverted") {
     aircraft.repairJobId = null;
+  }
+  if (aircraft.status === "lost") {
+    addLog(state, `aircraft-lost-${mission.id}-${aircraft.id}`, state.lastReconciledAt, "operations", `${aircraft.name} is now listed as lost. ${aircraft.lastOutcomeNote}`);
   }
 }
 
@@ -2909,6 +2997,7 @@ function generateDebrief(state: SaveState, mission: Mission): void {
   state.campaign.pendingDecisions = ["Review damage, start repairs, or order recon."];
   syncPendingDecisionNotes(state);
   state.campaign.stationWeather = createStationWeather(state.campaign.currentDay + mission.hiddenOutcome.targetDamage % 3);
+  buildMissionLedgerEntry(state, mission, target);
   addLog(state, `debrief-${mission.id}`, state.lastReconciledAt, "debrief", mission.debrief);
 }
 
@@ -3085,6 +3174,7 @@ function completeRecon(state: SaveState, recon: ReconMission): void {
     alertLevel: recon.enemyAlertEffect,
     updatedAt: recon.interpretedAt
   };
+  buildReconLedgerEntry(state, recon, target);
   deliverStrategicIntelDrip(state, recon.interpretedAt, recon.targetId);
   addLog(state, `recon-${recon.id}`, recon.interpretedAt, "recon", recon.resultText);
   addNotification(state, `toast-recon-${recon.id}`, "recon", "Recon interpretation filed", recon.interpretedAt);
@@ -3125,7 +3215,7 @@ function applyFatigueRecovery(state: SaveState, elapsedMs: number, now: number):
 }
 
 function nudgeTargetRepairs(state: SaveState, elapsedMs: number): boolean {
-  const daySteps = Math.floor(elapsedMs / DAY_MS);
+  const daySteps = elapsedMs / DAY_MS;
   if (daySteps <= 0) {
     return false;
   }
@@ -3133,8 +3223,8 @@ function nudgeTargetRepairs(state: SaveState, elapsedMs: number): boolean {
   const repairScale = clamp(state.campaign.directiveState.regionalRepairCapacity / 70, 0.4, 1.15);
   for (const target of state.targets) {
     const previous = target.hiddenActualCondition;
-    const repairLift = Math.max(1, Math.round(target.hiddenRepairRate * repairScale));
-    target.hiddenActualCondition = clamp(target.hiddenActualCondition + repairLift * daySteps, 0, 100);
+    const repairLift = Math.max(1, Math.round(target.hiddenRepairRate * repairScale * daySteps));
+    target.hiddenActualCondition = clamp(target.hiddenActualCondition + repairLift, 0, 100);
     if (previous !== target.hiddenActualCondition) {
       changed = true;
     }
@@ -3142,8 +3232,19 @@ function nudgeTargetRepairs(state: SaveState, elapsedMs: number): boolean {
   return changed;
 }
 
+function hasActiveTimedWork(state: SaveState): boolean {
+  return Boolean(getActiveMission(state))
+    || state.repairJobs.some((job) => !job.completionApplied)
+    || state.recoveryJobs.some((job) => !job.completionApplied)
+    || state.reconMissions.some((recon) => !recon.completionApplied);
+}
+
 export function reconcileState(state: SaveState, now: number): boolean {
   const previous = state.lastReconciledAt;
+  const cause = state.campaign.pendingTimeAdvanceKind ?? "passive";
+  if (cause === "passive" && !hasActiveTimedWork(state)) {
+    now = previous;
+  }
   let changed = false;
   for (const mission of state.missions) {
     const dueEvents = mission.timelineEvents
@@ -3177,12 +3278,18 @@ export function reconcileState(state: SaveState, now: number): boolean {
   }
   const elapsedMs = Math.max(0, now - previous);
   if (elapsedMs > 0) {
-    changed = applyFatigueRecovery(state, elapsedMs, now) || changed;
-    changed = nudgeTargetRepairs(state, elapsedMs) || changed;
+    changed = applyOperationalDrift(state, elapsedMs, now, cause) || changed;
+  }
+  const waitNote = buildWaitResultNote(state, cause, elapsedMs);
+  if (waitNote && waitNote !== state.campaign.latestWaitNote) {
+    state.campaign.latestWaitNote = waitNote;
+    addLog(state, `wait-note-${now}`, now, "command", waitNote);
+    changed = true;
   }
   changed = pruneExpiredNotifications(state, now) || changed;
   changed = cleanupPlanningState(state) || changed;
   changed = evaluateTutorial(state) || changed;
+  state.campaign.pendingTimeAdvanceKind = null;
   state.lastReconciledAt = now;
   return changed;
 }
@@ -3326,9 +3433,22 @@ export function startRecon(state: SaveState, targetId: string, type: ReconType, 
   if (!target) {
     return "Target not found.";
   }
-  const duration = type === "post_strike" ? 3.5 * 60 * 1000 : 2.5 * 60 * 1000;
+  const duration =
+    type === "focused_followup" ? 4.5 * 60 * 1000
+      : type === "post_strike" ? 3.5 * 60 * 1000
+        : 2.5 * 60 * 1000;
   const resultQuality: ReconResultQuality =
-    target.hiddenActualCondition < 45 ? "clear" : target.hiddenActualCondition < 72 ? "partial" : "inconclusive";
+    type === "weather_route"
+      ? target.hiddenWeatherRisk < 35 ? "clear" : target.hiddenWeatherRisk < 65 ? "partial" : "inconclusive"
+      : target.hiddenActualCondition < 45 ? "clear" : target.hiddenActualCondition < 72 ? "partial" : "inconclusive";
+  const enemyAlertEffect: AlertLevel =
+    type === "weather_route"
+      ? target.alertLevel
+      : type === "post_strike"
+        ? (target.alertLevel === "high" ? "high" : chance(0.2) ? "high" : "elevated")
+        : type === "focused_followup"
+          ? (target.alertLevel === "low" ? "elevated" : target.alertLevel)
+          : (target.alertLevel === "high" ? "high" : chance(0.45) ? "high" : "elevated");
   const recon: ReconMission = {
     id: nextId(state, "recon"),
     targetId,
@@ -3340,27 +3460,59 @@ export function startRecon(state: SaveState, targetId: string, type: ReconType, 
     resultText:
       type === "post_strike"
         ? `Recon photography over ${target.name} suggests ${target.hiddenActualCondition < 70 ? "some visible disturbance" : "only partial evidence"}, though complete interpretation remains uncertain.`
-        : `Recon sortie over ${target.name} has returned with partial weather and route observations.`,
+        : type === "weather_route"
+          ? `Weather and route reconnaissance around ${target.name} has returned with a preliminary flying picture for the current window.`
+          : type === "focused_followup"
+            ? `A focused follow-up run on ${target.name} is being read against one unresolved question from earlier reporting.`
+            : `Pre-strike reconnaissance over ${target.name} has returned with a fresh but incomplete look at target activity and approach conditions.`,
     confidenceChange: raiseConfidence(target.intelConfidence),
-    enemyAlertEffect: target.alertLevel === "high" ? "high" : chance(0.4) ? "high" : "elevated",
+    enemyAlertEffect,
     completionApplied: false,
     hiddenAssessment:
-      target.hiddenActualCondition < 45
-        ? "Recon reports visible damage and probable interruption to operations."
-        : target.hiddenActualCondition < 72
-          ? "Recon suggests useful disturbance, though parts of the target remain hard to judge."
-          : "Recon finds the target still appears largely operational.",
+      type === "weather_route"
+        ? target.hiddenWeatherRisk < 35
+          ? "Weather and approach conditions appear workable for a deliberate strike."
+          : target.hiddenWeatherRisk < 65
+            ? "Weather appears usable but imperfect, and staff expects a hazier attack picture."
+            : "Weather and approach conditions argue for caution or a doctrine that tolerates poor visibility."
+        : target.hiddenActualCondition < 45
+          ? "Recon reports visible damage and probable interruption to operations."
+          : target.hiddenActualCondition < 72
+            ? "Recon suggests useful disturbance, though parts of the target remain hard to judge."
+            : type === "pre_strike"
+              ? "Recon finds the target active and still worth striking, though not complacent."
+              : "Recon finds the target still appears largely operational.",
     hiddenEvidence:
-      target.hiddenActualCondition < 45
-        ? "Fresh photography shows obvious disturbance in the target area."
-        : "Recon photographs provide partial but usable new evidence.",
+      type === "weather_route"
+        ? target.hiddenWeatherRisk < 35
+          ? "Route observers report more reliable visibility than the older file implied."
+          : target.hiddenWeatherRisk < 65
+            ? "Cloud breaks and route reporting remain inconsistent but usable."
+            : "Cloud and route reporting remain poor enough to complicate visual bombing."
+        : target.hiddenActualCondition < 45
+          ? "Fresh photography shows obvious disturbance in the target area."
+          : target.hiddenActualCondition < 72
+            ? "Recon photographs provide partial but usable new evidence."
+            : "Fresh reconnaissance still finds the target operating with only limited visible disturbance.",
     resultQuality,
     recommendation:
-      resultQuality === "clear"
-        ? "Staff recommends either exploiting the damage or shifting attention elsewhere."
-        : resultQuality === "partial"
-          ? "Staff recommends weighing a follow-up attack against the value of more observation."
-          : "Staff recommends caution. The latest run did not settle the question."
+      type === "weather_route"
+        ? resultQuality === "clear"
+          ? "Weather argues this is still a workable window for action."
+          : resultQuality === "partial"
+            ? "Weather is usable, but staff recommends a cautious route or doctrine."
+            : "Weather argues for caution; further haste may buy tempo at the cost of certainty."
+        : resultQuality === "clear"
+          ? type === "post_strike"
+            ? "Staff believes this result is useful enough to act on without demanding another look immediately."
+            : "This target is worth striking now if the rest of the board can support it."
+          : resultQuality === "partial"
+            ? type === "focused_followup"
+              ? "Damage remains unresolved; staff recommends deciding whether another look would truly help."
+              : "Staff recommends weighing a follow-up attack against the value of more observation."
+            : type === "post_strike"
+              ? "Follow-up attack may be wasted unless other evidence improves the file."
+              : "The latest run did not settle the question. Staff recommends caution."
   };
   state.reconMissions.unshift(recon);
   state.campaign.activeReconId = recon.id;
@@ -3369,6 +3521,7 @@ export function startRecon(state: SaveState, targetId: string, type: ReconType, 
 }
 
 export function advanceCampaignDay(state: SaveState): void {
+  setPendingTimeAdvance(state, "day_advance");
   state.campaign.currentDay += 1;
   state.debug.clockOffsetMs += DAY_MS;
   state.campaign.commandStanding = getDirectiveProgressSummary(state).patience.replace("Command patience: ", "");
@@ -3427,6 +3580,169 @@ export function completeAllRepairs(state: SaveState, now: number): string | null
     job.completesAt = now - 1000;
   }
   return null;
+}
+
+function setPendingTimeAdvance(state: SaveState, kind: TimeAdvanceKind): void {
+  state.campaign.pendingTimeAdvanceKind = kind;
+}
+
+function getLatestPendingTime(state: SaveState): number | null {
+  const candidates: number[] = [];
+  for (const mission of state.missions) {
+    for (const event of mission.timelineEvents) {
+      if (!event.revealed || !event.applied) {
+        candidates.push(event.time);
+      }
+    }
+  }
+  for (const job of state.repairJobs) {
+    if (!job.completionApplied) {
+      candidates.push(job.completesAt);
+    }
+  }
+  for (const job of state.recoveryJobs) {
+    if (!job.completionApplied) {
+      candidates.push(job.completesAt);
+    }
+  }
+  for (const recon of state.reconMissions) {
+    if (!recon.completionApplied) {
+      candidates.push(recon.interpretedAt);
+    }
+  }
+  return candidates.length > 0 ? Math.max(...candidates) : null;
+}
+
+function getBoundedOperationalNow(state: SaveState, now: number): number {
+  const hasActiveWork = Boolean(getActiveMission(state))
+    || state.repairJobs.some((job) => !job.completionApplied)
+    || state.recoveryJobs.some((job) => !job.completionApplied)
+    || state.reconMissions.some((recon) => !recon.completionApplied);
+  if (!hasActiveWork) {
+    return state.lastReconciledAt;
+  }
+  const latestPending = getLatestPendingTime(state);
+  if (latestPending === null) {
+    return state.lastReconciledAt;
+  }
+  return Math.min(now, latestPending);
+}
+
+function activeTargetNames(state: SaveState): string[] {
+  return state.targets
+    .filter((target) => target.hiddenActualCondition < 100)
+    .map((target) => target.name);
+}
+
+function applyDailyStrategicDrift(state: SaveState, elapsedMs: number, now: number): boolean {
+  const daySteps = Math.max(1, Math.floor(elapsedMs / DAY_MS));
+  let changed = false;
+  for (let step = 0; step < daySteps; step += 1) {
+    changed = nudgeTargetRepairs(state, DAY_MS * 0.5) || changed;
+    const directive = state.campaign.directiveState;
+    directive.commandPatience = clamp(directive.commandPatience - 2, 0, 100);
+    if (chance(0.35)) {
+      deliverStrategicIntelDrip(state, now);
+      changed = true;
+    }
+  }
+  return changed;
+}
+
+function applyOperationalDrift(state: SaveState, elapsedMs: number, now: number, cause: TimeAdvanceKind): boolean {
+  let changed = false;
+  changed = applyFatigueRecovery(state, elapsedMs, now) || changed;
+  if (cause === "stand_down" || cause === "day_advance") {
+    changed = applyDailyStrategicDrift(state, elapsedMs, now) || changed;
+    state.campaign.stationWeather = createStationWeather(state.campaign.currentDay);
+    return changed;
+  }
+  if ((cause === "wait_next_event" || cause === "let_work_finish") && elapsedMs >= SHORT_WAIT_DRIFT_THRESHOLD_MS) {
+    changed = nudgeTargetRepairs(state, Math.round(elapsedMs * 0.08)) || changed;
+  }
+  return changed;
+}
+
+function buildWaitResultNote(state: SaveState, cause: TimeAdvanceKind, elapsedMs: number): string | null {
+  if (cause === "passive") {
+    return null;
+  }
+  const activeTargets = activeTargetNames(state);
+  const targetText = activeTargets.length > 0
+    ? `${activeTargets[0]} still appears disrupted, though enemy repair activity may be slowly resuming.`
+    : "No fresh target effect has yet become obvious from the pause.";
+  if (cause === "wait_next_event") {
+    if (getActiveMission(state)) {
+      return "The board was held until the next report arrived. Staff is working from a little more evidence, but not the full picture yet.";
+    }
+    if (state.campaign.activeReconId) {
+      return "Recon is still in motion. The pause bought interpretation time, but not a settled answer yet.";
+    }
+    return "Time was allowed to move to the next operational beat. Minor recovery continued while the broader picture remained largely unchanged.";
+  }
+  if (cause === "let_work_finish") {
+    return state.repairJobs.some((job) => job.status === "complete" && job.completionApplied)
+      ? `Current station work has caught up. Repairs and recovery advanced, and ${targetText.toLowerCase()}`
+      : `Recon and station work were allowed to finish. ${targetText}`;
+  }
+  if (cause === "offline_return") {
+    return "Work already under way has been carried through to its natural stopping point. The campaign has paused again at the next decision window.";
+  }
+  if (cause === "stand_down" || cause === "day_advance") {
+    return `The group stood down into the next morning. Crews steadied, weather shifted, and ${targetText.toLowerCase()}`;
+  }
+  return null;
+}
+
+function roleLossText(state: SaveState): string {
+  const lostAircraft = state.aircraft.filter((aircraft) => aircraft.status === "lost").length;
+  return lostAircraft > 0
+    ? `${lostAircraft} aircraft ${lostAircraft === 1 ? "has" : "have"} been struck off after recent losses.`
+    : "No aircraft have yet been struck off outright.";
+}
+
+function buildGroupConditionText(state: SaveState): string {
+  const available = countAvailableAircraft(state);
+  const wounded = state.crewMembers.filter((member) => member.status === "lightly_wounded" || member.status === "seriously_wounded").length;
+  const lostAircraft = state.aircraft.filter((aircraft) => aircraft.status === "lost").length;
+  if (available <= 2 || lostAircraft >= 2 || wounded >= 6) {
+    return "Group condition: near breaking after recent strain and losses.";
+  }
+  if (available <= 3 || wounded >= 3 || state.repairJobs.some((job) => !job.completionApplied)) {
+    return "Group condition: strained, but still capable of a limited effort.";
+  }
+  if (state.crewMembers.filter((member) => member.fatigue === "tired" || member.fatigue === "exhausted").length >= 6) {
+    return "Group condition: brittle in stamina, though not yet in outright crisis.";
+  }
+  return "Group condition: strong enough for deliberate action if staff chooses its moment.";
+}
+
+function buildCampaignMomentumText(state: SaveState): string {
+  const directive = state.campaign.directiveState;
+  if (directive.directiveProgress >= 65 && directive.commandPatience >= 50) {
+    return "Campaign momentum: promising, with some signs the wider pressure is beginning to tell.";
+  }
+  if (directive.directiveProgress >= 40) {
+    return "Campaign momentum: improving, though the campaign still lacks a decisive answer.";
+  }
+  if (directive.commandPatience < 45) {
+    return "Campaign momentum: slipping, with command asking harder questions than the evidence comfortably answers.";
+  }
+  return "Campaign momentum: holding, but the gains remain incomplete and reversible.";
+}
+
+function buildDirectiveStateText(state: SaveState): string {
+  const value = state.campaign.directiveState.directiveProgress;
+  if (value >= 70) {
+    return "Directive state: nearing satisfaction, though staff would not call the sector settled yet.";
+  }
+  if (value >= 45) {
+    return "Directive state: meaningful pressure achieved, but not enough to end the Bremen problem.";
+  }
+  if (value >= 20) {
+    return "Directive state: partial progress only; staff sees signs of pressure, not resolution.";
+  }
+  return "Directive state: unresolved. Command still lacks a persuasive answer in the sector.";
 }
 
 function strategicBand(value: number, high: string, mid: string, low: string): string {
@@ -3699,6 +4015,10 @@ export function getDirectiveProgressSummary(state: SaveState): {
   nextNeed: string;
   recentEffects: string[];
   latestIntel: string | null;
+  momentum: string;
+  directiveState: string;
+  groupCondition: string;
+  commandView: string;
 } {
   const directive = state.campaign.directiveState;
   const progress = strategicBand(
@@ -3726,8 +4046,107 @@ export function getDirectiveProgressSummary(state: SaveState): {
     patience,
     nextNeed,
     recentEffects: state.campaign.directiveState.recentStrategicEffects.slice(0, 3).map((effect) => effect.visibleHint),
-    latestIntel: state.campaign.latestStrategicIntelNote
+    latestIntel: state.campaign.latestStrategicIntelNote,
+    momentum: buildCampaignMomentumText(state),
+    directiveState: buildDirectiveStateText(state),
+    groupCondition: buildGroupConditionText(state),
+    commandView: directive.commandPatience < 45
+      ? "Command view: useful progress must soon become visible progress."
+      : directive.directiveProgress >= 40
+        ? "Command view: useful progress is visible, but not enough to stop pressing."
+        : "Command view: the effort remains under judgment rather than credit."
   };
+}
+
+function createConsequenceLedgerEntry(state: SaveState, input: Omit<ConsequenceLedgerEntry, "id" | "day">): void {
+  const entry: ConsequenceLedgerEntry = {
+    id: `${input.missionId ?? input.reconId ?? input.targetId ?? "ledger"}-${input.createdAt}`,
+    day: state.campaign.currentDay,
+    ...input
+  };
+  if (state.campaign.consequenceLedger.some((existing) => existing.id === entry.id)) {
+    return;
+  }
+  state.campaign.consequenceLedger.unshift(entry);
+  state.campaign.consequenceLedger = state.campaign.consequenceLedger.slice(0, 5);
+}
+
+function buildMissionLedgerEntry(state: SaveState, mission: Mission, target: Target): void {
+  const attackedTarget = getTargetById(state, mission.hiddenOutcome.attackedTargetId) ?? target;
+  const lostCount = mission.hiddenOutcome.aircraftOutcomes.filter((outcome) => outcome.finalStatus === "lost").length;
+  const damagedCount = mission.hiddenOutcome.aircraftOutcomes.filter((outcome) => outcome.finalStatus === "damaged").length;
+  const divertedCount = mission.hiddenOutcome.aircraftOutcomes.filter((outcome) => outcome.finalStatus === "diverted").length;
+  const posture =
+    lostCount > 0 || damagedCount >= 2
+      ? "Staff recommends recovery or only a reduced follow-up."
+      : mission.hiddenOutcome.targetDamage >= 20
+        ? "Staff recommends exploiting the apparent disruption before it fades."
+        : mission.hiddenOutcome.targetDamage > 0
+          ? "Staff recommends confirming the result or preparing a limited follow-up."
+          : "Staff recommends reconfirming the picture before asking for another major effort.";
+  createConsequenceLedgerEntry(state, {
+    createdAt: state.lastReconciledAt,
+    missionId: mission.id,
+    reconId: null,
+    targetId: attackedTarget.id,
+    title: `After ${attackedTarget.name}`,
+    staffRead: mission.hiddenOutcome.targetDamage >= 20
+      ? "Crews believe the strike caused useful disruption, though staff will not call the problem settled."
+      : mission.hiddenOutcome.targetDamage > 0
+        ? "Crews believe some disruption was caused, but staff regards the effect as incomplete."
+        : "Staff does not believe the operation produced a clearly trusted result.",
+    commandRead: mission.hiddenOutcome.commandAssessment,
+    targetRead: attackedTarget.id !== target.id
+      ? `${target.name} remained obscured. Crews believe the effective blow shifted toward ${attackedTarget.name}.`
+      : attackedTarget.suspectedEffects,
+    groupCost: `${damagedCount} damaged, ${divertedCount} diverted, ${lostCount} lost or missing. ${roleLossText(state)}`,
+    strategicConsequence: state.campaign.directiveState.recentStrategicEffects[0]?.visibleHint
+      ?? "The wider strategic effect remains under review.",
+    recommendedPosture: posture
+  });
+}
+
+function buildReconLedgerEntry(state: SaveState, recon: ReconMission, target: Target): void {
+  createConsequenceLedgerEntry(state, {
+    createdAt: recon.interpretedAt,
+    missionId: null,
+    reconId: recon.id,
+    targetId: target.id,
+    title: `Recon read on ${target.name}`,
+    staffRead: recon.resultText,
+    commandRead: recon.type === "post_strike"
+      ? "Command will treat this as support for judgment, not judgment by itself."
+      : "Command values the file only insofar as it sharpens the next operational choice.",
+    targetRead: recon.hiddenAssessment,
+    groupCost: recon.type === "focused_followup"
+      ? "The reconnaissance effort cost time and attention, but not a major operational commitment."
+      : "The reconnaissance effort was light, though it still consumed operational time.",
+    strategicConsequence: recon.recommendation,
+    recommendedPosture: recon.resultQuality === "clear"
+      ? "Staff recommends acting on the clearer picture while it remains timely."
+      : "Staff recommends weighing whether more information would truly help, or whether it is time to act."
+  });
+}
+
+export function getOperationalRhythm(state: SaveState): { id: string; label: string } {
+  const mission = getActiveMission(state);
+  const recon = getActiveRecon(state);
+  if (mission) {
+    return { id: "operation_underway", label: "Operation Underway" };
+  }
+  if (state.campaign.lastDebriefMissionId && state.campaign.pendingDecisions.some((line) => /review|repair|recon/i.test(line))) {
+    return { id: "debrief_window", label: "Debrief Window" };
+  }
+  if (recon || state.repairJobs.some((job) => !job.completionApplied) || state.recoveryJobs.some((job) => !job.completionApplied)) {
+    return { id: "evening_assessment", label: "Evening Assessment" };
+  }
+  if (state.campaign.currentDay === 1 && state.missions.length === 0) {
+    return { id: "morning_conference", label: "Morning Conference" };
+  }
+  if (state.campaign.personnelDecisions.some((entry) => !entry.resolved)) {
+    return { id: "stand_down", label: "Stand Down" };
+  }
+  return { id: "planning_window", label: "Planning Window" };
 }
 
 export function getTargetOperationalSummary(target: Target): string {
@@ -3814,6 +4233,7 @@ export function waitUntilNextEvent(state: SaveState, now: number): string | null
   if (candidates.length === 0) {
     return "No timed event is currently pending.";
   }
+  setPendingTimeAdvance(state, "wait_next_event");
   advanceClockTo(state, now, Math.min(...candidates));
   return null;
 }
@@ -3823,20 +4243,17 @@ export function letCurrentWorkFinish(state: SaveState, now: number): string | nu
   if (!targetTime) {
     return "No station-side work is currently pending.";
   }
+  setPendingTimeAdvance(state, "let_work_finish");
   advanceClockTo(state, now, targetTime);
   return null;
 }
 
 export function standDownUntilMorning(state: SaveState, now: number): string | null {
   const targetTime = now + DAY_MS;
-  reconcileState(state, targetTime);
+  setPendingTimeAdvance(state, "stand_down");
   state.campaign.currentDay += 1;
-  state.debug.clockOffsetMs += DAY_MS;
-  state.campaign.commandStanding = getDirectiveProgressSummary(state).patience.replace("Command patience: ", "");
-  state.campaign.stationWeather = createStationWeather(state.campaign.currentDay);
-  deliverStrategicIntelDrip(state, getEffectiveNow(state));
-  addLog(state, `day-${state.campaign.currentDay}`, getEffectiveNow(state), "command", `Campaign day ${state.campaign.currentDay} has begun. Routine rest and repair time have accrued.`);
-  syncPendingDecisionNotes(state);
+  advanceClockTo(state, now, targetTime);
+  addLog(state, `day-${state.campaign.currentDay}`, targetTime, "command", `Campaign day ${state.campaign.currentDay} has begun. Routine rest and repair time have accrued.`);
   return null;
 }
 
@@ -3911,15 +4328,21 @@ export function getCurrentOperationSummary(state: SaveState): string {
   return `Current stage is ${mission.stage.replaceAll("_", " ")}. Next report is expected after some delay.`;
 }
 
+export function getRecentConsequenceLedger(state: SaveState): ConsequenceLedgerEntry[] {
+  return state.campaign.consequenceLedger.slice(0, 3);
+}
+
 export function getOperationsDeskSummary(state: SaveState): string[] {
   const now = getEffectiveNow(state);
   const exact = state.debug.showHiddenValues;
   const lines: string[] = [];
+  const rhythm = getOperationalRhythm(state);
   const mission = getActiveMission(state);
   const recon = getActiveRecon(state);
   const activeRepairs = state.repairJobs.filter((job) => !job.completionApplied);
   const activeRecoveries = state.recoveryJobs.filter((job) => !job.completionApplied);
   const diverted = state.aircraft.filter((aircraft) => aircraft.status === "diverted" && !aircraft.recoveryJobId);
+  lines.push(`Operational posture: ${rhythm.label}.`);
   if (mission) {
     const target = getTargetById(state, mission.plan.targetId);
     const next = mission.timelineEvents.filter((event) => !event.revealed).sort((a, b) => a.time - b.time)[0];
@@ -3954,6 +4377,9 @@ export function getOperationsDeskSummary(state: SaveState): string[] {
   }
   lines.push(`Crew readiness: ${crewReadinessSummary(state)}`);
   lines.push(`Weather outlook: ${state.campaign.stationWeather}`);
+  if (state.campaign.latestWaitNote) {
+    lines.push(`Latest time note: ${state.campaign.latestWaitNote}`);
+  }
   return lines;
 }
 
@@ -4283,6 +4709,7 @@ export function getStaffConference(state: SaveState): StaffConference {
   const available = countAvailableAircraft(state);
   const marginal = countMarginalAircraft(state);
   const crisis = hasReadinessCrisis(state);
+  const latestLedger = state.campaign.consequenceLedger[0] ?? null;
   const recs = chooseConferenceRecommendations(state, phase.phaseId);
   const recommended = sanitizeConferenceRecommendation(state, recs.recommended);
   const alternates = recs.alternates.map((entry) => sanitizeConferenceRecommendation(state, entry)).slice(0, 3);
@@ -4293,29 +4720,39 @@ export function getStaffConference(state: SaveState): StaffConference {
         ? "Readiness has become the main story. Staff is arguing about how much risk the group can absorb before it starts breaking itself."
         : phase.phaseId === "fighter_pressure"
           ? "The immediate fighter picture still shapes every larger decision. Staff is weighing whether to soften that problem before anything ambitious."
-          : phase.phaseId === "bremen_preparation"
+        : phase.phaseId === "bremen_preparation"
             ? "The board is turning toward Bremen, but staff is split on whether to prepare the strike or commit directly."
-            : phase.phaseId === "direct_strike_pressure"
+          : phase.phaseId === "direct_strike_pressure"
               ? "Command wants clearer direct progress now, even if some departments would rather keep shaping the problem."
-              : "Staff is in follow-up mode, trying to decide whether the latest evidence argues for recon, reattack, or a shift in focus.";
+              : latestLedger
+                ? `${latestLedger.staffRead} ${latestLedger.recommendedPosture}`
+                : "Staff is in follow-up mode, trying to decide whether the latest evidence argues for recon, reattack, or a shift in focus.";
 
-  const executiveComment = latestDebrief && latestDebrief.debriefGenerated
-    ? `So basically: the last operation gave us ${latestDebrief.resultSummary.toLowerCase()}, and the next decision matters more than the last headline.`
+  const executiveComment = latestLedger
+    ? `So basically: ${latestLedger.staffRead.toLowerCase()} ${latestLedger.groupCost}`
+    : latestDebrief && latestDebrief.debriefGenerated
+      ? `So basically: the last operation gave us ${latestDebrief.resultSummary.toLowerCase()}, and the next decision matters more than the last headline.`
     : "So basically: we need a sane next move that matches what the squadron can actually sustain.";
   const operationsComment = crisis
     ? "Operations can still sketch reduced options, but it does not believe the group is ready for a confident full effort."
     : phase.phaseId === "direct_strike_pressure"
       ? "Operations believes a direct strike can be flown if the board accepts the remaining uncertainty."
+      : latestLedger
+        ? `Operations reads the present posture this way: ${latestLedger.recommendedPosture.toLowerCase()}`
       : target
         ? `Operations reads ${target.name} as the next practical objective, though it is not pretending the route or picture are clean.`
         : "Operations wants a target chosen before it starts talking as if a real order exists.";
   const intelligenceComment = activeRecon
     ? "Intelligence is already waiting on fresh interpretation and does not want the next big decision to outrun the evidence."
+    : latestLedger
+      ? `${latestLedger.targetRead} Intelligence is tracking the file as ${target ? getTargetIntelAgeLabel(state, target.id) : "aging"}.`
     : target
       ? `${target.name} still sits under a ${getTargetIntelAgeLabel(state, target.id)} file. Intelligence is willing to advise, but not to pretend certainty.`
       : "Intelligence has no target file in front of it worth pretending is settled.";
   const engineeringComment = state.repairJobs.some((job) => !job.completionApplied) || state.recoveryJobs.some((job) => !job.completionApplied)
     ? "Engineering would like the current queue cleared before anyone starts speaking as if the line is fresh again."
+    : state.aircraft.some((aircraft) => aircraft.status === "lost")
+      ? "Engineering has written off at least one aircraft entirely and wants the board to stop talking as if every loss is repairable."
     : marginal > 0
       ? "Engineering can support another effort, but it does not endorse acting as if every aircraft is equally trustworthy."
       : "Engineering has fewer objections than usual, which it takes as permission for caution rather than bravado.";
@@ -4326,6 +4763,8 @@ export function getStaffConference(state: SaveState): StaffConference {
       : "Personnel sees a workable roster, but not one that should be pushed carelessly just because it still looks functional on paper.";
   const commandComment = directive.commandPatience < 45
     ? "Command Liaison is blunt: headquarters wants visible progress soon and may not admire another purely preparatory answer."
+    : latestLedger
+      ? latestLedger.commandRead
     : directive.commandPatience < 60
       ? "Command Liaison says patience is narrowing, though not yet gone."
       : "Command Liaison says the board still has room to choose the next move deliberately, provided it looks purposeful.";
