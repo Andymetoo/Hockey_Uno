@@ -124,12 +124,141 @@ export type StrategicEffectCategory =
   | "approach_danger"
   | "directive_progress"
   | "command_patience";
+export type CampaignPhase = "opening" | "pressure" | "opportunity" | "crisis" | "commitment" | "resolution";
+export type CampaignResolutionState = "active" | "pending" | "finalized";
+export type CampaignHookState = "active" | "fading" | "resolved";
+export type CampaignOpportunityDisposition = "pending" | "exploited" | "confirmed_not_exploited" | "ignored" | "lost_through_delay";
+export type CampaignInsightStatus = "emerging" | "established" | "weakened" | "contradicted";
+export type CampaignEndCondition = "directive_complete" | "group_collapse" | "command_relief" | "window_exhausted";
+
+export interface EnemyResponseProfile {
+  codeName: string;
+  interceptionBias: number;
+  repairBias: number;
+  adaptationBias: number;
+  radarLeverage: number;
+  railLeverage: number;
+  repeatAttackSensitivity: number;
+  opportunityDecay: number;
+}
+
+export interface CampaignProfile {
+  profileId: string;
+  generatedAt: number;
+  expectedDays: number;
+  applicationMode: "legacy_baked_repair" | "drift_only";
+  primaryDirectiveTargetId: string;
+  enemyResponse: EnemyResponseProfile;
+  targetPriorityMods: Record<string, number>;
+  targetRepairMods: Record<string, number>;
+  targetDefenseMods: Record<string, number>;
+  viableApproachSummaries: string[];
+}
+
+export interface CampaignCausalHook {
+  id: string;
+  hookType: string;
+  sourceId: string;
+  relatedTargetId: string | null;
+  createdDay: number;
+  createdAt: number;
+  state: CampaignHookState;
+  fadingStartsDay: number | null;
+  fadingStartsBeat: number | null;
+  fadesAfterDay: number | null;
+  fadesAfterBeat: number | null;
+  evidenceKnown: boolean;
+  consumedById: string | null;
+  strength: number;
+  summary: string;
+}
+
+export interface CampaignOpportunity {
+  id: string;
+  kind: string;
+  description: string;
+  createdDay: number;
+  createdAt: number;
+  sourceTargetId: string | null;
+  relatedTargetId: string | null;
+  beneficiaryTargetIds: string[];
+  eligibleOperationTypes: OperationType[];
+  eligibleRouteRisks: RouteRisk[];
+  relatedHookIds: string[];
+  state: CampaignHookState;
+  fadingStartsDay: number | null;
+  fadingStartsBeat: number | null;
+  fadesAfterDay: number | null;
+  fadesAfterBeat: number | null;
+  disposition: CampaignOpportunityDisposition;
+  dispositionAt: number | null;
+  dispositionReason: string | null;
+  confirmedAt: number | null;
+  confirmationNote: string | null;
+}
+
+export interface CampaignInsight {
+  id: string;
+  subject: string;
+  conclusion: string;
+  status: CampaignInsightStatus;
+  evidenceCount: number;
+  discoveredAt: number;
+  updatedAt: number;
+}
+
+export interface CampaignEvent {
+  id: string;
+  kind: string;
+  title: string;
+  body: string;
+  createdAt: number;
+  day: number;
+  relatedTargetId: string | null;
+  relatedHookIds: string[];
+}
+
+export interface CampaignEvaluation {
+  generatedAt: number;
+  endCondition: CampaignEndCondition;
+  judgment: string;
+  summary: string;
+  commandJudgment: string;
+  staffJudgment: string;
+  directiveAssessment: string;
+  groupAssessment: string;
+  lossesAssessment: string;
+  opportunityAssessment: string;
+  notableChains: string[];
+}
+
+export interface CampaignMissionContext {
+  contextVersion: 1;
+  enemyProfileLabel: string;
+  profileTraits: Pick<
+    EnemyResponseProfile,
+    | "interceptionBias"
+    | "repairBias"
+    | "adaptationBias"
+    | "radarLeverage"
+    | "railLeverage"
+    | "repeatAttackSensitivity"
+    | "opportunityDecay"
+  >;
+  selectedHookIds: string[];
+  selectedOpportunityIds: string[];
+  riskModifiers: Array<{ key: string; amount: number; reason: string }>;
+  reportModifiers: Array<{ key: string; amount: number; reason: string }>;
+  repeatedTarget: boolean;
+  adaptationRiskApplied: boolean;
+}
 
 export interface CampaignState {
   currentDay: number;
   commandDirective: string;
   commandStanding: string;
   campaignPhase: string;
+  campaignPhaseId: CampaignPhase;
   activeMissionId: string | null;
   activeReconId: string | null;
   lastDebriefMissionId: string | null;
@@ -143,6 +272,25 @@ export interface CampaignState {
   pendingTimeAdvanceKind: TimeAdvanceKind | null;
   consequenceLedger: ConsequenceLedgerEntry[];
   directiveState: DirectiveState;
+  profile: CampaignProfile;
+  expectedDurationDays: number;
+  extensionReason: string | null;
+  operationalBeat: number;
+  causalHooks: CampaignCausalHook[];
+  opportunities: CampaignOpportunity[];
+  insights: CampaignInsight[];
+  events: CampaignEvent[];
+  resolutionState: CampaignResolutionState;
+  pendingEndCondition: CampaignEndCondition | null;
+  pendingResolutionDetectedAt: number | null;
+  pendingResolutionReason: string | null;
+  pendingResolutionMissionIds: string[];
+  pendingResolutionReconIds: string[];
+  pendingResolutionRepairIds: string[];
+  pendingResolutionRecoveryIds: string[];
+  evaluation: CampaignEvaluation | null;
+  finalSummaryMode: boolean;
+  frozenFinalState: boolean;
 }
 
 export interface ConsequenceLedgerEntry {
@@ -189,7 +337,7 @@ export interface StaffRecommendation {
 }
 
 export interface StaffConference {
-  phaseId: CampaignSpinePhase;
+  phaseId: CampaignPhase;
   phaseLabel: string;
   summary: string;
   executiveComment: string;
@@ -428,6 +576,7 @@ export interface MissionEvent {
 export interface Mission {
   id: string;
   plan: MissionPlan;
+  campaignContext: CampaignMissionContext | null;
   stage: MissionStage;
   timelineEvents: MissionEvent[];
   generatedEvents: MissionEvent[];

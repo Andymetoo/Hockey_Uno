@@ -23,6 +23,7 @@ import {
   getDisabledReasonForLaunch,
   getEffectiveNow,
   getGroundCrewPressureNote,
+  getPrimaryUsableOpportunity,
   getHardUnavailablePersonnel,
   getLeadAircraftAssessment,
   getLatestDebriefMission,
@@ -31,7 +32,6 @@ import {
   getMedicalRecoveryLabel,
   getMedicalPersonnel,
   getOperationalRhythm,
-  getOperationsDeskSummary,
   getPersonnelDecisionsForAircraft,
   getPlanningStaffPreview,
   getRecentConsequenceLedger,
@@ -40,7 +40,6 @@ import {
   getRestingPersonnel,
   getRoleCoverageProblems,
   getSecondaryTargetOptions,
-  getStaffBriefingRecommendations,
   getStaffConference,
   getTargetById,
   getTargetContextSummary,
@@ -334,6 +333,13 @@ function renderStaffRecommendation(recommendation: StaffRecommendation): string 
 }
 
 function renderStaffConference(state: SaveState, conference: StaffConference): string {
+  const officerLines = [
+    { label: "Operations Officer", text: conference.operationsComment },
+    { label: "Intelligence Officer", text: conference.intelligenceComment },
+    { label: "Engineering Officer", text: conference.engineeringComment },
+    { label: "Medical / Personnel Officer", text: conference.personnelComment },
+    { label: "Command Liaison", text: conference.commandComment }
+  ].filter((entry) => entry.text.trim().length > 0).slice(0, 4);
   return `
     <section class="note staff-conference-card">
       <div class="briefing-header">
@@ -346,11 +352,7 @@ function renderStaffConference(state: SaveState, conference: StaffConference): s
       <p>${escapeHtml(conference.summary)}</p>
       <div class="stack compact conference-comments">
         <p><strong>Executive Officer:</strong> ${escapeHtml(conference.executiveComment)}</p>
-        <p><strong>Operations Officer:</strong> ${escapeHtml(conference.operationsComment)}</p>
-        <p><strong>Intelligence Officer:</strong> ${escapeHtml(conference.intelligenceComment)}</p>
-        <p><strong>Engineering Officer:</strong> ${escapeHtml(conference.engineeringComment)}</p>
-        <p><strong>Personnel / Medical Officer:</strong> ${escapeHtml(conference.personnelComment)}</p>
-        <p><strong>Command Liaison:</strong> ${escapeHtml(conference.commandComment)}</p>
+        ${officerLines.map((entry) => `<p><strong>${escapeHtml(entry.label)}:</strong> ${escapeHtml(entry.text)}</p>`).join("")}
       </div>
       <div class="briefing-card urgency-${conference.recommendedAction.urgency}">
         <div class="briefing-header">
@@ -376,78 +378,181 @@ function renderStaffConference(state: SaveState, conference: StaffConference): s
   `;
 }
 
-function renderCommandPanel(state: SaveState): string {
-  const opsLines = getOperationsDeskSummary(state);
-  const conference = getStaffConference(state);
-  const briefing = getStaffBriefingRecommendations(state);
+function renderCommandSituation(state: SaveState): string {
   const directive = getDirectiveProgressSummary(state);
   const rhythm = getOperationalRhythm(state);
+  const activeOpportunity = getPrimaryUsableOpportunity(state);
+  const latestInsightLines = state.campaign.insights
+    .slice()
+    .sort((left, right) => right.updatedAt - left.updatedAt || right.evidenceCount - left.evidenceCount)
+    .slice(0, 3);
+  return `
+    <div class="note">
+      <strong>Current Command Situation</strong>
+      <div class="badge-row">
+        ${renderBadge("Phase", state.campaign.finalSummaryMode ? "final summary" : state.campaign.campaignPhaseId)}
+        ${renderBadge("Day", String(state.campaign.currentDay))}
+        ${renderBadge("Rhythm", rhythm.label)}
+      </div>
+      <p>${escapeHtml(directive.momentum)}</p>
+      <p>${escapeHtml(directive.directiveState)}</p>
+      <p>${escapeHtml(directive.groupCondition)}</p>
+      <p>${escapeHtml(state.campaign.commandStanding)}</p>
+      <p>${escapeHtml(activeOpportunity ? activeOpportunity.description : state.campaign.resolutionState === "pending" ? "Campaign resolution is pending while committed work finishes." : "No major active opening is presently judged decisive.")}</p>
+      <p class="muted">${escapeHtml(state.campaign.campaignPhase)}</p>
+      ${latestInsightLines.length > 0 ? `
+        <div class="stack compact">
+          <strong>Latest Insights</strong>
+          ${latestInsightLines.map((insight) => `<p class="muted">${escapeHtml(insight.conclusion)}</p>`).join("")}
+        </div>
+      ` : ""}
+    </div>
+  `;
+}
+
+function buildQualitativeEvaluationSummary(state: SaveState): string {
+  const evaluation = state.campaign.evaluation;
+  if (!evaluation) {
+    const directive = getDirectiveProgressSummary(state).progress.replace("Progress: ", "");
+    const group = getDirectiveProgressSummary(state).groupCondition.replace("Group condition: ", "");
+    return `Campaign result filed. Directive assessment remained ${directive.toLowerCase()} Group condition ended ${group.toLowerCase()}`;
+  }
+  const directive = evaluation.directiveAssessment.replace(/^Directive assessment:\s*/i, "");
+  const group = evaluation.groupAssessment.replace(/^Group condition:\s*/i, "");
+  return `Campaign result filed. Directive assessment remained ${directive.toLowerCase()} Group condition ended ${group.toLowerCase()}`;
+}
+
+function sanitizeCampaignSummaryText(state: SaveState, text: string): string {
+  const evaluation = state.campaign.evaluation;
+  if (!evaluation) {
+    return text;
+  }
+  if (/directive progress at \d+|group effectiveness judged \d+/i.test(text)) {
+    return buildQualitativeEvaluationSummary(state);
+  }
+  return text;
+}
+
+function renderWhatChanged(state: SaveState): string {
   const ledger = getRecentConsequenceLedger(state);
+  const events = state.campaign.events.slice(0, 2);
+  const latest = ledger[0];
+  return `
+    <div class="note">
+      <strong>What Changed</strong>
+      ${latest ? `
+        <div class="row-card">
+          <strong>${escapeHtml(latest.title)}</strong>
+          <p>${escapeHtml(latest.staffRead)}</p>
+          <p class="muted">${escapeHtml(latest.strategicConsequence)}</p>
+        </div>
+      ` : `<p class="muted">No formal consequence read has been filed yet.</p>`}
+      ${state.campaign.latestWaitNote ? `<p class="muted">${escapeHtml(state.campaign.latestWaitNote)}</p>` : ""}
+      ${ledger.slice(1, 3).map((entry) => `
+        <p class="muted">${escapeHtml(`${entry.title}: ${entry.recommendedPosture}`)}</p>
+      `).join("")}
+      ${events.map((event) => `<p class="muted">${escapeHtml(`${event.title}: ${sanitizeCampaignSummaryText(state, event.body)}`)}</p>`).join("")}
+    </div>
+  `;
+}
+
+function renderImmediateDecisions(state: SaveState, conference: StaffConference): string {
+  const recommendedType = conference.recommendedAction.relatedActionType;
+  const canWait = !state.campaign.finalSummaryMode && state.campaign.resolutionState === "active";
+  const buttons: string[] = [];
+  if (canWait && recommendedType !== "wait_next_event") {
+    buttons.push(`<button data-action="wait-next-event">Wait until next event</button>`);
+  }
+  if (canWait && recommendedType !== "stand_down_morning") {
+    buttons.push(`<button data-action="stand-down-morning">Stand down until morning</button>`);
+  }
+  if (canWait && recommendedType !== "let_work_finish") {
+    buttons.push(`<button data-action="let-work-finish">Let current work finish</button>`);
+  }
+  if (state.campaign.personnelDecisions.some((entry) => !entry.resolved)) {
+    buttons.push(`<button data-action="tab" data-payload="aircraft-crews">Resolve personnel decisions</button>`);
+  }
+  if (state.aircraft.some((aircraft) => aircraft.status === "damaged" || aircraft.status === "diverted")) {
+    buttons.push(`<button data-action="tab" data-payload="maintenance">Review maintenance</button>`);
+  }
+  if (state.campaign.finalSummaryMode) {
+    buttons.push(`<button data-action="start-new-campaign" class="active">Start New Campaign</button>`);
+  }
+  return `
+    <div class="note">
+      <strong>Immediate Decisions</strong>
+      <p>${escapeHtml(state.campaign.pendingDecisions.length > 0 ? state.campaign.pendingDecisions.join(" ") : "No new operational commitment is pending right now.")}</p>
+      <div class="button-row">
+        ${buttons.join("")}
+      </div>
+    </div>
+  `;
+}
+
+function renderCampaignRecord(state: SaveState): string {
+  const insights = state.campaign.insights.slice(0, 6);
+  const events = state.campaign.events.slice(0, 6);
+  const ledger = state.campaign.consequenceLedger.slice(0, 6);
+  return `
+    <details class="note">
+      <summary><strong>Campaign Record</strong></summary>
+      <div class="stack compact">
+        ${insights.length > 0 ? `<p><strong>Discovered Insights:</strong> ${escapeHtml(insights.map((insight) => insight.conclusion).join(" "))}</p>` : `<p class="muted">No durable campaign insights have been recorded yet.</p>`}
+        ${events.map((event) => `<p class="muted">${escapeHtml(`${event.title}: ${sanitizeCampaignSummaryText(state, event.body)}`)}</p>`).join("")}
+        ${ledger.map((entry) => `<p class="muted">${escapeHtml(`${entry.title}: ${entry.staffRead}`)}</p>`).join("")}
+      </div>
+    </details>
+  `;
+}
+
+function sanitizeEvaluationSummary(state: SaveState): string {
+  return sanitizeCampaignSummaryText(state, state.campaign.evaluation?.summary ?? buildQualitativeEvaluationSummary(state));
+}
+
+function renderFinalCampaignSummary(state: SaveState): string {
+  const evaluation = state.campaign.evaluation;
+  if (!evaluation) {
+    return `<section class="panel stack"><h2>Command</h2><p>Campaign summary unavailable.</p></section>`;
+  }
+  return `
+    <section class="panel stack">
+      <h2>Command</h2>
+      <div class="note">
+        <strong>Final Campaign Summary</strong>
+        <div class="badge-row">
+          ${renderBadge("Result", evaluation.judgment)}
+          ${renderBadge("End", evaluation.endCondition.replaceAll("_", " "))}
+        </div>
+        <p>${escapeHtml(sanitizeEvaluationSummary(state))}</p>
+        <p>${escapeHtml(evaluation.commandJudgment)}</p>
+        <p>${escapeHtml(evaluation.staffJudgment)}</p>
+        <p class="muted">${escapeHtml(evaluation.directiveAssessment)}</p>
+        <p class="muted">${escapeHtml(evaluation.groupAssessment)}</p>
+        <p class="muted">${escapeHtml(evaluation.lossesAssessment)}</p>
+        <p class="muted">${escapeHtml(evaluation.opportunityAssessment)}</p>
+        ${evaluation.notableChains.map((line) => `<p class="muted">${escapeHtml(line)}</p>`).join("")}
+      </div>
+      ${renderWhatChanged(state)}
+      ${renderImmediateDecisions(state, getStaffConference(state))}
+      ${renderCampaignRecord(state)}
+    </section>
+  `;
+}
+
+function renderCommandPanel(state: SaveState): string {
+  const conference = getStaffConference(state);
+  if (state.campaign.finalSummaryMode) {
+    return renderFinalCampaignSummary(state);
+  }
   return `
     <section class="panel stack">
       <h2>Command</h2>
       <p>${escapeHtml(state.campaign.commandDirective)}</p>
-      <p>${escapeHtml(state.campaign.commandStanding)}</p>
-      <p>${escapeHtml(state.campaign.campaignPhase)}</p>
-      <div class="note">
-        <strong>Operations Desk</strong>
-        <div class="stack compact">
-          <p><strong>Current rhythm:</strong> ${escapeHtml(rhythm.label)}</p>
-          ${opsLines.map((line) => `<p>${escapeHtml(line)}</p>`).join("")}
-        </div>
-        <div class="button-row">
-          <button data-action="wait-next-event">Wait until next event</button>
-          <button data-action="stand-down-morning">Stand down until morning</button>
-          <button data-action="let-work-finish">Let current work finish</button>
-        </div>
-      </div>
+      ${renderCommandSituation(state)}
+      ${renderWhatChanged(state)}
       ${renderStaffConference(state, conference)}
-      <div class="note directive-progress-card">
-        <strong>Directive Progress</strong>
-        <div class="stack compact">
-          <p><strong>Current directive:</strong> ${escapeHtml(state.campaign.commandDirective)}</p>
-          <p>${escapeHtml(directive.momentum)}</p>
-          <p>${escapeHtml(directive.directiveState)}</p>
-          <p>${escapeHtml(directive.groupCondition)}</p>
-          <p>${escapeHtml(directive.commandView)}</p>
-          <p>${escapeHtml(directive.progress)}</p>
-          <p>${escapeHtml(directive.patience)}</p>
-          <p>${escapeHtml(directive.nextNeed)}</p>
-          ${directive.latestIntel ? `<p class="muted">${escapeHtml(directive.latestIntel)}</p>` : ""}
-          ${directive.recentEffects.length > 0
-            ? directive.recentEffects.map((line) => `<p class="muted">${escapeHtml(line)}</p>`).join("")
-            : `<p class="muted">No wider strategic read has been filed yet.</p>`}
-        </div>
-      </div>
-      <div class="note">
-        <strong>Consequence Ledger</strong>
-        ${ledger.length === 0 ? `
-          <p class="muted">No formal consequence read has been filed yet.</p>
-        ` : `
-          <div class="stack compact">
-            ${ledger.map((entry) => `
-              <div class="row-card">
-                <strong>${escapeHtml(entry.title)}</strong>
-                <p>${escapeHtml(entry.staffRead)}</p>
-                <p class="muted">${escapeHtml(entry.groupCost)}</p>
-                <p class="muted">${escapeHtml(entry.recommendedPosture)}</p>
-              </div>
-            `).join("")}
-          </div>
-        `}
-      </div>
-      <div class="stack">
-        <div>
-          <strong>Staff Briefing / Commander's Desk</strong>
-          <p class="muted">Recommendations are qualitative and occasionally competing. They are meant to frame the next decision, not solve it for you.</p>
-        </div>
-        <div class="briefing-grid">
-          ${briefing.map((recommendation) => renderStaffRecommendation(recommendation)).join("")}
-        </div>
-      </div>
-      <div class="note">
-        <strong>Pending:</strong> ${state.campaign.pendingDecisions.length > 0 ? escapeHtml(state.campaign.pendingDecisions.join(" ")) : "No outstanding command note."}
-      </div>
+      ${renderImmediateDecisions(state, conference)}
+      ${renderCampaignRecord(state)}
     </section>
   `;
 }
@@ -1002,7 +1107,7 @@ function renderEventLog(state: SaveState): string {
         ${state.campaign.logEntries.map((entry) => `
           <div class="log-item">
             <span class="muted">${escapeHtml(entry.category)}</span>
-            <p>${escapeHtml(entry.text)}</p>
+            <p>${escapeHtml(sanitizeCampaignSummaryText(state, entry.text))}</p>
           </div>
         `).join("")}
       </div>
@@ -1245,12 +1350,16 @@ export function mountBomberCommand(root: HTMLElement): void {
         error = completeAllRepairs(state, now);
         break;
       case "advance-day":
-        advanceCampaignDay(state);
+        error = advanceCampaignDay(state);
         break;
       case "toggle-hidden":
         setShowHiddenValues(state, !state.debug.showHiddenValues);
         break;
       case "reset-save":
+        resetState();
+        state = createNewGame(Date.now());
+        break;
+      case "start-new-campaign":
         resetState();
         state = createNewGame(Date.now());
         break;

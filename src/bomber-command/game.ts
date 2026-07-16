@@ -4,6 +4,15 @@ import type {
   AlertLevel,
   AvailabilityReport,
   AttackDoctrine,
+  CampaignCausalHook,
+  CampaignEndCondition,
+  CampaignEvaluation,
+  CampaignEvent,
+  CampaignInsight,
+  CampaignOpportunity,
+  CampaignPhase,
+  CampaignProfile,
+  CampaignResolutionState,
   CampaignTab,
   CampaignSpinePhase,
   CrewExperience,
@@ -51,7 +60,7 @@ import type {
 } from "./types";
 
 export const SAVE_KEY = "bomber-command-save-v1";
-export const SAVE_VERSION = 9;
+export const SAVE_VERSION = 11;
 
 const SHORT_MISSION_MS = 5 * 60 * 1000;
 const MAJOR_MISSION_MS = 10 * 60 * 1000;
@@ -60,6 +69,8 @@ const FATIGUE_RECOVERY_MS = 6 * 60 * 1000;
 const LIGHT_WOUND_RECOVERY_MS = 12 * 60 * 60 * 1000;
 const TOAST_LIFETIME_MS = 12 * 1000;
 const SHORT_WAIT_DRIFT_THRESHOLD_MS = 8 * 60 * 1000;
+const DEFAULT_CAMPAIGN_DAYS = 8;
+const CAMPAIGN_CONCLUDED_MESSAGE = "The campaign has concluded. No further operational orders may be issued.";
 
 const AIRCRAFT_NAMES = [
   "Lucky Lady",
@@ -536,6 +547,989 @@ function createInitialDirectiveState(): DirectiveState {
   };
 }
 
+function createFallbackEnemyResponseProfile(): CampaignProfile["enemyResponse"] {
+  return {
+    codeName: "Measured resistance",
+    interceptionBias: 1,
+    repairBias: 1,
+    adaptationBias: 1,
+    radarLeverage: 1,
+    railLeverage: 1,
+    repeatAttackSensitivity: 1,
+    opportunityDecay: 1
+  };
+}
+
+const ENEMY_PROFILE_BUNDLES: Array<{
+  codeName: string;
+  base: CampaignProfile["enemyResponse"];
+}> = [
+  {
+    codeName: "Aggressive interception",
+    base: {
+      codeName: "Aggressive interception",
+      interceptionBias: 1.16,
+      repairBias: 0.96,
+      adaptationBias: 1.04,
+      radarLeverage: 1.08,
+      railLeverage: 0.94,
+      repeatAttackSensitivity: 1.08,
+      opportunityDecay: 1.04
+    }
+  },
+  {
+    codeName: "Rapid repair movement",
+    base: {
+      codeName: "Rapid repair movement",
+      interceptionBias: 0.98,
+      repairBias: 1.16,
+      adaptationBias: 1.02,
+      radarLeverage: 0.94,
+      railLeverage: 1.12,
+      repeatAttackSensitivity: 0.98,
+      opportunityDecay: 1.02
+    }
+  },
+  {
+    codeName: "Adaptive sector command",
+    base: {
+      codeName: "Adaptive sector command",
+      interceptionBias: 1.02,
+      repairBias: 1,
+      adaptationBias: 1.16,
+      radarLeverage: 1.04,
+      railLeverage: 0.96,
+      repeatAttackSensitivity: 1.14,
+      opportunityDecay: 1.08
+    }
+  },
+  {
+    codeName: "Strained logistics",
+    base: {
+      codeName: "Strained logistics",
+      interceptionBias: 0.94,
+      repairBias: 0.9,
+      adaptationBias: 0.94,
+      radarLeverage: 0.96,
+      railLeverage: 1.04,
+      repeatAttackSensitivity: 0.96,
+      opportunityDecay: 0.94
+    }
+  },
+  {
+    codeName: "Diffuse warning network",
+    base: {
+      codeName: "Diffuse warning network",
+      interceptionBias: 0.96,
+      repairBias: 1,
+      adaptationBias: 1,
+      radarLeverage: 1.16,
+      railLeverage: 0.92,
+      repeatAttackSensitivity: 1,
+      opportunityDecay: 0.98
+    }
+  }
+];
+
+function buildTargetModMap(state: SaveState, selector: (target: Target) => number): Record<string, number> {
+  return Object.fromEntries(state.targets.map((target) => [target.id, selector(target)]));
+}
+
+function validateCampaignProfile(profile: CampaignProfile): boolean {
+  const viableApproaches = profile.viableApproachSummaries.length >= 2;
+  const boundedPriority = Object.values(profile.targetPriorityMods).every((value) => value >= 0.8 && value <= 1.25);
+  const boundedRepair = Object.values(profile.targetRepairMods).every((value) => value >= 0.75 && value <= 1.25);
+  const boundedDefense = Object.values(profile.targetDefenseMods).every((value) => value >= 0.8 && value <= 1.25);
+  const supportTargets = Object.entries(profile.targetPriorityMods)
+    .filter(([targetId]) => targetId !== profile.primaryDirectiveTargetId)
+    .map(([, value]) => value);
+  const noMandatorySupport = supportTargets.filter((value) => value >= 1.12).length <= 2;
+  const reachableDirective = profile.enemyResponse.repairBias * profile.enemyResponse.interceptionBias <= 1.28;
+  const coherentBundle =
+    profile.enemyResponse.codeName === "Aggressive interception"
+      ? profile.enemyResponse.interceptionBias >= 1.08
+      : profile.enemyResponse.codeName === "Rapid repair movement"
+        ? profile.enemyResponse.repairBias >= 1.08
+        : profile.enemyResponse.codeName === "Adaptive sector command"
+          ? profile.enemyResponse.adaptationBias >= 1.08
+          : true;
+  return viableApproaches && boundedPriority && boundedRepair && boundedDefense && noMandatorySupport && reachableDirective && coherentBundle;
+}
+
+function createCampaignProfile(state: SaveState, now: number): CampaignProfile {
+  const primaryTargetId = state.targets.find((target) => target.type === "factory")?.id ?? state.targets[0]!.id;
+  for (let attempt = 0; attempt < 24; attempt += 1) {
+    const bundle = pick(ENEMY_PROFILE_BUNDLES);
+    const enemyResponse = {
+      codeName: bundle.codeName,
+      interceptionBias: clamp(bundle.base.interceptionBias + (Math.random() * 0.08 - 0.04), 0.88, 1.2),
+      repairBias: clamp(bundle.base.repairBias + (Math.random() * 0.08 - 0.04), 0.86, 1.2),
+      adaptationBias: clamp(bundle.base.adaptationBias + (Math.random() * 0.08 - 0.04), 0.88, 1.2),
+      radarLeverage: clamp(bundle.base.radarLeverage + (Math.random() * 0.08 - 0.04), 0.86, 1.18),
+      railLeverage: clamp(bundle.base.railLeverage + (Math.random() * 0.08 - 0.04), 0.86, 1.18),
+      repeatAttackSensitivity: clamp(bundle.base.repeatAttackSensitivity + (Math.random() * 0.08 - 0.04), 0.88, 1.2),
+      opportunityDecay: clamp(bundle.base.opportunityDecay + (Math.random() * 0.08 - 0.04), 0.88, 1.16)
+    };
+    const profile: CampaignProfile = {
+      profileId: `profile-${now}-${attempt}`,
+      generatedAt: now,
+      expectedDays: DEFAULT_CAMPAIGN_DAYS,
+      applicationMode: "drift_only",
+      primaryDirectiveTargetId: primaryTargetId,
+      enemyResponse,
+      targetPriorityMods: buildTargetModMap(state, (target) => {
+        if (target.type === "factory") {
+          return 1.08 + Math.random() * 0.12;
+        }
+        if (target.type === "airfield" || target.type === "rail" || target.type === "radar") {
+          return 0.9 + Math.random() * 0.25;
+        }
+        return 0.82 + Math.random() * 0.2;
+      }),
+      targetRepairMods: buildTargetModMap(state, (target) => {
+        if (target.type === "rail") {
+          return 0.82 + Math.random() * 0.2;
+        }
+        if (target.type === "factory") {
+          return 0.95 + Math.random() * 0.2;
+        }
+        return 0.88 + Math.random() * 0.2;
+      }),
+      targetDefenseMods: buildTargetModMap(state, (target) => {
+        if (target.type === "radar" || target.type === "defense") {
+          return 0.95 + Math.random() * 0.22;
+        }
+        return 0.85 + Math.random() * 0.22;
+      }),
+      viableApproachSummaries: [
+        "Direct pressure on Bremen after one preparatory disruption remains plausible.",
+        "Indirect pressure through airfield, radar, or rail shaping can still open a later strike."
+      ]
+    };
+    if (validateCampaignProfile(profile)) {
+      return profile;
+    }
+  }
+  return {
+    profileId: `profile-${now}-fallback`,
+    generatedAt: now,
+    expectedDays: DEFAULT_CAMPAIGN_DAYS,
+    applicationMode: "drift_only",
+    primaryDirectiveTargetId: primaryTargetId,
+    enemyResponse: createFallbackEnemyResponseProfile(),
+    targetPriorityMods: buildTargetModMap(state, (target) => target.type === "factory" ? 1.1 : 1),
+    targetRepairMods: buildTargetModMap(state, () => 1),
+    targetDefenseMods: buildTargetModMap(state, () => 1),
+    viableApproachSummaries: [
+      "Direct pressure on Bremen remains viable.",
+      "Support-target shaping can still create a later opening."
+    ]
+  };
+}
+
+function getCampaignProfileTargetMod(profile: CampaignProfile, targetId: string, kind: "priority" | "repair" | "defense"): number {
+  const source =
+    kind === "priority" ? profile.targetPriorityMods
+      : kind === "repair" ? profile.targetRepairMods
+        : profile.targetDefenseMods;
+  return source[targetId] ?? 1;
+}
+
+function applyCampaignProfileToTargets(state: SaveState): void {
+  for (const target of state.targets) {
+    target.hiddenDefenseLevel = clamp(
+      Math.round(target.hiddenDefenseLevel * getCampaignProfileTargetMod(state.campaign.profile, target.id, "defense")),
+      18,
+      100
+    );
+  }
+}
+
+function getCampaignResolutionState(state: SaveState): CampaignResolutionState {
+  return state.campaign.resolutionState;
+}
+
+function isCampaignClosedToOrders(state: SaveState): boolean {
+  return getCampaignResolutionState(state) !== "active";
+}
+
+function getCampaignClosedOrderMessage(state: SaveState): string | null {
+  return isCampaignClosedToOrders(state) ? CAMPAIGN_CONCLUDED_MESSAGE : null;
+}
+
+function registerOperationalBeat(state: SaveState, tracker?: { count: number }): boolean {
+  state.campaign.operationalBeat += 1;
+  if (tracker) {
+    tracker.count += 1;
+  }
+  return true;
+}
+
+function getResolutionPendingWorkSummary(state: SaveState): string[] {
+  const pending: string[] = [];
+  if (getActiveMission(state)) {
+    pending.push("mission");
+  }
+  if (getActiveRecon(state)) {
+    pending.push("recon");
+  }
+  if (state.repairJobs.some((job) => !job.completionApplied && state.campaign.pendingResolutionRepairIds.includes(job.id))) {
+    pending.push("repair");
+  }
+  if (state.recoveryJobs.some((job) => !job.completionApplied && state.campaign.pendingResolutionRecoveryIds.includes(job.id))) {
+    pending.push("recovery");
+  }
+  return pending;
+}
+
+function hasPendingResolutionWork(state: SaveState): boolean {
+  if (getActiveMission(state) || getActiveRecon(state)) {
+    return true;
+  }
+  if (state.repairJobs.some((job) => !job.completionApplied && state.campaign.pendingResolutionRepairIds.includes(job.id))) {
+    return true;
+  }
+  if (state.recoveryJobs.some((job) => !job.completionApplied && state.campaign.pendingResolutionRecoveryIds.includes(job.id))) {
+    return true;
+  }
+  return false;
+}
+
+function selectRelevantHooks(
+  state: SaveState,
+  options: { targetId?: string | null; allowEvidenceUnknown?: boolean; limit?: number; hookTypes?: string[] } = {}
+): CampaignCausalHook[] {
+  const limit = options.limit ?? 2;
+  const filtered = state.campaign.causalHooks
+    .filter((hook) => hook.state !== "resolved")
+    .filter((hook) => options.allowEvidenceUnknown || hook.evidenceKnown)
+    .filter((hook) => !options.targetId || hook.relatedTargetId === options.targetId || hook.relatedTargetId === null)
+    .filter((hook) => !options.hookTypes || options.hookTypes.includes(hook.hookType))
+    .sort((left, right) => right.strength - left.strength || right.createdAt - left.createdAt);
+  return filtered.slice(0, limit);
+}
+
+function hookFlavorLine(hook: CampaignCausalHook): string {
+  switch (hook.hookType) {
+    case "fighter_response_softened":
+      return "Staff still suspects fighter response is softer than usual, if only briefly.";
+    case "repair_network_slowed":
+      return "Earlier disruption still appears to be slowing repair movement around Bremen.";
+    case "warning_coordination_disrupted":
+      return "Warning coordination may still be less settled than the older files imply.";
+    case "repeat_attack_alert":
+      return "Repeated attention to the same objective may be making the defenses more watchful.";
+    case "command_pressure":
+      return "Higher command is increasingly impatient with indirect answers.";
+    default:
+      return hook.summary;
+  }
+}
+
+function createOrRefreshHook(
+  state: SaveState,
+  input: Omit<CampaignCausalHook, "id" | "strength"> & { strength?: number }
+): CampaignCausalHook {
+  const existing = state.campaign.causalHooks.find((hook) =>
+    hook.hookType === input.hookType
+    && hook.relatedTargetId === input.relatedTargetId
+    && hook.state !== "resolved"
+  );
+  if (existing) {
+    existing.sourceId = input.sourceId;
+    existing.createdDay = input.createdDay;
+    existing.createdAt = input.createdAt;
+    existing.state = input.state;
+    existing.fadingStartsDay = input.fadingStartsDay;
+    existing.fadingStartsBeat = input.fadingStartsBeat;
+    existing.fadesAfterDay = input.fadesAfterDay;
+    existing.fadesAfterBeat = input.fadesAfterBeat;
+    existing.evidenceKnown = existing.evidenceKnown || input.evidenceKnown;
+    existing.summary = input.summary;
+    existing.strength = clamp(existing.strength + (input.strength ?? 1), 1, 5);
+    return existing;
+  }
+  const hook: CampaignCausalHook = {
+    id: nextId(state, "hook"),
+    strength: input.strength ?? 1,
+    ...input
+  };
+  state.campaign.causalHooks.unshift(hook);
+  return hook;
+}
+
+function resolveHook(state: SaveState, hookType: string, relatedTargetId: string | null, consumedById: string | null): void {
+  const hook = state.campaign.causalHooks.find((entry) =>
+    entry.hookType === hookType && entry.relatedTargetId === relatedTargetId && entry.state !== "resolved"
+  );
+  if (!hook) {
+    return;
+  }
+  hook.state = "resolved";
+  hook.consumedById = consumedById;
+}
+
+function upsertInsight(state: SaveState, subject: string, conclusion: string, status: CampaignInsight["status"], now: number): CampaignInsight {
+  const existing = state.campaign.insights.find((insight) => insight.subject === subject && insight.conclusion === conclusion);
+  if (existing) {
+    existing.status = status;
+    existing.evidenceCount += 1;
+    existing.updatedAt = now;
+    return existing;
+  }
+  const insight: CampaignInsight = {
+    id: nextId(state, "insight"),
+    subject,
+    conclusion,
+    status,
+    evidenceCount: 1,
+    discoveredAt: now,
+    updatedAt: now
+  };
+  state.campaign.insights.unshift(insight);
+  return insight;
+}
+
+function addCampaignEvent(
+  state: SaveState,
+  kind: string,
+  title: string,
+  body: string,
+  now: number,
+  relatedTargetId: string | null = null,
+  relatedHookIds: string[] = []
+): void {
+  const id = `${kind}-${relatedTargetId ?? "campaign"}-${state.campaign.currentDay}-${title}`.toLowerCase().replaceAll(/[^a-z0-9]+/g, "-");
+  if (state.campaign.events.some((event) => event.id === id)) {
+    return;
+  }
+  state.campaign.events.unshift({
+    id,
+    kind,
+    title,
+    body,
+    createdAt: now,
+    day: state.campaign.currentDay,
+    relatedTargetId,
+    relatedHookIds
+  });
+  addLog(state, id, now, "command", `${title}: ${body}`);
+}
+
+function maybeCreateOpportunity(
+  state: SaveState,
+  kind: string,
+  description: string,
+  sourceTargetId: string | null,
+  relatedTargetId: string | null,
+  beneficiaryTargetIds: string[],
+  eligibleOperationTypes: OperationType[],
+  eligibleRouteRisks: RouteRisk[],
+  hookIds: string[],
+  now: number,
+  fadesAfterBeatDelta: number
+): CampaignOpportunity {
+  const existing = state.campaign.opportunities.find((opportunity) =>
+    opportunity.kind === kind && opportunity.relatedTargetId === relatedTargetId && opportunity.state !== "resolved"
+  );
+  if (existing) {
+    existing.state = "active";
+    existing.fadingStartsDay = Math.min(
+      existing.fadingStartsDay ?? Number.MAX_SAFE_INTEGER,
+      state.campaign.currentDay + Math.max(0, fadesAfterBeatDelta - 1)
+    );
+    existing.fadingStartsBeat = Math.min(
+      existing.fadingStartsBeat ?? Number.MAX_SAFE_INTEGER,
+      state.campaign.operationalBeat + Math.max(0, fadesAfterBeatDelta - 1)
+    );
+    existing.fadesAfterBeat = state.campaign.operationalBeat + fadesAfterBeatDelta;
+    existing.description = description;
+    existing.sourceTargetId = sourceTargetId;
+    existing.beneficiaryTargetIds = beneficiaryTargetIds;
+    existing.eligibleOperationTypes = eligibleOperationTypes;
+    existing.eligibleRouteRisks = eligibleRouteRisks;
+    existing.relatedHookIds = hookIds;
+    existing.confirmedAt = null;
+    existing.confirmationNote = null;
+    return existing;
+  }
+  const opportunity: CampaignOpportunity = {
+    id: nextId(state, "opportunity"),
+    kind,
+    description,
+    createdDay: state.campaign.currentDay,
+    createdAt: now,
+    sourceTargetId,
+    relatedTargetId,
+    beneficiaryTargetIds,
+    eligibleOperationTypes,
+    eligibleRouteRisks,
+    relatedHookIds: hookIds,
+    state: "active",
+    fadingStartsDay: null,
+    fadingStartsBeat: state.campaign.operationalBeat + Math.max(0, fadesAfterBeatDelta - 1),
+    fadesAfterDay: null,
+    fadesAfterBeat: state.campaign.operationalBeat + fadesAfterBeatDelta,
+    disposition: "pending",
+    dispositionAt: null,
+    dispositionReason: null,
+    confirmedAt: null,
+    confirmationNote: null
+  };
+  state.campaign.opportunities.unshift(opportunity);
+  addCampaignEvent(state, "opportunity", "Opportunity appears", description, now, relatedTargetId, hookIds);
+  return opportunity;
+}
+
+function opportunityExpiryReached(opportunity: CampaignOpportunity, state: SaveState): boolean {
+  return (opportunity.fadesAfterBeat !== null && state.campaign.operationalBeat >= opportunity.fadesAfterBeat)
+    || (opportunity.fadesAfterDay !== null && state.campaign.currentDay >= opportunity.fadesAfterDay);
+}
+
+function opportunityShouldFade(opportunity: CampaignOpportunity, state: SaveState): boolean {
+  return (opportunity.fadingStartsBeat !== null && state.campaign.operationalBeat >= opportunity.fadingStartsBeat)
+    || (opportunity.fadingStartsDay !== null && state.campaign.currentDay >= opportunity.fadingStartsDay);
+}
+
+export function isOpportunityUsable(opportunity: CampaignOpportunity, state: SaveState): boolean {
+  return opportunity.disposition === "pending"
+    && (opportunity.state === "active" || opportunity.state === "fading")
+    && !opportunityExpiryReached(opportunity, state);
+}
+
+export function doesOperationExploitOpportunity(
+  opportunity: CampaignOpportunity,
+  targetId: string,
+  operationType: OperationType,
+  routeRisk: RouteRisk
+): boolean {
+  const targetMatch = opportunity.beneficiaryTargetIds.length === 0 || opportunity.beneficiaryTargetIds.includes(targetId);
+  const operationMatch = opportunity.eligibleOperationTypes.length === 0 || opportunity.eligibleOperationTypes.includes(operationType);
+  const routeMatch = opportunity.eligibleRouteRisks.length === 0 || opportunity.eligibleRouteRisks.includes(routeRisk);
+  return targetMatch && operationMatch && routeMatch;
+}
+
+export function getPrimaryUsableOpportunity(state: SaveState): CampaignOpportunity | null {
+  return state.campaign.opportunities.find((opportunity) => isOpportunityUsable(opportunity, state)) ?? null;
+}
+
+function recordOpportunityDisposition(
+  state: SaveState,
+  opportunity: CampaignOpportunity,
+  disposition: CampaignOpportunity["disposition"],
+  reason: string,
+  now: number
+): void {
+  if (opportunity.disposition !== "pending") {
+    return;
+  }
+  opportunity.disposition = disposition;
+  opportunity.dispositionAt = now;
+  opportunity.dispositionReason = reason;
+  opportunity.state = "resolved";
+  for (const hookId of opportunity.relatedHookIds) {
+    const hook = state.campaign.causalHooks.find((entry) => entry.id === hookId && entry.state !== "resolved");
+    if (hook) {
+      hook.state = "resolved";
+      hook.consumedById = opportunity.id;
+    }
+  }
+  addCampaignEvent(
+    state,
+    "opportunity",
+    disposition === "exploited"
+      ? "Opportunity exploited"
+      : disposition === "lost_through_delay"
+        ? "Opportunity lost"
+        : disposition === "confirmed_not_exploited"
+          ? "Opportunity surrendered"
+          : "Opportunity resolved",
+    reason,
+    now,
+    opportunity.relatedTargetId,
+    opportunity.relatedHookIds
+  );
+}
+
+function markOpportunityUseOnLaunch(state: SaveState, targetId: string, operationType: OperationType, routeRisk: RouteRisk, now: number): void {
+  for (const opportunity of state.campaign.opportunities.filter((entry) => isOpportunityUsable(entry, state))) {
+    if (doesOperationExploitOpportunity(opportunity, targetId, operationType, routeRisk)) {
+      recordOpportunityDisposition(state, opportunity, "exploited", "A relevant operation was launched before the opening faded.", now);
+    }
+  }
+}
+
+function updateOpportunityStates(state: SaveState, now: number, beatDelta: number, dayAdvanced: boolean): void {
+  if (beatDelta <= 0 && !dayAdvanced) {
+    return;
+  }
+  for (const opportunity of state.campaign.opportunities) {
+    if (opportunity.state === "resolved") {
+      continue;
+    }
+    if (opportunityExpiryReached(opportunity, state)) {
+      recordOpportunityDisposition(state, opportunity, opportunity.disposition === "pending" ? "lost_through_delay" : opportunity.disposition, "The opening faded before it was used.", now);
+      continue;
+    }
+    if (opportunityShouldFade(opportunity, state)) {
+      if (opportunity.state !== "fading") {
+        addCampaignEvent(state, "opportunity", "Opportunity fading", `${opportunity.description} Staff doubts the opening will last much longer.`, now, opportunity.relatedTargetId, opportunity.relatedHookIds);
+      }
+      opportunity.state = "fading";
+    }
+  }
+}
+
+function updateHookLifecycle(state: SaveState, now: number, beatDelta: number, dayAdvanced: boolean): void {
+  if (beatDelta <= 0 && !dayAdvanced) {
+    return;
+  }
+  for (const hook of state.campaign.causalHooks) {
+    if (hook.state === "resolved") {
+      continue;
+    }
+    const shouldFade =
+      (hook.fadingStartsBeat !== null && state.campaign.operationalBeat >= hook.fadingStartsBeat)
+      || (hook.fadingStartsDay !== null && state.campaign.currentDay >= hook.fadingStartsDay);
+    const beatExpired = hook.fadesAfterBeat !== null && state.campaign.operationalBeat >= hook.fadesAfterBeat;
+    const dayExpired = hook.fadesAfterDay !== null && state.campaign.currentDay >= hook.fadesAfterDay;
+    if (beatExpired || dayExpired) {
+      hook.state = "resolved";
+      if (hook.consumedById === null) {
+        hook.consumedById = "lifecycle";
+      }
+      continue;
+    }
+    if (hook.state === "active" && shouldFade) {
+      hook.state = "fading";
+    }
+  }
+}
+
+function getActiveOpportunityBenefitsForTarget(state: SaveState, targetId: string): CampaignOpportunity[] {
+  return state.campaign.opportunities.filter((opportunity) =>
+    isOpportunityUsable(opportunity, state)
+    && (opportunity.beneficiaryTargetIds.length === 0 || opportunity.beneficiaryTargetIds.includes(targetId))
+  );
+}
+
+function buildMissionCampaignContext(
+  state: SaveState,
+  target: Target,
+  operationType: OperationType,
+  routeRisk: RouteRisk
+): Mission["campaignContext"] {
+  const selectedOpportunities = getActiveOpportunityBenefitsForTarget(state, target.id)
+    .filter((opportunity) => doesOperationExploitOpportunity(opportunity, target.id, operationType, routeRisk))
+    .slice(0, 2);
+  const hooks = selectRelevantHooks(state, {
+    targetId: target.id,
+    allowEvidenceUnknown: true,
+    limit: Math.max(0, 2 - selectedOpportunities.length)
+  });
+  const repeatedTarget = state.missions.some((mission) => mission.debriefGenerated && mission.hiddenOutcome.attackedTargetId === target.id);
+  const context: NonNullable<Mission["campaignContext"]> = {
+    contextVersion: 1,
+    enemyProfileLabel: state.campaign.profile.enemyResponse.codeName,
+    profileTraits: {
+      interceptionBias: state.campaign.profile.enemyResponse.interceptionBias,
+      repairBias: state.campaign.profile.enemyResponse.repairBias,
+      adaptationBias: state.campaign.profile.enemyResponse.adaptationBias,
+      radarLeverage: state.campaign.profile.enemyResponse.radarLeverage,
+      railLeverage: state.campaign.profile.enemyResponse.railLeverage,
+      repeatAttackSensitivity: state.campaign.profile.enemyResponse.repeatAttackSensitivity,
+      opportunityDecay: state.campaign.profile.enemyResponse.opportunityDecay
+    },
+    selectedHookIds: hooks.map((hook) => hook.id),
+    selectedOpportunityIds: selectedOpportunities.map((opportunity) => opportunity.id),
+    riskModifiers: [],
+    reportModifiers: [],
+    repeatedTarget,
+    adaptationRiskApplied: false
+  };
+  const addRisk = (key: string, amount: number, reason: string) => {
+    if (amount === 0) {
+      return;
+    }
+    context.riskModifiers.push({ key, amount, reason });
+  };
+  const addReport = (key: string, amount: number, reason: string) => {
+    context.reportModifiers.push({ key, amount, reason });
+  };
+  addRisk("interception_bias", Math.round((context.profileTraits.interceptionBias - 1) * 18), "Enemy response profile");
+  addRisk("route_pressure", Math.round((state.campaign.directiveState.warningCoordination - 50) / 8), "Current warning coordination");
+  if (selectedOpportunities.some((opportunity) => opportunity.kind === "fighter_response_softened")) {
+    addRisk("fighter_response_softened", -8, "Earlier pressure appears to have softened fighter response.");
+    addReport("fighter_response_softened", 1, "Crews may meet a slower and less concentrated response.");
+  }
+  if (selectedOpportunities.some((opportunity) => opportunity.kind === "warning_coordination_disrupted")) {
+    addRisk("warning_coordination_disrupted", routeRisk === "direct" || operationType === "main_strike" ? -9 : -5, "Radar disruption may weaken warning coordination.");
+    addReport("warning_coordination_disrupted", 1, "Interception may be less coordinated than staff feared.");
+  }
+  if (selectedOpportunities.some((opportunity) => opportunity.kind === "repair_network_slowed") && target.hiddenActualCondition < 85) {
+    addRisk("repair_network_slowed", -2, "Earlier disruption may be holding older damage in place.");
+    addReport("repair_network_slowed", 1, "Older damage may be holding longer than expected.");
+  }
+  if (repeatedTarget) {
+    const repeatRisk = Math.round((context.profileTraits.repeatAttackSensitivity + context.profileTraits.adaptationBias - 2) * 10) + 4;
+    addRisk("repeat_attack_alert", repeatRisk, "Enemy defenses may be adapting to repeated visits.");
+    addReport("repeat_attack_alert", 1, "Defenses may be unusually alert to another visit.");
+    context.adaptationRiskApplied = repeatRisk > 0;
+  }
+  return context;
+}
+
+function missionContextRiskTotal(context: Mission["campaignContext"]): number {
+  if (!context) {
+    return 0;
+  }
+  return context.riskModifiers.reduce((sum, modifier) => sum + modifier.amount, 0);
+}
+
+function describeContextualReport(
+  stage: MissionStage,
+  baseText: string,
+  context: Mission["campaignContext"]
+): string {
+  if (!context || context.reportModifiers.length === 0) {
+    return baseText;
+  }
+  const reasons = new Set(context.reportModifiers.map((modifier) => modifier.key));
+  if (stage === "outbound" && reasons.has("warning_coordination_disrupted")) {
+    return `${baseText} Wireless reports suggest interception is less coordinated than on earlier routes.`;
+  }
+  if (stage === "target_area" && reasons.has("repeat_attack_alert")) {
+    return `${baseText} Several crews believe the defenses were waiting for another visit.`;
+  }
+  if (stage === "withdrawal" && reasons.has("fighter_response_softened")) {
+    return `${baseText} Fighter contact appears slower and less concentrated than staff feared.`;
+  }
+  if (stage === "debrief_ready" && reasons.has("repair_network_slowed")) {
+    return `${baseText} Staff suspects earlier damage may be holding longer than expected.`;
+  }
+  return baseText;
+}
+
+function applyMissionCampaignConsequences(state: SaveState, mission: Mission, target: Target, now: number): void {
+  const hookIds: string[] = [];
+  const opportunityDecay = state.campaign.profile.enemyResponse.opportunityDecay;
+  const opportunityBeatDelta = opportunityDecay <= 0.95
+    ? 3
+    : opportunityDecay >= 1.08
+      ? (chance(0.5) ? 1 : 2)
+      : 2;
+  if (mission.hiddenOutcome.targetDamage >= 12) {
+    if (target.type === "airfield") {
+      const hook = createOrRefreshHook(state, {
+        hookType: "fighter_response_softened",
+        sourceId: mission.id,
+        relatedTargetId: target.id,
+        createdDay: state.campaign.currentDay,
+        createdAt: now,
+        state: "active",
+        fadingStartsDay: null,
+        fadingStartsBeat: state.campaign.operationalBeat + Math.max(0, opportunityBeatDelta - 1),
+        fadesAfterDay: null,
+        fadesAfterBeat: state.campaign.operationalBeat + opportunityBeatDelta,
+        evidenceKnown: true,
+        consumedById: null,
+        summary: "A successful airfield strike may have softened fighter response for a short window."
+      });
+      hookIds.push(hook.id);
+      maybeCreateOpportunity(
+        state,
+        "fighter_response_softened",
+        "Staff believes fighter response may stay softer through the current operational window.",
+        target.id,
+        target.id,
+        state.targets.filter((entry) => entry.type !== "airfield").map((entry) => entry.id),
+        ["main_strike", "reduced_strike", "follow_up_attack"],
+        [],
+        hookIds,
+        now,
+        opportunityBeatDelta
+      );
+      upsertInsight(state, "fighter-response", "Intelligence increasingly suspects near-term fighter response can be blunted by pressure on the airfield network.", state.campaign.insights.some((entry) => entry.subject === "fighter-response") ? "established" : "emerging", now);
+    }
+    if (target.type === "rail") {
+      const hook = createOrRefreshHook(state, {
+        hookType: "repair_network_slowed",
+        sourceId: mission.id,
+        relatedTargetId: target.id,
+        createdDay: state.campaign.currentDay,
+        createdAt: now,
+        state: "active",
+        fadingStartsDay: null,
+        fadingStartsBeat: state.campaign.operationalBeat + Math.max(0, opportunityBeatDelta - 1),
+        fadesAfterDay: null,
+        fadesAfterBeat: state.campaign.operationalBeat + opportunityBeatDelta,
+        evidenceKnown: true,
+        consumedById: null,
+        summary: "The earlier rail disruption may be slowing repair movement into Bremen."
+      });
+      hookIds.push(hook.id);
+      const beneficiaryIds = (target.connectedTargetIds.length > 0 ? target.connectedTargetIds : [state.campaign.profile.primaryDirectiveTargetId])
+        .filter((targetId, index, ids) => ids.indexOf(targetId) === index)
+        .filter((targetId) => {
+          const beneficiary = getTargetById(state, targetId);
+          return Boolean(beneficiary && beneficiary.hiddenActualCondition <= 84);
+        });
+      if (beneficiaryIds.length > 0) {
+        maybeCreateOpportunity(
+          state,
+          "repair_network_slowed",
+          "Repair traffic appears slowed. A follow-up strike may land before the damage is erased.",
+          target.id,
+          target.id,
+          beneficiaryIds,
+          ["main_strike", "follow_up_attack", "reduced_strike"],
+          [],
+          hookIds,
+          now,
+          opportunityBeatDelta
+        );
+      }
+      upsertInsight(state, "repair-network", "Intelligence increasingly suspects unusually rapid repair movement can be interrupted through rail disruption.", state.campaign.insights.some((entry) => entry.subject === "repair-network") ? "established" : "emerging", now);
+    }
+    if (target.type === "radar") {
+      const hook = createOrRefreshHook(state, {
+        hookType: "warning_coordination_disrupted",
+        sourceId: mission.id,
+        relatedTargetId: target.id,
+        createdDay: state.campaign.currentDay,
+        createdAt: now,
+        state: "active",
+        fadingStartsDay: null,
+        fadingStartsBeat: state.campaign.operationalBeat + Math.max(0, opportunityBeatDelta - 1),
+        fadesAfterDay: null,
+        fadesAfterBeat: state.campaign.operationalBeat + opportunityBeatDelta,
+        evidenceKnown: true,
+        consumedById: null,
+        summary: "Radar disruption may have unsettled warning coordination along the route."
+      });
+      hookIds.push(hook.id);
+      maybeCreateOpportunity(
+        state,
+        "warning_coordination_disrupted",
+        "Staff believes route warning coordination may still be unsettled.",
+        target.id,
+        target.id,
+        state.targets.filter((entry) => entry.type === "factory" || entry.type === "defense").map((entry) => entry.id),
+        ["main_strike", "reduced_strike", "follow_up_attack"],
+        ["direct"],
+        hookIds,
+        now,
+        opportunityBeatDelta
+      );
+      upsertInsight(state, "warning-coordination", "Repeated reports suggest interception control depends heavily on coastal radar.", state.campaign.insights.some((entry) => entry.subject === "warning-coordination") ? "established" : "emerging", now);
+    }
+  }
+  const attacksOnTarget = state.missions.filter((entry) =>
+    entry.debriefGenerated && entry.hiddenOutcome.attackedTargetId === target.id
+  ).length;
+  if (attacksOnTarget >= 2) {
+    createOrRefreshHook(state, {
+      hookType: "repeat_attack_alert",
+      sourceId: mission.id,
+      relatedTargetId: target.id,
+      createdDay: state.campaign.currentDay,
+      createdAt: now,
+      state: "active",
+      fadingStartsDay: null,
+      fadingStartsBeat: state.campaign.operationalBeat + opportunityBeatDelta,
+      fadesAfterDay: null,
+      fadesAfterBeat: state.campaign.operationalBeat + opportunityBeatDelta + 1,
+      evidenceKnown: mission.hiddenOutcome.targetDamage <= 0,
+      consumedById: null,
+      summary: "Enemy defenses appear to be adapting to repeated attacks on the same objective."
+    });
+    upsertInsight(state, "defense-adaptation", "Enemy defenses appear to be adapting to repeated attacks on the same objective.", attacksOnTarget >= 3 ? "established" : "emerging", now);
+  }
+}
+
+function applyReconCampaignConsequences(state: SaveState, recon: ReconMission, target: Target, now: number): void {
+  if (recon.type === "post_strike") {
+    const opportunity = state.campaign.opportunities.find((entry) =>
+      entry.state !== "resolved"
+      && entry.disposition === "pending"
+      && (entry.relatedTargetId === target.id || entry.beneficiaryTargetIds.includes(target.id))
+    );
+    if (opportunity) {
+      opportunity.confirmedAt = now;
+      opportunity.confirmationNote = "Recon clarified the opening, but the choice to exploit it still remains.";
+      addCampaignEvent(state, "opportunity", "Opportunity confirmed", opportunity.confirmationNote, now, opportunity.relatedTargetId, opportunity.relatedHookIds);
+    }
+  }
+  if (target.type === "factory" && recon.resultQuality === "clear") {
+    upsertInsight(state, "bremen-vulnerability", "Recon increasingly suggests the Bremen works can be held down if follow-up pressure arrives before repairs settle.", state.campaign.insights.some((entry) => entry.subject === "bremen-vulnerability") ? "established" : "emerging", now);
+  }
+}
+
+function getGroupEffectivenessScore(state: SaveState): number {
+  const available = state.aircraft.filter((aircraft) => aircraft.status === "serviceable").length;
+  const lost = state.aircraft.filter((aircraft) => aircraft.status === "lost").length;
+  const wounded = state.crewMembers.filter((member) => member.status === "lightly_wounded" || member.status === "seriously_wounded").length;
+  return clamp(available * 16 - lost * 10 - wounded * 2 + state.campaign.directiveState.commandPatience / 4, 0, 100);
+}
+
+function getCampaignPhaseLabel(phase: CampaignPhase): string {
+  switch (phase) {
+    case "opening":
+      return "Opening";
+    case "pressure":
+      return "Pressure";
+    case "opportunity":
+      return "Opportunity";
+    case "crisis":
+      return "Crisis";
+    case "commitment":
+      return "Commitment";
+    case "resolution":
+      return "Resolution";
+    default:
+      return "Campaign";
+  }
+}
+
+function computeCampaignPhase(state: SaveState): CampaignPhase {
+  if (state.campaign.resolutionState !== "active") {
+    return "resolution";
+  }
+  if (getGroupEffectivenessScore(state) < 34 || hasReadinessCrisis(state)) {
+    return "crisis";
+  }
+  if (getPrimaryUsableOpportunity(state)) {
+    return "opportunity";
+  }
+  if (state.campaign.directiveState.commandPatience < 42 || state.campaign.currentDay >= Math.max(5, state.campaign.expectedDurationDays - 2)) {
+    return "commitment";
+  }
+  if (state.missions.some((mission) => mission.debriefGenerated)) {
+    return "pressure";
+  }
+  return "opening";
+}
+
+function setCampaignPhase(state: SaveState, phase: CampaignPhase, now: number): void {
+  if (state.campaign.campaignPhaseId === phase) {
+    return;
+  }
+  state.campaign.campaignPhaseId = phase;
+  state.campaign.campaignPhase = `${getCampaignPhaseLabel(phase)} phase. ${phase === "resolution" ? "The campaign is drawing to its close." : "Staff is revising the group posture."}`;
+  addCampaignEvent(state, "phase", `${getCampaignPhaseLabel(phase)} phase`, state.campaign.campaignPhase, now);
+}
+
+function detectCampaignEndCondition(state: SaveState): CampaignEndCondition | null {
+  if (state.campaign.evaluation) {
+    return state.campaign.evaluation.endCondition;
+  }
+  const effectiveness = getGroupEffectivenessScore(state);
+  if (state.campaign.directiveState.directiveProgress >= 72 && effectiveness >= 42) {
+    return "directive_complete";
+  }
+  if (effectiveness < 20 || state.aircraft.filter((aircraft) => aircraft.status === "lost").length >= 3) {
+    return "group_collapse";
+  }
+  if (state.campaign.directiveState.commandPatience <= 12) {
+    return "command_relief";
+  }
+  if (
+    state.campaign.currentDay > state.campaign.expectedDurationDays
+    && (Boolean(getPrimaryUsableOpportunity(state)) || Boolean(getActiveMission(state)))
+  ) {
+    state.campaign.extensionReason = "A final opportunity or committed operation is still in motion.";
+    return null;
+  }
+  if (state.campaign.currentDay > state.campaign.expectedDurationDays && !getPrimaryUsableOpportunity(state)) {
+    return "window_exhausted";
+  }
+  return null;
+}
+
+function markCampaignResolutionPending(state: SaveState, endCondition: CampaignEndCondition, now: number): void {
+  if (state.campaign.resolutionState !== "active") {
+    return;
+  }
+  state.campaign.resolutionState = "pending";
+  state.campaign.pendingEndCondition = endCondition;
+  state.campaign.pendingResolutionDetectedAt = now;
+  state.campaign.pendingResolutionReason = endCondition.replaceAll("_", " ");
+  state.campaign.pendingResolutionMissionIds = state.missions.filter((mission) => !mission.debriefGenerated).map((mission) => mission.id);
+  state.campaign.pendingResolutionReconIds = state.reconMissions.filter((recon) => !recon.completionApplied).map((recon) => recon.id);
+  state.campaign.pendingResolutionRepairIds = state.repairJobs.filter((job) => !job.completionApplied).map((job) => job.id);
+  state.campaign.pendingResolutionRecoveryIds = state.recoveryJobs.filter((job) => !job.completionApplied).map((job) => job.id);
+  state.campaign.pendingDecisions = ["The campaign is closing. Allow committed work to finish; no new operational orders may be issued."];
+  addCampaignEvent(
+    state,
+    "resolution-pending",
+    "Resolution pending",
+    "An end condition has been reached. Already-committed work will be allowed to finish before the campaign is judged.",
+    now
+  );
+}
+
+function generateCampaignEvaluation(state: SaveState, now: number): CampaignEvaluation {
+  const endCondition = state.campaign.pendingEndCondition ?? detectCampaignEndCondition(state) ?? "window_exhausted";
+  const effectiveness = getGroupEffectivenessScore(state);
+  const losses = state.aircraft.filter((aircraft) => aircraft.status === "lost").length;
+  const exploited = state.campaign.opportunities.filter((entry) => entry.disposition === "exploited").length;
+  const missed = state.campaign.opportunities.filter((entry) => entry.disposition === "lost_through_delay" || entry.disposition === "ignored").length;
+  const judgment =
+    endCondition === "directive_complete" && effectiveness >= 55
+      ? "Decisive success, group still effective"
+      : endCondition === "directive_complete"
+        ? "Directive achieved at severe cost"
+        : endCondition === "group_collapse"
+          ? "Group relieved after unacceptable losses"
+          : endCondition === "command_relief"
+            ? "Campaign inconclusive under command pressure"
+            : effectiveness >= 45
+              ? "Useful partial success with force preserved"
+              : "Main directive unresolved";
+  const notableChains = [
+    state.campaign.causalHooks[0]?.summary ?? "The last campaign effects remained difficult to disentangle.",
+    state.campaign.insights[0]?.conclusion ?? "Staff never completely solved the enemy's local pattern."
+  ].slice(0, 2);
+  return {
+    generatedAt: now,
+    endCondition,
+    judgment,
+    summary: `Campaign result filed. ${judgment}. ${getDirectiveProgressSummary(state).progress.replace("Progress: ", "")} ${getDirectiveProgressSummary(state).groupCondition.replace("Group condition: ", "")}`,
+    commandJudgment: state.campaign.directiveState.commandPatience < 30
+      ? "Higher command judged the campaign increasingly harshly by the end."
+      : "Higher command judged the campaign as a meaningful use of a strained force.",
+    staffJudgment: exploited > missed
+      ? "Staff believes the group recognized and used more openings than it wasted."
+      : "Staff believes the group saw opportunities, but too many slipped while the picture remained uncertain.",
+    directiveAssessment: getDirectiveProgressSummary(state).progress,
+    groupAssessment: buildGroupConditionText(state),
+    lossesAssessment: `${losses} aircraft lost. ${roleLossText(state)}`,
+    opportunityAssessment: `${exploited} opportunities exploited, ${missed} missed or lost through delay.`,
+    notableChains
+  };
+}
+
+function maybeFinalizeCampaign(state: SaveState, now: number): void {
+  if (state.campaign.evaluation || state.campaign.frozenFinalState) {
+    return;
+  }
+  const endCondition = detectCampaignEndCondition(state);
+  if (state.campaign.resolutionState === "active" && endCondition) {
+    markCampaignResolutionPending(state, endCondition, now);
+  }
+  if (state.campaign.resolutionState !== "pending" || hasPendingResolutionWork(state)) {
+    return;
+  }
+  state.campaign.evaluation = generateCampaignEvaluation(state, now);
+  state.campaign.resolutionState = "finalized";
+  state.campaign.finalSummaryMode = true;
+  state.campaign.frozenFinalState = true;
+  state.campaign.campaignPhaseId = "resolution";
+  state.campaign.campaignPhase = "Campaign concluded. Final summary follows.";
+  state.campaign.pendingDecisions = [];
+  addCampaignEvent(state, "campaign-final", "Campaign concluded", state.campaign.evaluation.summary, now);
+}
+
 function randomName(): string {
   return `${pick(FIRST_NAMES)} ${pick(LAST_NAMES)}`;
 }
@@ -759,11 +1753,13 @@ function stageReport(
     aircraftCount: number;
     hasLossRisk: boolean;
     hasDiversionRisk: boolean;
+    missionContext: Mission["campaignContext"];
   }
 ): { text: string; source: MissionEvent["source"]; confidence: MissionEvent["confidence"] } {
+  let report: { text: string; source: MissionEvent["source"]; confidence: MissionEvent["confidence"] };
   switch (stage) {
     case "takeoff":
-      return {
+      report = {
         text: pickOne([
           "Tower reports the force has begun departing in sequence. Visibility over the field is serviceable, though exact assembly timing remains uncertain.",
           context.aircraftCount >= 4
@@ -773,8 +1769,9 @@ function stageReport(
         source: "tower",
         confidence: "confirmed"
       };
+      break;
     case "assembly":
-      return {
+      report = {
         text: pickOne([
           context.leadLabel === "Trusted lead"
             ? "Group Operations believes the formation is climbing into place in reasonably good order, though the picture remains fragmentary."
@@ -786,8 +1783,9 @@ function stageReport(
         source: "group_operations",
         confidence: "fragmentary"
       };
+      break;
     case "outbound":
-      return {
+      report = {
         text: pickOne([
           `Observers judge the route ${riskWord}. Wireless traffic suggests the force is approaching the enemy coast, though direct contact is incomplete.`,
           `Operations reports ${context.weather.toLowerCase()} on the route. The outbound stream is believed to be holding together, but only in fragments.`,
@@ -798,8 +1796,9 @@ function stageReport(
         source: "group_operations",
         confidence: "estimated"
       };
+      break;
     case "target_area":
-      return {
+      report = {
         text: pickOne([
           `Lead crews report ${visibility} over ${target.name}. Bombing is believed to have been carried out, but the exact aiming point cannot yet be confirmed.`,
           context.targetType === "airfield"
@@ -812,8 +1811,9 @@ function stageReport(
         source: "lead_aircraft",
         confidence: "probable"
       };
+      break;
     case "withdrawal":
-      return {
+      report = {
         text: pickOne([
           context.hasLossRisk || context.hasDiversionRisk
             ? "Coastal watchers report the stream returning in fragments. Counting is unreliable, and at least one aircraft may be overdue."
@@ -824,8 +1824,9 @@ function stageReport(
         source: "coastal_observer",
         confidence: "estimated"
       };
+      break;
     case "recovery":
-      return {
+      report = {
         text: pickOne([
           "Aircraft are reported landing or diverting in ones and twos. Engineering is beginning to sort rumor from fact.",
           context.hasDiversionRisk
@@ -835,8 +1836,9 @@ function stageReport(
         source: "tower",
         confidence: "confirmed"
       };
+      break;
     case "debrief_ready":
-      return {
+      report = {
         text: pickOne([
           "Crews are available for debrief. Intelligence requests a provisional assessment before recommending the next move.",
           "Returning crews are now in position to be heard. Staff expects the next useful judgment to come from debrief rather than rumor.",
@@ -845,13 +1847,19 @@ function stageReport(
         source: "crew_debrief",
         confidence: "confirmed"
       };
+      break;
     default:
-      return {
+      report = {
         text: `${target.name} remains under observation.`,
         source: "intelligence",
         confidence: "unverified"
       };
+      break;
   }
+  return {
+    ...report,
+    text: describeContextualReport(stage, report.text, context.missionContext)
+  };
 }
 
 export function getEffectiveNow(state: SaveState): number {
@@ -1045,6 +2053,7 @@ export function createNewGame(now: number): SaveState {
       commandDirective: "Reduce enemy fighter pressure in the Bremen sector.",
       commandStanding: "High command wants a prompt operation, but not a wasted one.",
       campaignPhase: "Awaiting your first operation order.",
+      campaignPhaseId: "opening",
       activeMissionId: null,
       activeReconId: null,
       lastDebriefMissionId: null,
@@ -1057,7 +2066,37 @@ export function createNewGame(now: number): SaveState {
       latestWaitNote: null,
       pendingTimeAdvanceKind: null,
       consequenceLedger: [],
-      directiveState: createInitialDirectiveState()
+      directiveState: createInitialDirectiveState(),
+      profile: {
+        profileId: "pending",
+        generatedAt: now,
+        expectedDays: DEFAULT_CAMPAIGN_DAYS,
+        applicationMode: "drift_only" as CampaignProfile["applicationMode"],
+        primaryDirectiveTargetId: "target-1",
+        enemyResponse: createFallbackEnemyResponseProfile(),
+        targetPriorityMods: {} as Record<string, number>,
+        targetRepairMods: {} as Record<string, number>,
+        targetDefenseMods: {} as Record<string, number>,
+        viableApproachSummaries: [] as string[]
+      },
+      expectedDurationDays: DEFAULT_CAMPAIGN_DAYS,
+      extensionReason: null,
+      operationalBeat: 0,
+      causalHooks: [],
+      opportunities: [],
+      insights: [],
+      events: [],
+      resolutionState: "active",
+      pendingEndCondition: null,
+      pendingResolutionDetectedAt: null,
+      pendingResolutionReason: null,
+      pendingResolutionMissionIds: [],
+      pendingResolutionReconIds: [],
+      pendingResolutionRepairIds: [],
+      pendingResolutionRecoveryIds: [],
+      evaluation: null,
+      finalSummaryMode: false,
+      frozenFinalState: false
     },
     aircraft: [] as Aircraft[],
     crews: [] as Aircrew[],
@@ -1151,6 +2190,9 @@ export function createNewGame(now: number): SaveState {
   state.targets[2]!.connectedTargetIds = ["target-1"];
   state.targets[3]!.connectedTargetIds = ["target-5"];
   state.targets[4]!.connectedTargetIds = ["target-1", "target-4"];
+  state.campaign.profile = createCampaignProfile(state, now);
+  state.campaign.expectedDurationDays = state.campaign.profile.expectedDays;
+  applyCampaignProfileToTargets(state);
 
   for (const aircraft of state.aircraft) {
     const pilotName = aircraft.id === "aircraft-1"
@@ -1193,7 +2235,28 @@ function migrateLegacyState(parsed: Partial<SaveState>): SaveState {
   state.campaign.pendingTimeAdvanceKind ??= null;
   state.campaign.consequenceLedger ??= [];
   state.campaign.personnelDecisions ??= [];
+  state.campaign.campaignPhaseId ??= "opening";
   state.campaign.directiveState ??= createInitialDirectiveState();
+  state.campaign.profile ??= createCampaignProfile(baseline, Date.now());
+  state.campaign.profile.applicationMode ??= "legacy_baked_repair";
+  state.campaign.expectedDurationDays ??= state.campaign.profile.expectedDays ?? DEFAULT_CAMPAIGN_DAYS;
+  state.campaign.extensionReason ??= null;
+  state.campaign.operationalBeat ??= state.campaign.directiveState.operationsElapsed ?? 0;
+  state.campaign.causalHooks ??= [];
+  state.campaign.opportunities ??= [];
+  state.campaign.insights ??= [];
+  state.campaign.events ??= [];
+  state.campaign.resolutionState ??= state.campaign.evaluation ? "finalized" : "active";
+  state.campaign.pendingEndCondition ??= null;
+  state.campaign.pendingResolutionDetectedAt ??= null;
+  state.campaign.pendingResolutionReason ??= null;
+  state.campaign.pendingResolutionMissionIds ??= [];
+  state.campaign.pendingResolutionReconIds ??= [];
+  state.campaign.pendingResolutionRepairIds ??= [];
+  state.campaign.pendingResolutionRecoveryIds ??= [];
+  state.campaign.evaluation ??= null;
+  state.campaign.finalSummaryMode ??= Boolean(state.campaign.evaluation);
+  state.campaign.frozenFinalState ??= Boolean(state.campaign.evaluation);
   state.campaign.directiveState.fighterPressure ??= baseline.campaign.directiveState.fighterPressure;
   state.campaign.directiveState.fighterReplacementFlow ??= baseline.campaign.directiveState.fighterReplacementFlow;
   state.campaign.directiveState.regionalRepairCapacity ??= baseline.campaign.directiveState.regionalRepairCapacity;
@@ -1267,6 +2330,7 @@ function migrateLegacyState(parsed: Partial<SaveState>): SaveState {
     normalizeSeriousWoundMember(member);
   }
   for (const mission of state.missions ?? []) {
+    mission.campaignContext ??= null;
     mission.debriefCasualtyLines ??= [];
     mission.plan.operationType ??= "main_strike";
     mission.plan.secondaryTargetId ??= null;
@@ -1289,6 +2353,20 @@ function migrateLegacyState(parsed: Partial<SaveState>): SaveState {
       outcome.crewEffects ??= [];
       outcome.casualtySummary ??= [];
     }
+  }
+  for (const hook of state.campaign.causalHooks) {
+    hook.fadingStartsDay ??= hook.fadesAfterDay !== null ? Math.max(0, hook.fadesAfterDay - 1) : null;
+    hook.fadingStartsBeat ??= hook.fadesAfterBeat !== null ? Math.max(0, hook.fadesAfterBeat - 1) : null;
+  }
+  for (const opportunity of state.campaign.opportunities) {
+    opportunity.sourceTargetId ??= opportunity.relatedTargetId ?? null;
+    opportunity.beneficiaryTargetIds ??= opportunity.relatedTargetId ? [opportunity.relatedTargetId] : [];
+    opportunity.eligibleOperationTypes ??= [];
+    opportunity.eligibleRouteRisks ??= [];
+    opportunity.confirmedAt ??= null;
+    opportunity.confirmationNote ??= null;
+    opportunity.fadingStartsDay ??= opportunity.fadesAfterDay !== null ? Math.max(0, opportunity.fadesAfterDay - 1) : null;
+    opportunity.fadingStartsBeat ??= opportunity.fadesAfterBeat !== null ? Math.max(0, opportunity.fadesAfterBeat - 1) : null;
   }
   state.planning.operationType ??= "main_strike";
   state.planning.secondaryTargetId ??= null;
@@ -1316,6 +2394,11 @@ function migrateLegacyState(parsed: Partial<SaveState>): SaveState {
   syncDerivedCrews(state);
   syncPendingDecisionNotes(state);
   evaluateTutorial(state);
+  if (state.campaign.evaluation) {
+    state.campaign.resolutionState = "finalized";
+    state.campaign.finalSummaryMode = true;
+    state.campaign.frozenFinalState = true;
+  }
   return state;
 }
 
@@ -2479,6 +3562,7 @@ function buildMission(state: SaveState, now: number): Mission | null {
   const leadAircraftId = state.planning.leadAircraftId;
   const leadAssessment = getLeadAircraftAssessment(state, leadAircraftId);
   const staffPreview = getPlanningStaffPreview(state);
+  const campaignContext = buildMissionCampaignContext(state, target, state.planning.operationType, state.planning.routeRisk);
 
   const launchTime = state.planning.launchMode === "schedule" ? now + state.planning.scheduleDelayMs : now;
   const duration = missionDurationForTarget(target);
@@ -2523,7 +3607,8 @@ function buildMission(state: SaveState, now: number): Mission | null {
     + avgFatigue * 7
     + doctrineRisk
     + operationRisk
-    + leadRisk;
+    + leadRisk
+    + missionContextRiskTotal(campaignContext);
 
   const launchCrewManifests = assignedAircraftIds.map((aircraftId) => snapshotAircraftCrew(state, aircraftId));
   const outcomes: Mission["hiddenOutcome"]["aircraftOutcomes"] = [];
@@ -2621,7 +3706,8 @@ function buildMission(state: SaveState, now: number): Mission | null {
   );
   const noEffectiveAttack = visibility === "obscured" && state.planning.attackDoctrine === "abort_unless_visual";
   const attackedTarget = secondaryShift ? (secondaryTarget ?? target) : target;
-  const computedDamage = Math.round(contributed * (8 + Math.random() * 5) * visibilityPenalty * doctrineDamageMod * leadDamageMod * operationDamageMod);
+  const repairOpportunityBoost = campaignContext?.reportModifiers.some((modifier) => modifier.key === "repair_network_slowed") ? 1.08 : 1;
+  const computedDamage = Math.round(contributed * (8 + Math.random() * 5) * visibilityPenalty * doctrineDamageMod * leadDamageMod * operationDamageMod * repairOpportunityBoost);
   const targetDamage = noEffectiveAttack || contributed === 0 ? 0 : clamp(computedDamage, 1, 42);
   const targetAssessment =
     noEffectiveAttack
@@ -2709,7 +3795,8 @@ function buildMission(state: SaveState, now: number): Mission | null {
       leadLabel: leadAssessment.label,
       aircraftCount: state.planning.assignedAircraftIds.length,
       hasLossRisk,
-      hasDiversionRisk
+      hasDiversionRisk,
+      missionContext: campaignContext
     });
     const hiddenEffects: HiddenEffect[] = [];
     if (stage === "assembly") {
@@ -2776,6 +3863,7 @@ function buildMission(state: SaveState, now: number): Mission | null {
       launchCrewManifests,
       staffWarningsAtLaunch: staffPreview.warnings
     },
+    campaignContext,
     stage: launchTime > now ? "scheduled" : "takeoff",
     timelineEvents,
     generatedEvents: timelineEvents,
@@ -2821,10 +3909,15 @@ function updateMissionParticipantsOnLaunch(state: SaveState, mission: Mission): 
 }
 
 export function launchMission(state: SaveState, now: number): string | null {
+  const closedMessage = getCampaignClosedOrderMessage(state);
+  if (closedMessage) {
+    return closedMessage;
+  }
   const mission = buildMission(state, now);
   if (!mission) {
     return "Mission could not be created.";
   }
+  markOpportunityUseOnLaunch(state, mission.plan.targetId, mission.plan.operationType, mission.plan.routeRisk, now);
   state.missions.unshift(mission);
   state.campaign.activeMissionId = mission.id;
   state.campaign.campaignPhase = mission.plan.status === "scheduled"
@@ -2912,7 +4005,7 @@ function applyCrewOutcome(state: SaveState, mission: Mission, outcomeIndex: numb
   updateAllDerivedCrewState(state);
 }
 
-function generateDebrief(state: SaveState, mission: Mission): void {
+function generateDebrief(state: SaveState, mission: Mission, beatTracker?: { count: number }): void {
   if (mission.debriefGenerated) {
     return;
   }
@@ -2943,13 +4036,16 @@ function generateDebrief(state: SaveState, mission: Mission): void {
     mission.hiddenOutcome.doctrineNote,
     mission.hiddenOutcome.leadNote,
     mission.hiddenOutcome.commandAssessment,
+    ...selectRelevantHooks(state, { targetId: attackedTarget.id, allowEvidenceUnknown: true, limit: 1 }).map((hook) => hookFlavorLine(hook)),
     target.suspectedEffects
   ].join(" ");
   mission.debriefGenerated = true;
   mission.status = "complete";
   mission.stage = "complete";
+  registerOperationalBeat(state, beatTracker);
 
   applyStrategicDirectiveEffects(state, mission, attackedTarget, state.lastReconciledAt);
+  applyMissionCampaignConsequences(state, mission, attackedTarget, state.lastReconciledAt);
 
   if (attackedTarget.id !== target.id) {
     updateVisibleTargetAssessment(
@@ -3028,7 +4124,7 @@ function applyTargetDamage(state: SaveState, mission: Mission): void {
   }
 }
 
-function applyMissionEffect(state: SaveState, mission: Mission, effect: HiddenEffect): void {
+function applyMissionEffect(state: SaveState, mission: Mission, effect: HiddenEffect, beatTracker?: { count: number }): void {
   switch (effect.kind) {
     case "apply_aircraft_outcome":
       applyAircraftOutcome(state, mission, effect.outcomeIndex);
@@ -3040,7 +4136,7 @@ function applyMissionEffect(state: SaveState, mission: Mission, effect: HiddenEf
       applyTargetDamage(state, mission);
       break;
     case "generate_debrief":
-      generateDebrief(state, mission);
+      generateDebrief(state, mission, beatTracker);
       break;
     case "set_campaign_phase":
       if (effect.phaseText) {
@@ -3053,7 +4149,7 @@ function applyMissionEffect(state: SaveState, mission: Mission, effect: HiddenEf
   }
 }
 
-function applyMissionEvent(state: SaveState, mission: Mission, event: MissionEvent): void {
+function applyMissionEvent(state: SaveState, mission: Mission, event: MissionEvent, beatTracker?: { count: number }): void {
   if (!event.revealed) {
     event.revealed = true;
     mission.reports.push(event.publicReportText);
@@ -3078,7 +4174,7 @@ function applyMissionEvent(state: SaveState, mission: Mission, event: MissionEve
     mission.status = "launched";
   }
   for (const effect of event.hiddenEffects) {
-    applyMissionEffect(state, mission, effect);
+    applyMissionEffect(state, mission, effect, beatTracker);
   }
   event.applied = true;
 }
@@ -3139,7 +4235,7 @@ function completeRecovery(state: SaveState, job: RecoveryJob): void {
   addNotification(state, `toast-recovery-${job.id}`, "operations", `${aircraft.name} has returned from diversion`, job.completesAt);
 }
 
-function completeRecon(state: SaveState, recon: ReconMission): void {
+function completeRecon(state: SaveState, recon: ReconMission, beatTracker?: { count: number }): void {
   if (recon.completionApplied) {
     return;
   }
@@ -3163,6 +4259,7 @@ function completeRecon(state: SaveState, recon: ReconMission): void {
   recon.status = "complete";
   recon.completionApplied = true;
   state.campaign.activeReconId = null;
+  registerOperationalBeat(state, beatTracker);
   state.campaign.latestIntelUpdate = {
     reconId: recon.id,
     targetId: target.id,
@@ -3174,6 +4271,7 @@ function completeRecon(state: SaveState, recon: ReconMission): void {
     alertLevel: recon.enemyAlertEffect,
     updatedAt: recon.interpretedAt
   };
+  applyReconCampaignConsequences(state, recon, target, recon.interpretedAt);
   buildReconLedgerEntry(state, recon, target);
   deliverStrategicIntelDrip(state, recon.interpretedAt, recon.targetId);
   addLog(state, `recon-${recon.id}`, recon.interpretedAt, "recon", recon.resultText);
@@ -3220,10 +4318,21 @@ function nudgeTargetRepairs(state: SaveState, elapsedMs: number): boolean {
     return false;
   }
   let changed = false;
-  const repairScale = clamp(state.campaign.directiveState.regionalRepairCapacity / 70, 0.4, 1.15);
+  const repairScale = clamp(
+    (state.campaign.directiveState.regionalRepairCapacity / 70) * state.campaign.profile.enemyResponse.repairBias,
+    0.35,
+    1.3
+  );
   for (const target of state.targets) {
     const previous = target.hiddenActualCondition;
-    const repairLift = Math.max(1, Math.round(target.hiddenRepairRate * repairScale * daySteps));
+    const profileRepairMod = state.campaign.profile.applicationMode === "drift_only"
+      ? getCampaignProfileTargetMod(state.campaign.profile, target.id, "repair")
+      : 1;
+    const slowingOpportunity = getActiveOpportunityBenefitsForTarget(state, target.id).some((opportunity) => opportunity.kind === "repair_network_slowed");
+    const repairLift = Math.max(
+      1,
+      Math.round(target.hiddenRepairRate * repairScale * daySteps * profileRepairMod * (slowingOpportunity ? 0.72 : 1))
+    );
     target.hiddenActualCondition = clamp(target.hiddenActualCondition + repairLift, 0, 100);
     if (previous !== target.hiddenActualCondition) {
       changed = true;
@@ -3240,36 +4349,45 @@ function hasActiveTimedWork(state: SaveState): boolean {
 }
 
 export function reconcileState(state: SaveState, now: number): boolean {
+  if (state.campaign.frozenFinalState) {
+    state.campaign.pendingTimeAdvanceKind = null;
+    return pruneExpiredNotifications(state, now);
+  }
   const previous = state.lastReconciledAt;
+  const previousBeat = state.campaign.operationalBeat;
   const cause = state.campaign.pendingTimeAdvanceKind ?? "passive";
+  const beatTracker = { count: 0 };
   if (cause === "passive" && !hasActiveTimedWork(state)) {
     now = previous;
   }
   let changed = false;
+  let completedStationSideWork = false;
   for (const mission of state.missions) {
     const dueEvents = mission.timelineEvents
       .filter((event) => event.time <= now && (!event.applied || !event.revealed))
       .sort((left, right) => left.time - right.time);
     for (const event of dueEvents) {
-      applyMissionEvent(state, mission, event);
+      applyMissionEvent(state, mission, event, beatTracker);
       changed = true;
     }
   }
   for (const job of state.repairJobs) {
     if (job.status !== "complete" && job.completesAt <= now) {
       completeRepair(state, job);
+      completedStationSideWork = true;
       changed = true;
     }
   }
   for (const job of state.recoveryJobs) {
     if (job.status !== "complete" && job.completesAt <= now) {
       completeRecovery(state, job);
+      completedStationSideWork = true;
       changed = true;
     }
   }
   for (const recon of state.reconMissions) {
     if (!recon.completionApplied && recon.interpretedAt <= now) {
-      completeRecon(state, recon);
+      completeRecon(state, recon, beatTracker);
       changed = true;
     } else if (recon.status === "airborne" && recon.returnsAt <= now) {
       recon.status = "awaiting_interpretation";
@@ -3280,6 +4398,32 @@ export function reconcileState(state: SaveState, now: number): boolean {
   if (elapsedMs > 0) {
     changed = applyOperationalDrift(state, elapsedMs, now, cause) || changed;
   }
+  if (cause === "let_work_finish" && completedStationSideWork) {
+    registerOperationalBeat(state, beatTracker);
+  }
+  const beatDelta = state.campaign.operationalBeat - previousBeat;
+  const dayAdvanced = cause === "stand_down" || cause === "day_advance";
+  if (state.campaign.directiveState.commandPatience < 32) {
+    createOrRefreshHook(state, {
+      hookType: "command_pressure",
+      sourceId: "command",
+      relatedTargetId: null,
+      createdDay: state.campaign.currentDay,
+      createdAt: now,
+      state: "active",
+      fadingStartsDay: null,
+      fadingStartsBeat: state.campaign.operationalBeat + 1,
+      fadesAfterDay: null,
+      fadesAfterBeat: state.campaign.operationalBeat + 2,
+      evidenceKnown: true,
+      consumedById: null,
+      summary: "Higher command is increasingly impatient with further preparation."
+    });
+  }
+  updateHookLifecycle(state, now, beatDelta, dayAdvanced);
+  updateOpportunityStates(state, now, beatDelta, dayAdvanced);
+  setCampaignPhase(state, computeCampaignPhase(state), now);
+  maybeFinalizeCampaign(state, now);
   const waitNote = buildWaitResultNote(state, cause, elapsedMs);
   if (waitNote && waitNote !== state.campaign.latestWaitNote) {
     state.campaign.latestWaitNote = waitNote;
@@ -3295,6 +4439,10 @@ export function reconcileState(state: SaveState, now: number): boolean {
 }
 
 export function startRepair(state: SaveState, aircraftId: string, tier: RepairTier, now: number): string | null {
+  const closedMessage = getCampaignClosedOrderMessage(state);
+  if (closedMessage) {
+    return closedMessage;
+  }
   const aircraft = getAircraftById(state, aircraftId);
   if (!aircraft) {
     return "Aircraft not found.";
@@ -3361,6 +4509,10 @@ export function startRepair(state: SaveState, aircraftId: string, tier: RepairTi
 }
 
 export function startRecovery(state: SaveState, aircraftId: string, now: number): string | null {
+  const closedMessage = getCampaignClosedOrderMessage(state);
+  if (closedMessage) {
+    return closedMessage;
+  }
   const aircraft = getAircraftById(state, aircraftId);
   if (!aircraft) {
     return "Aircraft not found.";
@@ -3426,6 +4578,10 @@ export function startRecovery(state: SaveState, aircraftId: string, now: number)
 }
 
 export function startRecon(state: SaveState, targetId: string, type: ReconType, now: number): string | null {
+  const closedMessage = getCampaignClosedOrderMessage(state);
+  if (closedMessage) {
+    return closedMessage;
+  }
   if (state.campaign.activeReconId) {
     return "Recon section already occupied.";
   }
@@ -3520,7 +4676,11 @@ export function startRecon(state: SaveState, targetId: string, type: ReconType, 
   return null;
 }
 
-export function advanceCampaignDay(state: SaveState): void {
+export function advanceCampaignDay(state: SaveState): string | null {
+  const closedMessage = getCampaignClosedOrderMessage(state);
+  if (closedMessage) {
+    return closedMessage;
+  }
   setPendingTimeAdvance(state, "day_advance");
   state.campaign.currentDay += 1;
   state.debug.clockOffsetMs += DAY_MS;
@@ -3529,6 +4689,8 @@ export function advanceCampaignDay(state: SaveState): void {
   deliverStrategicIntelDrip(state, getEffectiveNow(state));
   addLog(state, `day-${state.campaign.currentDay}`, getEffectiveNow(state), "command", `Campaign day ${state.campaign.currentDay} has begun. Routine rest and repair time have accrued.`);
   syncPendingDecisionNotes(state);
+  registerOperationalBeat(state);
+  return null;
 }
 
 export function skipToNextReport(state: SaveState, now: number): string | null {
@@ -3884,13 +5046,14 @@ function applyStrategicDirectiveEffects(state: SaveState, mission: Mission, targ
   directive.operationsElapsed += 1;
   const severity = mission.hiddenOutcome.targetDamage >= 26 ? "serious" : mission.hiddenOutcome.targetDamage >= 14 ? "useful" : mission.hiddenOutcome.targetDamage > 0 ? "limited" : "poor";
   const baseImpact = mission.hiddenOutcome.targetDamage >= 26 ? 16 : mission.hiddenOutcome.targetDamage >= 14 ? 10 : mission.hiddenOutcome.targetDamage > 0 ? 5 : 1;
+  const targetPriorityMod = getCampaignProfileTargetMod(state.campaign.profile, target.id, "priority");
   const impactMod =
     mission.plan.operationType === "main_strike" ? 1.18
       : mission.plan.operationType === "reduced_strike" ? 0.82
         : mission.plan.operationType === "support_raid" ? 0.72
           : mission.plan.operationType === "follow_up_attack" ? 1.1
             : 0.58;
-  const impact = Math.max(1, Math.round(baseImpact * impactMod));
+  const impact = Math.max(1, Math.round(baseImpact * impactMod * targetPriorityMod));
   const costly = mission.hiddenOutcome.aircraftOutcomes.filter((outcome) => outcome.finalStatus === "lost").length > 0;
 
   if (severity === "poor") {
@@ -3912,19 +5075,12 @@ function applyStrategicDirectiveEffects(state: SaveState, mission: Mission, targ
       appendStrategicEffect(state, target, at, "fighter_pressure", `${target.name} is believed to have reduced near-term fighter pressure around the sector.`);
       break;
     case "rail":
-      directive.regionalRepairCapacity = clamp(directive.regionalRepairCapacity - (impact + 3), 0, 100);
+      directive.regionalRepairCapacity = clamp(directive.regionalRepairCapacity - Math.round((impact + 3) * state.campaign.profile.enemyResponse.railLeverage), 0, 100);
       directive.directiveProgress = clamp(directive.directiveProgress + Math.max(2, impact - 1), 0, 100);
-      for (const connectedId of target.connectedTargetIds) {
-        const connected = getTargetById(state, connectedId);
-        if (!connected) {
-          continue;
-        }
-        connected.hiddenRepairRate = clamp(connected.hiddenRepairRate - (severity === "serious" ? 3 : 2), 2, 20);
-      }
       appendStrategicEffect(state, target, at, "repair_capacity", `${target.name} may have slowed the repair tempo supporting connected Bremen targets.`);
       break;
     case "radar":
-      directive.warningCoordination = clamp(directive.warningCoordination - (impact + 2), 0, 100);
+      directive.warningCoordination = clamp(directive.warningCoordination - Math.round((impact + 2) * state.campaign.profile.enemyResponse.radarLeverage), 0, 100);
       directive.directiveProgress = clamp(directive.directiveProgress + Math.max(1, impact - 2), 0, 100);
       for (const connectedId of target.connectedTargetIds) {
         const connected = getTargetById(state, connectedId);
@@ -4068,7 +5224,6 @@ function createConsequenceLedgerEntry(state: SaveState, input: Omit<ConsequenceL
     return;
   }
   state.campaign.consequenceLedger.unshift(entry);
-  state.campaign.consequenceLedger = state.campaign.consequenceLedger.slice(0, 5);
 }
 
 function buildMissionLedgerEntry(state: SaveState, mission: Mission, target: Target): void {
@@ -4129,6 +5284,12 @@ function buildReconLedgerEntry(state: SaveState, recon: ReconMission, target: Ta
 }
 
 export function getOperationalRhythm(state: SaveState): { id: string; label: string } {
+  if (state.campaign.finalSummaryMode) {
+    return { id: "final_summary", label: "Final Summary" };
+  }
+  if (state.campaign.resolutionState === "pending") {
+    return { id: "resolution_pending", label: "Resolution Pending" };
+  }
   const mission = getActiveMission(state);
   const recon = getActiveRecon(state);
   if (mission) {
@@ -4223,6 +5384,10 @@ function advanceClockTo(state: SaveState, now: number, targetTime: number): void
 }
 
 export function waitUntilNextEvent(state: SaveState, now: number): string | null {
+  const closedMessage = getCampaignClosedOrderMessage(state);
+  if (closedMessage) {
+    return closedMessage;
+  }
   const candidates = [
     getNextMissionEventTime(state),
     getNextNonMissionCompletionTime(state),
@@ -4239,6 +5404,10 @@ export function waitUntilNextEvent(state: SaveState, now: number): string | null
 }
 
 export function letCurrentWorkFinish(state: SaveState, now: number): string | null {
+  const closedMessage = getCampaignClosedOrderMessage(state);
+  if (closedMessage) {
+    return closedMessage;
+  }
   const targetTime = getNextNonMissionCompletionTime(state);
   if (!targetTime) {
     return "No station-side work is currently pending.";
@@ -4249,11 +5418,16 @@ export function letCurrentWorkFinish(state: SaveState, now: number): string | nu
 }
 
 export function standDownUntilMorning(state: SaveState, now: number): string | null {
+  const closedMessage = getCampaignClosedOrderMessage(state);
+  if (closedMessage) {
+    return closedMessage;
+  }
   const targetTime = now + DAY_MS;
   setPendingTimeAdvance(state, "stand_down");
   state.campaign.currentDay += 1;
   advanceClockTo(state, now, targetTime);
   addLog(state, `day-${state.campaign.currentDay}`, targetTime, "command", `Campaign day ${state.campaign.currentDay} has begun. Routine rest and repair time have accrued.`);
+  registerOperationalBeat(state);
   return null;
 }
 
@@ -4454,28 +5628,37 @@ export function getCampaignSpinePhase(state: SaveState): {
   return { phaseId: "opening_assessment", phaseLabel: phaseLabel("opening_assessment") };
 }
 
-function findPreferredOperationalTarget(state: SaveState, phase: CampaignSpinePhase): Target | undefined {
+function findPreferredOperationalTarget(state: SaveState, phase: CampaignPhase): Target | undefined {
   const selected = getTargetById(state, state.planning.selectedTargetId);
   const factory = state.targets.find((target) => target.type === "factory");
   const airfield = state.targets.find((target) => target.type === "airfield");
   const radar = state.targets.find((target) => target.type === "radar");
   const rail = state.targets.find((target) => target.type === "rail");
   const defense = state.targets.find((target) => target.type === "defense");
+  const activeOpportunity = getPrimaryUsableOpportunity(state);
+  if (activeOpportunity?.beneficiaryTargetIds.length) {
+    const beneficiary = activeOpportunity.beneficiaryTargetIds
+      .map((targetId) => getTargetById(state, targetId))
+      .find((target): target is Target => Boolean(target));
+    if (beneficiary) {
+      return beneficiary;
+    }
+  }
   switch (phase) {
-    case "opening_assessment":
+    case "opening":
       return airfield ?? factory ?? selected;
-    case "fighter_pressure":
+    case "pressure":
       return airfield ?? radar ?? selected ?? factory;
-    case "bremen_preparation":
-      return rail ?? radar ?? defense ?? factory ?? selected;
-    case "direct_strike_pressure":
-      return factory ?? selected ?? airfield;
-    case "assessment_followup":
+    case "opportunity":
       return selected ?? factory ?? airfield;
-    case "crisis_recovery":
+    case "commitment":
+      return factory ?? selected ?? airfield;
+    case "crisis":
       return selected ?? airfield ?? factory;
+    case "resolution":
+      return selected ?? factory ?? airfield;
     default:
-      return selected ?? factory;
+      return rail ?? radar ?? defense ?? factory ?? selected;
   }
 }
 
@@ -4511,6 +5694,61 @@ function createOperationalRecommendation(
   });
 }
 
+function buildOpportunityRecommendation(
+  state: SaveState,
+  opportunity: CampaignOpportunity
+): {
+  recommended: StaffRecommendation;
+  alternates: StaffRecommendation[];
+  riskIfIgnored: string | null;
+} | null {
+  const beneficiary = opportunity.beneficiaryTargetIds
+    .map((targetId) => getTargetById(state, targetId))
+    .find((target): target is Target => Boolean(target));
+  if (!beneficiary) {
+    return null;
+  }
+  const operationType = opportunity.eligibleOperationTypes[0] ?? "follow_up_attack";
+  const routeRisk = opportunity.eligibleRouteRisks[0] ?? "standard";
+  if (!doesOperationExploitOpportunity(opportunity, beneficiary.id, operationType, routeRisk)) {
+    return null;
+  }
+  const title = opportunity.kind === "fighter_response_softened"
+    ? `Exploit the opening against ${beneficiary.name}`
+    : opportunity.kind === "repair_network_slowed"
+      ? `Follow through before repairs settle at ${beneficiary.name}`
+      : `Use the route opening toward ${beneficiary.name}`;
+  const body = opportunity.kind === "fighter_response_softened"
+    ? "Operations believes the softened fighter picture can cover one more meaningful strike before the enemy restores it."
+    : opportunity.kind === "repair_network_slowed"
+      ? "Operations believes the repair slowdown only matters if the next strike lands on damaged connected works before recovery catches up."
+      : routeRisk === "direct"
+        ? "Operations believes warning coordination is loose enough to justify a more direct route while the opening still exists."
+        : "Operations believes route warning remains unsettled for a short while longer.";
+  const riskIfIgnored = opportunity.kind === "fighter_response_softened"
+    ? "If the group waits, the fighter picture may harden again before another meaningful strike can be launched."
+    : opportunity.kind === "repair_network_slowed"
+      ? "If the group waits, the repair network may catch up and erase the benefit of the earlier rail disruption."
+      : "If the group waits, warning coordination may recover and the route advantage will disappear.";
+  return {
+    recommended: createOperationalRecommendation(
+      state,
+      title,
+      body,
+      "normal",
+      beneficiary,
+      operationType,
+      routeRisk,
+      operationType === "main_strike" ? "single_pass" : "repeat_if_needed"
+    ),
+    alternates: [
+      createAdministrativeRecommendation("Intelligence Officer", "Review the target folders", "Intelligence would compare the current opening against the rest of the board before the group commits.", "low", "go_target_board"),
+      createOperationalRecommendation(state, "Commit directly to Bremen", "Command Liaison would still accept a direct Bremen effort if the board wants progress more than a shaped opening.", "low", state.targets.find((entry) => entry.type === "factory"), "main_strike", "standard", "single_pass")
+    ],
+    riskIfIgnored
+  };
+}
+
 function createAdministrativeRecommendation(
   sourceOfficer: StaffRecommendation["sourceOfficer"],
   title: string,
@@ -4532,7 +5770,7 @@ function createAdministrativeRecommendation(
   });
 }
 
-function chooseConferenceRecommendations(state: SaveState, phase: CampaignSpinePhase): {
+function chooseConferenceRecommendations(state: SaveState, phase: CampaignPhase): {
   recommended: StaffRecommendation;
   alternates: StaffRecommendation[];
   riskIfIgnored: string | null;
@@ -4569,7 +5807,7 @@ function chooseConferenceRecommendations(state: SaveState, phase: CampaignSpineP
     };
   }
 
-  if (phase === "crisis_recovery") {
+  if (phase === "crisis") {
     const recommended = activeRepairs.length > 0
       ? createAdministrativeRecommendation("Engineering Officer", "Let the line settle", "Engineering recommends letting current work finish before risking another major operation.", "urgent", "let_work_finish")
       : createAdministrativeRecommendation("Medical/Personnel Officer", "Stand down until morning", "Personnel and engineering both argue the group needs recovery time before another full effort.", "urgent", "stand_down_morning");
@@ -4643,7 +5881,7 @@ function chooseConferenceRecommendations(state: SaveState, phase: CampaignSpineP
     };
   }
 
-  if (phase === "fighter_pressure") {
+  if (phase === "pressure") {
     return {
       recommended: createOperationalRecommendation(state, "Prepare a reduced strike against Jever", "Operations recommends an airfield effort to soften immediate fighter response before committing to a deeper Bremen problem.", "normal", state.targets.find((entry) => entry.type === "airfield"), "reduced_strike", "standard", "single_pass"),
       alternates: [
@@ -4654,18 +5892,15 @@ function chooseConferenceRecommendations(state: SaveState, phase: CampaignSpineP
     };
   }
 
-  if (phase === "bremen_preparation") {
-    return {
-      recommended: createOperationalRecommendation(state, "Prepare Bremen first", "Staff leans toward a shaping raid against rail, radar, or defenses before asking for a clearer factory result.", "normal", target, "support_raid", "cautious", "abort_unless_visual"),
-      alternates: [
-        createOperationalRecommendation(state, "Commit directly to Bremen", "Operations could still carry a direct strike if Command's appetite for progress outweighs the uncertainty.", "low", state.targets.find((entry) => entry.type === "factory"), "main_strike", "standard", "single_pass"),
-        createAdministrativeRecommendation("Intelligence Officer", "Revisit target folders", "Intelligence would review the competing target files once more before a commitment.", "low", "go_target_board")
-      ],
-      riskIfIgnored: "Committing directly now may still work, but it gives up the chance to arrive over Bremen under slightly better conditions."
-    };
+  if (phase === "opportunity") {
+    const usableOpportunity = getPrimaryUsableOpportunity(state);
+    const recommendation = usableOpportunity ? buildOpportunityRecommendation(state, usableOpportunity) : null;
+    if (recommendation) {
+      return recommendation;
+    }
   }
 
-  if (phase === "direct_strike_pressure") {
+  if (phase === "commitment") {
     return {
       recommended: createOperationalRecommendation(state, "Commit to Bremen", "Command patience is narrowing. Staff believes the next useful move should show direct pressure on the aviation target itself.", "urgent", state.targets.find((entry) => entry.type === "factory"), "main_strike", "standard", "single_pass"),
       alternates: [
@@ -4701,28 +5936,68 @@ function sanitizeConferenceRecommendation(state: SaveState, recommendation: Staf
 }
 
 export function getStaffConference(state: SaveState): StaffConference {
-  const phase = getCampaignSpinePhase(state);
+  if (state.campaign.finalSummaryMode && state.campaign.evaluation) {
+    const evaluation = state.campaign.evaluation;
+    return {
+      phaseId: "resolution",
+      phaseLabel: "Campaign Summary",
+      summary: "The campaign has concluded and the final judgment is now fixed.",
+      executiveComment: evaluation.staffJudgment,
+      operationsComment: evaluation.directiveAssessment,
+      intelligenceComment: evaluation.notableChains[0] ?? "The final intelligence picture remains incomplete in places.",
+      engineeringComment: evaluation.groupAssessment,
+      personnelComment: evaluation.lossesAssessment,
+      commandComment: evaluation.commandJudgment,
+      recommendedAction: createAdministrativeRecommendation("Executive Officer", "Review campaign record", "The campaign has concluded. Staff recommends reviewing the final record or starting a new campaign.", "low", "go_target_board"),
+      alternateActions: [],
+      riskIfIgnored: null
+    };
+  }
+  if (state.campaign.resolutionState === "pending") {
+    const pending = getResolutionPendingWorkSummary(state);
+    return {
+      phaseId: "resolution",
+      phaseLabel: "Resolution Pending",
+      summary: "An end condition has been reached. No new operational orders may be issued while already-committed work finishes.",
+      executiveComment: pending.length > 0
+        ? `Staff is waiting on ${pending.join(", ")} already in motion before the campaign is judged.`
+        : "Staff is waiting on the final consequential paperwork before the campaign is judged.",
+      operationsComment: "Operations is no longer proposing fresh sorties.",
+      intelligenceComment: "Intelligence will file what is already airborne, but will not ask for new collection.",
+      engineeringComment: "Engineering can finish current work, but no new maintenance commitment should begin.",
+      personnelComment: "Personnel matters may still be reviewed while the final picture settles.",
+      commandComment: "Higher command is awaiting the final accounting rather than another plan.",
+      recommendedAction: createAdministrativeRecommendation("Executive Officer", "Review the current record", "Use the remaining time to review the latest debriefs, aircraft state, and campaign record while committed work settles.", "normal", "go_debrief"),
+      alternateActions: [
+        createAdministrativeRecommendation("Engineering Officer", "Review Maintenance", "Inspect ongoing repair and recovery work already in train.", "low", "go_maintenance"),
+        createAdministrativeRecommendation("Intelligence Officer", "Review Recon", "Track the last intelligence already committed to the air.", "low", "go_recon")
+      ],
+      riskIfIgnored: null
+    };
+  }
+  const phaseId = state.campaign.campaignPhaseId;
+  const phaseLabel = getCampaignPhaseLabel(phaseId);
   const directive = state.campaign.directiveState;
-  const target = findPreferredOperationalTarget(state, phase.phaseId);
+  const target = findPreferredOperationalTarget(state, phaseId);
   const latestDebrief = getLatestDebriefMission(state);
   const activeRecon = getActiveRecon(state);
   const available = countAvailableAircraft(state);
   const marginal = countMarginalAircraft(state);
   const crisis = hasReadinessCrisis(state);
   const latestLedger = state.campaign.consequenceLedger[0] ?? null;
-  const recs = chooseConferenceRecommendations(state, phase.phaseId);
+  const recs = chooseConferenceRecommendations(state, phaseId);
   const recommended = sanitizeConferenceRecommendation(state, recs.recommended);
   const alternates = recs.alternates.map((entry) => sanitizeConferenceRecommendation(state, entry)).slice(0, 3);
   const summary =
-    phase.phaseId === "opening_assessment"
+    phaseId === "opening"
       ? "The group is still finding its footing. Staff wants the first operation to teach something useful without squandering the squadron."
-      : phase.phaseId === "crisis_recovery"
+      : phaseId === "crisis"
         ? "Readiness has become the main story. Staff is arguing about how much risk the group can absorb before it starts breaking itself."
-        : phase.phaseId === "fighter_pressure"
+        : phaseId === "pressure"
           ? "The immediate fighter picture still shapes every larger decision. Staff is weighing whether to soften that problem before anything ambitious."
-        : phase.phaseId === "bremen_preparation"
-            ? "The board is turning toward Bremen, but staff is split on whether to prepare the strike or commit directly."
-          : phase.phaseId === "direct_strike_pressure"
+        : phaseId === "opportunity"
+            ? "Staff believes a temporary opening exists. The question is whether to exploit it now, confirm it, or let it pass."
+          : phaseId === "commitment"
               ? "Command wants clearer direct progress now, even if some departments would rather keep shaping the problem."
               : latestLedger
                 ? `${latestLedger.staffRead} ${latestLedger.recommendedPosture}`
@@ -4735,8 +6010,10 @@ export function getStaffConference(state: SaveState): StaffConference {
     : "So basically: we need a sane next move that matches what the squadron can actually sustain.";
   const operationsComment = crisis
     ? "Operations can still sketch reduced options, but it does not believe the group is ready for a confident full effort."
-    : phase.phaseId === "direct_strike_pressure"
+    : phaseId === "commitment"
       ? "Operations believes a direct strike can be flown if the board accepts the remaining uncertainty."
+      : phaseId === "opportunity"
+        ? "Operations believes the board should exploit the current opening before the enemy restores the old pattern."
       : latestLedger
         ? `Operations reads the present posture this way: ${latestLedger.recommendedPosture.toLowerCase()}`
       : target
@@ -4770,8 +6047,8 @@ export function getStaffConference(state: SaveState): StaffConference {
       : "Command Liaison says the board still has room to choose the next move deliberately, provided it looks purposeful.";
 
   return {
-    phaseId: phase.phaseId,
-    phaseLabel: phase.phaseLabel,
+    phaseId,
+    phaseLabel,
     summary,
     executiveComment,
     operationsComment,
