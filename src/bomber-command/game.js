@@ -762,8 +762,9 @@ function maybeCreateOpportunity(state, kind, description, sourceTargetId, relate
     const existing = state.campaign.opportunities.find((opportunity) => opportunity.kind === kind && opportunity.relatedTargetId === relatedTargetId && opportunity.state !== "resolved");
     if (existing) {
         existing.state = "active";
-        existing.fadingStartsDay = Math.min(existing.fadingStartsDay ?? Number.MAX_SAFE_INTEGER, state.campaign.currentDay + Math.max(0, fadesAfterBeatDelta - 1));
-        existing.fadingStartsBeat = Math.min(existing.fadingStartsBeat ?? Number.MAX_SAFE_INTEGER, state.campaign.operationalBeat + Math.max(0, fadesAfterBeatDelta - 1));
+        existing.fadingStartsDay = null;
+        existing.fadesAfterDay = null;
+        existing.fadingStartsBeat = state.campaign.operationalBeat + Math.max(0, fadesAfterBeatDelta - 1);
         existing.fadesAfterBeat = state.campaign.operationalBeat + fadesAfterBeatDelta;
         existing.description = description;
         existing.sourceTargetId = sourceTargetId;
@@ -815,11 +816,20 @@ export function isOpportunityUsable(opportunity, state) {
         && (opportunity.state === "active" || opportunity.state === "fading")
         && !opportunityExpiryReached(opportunity, state);
 }
-export function doesOperationExploitOpportunity(opportunity, targetId, operationType, routeRisk) {
+function isRepairNetworkBenefitTarget(target) {
+    return Boolean(target && target.hiddenActualCondition < 85);
+}
+export function doesOperationExploitOpportunity(state, opportunity, targetId, operationType, routeRisk) {
     const targetMatch = opportunity.beneficiaryTargetIds.length === 0 || opportunity.beneficiaryTargetIds.includes(targetId);
     const operationMatch = opportunity.eligibleOperationTypes.length === 0 || opportunity.eligibleOperationTypes.includes(operationType);
     const routeMatch = opportunity.eligibleRouteRisks.length === 0 || opportunity.eligibleRouteRisks.includes(routeRisk);
-    return targetMatch && operationMatch && routeMatch;
+    if (!targetMatch || !operationMatch || !routeMatch) {
+        return false;
+    }
+    if (opportunity.kind === "repair_network_slowed") {
+        return isRepairNetworkBenefitTarget(getTargetById(state, targetId));
+    }
+    return true;
 }
 export function getPrimaryUsableOpportunity(state) {
     return state.campaign.opportunities.find((opportunity) => isOpportunityUsable(opportunity, state)) ?? null;
@@ -847,9 +857,13 @@ function recordOpportunityDisposition(state, opportunity, disposition, reason, n
                 ? "Opportunity surrendered"
                 : "Opportunity resolved", reason, now, opportunity.relatedTargetId, opportunity.relatedHookIds);
 }
-function markOpportunityUseOnLaunch(state, targetId, operationType, routeRisk, now) {
-    for (const opportunity of state.campaign.opportunities.filter((entry) => isOpportunityUsable(entry, state))) {
-        if (doesOperationExploitOpportunity(opportunity, targetId, operationType, routeRisk)) {
+function markSelectedOpportunitiesExploited(state, mission, now) {
+    for (const opportunityId of mission.campaignContext?.selectedOpportunityIds ?? []) {
+        const opportunity = state.campaign.opportunities.find((entry) => entry.id === opportunityId);
+        if (!opportunity || !isOpportunityUsable(opportunity, state)) {
+            continue;
+        }
+        if (doesOperationExploitOpportunity(state, opportunity, mission.plan.targetId, mission.plan.operationType, mission.plan.routeRisk)) {
             recordOpportunityDisposition(state, opportunity, "exploited", "A relevant operation was launched before the opening faded.", now);
         }
     }
@@ -902,16 +916,26 @@ function getActiveOpportunityBenefitsForTarget(state, targetId) {
     return state.campaign.opportunities.filter((opportunity) => isOpportunityUsable(opportunity, state)
         && (opportunity.beneficiaryTargetIds.length === 0 || opportunity.beneficiaryTargetIds.includes(targetId)));
 }
+const OPPORTUNITY_INFLUENCE_PRIORITY = {
+    warning_coordination_disrupted: 0,
+    fighter_response_softened: 1,
+    repair_network_slowed: 2
+};
 function buildMissionCampaignContext(state, target, operationType, routeRisk) {
-    const selectedOpportunities = getActiveOpportunityBenefitsForTarget(state, target.id)
-        .filter((opportunity) => doesOperationExploitOpportunity(opportunity, target.id, operationType, routeRisk))
-        .slice(0, 2);
-    const hooks = selectRelevantHooks(state, {
-        targetId: target.id,
-        allowEvidenceUnknown: true,
-        limit: Math.max(0, 2 - selectedOpportunities.length)
-    });
     const repeatedTarget = state.missions.some((mission) => mission.debriefGenerated && mission.hiddenOutcome.attackedTargetId === target.id);
+    const repeatHook = repeatedTarget
+        ? selectRelevantHooks(state, {
+            targetId: target.id,
+            allowEvidenceUnknown: true,
+            limit: 1,
+            hookTypes: ["repeat_attack_alert"]
+        })[0] ?? null
+        : null;
+    const candidateOpportunities = getActiveOpportunityBenefitsForTarget(state, target.id)
+        .filter((opportunity) => doesOperationExploitOpportunity(state, opportunity, target.id, operationType, routeRisk))
+        .sort((left, right) => (OPPORTUNITY_INFLUENCE_PRIORITY[left.kind] ?? Number.MAX_SAFE_INTEGER) - (OPPORTUNITY_INFLUENCE_PRIORITY[right.kind] ?? Number.MAX_SAFE_INTEGER)
+        || left.createdAt - right.createdAt
+        || left.id.localeCompare(right.id));
     const context = {
         contextVersion: 1,
         enemyProfileLabel: state.campaign.profile.enemyResponse.codeName,
@@ -924,8 +948,8 @@ function buildMissionCampaignContext(state, target, operationType, routeRisk) {
             repeatAttackSensitivity: state.campaign.profile.enemyResponse.repeatAttackSensitivity,
             opportunityDecay: state.campaign.profile.enemyResponse.opportunityDecay
         },
-        selectedHookIds: hooks.map((hook) => hook.id),
-        selectedOpportunityIds: selectedOpportunities.map((opportunity) => opportunity.id),
+        selectedHookIds: [],
+        selectedOpportunityIds: [],
         riskModifiers: [],
         reportModifiers: [],
         repeatedTarget,
@@ -942,23 +966,40 @@ function buildMissionCampaignContext(state, target, operationType, routeRisk) {
     };
     addRisk("interception_bias", Math.round((context.profileTraits.interceptionBias - 1) * 18), "Enemy response profile");
     addRisk("route_pressure", Math.round((state.campaign.directiveState.warningCoordination - 50) / 8), "Current warning coordination");
-    if (selectedOpportunities.some((opportunity) => opportunity.kind === "fighter_response_softened")) {
-        addRisk("fighter_response_softened", -8, "Earlier pressure appears to have softened fighter response.");
-        addReport("fighter_response_softened", 1, "Crews may meet a slower and less concentrated response.");
+    let influenceSlotsRemaining = 2;
+    for (const opportunity of candidateOpportunities) {
+        if (influenceSlotsRemaining <= 0) {
+            break;
+        }
+        if (opportunity.kind === "fighter_response_softened") {
+            addRisk("fighter_response_softened", -8, "Earlier pressure appears to have softened fighter response.");
+            addReport("fighter_response_softened", 1, "Crews may meet a slower and less concentrated response.");
+            context.selectedOpportunityIds.push(opportunity.id);
+            influenceSlotsRemaining -= 1;
+            continue;
+        }
+        if (opportunity.kind === "warning_coordination_disrupted") {
+            addRisk("warning_coordination_disrupted", routeRisk === "direct" || operationType === "main_strike" ? -9 : -5, "Radar disruption may weaken warning coordination.");
+            addReport("warning_coordination_disrupted", 1, "Interception may be less coordinated than staff feared.");
+            context.selectedOpportunityIds.push(opportunity.id);
+            influenceSlotsRemaining -= 1;
+            continue;
+        }
+        if (opportunity.kind === "repair_network_slowed") {
+            addRisk("repair_network_slowed", -2, "Earlier disruption may be holding older damage in place.");
+            addReport("repair_network_slowed", 1, "Older damage may be holding longer than expected.");
+            context.selectedOpportunityIds.push(opportunity.id);
+            influenceSlotsRemaining -= 1;
+        }
     }
-    if (selectedOpportunities.some((opportunity) => opportunity.kind === "warning_coordination_disrupted")) {
-        addRisk("warning_coordination_disrupted", routeRisk === "direct" || operationType === "main_strike" ? -9 : -5, "Radar disruption may weaken warning coordination.");
-        addReport("warning_coordination_disrupted", 1, "Interception may be less coordinated than staff feared.");
-    }
-    if (selectedOpportunities.some((opportunity) => opportunity.kind === "repair_network_slowed") && target.hiddenActualCondition < 85) {
-        addRisk("repair_network_slowed", -2, "Earlier disruption may be holding older damage in place.");
-        addReport("repair_network_slowed", 1, "Older damage may be holding longer than expected.");
-    }
-    if (repeatedTarget) {
+    if (repeatHook && influenceSlotsRemaining > 0) {
         const repeatRisk = Math.round((context.profileTraits.repeatAttackSensitivity + context.profileTraits.adaptationBias - 2) * 10) + 4;
-        addRisk("repeat_attack_alert", repeatRisk, "Enemy defenses may be adapting to repeated visits.");
-        addReport("repeat_attack_alert", 1, "Defenses may be unusually alert to another visit.");
-        context.adaptationRiskApplied = repeatRisk > 0;
+        if (repeatRisk !== 0) {
+            addRisk("repeat_attack_alert", repeatRisk, "Enemy defenses may be adapting to repeated visits.");
+            addReport("repeat_attack_alert", 1, "Defenses may be unusually alert to another visit.");
+            context.selectedHookIds.push(repeatHook.id);
+            context.adaptationRiskApplied = repeatRisk > 0;
+        }
     }
     return context;
 }
@@ -3391,7 +3432,7 @@ export function launchMission(state, now) {
     if (!mission) {
         return "Mission could not be created.";
     }
-    markOpportunityUseOnLaunch(state, mission.plan.targetId, mission.plan.operationType, mission.plan.routeRisk, now);
+    markSelectedOpportunitiesExploited(state, mission, now);
     state.missions.unshift(mission);
     state.campaign.activeMissionId = mission.id;
     state.campaign.campaignPhase = mission.plan.status === "scheduled"
@@ -4989,15 +5030,13 @@ function createOperationalRecommendation(state, title, body, urgency, target, op
     });
 }
 function buildOpportunityRecommendation(state, opportunity) {
-    const beneficiary = opportunity.beneficiaryTargetIds
-        .map((targetId) => getTargetById(state, targetId))
-        .find((target) => Boolean(target));
-    if (!beneficiary) {
-        return null;
-    }
     const operationType = opportunity.eligibleOperationTypes[0] ?? "follow_up_attack";
     const routeRisk = opportunity.eligibleRouteRisks[0] ?? "standard";
-    if (!doesOperationExploitOpportunity(opportunity, beneficiary.id, operationType, routeRisk)) {
+    const beneficiary = opportunity.beneficiaryTargetIds
+        .map((targetId) => getTargetById(state, targetId))
+        .filter((target) => Boolean(target))
+        .find((target) => doesOperationExploitOpportunity(state, opportunity, target.id, operationType, routeRisk));
+    if (!beneficiary) {
         return null;
     }
     const title = opportunity.kind === "fighter_response_softened"
