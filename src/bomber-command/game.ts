@@ -15,6 +15,10 @@ import type {
   CampaignResolutionState,
   CampaignTab,
   CampaignSpinePhase,
+  CommandBrief,
+  CommandBriefAction,
+  CommandBriefDecision,
+  CommandBriefDelta,
   CrewExperience,
   CrewFatigue,
   CrewMember,
@@ -56,11 +60,12 @@ import type {
   TimeAdvanceKind,
   TutorialStepDisplay,
   TutorialStepId,
+  UiReadState,
   UiNotification
 } from "./types";
 
 export const SAVE_KEY = "bomber-command-save-v1";
-export const SAVE_VERSION = 11;
+export const SAVE_VERSION = 12;
 
 const SHORT_MISSION_MS = 5 * 60 * 1000;
 const MAJOR_MISSION_MS = 10 * 60 * 1000;
@@ -261,44 +266,33 @@ const TAB_LABELS: Record<CampaignTab, string> = {
 const TUTORIAL_STEPS: TutorialStepDefinition[] = [
   {
     id: "welcome",
-    title: "Welcome to the First Operation",
-    body: "Start on Command, then move to Target Board and Mission Planning. Pick one target, assign serviceable aircraft, and launch a first strike so the operation loop can begin.",
+    title: "Opening Decision",
+    body: "Your first question is whether to weaken fighter resistance at Jever or pursue direct progress at Bremen. Staff recommends Jever, but both are valid.",
     suggestedTab: "command",
     trigger: (state) => state.missions.length === 0 && state.campaign.currentDay === 1
   },
   {
     id: "planning-basics",
-    title: "Build a Mission Plan",
-    body: "On Mission Planning, confirm target, route risk, doctrine, and lead aircraft. Lead quality and route choice strongly affect the hidden mission risk profile.",
+    title: "Planning",
+    body: "Staff has prepared a launchable Jever order. Review the proposed order, expand advanced controls only when needed, then launch.",
     suggestedTab: "mission-planning",
     prerequisites: ["welcome"],
     trigger: (state) => state.missions.length === 0 && state.campaign.activeMissionId === null
   },
   {
     id: "mission-launched",
-    title: "Operation Launched",
-    body: "Reports now arrive over time. Use Current Operation to watch stage updates, or use wait controls to jump to the next report when testing.",
+    title: "Mission Underway",
+    body: "Reports are fragmentary. No new strategic decision is required until debrief.",
     suggestedTab: "current-operation",
     prerequisites: ["planning-basics"],
     trigger: (state) => Boolean(getActiveMission(state))
   },
   {
-    id: "mission-reporting",
-    title: "Read Incoming Reports",
-    body: "Mission events are revealed in sequence. Early reports can be fragmentary, so wait for debrief before committing to major follow-up decisions.",
-    suggestedTab: "current-operation",
-    prerequisites: ["mission-launched"],
-    trigger: (state) => {
-      const mission = getActiveMission(state);
-      return Boolean(mission && mission.reports.length > 0);
-    }
-  },
-  {
     id: "debrief-review",
-    title: "Debrief Is Ready",
-    body: "Review Debrief / Assessment now. This is where target effect, aircraft status, and crew casualties are consolidated for your next order.",
+    title: "Debrief",
+    body: "Review what changed, what it cost, and what remains uncertain.",
     suggestedTab: "debrief",
-    prerequisites: ["mission-reporting"],
+    prerequisites: ["mission-launched"],
     trigger: (state) => state.campaign.lastDebriefMissionId !== null
   },
   {
@@ -307,46 +301,41 @@ const TUTORIAL_STEPS: TutorialStepDefinition[] = [
     body: "After each debrief, inspect Maintenance for damaged or diverted aircraft. Start repairs quickly to restore sortie capacity for the next operation.",
     suggestedTab: "maintenance",
     prerequisites: ["debrief-review"],
-    trigger: (state) => state.aircraft.some((aircraft) => aircraft.status === "damaged" || aircraft.status === "diverted")
+    trigger: (state) => state.tutorial.firstLoopCompleted && state.aircraft.some((aircraft) => aircraft.status === "damaged" || aircraft.status === "diverted")
   },
   {
     id: "recon-follow-up",
-    title: "Order Post-Strike Recon",
-    body: "A follow-up recon helps confirm target condition and updates confidence. Recon is valuable before committing to another strike on the same target.",
+    title: "Recon Underway",
+    body: "Recon is already in motion. Let the sortie finish and review the interpretation before hardening the next decision.",
     suggestedTab: "recon",
     prerequisites: ["debrief-review"],
-    trigger: (state) => state.campaign.lastDebriefMissionId !== null && state.reconMissions.length === 0 && !state.campaign.activeReconId
+    trigger: (state) => state.tutorial.firstLoopCompleted && state.campaign.activeReconId !== null
   },
   {
     id: "recon-results",
     title: "Use Recon Interpretation",
     body: "Recon interpretation is now filed. Re-check target confidence, defense outlook, and alert level before selecting your next operation profile.",
-    suggestedTab: "target-board",
+    suggestedTab: "recon",
     prerequisites: ["recon-follow-up"],
-    trigger: (state) => state.campaign.latestIntelUpdate !== null
-  },
-  {
-    id: "advance-day",
-    title: "Advance the Campaign Day",
-    body: "When no immediate action is pending, advance day to accrue rest and continue campaign tempo. Avoid long idle gaps if command patience is slipping.",
-    suggestedTab: "command",
-    prerequisites: ["debrief-review"],
-    trigger: (state) => state.campaign.lastDebriefMissionId !== null && state.campaign.currentDay === 1 && !state.campaign.activeMissionId
+    trigger: (state) => {
+      const latestRecon = getLatestCompletedRecon(state);
+      return Boolean(latestRecon && state.uiReadState.lastViewedReconId !== latestRecon.id);
+    }
   },
   {
     id: "first-loop-complete",
-    title: "First Loop Complete",
-    body: "You have completed the core loop: plan, launch, debrief, and follow-up decisions. Continue cycling missions while balancing fatigue, repairs, recon, and directive pressure.",
+    title: "Follow-Up",
+    body: "Choose whether to exploit, confirm with recon, repair or recover, redirect, or stand down.",
     suggestedTab: "command",
-    prerequisites: ["advance-day"],
-    trigger: (state) => state.campaign.currentDay > 1 && state.missions.some((mission) => mission.debriefGenerated)
+    prerequisites: ["debrief-review"],
+    trigger: (state) => state.missions.some((mission) => mission.debriefGenerated)
   },
   {
     id: "personnel-decisions",
     title: "Personnel Decision Pending",
     body: "A recovered original crew member can reclaim a seat from a temporary replacement. Resolve the personnel decision to stabilize crew cohesion.",
     suggestedTab: "aircraft-crews",
-    prerequisites: ["debrief-review"],
+    prerequisites: ["first-loop-complete"],
     trigger: (state) => state.campaign.personnelDecisions.some((decision) => !decision.resolved)
   },
   {
@@ -354,7 +343,7 @@ const TUTORIAL_STEPS: TutorialStepDefinition[] = [
     title: "Replacement Crew in Use",
     body: "Replacements keep aircraft flying, but too many substitutions can strain cohesion. Keep an eye on role coverage and fatigue before launch.",
     suggestedTab: "aircraft-crews",
-    prerequisites: ["debrief-review"],
+    prerequisites: ["first-loop-complete"],
     trigger: (state) => state.crewMembers.some((member) => member.isReplacement && member.assignedAircraftId !== null)
   },
   {
@@ -381,6 +370,17 @@ function createInitialTutorialState(): SaveState["tutorial"] {
   };
 }
 
+function createInitialUiReadState(now: number): UiReadState {
+  return {
+    lastViewedCommandUpdateAt: now,
+    lastViewedDebriefMissionId: null,
+    lastViewedReconId: null,
+    lastViewedTargetChangeAt: now,
+    lastViewedMaintenanceAt: now,
+    lastViewedPersonnelDecisionAt: now
+  };
+}
+
 function hasCompletedTutorialStep(state: SaveState, stepId: TutorialStepId): boolean {
   return state.tutorial.completedStepIds.includes(stepId);
 }
@@ -393,7 +393,7 @@ function prerequisitesMet(state: SaveState, step: TutorialStepDefinition): boole
 }
 
 function updateFirstLoopTutorialFlag(state: SaveState): boolean {
-  const shouldBeComplete = state.campaign.currentDay > 1 && state.missions.some((mission) => mission.debriefGenerated);
+  const shouldBeComplete = state.missions.some((mission) => mission.debriefGenerated);
   if (state.tutorial.firstLoopCompleted === shouldBeComplete) {
     return false;
   }
@@ -2167,6 +2167,7 @@ export function createNewGame(now: number): SaveState {
     notifications: [] as UiNotification[],
     planning: createPlanningState("target-1"),
     tutorial: createInitialTutorialState(),
+    uiReadState: createInitialUiReadState(now),
     debug: {
       showHiddenValues: false,
       clockOffsetMs: 0
@@ -2418,6 +2419,17 @@ function migrateLegacyState(parsed: Partial<SaveState>): SaveState {
   state.tutorial.completedStepIds ??= [];
   state.tutorial.firstLoopCompleted ??= false;
   state.tutorial.suppressModalUntilAt ??= null;
+  state.uiReadState ??= createInitialUiReadState(state.lastReconciledAt ?? Date.now());
+  state.uiReadState.lastViewedCommandUpdateAt ??= state.campaign.consequenceLedger[0]?.createdAt ?? state.lastReconciledAt ?? Date.now();
+  state.uiReadState.lastViewedDebriefMissionId ??= state.campaign.lastDebriefMissionId ?? null;
+  state.uiReadState.lastViewedReconId ??= getLatestCompletedRecon(state)?.id ?? null;
+  state.uiReadState.lastViewedTargetChangeAt ??= state.targets.reduce((latest, target) => Math.max(latest, target.latestIntelUpdatedAt ?? target.lastDebriefAt ?? target.lastMissionAt ?? 0), 0) || state.lastReconciledAt;
+  state.uiReadState.lastViewedMaintenanceAt ??= Math.max(
+    ...state.repairJobs.filter((job) => job.completionApplied).map((job) => job.completesAt),
+    ...state.recoveryJobs.filter((job) => job.completionApplied).map((job) => job.completesAt),
+    state.lastReconciledAt
+  );
+  state.uiReadState.lastViewedPersonnelDecisionAt ??= state.campaign.personnelDecisions[state.campaign.personnelDecisions.length - 1]?.createdAt ?? state.lastReconciledAt;
   state.tutorial.completedStepIds = state.tutorial.completedStepIds.filter((stepId) => TUTORIAL_STEP_MAP.has(stepId));
   if (state.tutorial.activeStepId && !TUTORIAL_STEP_MAP.has(state.tutorial.activeStepId)) {
     state.tutorial.activeStepId = null;
@@ -2854,8 +2866,48 @@ function getActiveFieldJobForGroundCrew(state: SaveState, groundCrewId: string):
     ?? state.recoveryJobs.find((job) => job.groundCrewId === groundCrewId && !job.completionApplied);
 }
 
+function getLatestCommandUpdateAt(state: SaveState): number {
+  return Math.max(
+    state.campaign.consequenceLedger[0]?.createdAt ?? 0,
+    state.campaign.latestIntelUpdate?.updatedAt ?? 0,
+    state.campaign.events[0]?.createdAt ?? 0,
+    state.campaign.pendingDecisions.length > 0 ? state.lastReconciledAt : 0
+  );
+}
+
+function acknowledgeTabView(state: SaveState, tab: CampaignTab): void {
+  const now = getEffectiveNow(state);
+  switch (tab) {
+    case "command":
+      state.uiReadState.lastViewedCommandUpdateAt = getLatestCommandUpdateAt(state) || now;
+      break;
+    case "debrief":
+      state.uiReadState.lastViewedDebriefMissionId = getLatestDebriefMission(state)?.id ?? state.uiReadState.lastViewedDebriefMissionId;
+      break;
+    case "recon":
+      state.uiReadState.lastViewedReconId = getLatestCompletedRecon(state)?.id ?? state.uiReadState.lastViewedReconId;
+      break;
+    case "target-board":
+      state.uiReadState.lastViewedTargetChangeAt = Math.max(
+        ...state.targets.map((target) => target.latestIntelUpdatedAt ?? target.lastDebriefAt ?? target.lastMissionAt ?? 0),
+        now
+      );
+      break;
+    case "maintenance":
+      state.uiReadState.lastViewedMaintenanceAt = now;
+      break;
+    case "aircraft-crews":
+      state.uiReadState.lastViewedPersonnelDecisionAt = now;
+      break;
+  }
+}
+
 export function setSelectedTab(state: SaveState, tab: CampaignTab): void {
   state.selectedTab = tab;
+}
+
+export function acknowledgeVisibleTab(state: SaveState, tab: CampaignTab): void {
+  acknowledgeTabView(state, tab);
 }
 
 export function setPlanningTarget(state: SaveState, targetId: string): void {
@@ -3120,6 +3172,117 @@ export function getTargetIntelAgeLabel(state: SaveState, targetId: string): stri
   return target ? currentIntelAge(state, target) : "unknown";
 }
 
+export function getQualitativeAgeLabel(state: SaveState, timestamp: number | null): string {
+  if (!timestamp) {
+    return "no recent filing";
+  }
+  const diff = Math.max(0, getEffectiveNow(state) - timestamp);
+  if (diff < 60 * 60 * 1000) {
+    return "moments ago";
+  }
+  if (diff < 12 * 60 * 60 * 1000) {
+    return "earlier today";
+  }
+  if (diff < DAY_MS) {
+    return "yesterday";
+  }
+  if (diff < 2 * DAY_MS) {
+    return "two days ago";
+  }
+  return "several days old";
+}
+
+function isOptionalInspectionCandidate(state: SaveState, aircraftId: string): boolean {
+  const aircraft = getAircraftById(state, aircraftId);
+  return Boolean(
+    aircraft
+    && aircraft.status === "serviceable"
+    && !aircraft.repairJobId
+    && !aircraft.recoveryJobId
+    && aircraft.hiddenCondition < 70
+  );
+}
+
+export function getAircraftReadinessSummary(state: SaveState, aircraftId: string): {
+  airframe: string;
+  crew: string;
+  tasking: string;
+  primaryReason: string;
+  optionalMaintenance: boolean;
+} {
+  const aircraft = getAircraftById(state, aircraftId);
+  if (!aircraft) {
+    return {
+      airframe: "unknown",
+      crew: "unknown",
+      tasking: "unavailable",
+      primaryReason: "Aircraft record missing.",
+      optionalMaintenance: false
+    };
+  }
+
+  const availability = getAircraftAvailability(state, aircraftId);
+  const manifest = getCrewMembersForAircraft(state, aircraftId);
+  const coverageProblems = getRoleCoverageProblems(state, aircraftId);
+  const tiredCount = manifest.filter((member) => member.fatigue === "tired" || member.fatigue === "exhausted").length;
+  const replacementKeyCrew = manifest.filter((member) =>
+    member.isReplacement && ["pilot", "copilot", "navigator", "bombardier"].includes(member.currentAssignmentRole ?? "")
+  ).length;
+
+  let airframe = "Sound";
+  if (aircraft.status === "lost") {
+    airframe = "Lost";
+  } else if (aircraft.status === "under_repair" || aircraft.repairJobId) {
+    airframe = "Under repair";
+  } else if (aircraft.status === "diverted" || aircraft.recoveryJobId) {
+    airframe = "Away after diversion";
+  } else if (aircraft.status === "damaged") {
+    airframe = "Damaged / repair required";
+  } else if (aircraft.hiddenCondition < 70) {
+    airframe = "Serviceable but worn / optional inspection";
+  } else if (aircraft.hiddenCondition < 80) {
+    airframe = "Usable with concern";
+  }
+
+  let crew = "Fully covered";
+  if (coverageProblems.length > 0) {
+    const problem = coverageProblems[0]!;
+    crew = problem.hasConflict
+      ? `${roleLabel(problem.role)} assignment conflict`
+      : `Missing required ${roleLabel(problem.role)}`;
+  } else if (manifest.some((member) => member.status === "seriously_wounded")) {
+    const wounded = manifest.find((member) => member.status === "seriously_wounded")!;
+    crew = `Required crew member unfit: ${roleLabel(wounded.currentAssignmentRole ?? wounded.role as CrewRole)}`;
+  } else if (replacementKeyCrew > 0) {
+    crew = "Replacement coverage";
+  } else if (tiredCount >= 3) {
+    crew = "Fatigued";
+  }
+
+  let tasking = "Available";
+  if (aircraft.status === "under_repair" || aircraft.repairJobId) {
+    tasking = "Unavailable";
+  } else if (aircraft.status === "lost") {
+    tasking = "Unavailable";
+  } else if (aircraft.status === "diverted" || aircraft.recoveryJobId) {
+    tasking = "Unavailable";
+  } else if (state.campaign.activeMissionId && state.missions.some((mission) => mission.status !== "complete" && mission.plan.assignedAircraftIds.includes(aircraftId))) {
+    tasking = "Airborne";
+  } else if (availability.level === "marginal") {
+    tasking = "Marginal";
+  } else if (availability.level === "unavailable") {
+    tasking = "Unavailable";
+  }
+
+  return {
+    airframe,
+    crew,
+    tasking,
+    primaryReason: `${availability.label} - ${availability.reason}.`,
+    optionalMaintenance: isOptionalInspectionCandidate(state, aircraftId)
+  };
+}
+
 function countMissingGunners(state: SaveState, aircraftId: string): number {
   return [
     "ball_turret",
@@ -3182,8 +3345,10 @@ export function getAircraftAvailability(state: SaveState, aircraftId: string): A
   if (missingGunners >= 2) {
     warnings.push(`${missingGunners} gunner positions are compromised.`);
   }
-  if (aircraft.hiddenCondition < 70 || aircraft.status === "damaged") {
+  if (aircraft.status === "damaged") {
     warnings.push("Maintenance considers the aircraft only marginally fit.");
+  } else if (isOptionalInspectionCandidate(state, aircraftId)) {
+    warnings.push("Airframe is worn enough to benefit from optional inspection.");
   }
   const manifest = getCrewMembersForAircraft(state, aircraftId);
   const tiredCount = manifest.filter((member) => member.fatigue === "tired" || member.fatigue === "exhausted").length;
@@ -3966,7 +4131,7 @@ export function launchMission(state: SaveState, now: number): string | null {
   state.campaign.commandStanding = "High command expects a useful result, but the details will remain uncertain for some time.";
   state.campaign.pendingDecisions = ["Await timed reports and the returning crews."];
   syncPendingDecisionNotes(state);
-  state.selectedTab = "current-operation";
+  setSelectedTab(state, "current-operation");
   const target = getTargetById(state, mission.plan.targetId);
   addLog(
     state,
@@ -4490,8 +4655,21 @@ export function startRepair(state: SaveState, aircraftId: string, tier: RepairTi
   if (aircraft.repairJobId) {
     return "Aircraft already under repair.";
   }
-  if (aircraft.status !== "damaged") {
-    return "No damaged aircraft selected.";
+  if (aircraft.status === "lost") {
+    return "Lost aircraft cannot be repaired.";
+  }
+  if (aircraft.status === "diverted" || aircraft.recoveryJobId) {
+    return "Aircraft away after diversion must be recovered before maintenance begins.";
+  }
+  if (state.campaign.activeMissionId && state.missions.some((mission) => mission.status !== "complete" && mission.plan.assignedAircraftIds.includes(aircraftId))) {
+    return "Airborne aircraft cannot begin maintenance.";
+  }
+  const optionalInspection = isOptionalInspectionCandidate(state, aircraftId);
+  if (aircraft.status !== "damaged" && !optionalInspection) {
+    return "This aircraft does not currently require repair or optional inspection.";
+  }
+  if (optionalInspection && tier !== "thorough") {
+    return "Optional preventive inspection only allows the thorough inspection setting.";
   }
   const groundCrew = getGroundCrewById(state, aircraft.assignedGroundCrewId);
   if (!groundCrew) {
@@ -4510,7 +4688,9 @@ export function startRepair(state: SaveState, aircraftId: string, tier: RepairTi
   const hiddenNewCondition = clamp(aircraft.hiddenCondition + (tier === "patch" ? 13 : tier === "standard" ? 22 : 30), 36, 96);
   const hiddenNewStatus: Aircraft["status"] = hiddenNewCondition >= 72 ? "serviceable" : "damaged";
   const resultText =
-    tier === "patch"
+    optionalInspection
+      ? `${aircraft.name} has completed optional preventive inspection work and is considered steadier than before.`
+      : tier === "patch"
       ? `${aircraft.name} has received a quick patch. Maintenance will allow it back only with reservations.`
       : tier === "standard"
         ? `${aircraft.name} has completed a standard repair cycle and is believed fit enough for use.`
@@ -4524,7 +4704,9 @@ export function startRepair(state: SaveState, aircraftId: string, tier: RepairTi
     completesAt: Math.round(now + duration),
     status: "in_progress",
     riskNote:
-      tier === "patch"
+      optionalInspection
+        ? "Optional preventive work. The aircraft may still have flown, but engineering will tie up the crew to steady it before the next order."
+        : tier === "patch"
         ? "Fastest option. A patch may return the aircraft sooner, but engineering will not call it fully trusted."
         : tier === "standard"
           ? "Balanced turnround. This will occupy the ground crew for the normal field cycle."
@@ -4535,7 +4717,9 @@ export function startRepair(state: SaveState, aircraftId: string, tier: RepairTi
     hiddenNewStatus,
     hiddenConditionSummary: conditionSummary(hiddenNewCondition, hiddenNewStatus),
     hiddenDamageNote:
-      tier === "patch"
+      optionalInspection
+        ? "Optional preventive inspection completed on a worn but serviceable aircraft."
+        : tier === "patch"
         ? "Quick patch completed; maintenance still distrusts the deeper structure."
         : tier === "standard"
           ? "Standard repair completed after post-mission damage."
@@ -4544,7 +4728,7 @@ export function startRepair(state: SaveState, aircraftId: string, tier: RepairTi
   aircraft.status = "under_repair";
   aircraft.repairJobId = job.id;
   state.repairJobs.unshift(job);
-  addLog(state, `repair-start-${job.id}`, now, "maintenance", `${groundCrew.chiefName} has started ${tier} work on ${aircraft.name}.`);
+  addLog(state, `repair-start-${job.id}`, now, "maintenance", `${groundCrew.chiefName} has started ${optionalInspection ? "optional preventive inspection" : tier} work on ${aircraft.name}.`);
   return null;
 }
 
@@ -5546,6 +5730,405 @@ export function getRecentConsequenceLedger(state: SaveState): ConsequenceLedgerE
   return state.campaign.consequenceLedger.slice(0, 3);
 }
 
+export function getStaffActionLabel(recommendation: StaffRecommendation): string {
+  switch (recommendation.relatedActionType) {
+    case "go_debrief":
+      return "Review Debrief";
+    case "go_maintenance":
+      return "Open Maintenance";
+    case "go_aircraft_crews":
+      return "Resolve Crew Issue";
+    case "go_recon":
+      return "Go to Recon";
+    case "go_target_board":
+      return "Review Target Board";
+    case "go_mission_planning":
+      return "Prepare Recommended Order";
+    case "start_recon":
+      return "Start Recon";
+    case "wait_next_event":
+      return "Wait for Next Report";
+    case "stand_down_morning":
+      return "Stand Down Until Morning";
+    case "let_work_finish":
+      return "Let Current Work Finish";
+    default:
+      return "Use Recommended Plan";
+  }
+}
+
+function getStaffRecommendationExpectedOutcome(recommendation: StaffRecommendation, state: SaveState): string {
+  const target = recommendation.relatedTargetId ? getTargetById(state, recommendation.relatedTargetId) : null;
+  switch (recommendation.relatedActionType) {
+    case "go_debrief":
+      return "Reviewing the debrief should settle what the last operation changed before you commit again.";
+    case "go_maintenance":
+      return "Opening maintenance should show which aircraft can be recovered quickly and which cannot.";
+    case "go_aircraft_crews":
+      return "Resolving the crew issue should restore a usable package or clarify that the group must pause.";
+    case "go_recon":
+    case "start_recon":
+      return target ? `Fresh intelligence on ${target.name} should sharpen the next decision.` : "Fresh intelligence should sharpen the next decision.";
+    case "wait_next_event":
+      return "Waiting should bring the next meaningful report instead of forcing a premature response.";
+    case "stand_down_morning":
+      return "Standing down should recover fatigue and let station-side work progress, though the wider situation will keep moving.";
+    case "let_work_finish":
+      return "Letting work finish should return the current repair, recovery, or interpretation result to the board.";
+    case "go_mission_planning":
+    default:
+      return target ? `The group will have a viable order prepared for ${target.name} rather than starting from scratch.` : "The group will have a viable order prepared instead of starting from scratch.";
+  }
+}
+
+function getStaffRecommendationCost(recommendation: StaffRecommendation, conference: StaffConference, state: SaveState): string {
+  if (conference.riskIfIgnored) {
+    return conference.riskIfIgnored;
+  }
+  switch (recommendation.relatedActionType) {
+    case "wait_next_event":
+      return "You will not influence the situation until the next filing arrives.";
+    case "stand_down_morning":
+      return "You are knowingly allowing time and possible enemy recovery to pass.";
+    case "start_recon":
+    case "go_recon":
+      return "Recon consumes time and may raise alertness without solving the larger problem by itself.";
+    case "go_maintenance":
+      return "Time spent recovering the line does not directly pressure the directive.";
+    case "go_mission_planning":
+      return state.campaign.directiveState.commandPatience < 45
+        ? "The order may still rely on imperfect evidence, but Command wants visible progress soon."
+        : "The order will still carry uncertainty and any aircraft concerns already on file.";
+    default:
+      return "Some uncertainty will remain even after this step.";
+  }
+}
+
+export function getOperationalStatusLabel(state: SaveState): string {
+  if (state.campaign.finalSummaryMode) {
+    return "Campaign Concluded";
+  }
+  if (getLatestDebriefMission(state)?.debriefGenerated && state.uiReadState.lastViewedDebriefMissionId !== getLatestDebriefMission(state)?.id) {
+    return "Debrief Ready";
+  }
+  if (getActiveMission(state)) {
+    return "Operation Underway";
+  }
+  if (getActiveRecon(state)) {
+    return "Recon In Progress";
+  }
+  if (state.aircraft.some((aircraft) => aircraft.status === "damaged" && !aircraft.repairJobId)) {
+    return "Repair Required";
+  }
+  if (state.aircraft.some((aircraft) => {
+    const readiness = getAircraftReadinessSummary(state, aircraft.id);
+    return readiness.crew !== "Fully covered" && readiness.tasking === "Unavailable" && aircraft.status !== "lost";
+  })) {
+    return "Crew Issue";
+  }
+  if (state.aircraft.some((aircraft) => aircraft.status === "diverted" && !aircraft.recoveryJobId)) {
+    return "Recovery Required";
+  }
+  return getOperationalRhythm(state).label;
+}
+
+function getDecisionQuestion(state: SaveState, conference: StaffConference): string {
+  if (getActiveMission(state)) {
+    return "Do we wait for the next report before changing the plan?";
+  }
+  const latestDebrief = getLatestDebriefMission(state);
+  if (latestDebrief?.debriefGenerated && state.uiReadState.lastViewedDebriefMissionId !== latestDebrief.id) {
+    return "What did the last operation change, and what should follow it?";
+  }
+  switch (conference.phaseId) {
+    case "opening":
+      return "Do we soften fighter resistance at Jever first, or strike directly at Bremen?";
+    case "opportunity":
+      return "Do we exploit the temporary opening, confirm it, or let it pass?";
+    case "crisis":
+      return "Do we recover the group now, or accept the risk of another operation?";
+    case "commitment":
+      return "Do we strike Bremen now, or spend another turn preparing?";
+    case "pressure":
+      return "Do we soften fighter resistance first, or accept the risk of a direct strike?";
+    default:
+      return conference.summary;
+  }
+}
+
+export function getCommandDeltaCards(state: SaveState): CommandBriefDelta[] {
+  const deltas: CommandBriefDelta[] = [];
+  const seenReconIds = new Set<string>();
+  const seenMissionIds = new Set<string>();
+  const unreadLedger = state.campaign.consequenceLedger
+    .filter((entry) => entry.createdAt > (state.uiReadState.lastViewedCommandUpdateAt ?? 0))
+    .sort((left, right) => right.createdAt - left.createdAt);
+  for (const entry of unreadLedger) {
+    if (entry.reconId && seenReconIds.has(entry.reconId)) {
+      continue;
+    }
+    if (entry.missionId && seenMissionIds.has(entry.missionId)) {
+      continue;
+    }
+    if (entry.reconId) {
+      seenReconIds.add(entry.reconId);
+    }
+    if (entry.missionId) {
+      seenMissionIds.add(entry.missionId);
+    }
+    deltas.push({
+      id: entry.id,
+      title: entry.title,
+      location: getTargetById(state, entry.targetId ?? "")?.name ?? "Campaign board",
+      filedAt: entry.createdAt,
+      filedLabel: getQualitativeAgeLabel(state, entry.createdAt),
+      whyItMatters: entry.recommendedPosture
+    });
+    if (deltas.length >= 3) {
+      return deltas;
+    }
+  }
+  const latestIntel = state.campaign.latestIntelUpdate;
+  if (latestIntel && latestIntel.updatedAt > (state.uiReadState.lastViewedCommandUpdateAt ?? 0) && !seenReconIds.has(latestIntel.reconId)) {
+    seenReconIds.add(latestIntel.reconId);
+    deltas.push({
+      id: latestIntel.reconId,
+      title: `New intelligence on ${latestIntel.targetName}`,
+      location: latestIntel.targetName,
+      filedAt: latestIntel.updatedAt,
+      filedLabel: getQualitativeAgeLabel(state, latestIntel.updatedAt),
+      whyItMatters: latestIntel.recommendation
+    });
+  }
+  const latestEvent = state.campaign.events[0];
+  const distinctEvent = latestEvent
+    && !/offline return/i.test(latestEvent.body)
+    && (!unreadLedger[0] || latestEvent.relatedTargetId !== unreadLedger[0].targetId || /(opportunity|phase|command)/i.test(latestEvent.kind));
+  if (latestEvent && latestEvent.createdAt > (state.uiReadState.lastViewedCommandUpdateAt ?? 0) && distinctEvent) {
+    deltas.push({
+      id: latestEvent.id,
+      title: latestEvent.title,
+      location: getTargetById(state, latestEvent.relatedTargetId ?? "")?.name ?? "Campaign record",
+      filedAt: latestEvent.createdAt,
+      filedLabel: getQualitativeAgeLabel(state, latestEvent.createdAt),
+      whyItMatters: latestEvent.body
+    });
+  }
+  return deltas.slice(0, 3);
+}
+
+function createActionRequiredItems(state: SaveState): CommandBriefAction[] {
+  const items: CommandBriefAction[] = [];
+  const seenAircraft = new Set<string>();
+  const aircraftWithPersonnelDecision = new Set(
+    state.campaign.personnelDecisions.filter((entry) => !entry.resolved).map((entry) => entry.aircraftId)
+  );
+  const latestDebrief = getLatestDebriefMission(state);
+  if (latestDebrief?.debriefGenerated && state.uiReadState.lastViewedDebriefMissionId !== latestDebrief.id) {
+    items.push({
+      id: `debrief-${latestDebrief.id}`,
+      title: "Debrief awaiting review",
+      detail: `Debrief from ${getTargetById(state, latestDebrief.plan.targetId)?.name ?? "the last operation"} is ready.`,
+      whyItMatters: "It may change the next recommendation.",
+      buttonLabel: "Review Debrief",
+      actionType: "go_debrief",
+      actionPayload: null
+    });
+  }
+  const latestRecon = getLatestCompletedRecon(state);
+  if (latestRecon && state.uiReadState.lastViewedReconId !== latestRecon.id) {
+    items.push({
+      id: `recon-${latestRecon.id}`,
+      title: "Recon interpretation available",
+      detail: `${getTargetById(state, latestRecon.targetId)?.name ?? "Target"} has a fresh interpretation on file.`,
+      whyItMatters: "It may change whether staff wants to exploit, confirm, or redirect.",
+      buttonLabel: "Review Recon",
+      actionType: "go_recon",
+      actionPayload: null
+    });
+  }
+  for (const aircraft of state.aircraft) {
+    if (aircraft.status === "lost" || seenAircraft.has(aircraft.id)) {
+      continue;
+    }
+    const readiness = getAircraftReadinessSummary(state, aircraft.id);
+    const roleProblems = getRoleCoverageProblems(state, aircraft.id);
+    const requiredRoleProblem = roleProblems.some((problem) => REQUIRED_ROLES.includes(problem.role));
+    const seriousRequiredOccupant = getCrewMembersForAircraft(state, aircraft.id).some((member) =>
+      member.status === "seriously_wounded" && REQUIRED_ROLES.includes((member.currentAssignmentRole ?? member.role) as CrewRole)
+    );
+    const crewCause = readiness.tasking === "Unavailable"
+      && aircraft.status === "serviceable"
+      && !aircraft.repairJobId
+      && !aircraft.recoveryJobId
+      && !aircraftWithPersonnelDecision.has(aircraft.id)
+      && (requiredRoleProblem || seriousRequiredOccupant);
+    const maintenanceCause = (aircraft.status === "damaged" && !aircraft.repairJobId) || (aircraft.status === "diverted" && !aircraft.recoveryJobId);
+    if (crewCause || maintenanceCause) {
+      seenAircraft.add(aircraft.id);
+      items.push({
+        id: `aircraft-${aircraft.id}`,
+        title: crewCause
+          ? `${aircraft.name} cannot currently fly`
+          : aircraft.status === "diverted"
+            ? `${aircraft.name} remains away after diversion`
+            : `Repair required - ${aircraft.name}`,
+        detail: crewCause
+          ? `${readiness.primaryReason} Airframe: ${readiness.airframe}. Crew: ${readiness.crew}.`
+          : aircraft.status === "diverted"
+            ? `${aircraft.name} must be recovered before it can return to tasking. ${readiness.primaryReason}`
+            : `${aircraft.name} remains marginally available, but repair is still required before the line can fully trust it. ${readiness.primaryReason}`,
+        whyItMatters: "The next package cannot rely on this aircraft until the blocker is resolved.",
+        buttonLabel: crewCause ? "Resolve Crew Issue" : "Open Maintenance",
+        actionType: crewCause ? "go_aircraft_crews" : "go_maintenance",
+        actionPayload: null
+      });
+    }
+  }
+  for (const decision of state.campaign.personnelDecisions.filter((entry) => !entry.resolved)) {
+    const aircraft = getAircraftById(state, decision.aircraftId);
+    items.push({
+      id: decision.id,
+      title: "Personnel decision pending",
+      detail: `${aircraft?.name ?? "One aircraft"} has a recovered original and replacement overlap in the ${roleLabel(decision.role)} seat.`,
+      whyItMatters: "The seat can still function, but the roster decision should be settled before the next commitment grows.",
+      buttonLabel: "Resolve Personnel",
+      actionType: "go_aircraft_crews",
+      actionPayload: null
+    });
+  }
+  return items.slice(0, 6);
+}
+
+export function getCommandBrief(state: SaveState): CommandBrief {
+  const conference = getStaffConference(state);
+  const recommended = conference.recommendedAction;
+  const nextDecision: CommandBriefDecision = {
+    question: getDecisionQuestion(state, conference),
+    recommendedAction: recommended.title,
+    whyRecommended: recommended.body,
+    expectedOutcome: getStaffRecommendationExpectedOutcome(recommended, state),
+    unresolvedCost: getStaffRecommendationCost(recommended, conference, state),
+    primaryButtonLabel: getStaffActionLabel(recommended),
+    recommendation: recommended
+  };
+
+  const strongestSupport = conference.operationsComment || conference.intelligenceComment || conference.engineeringComment;
+  const strongestObjection = conference.commandComment && conference.commandComment !== strongestSupport
+    ? conference.commandComment
+    : conference.riskIfIgnored;
+
+  return {
+    nextDecision,
+    newSinceLastDecision: getCommandDeltaCards(state),
+    actionRequired: createActionRequiredItems(state),
+    details: {
+      executiveConclusion: conference.executiveComment,
+      strongestSupport,
+      strongestObjection: strongestObjection ?? null,
+      conference,
+      campaignSituation: getOperationsDeskSummary(state),
+      campaignRecord: state.campaign.events.slice(0, 6).map((event) => `${event.title}: ${event.body}`)
+    }
+  };
+}
+
+export function getNextStepGuidance(state: SaveState): { title: string; reason: string; buttonLabel: string; recommendation: StaffRecommendation } | null {
+  if (state.selectedTab === "debug" || state.selectedTab === "command" || state.campaign.finalSummaryMode) {
+    return null;
+  }
+  const brief = getCommandBrief(state);
+  return {
+    title: `Next: ${brief.nextDecision.recommendedAction}.`,
+    reason: brief.nextDecision.whyRecommended,
+    buttonLabel: brief.nextDecision.primaryButtonLabel,
+    recommendation: brief.nextDecision.recommendation
+  };
+}
+
+export function getTargetCardLatestChange(state: SaveState, target: Target): { text: string; updatedAt: number | null } | null {
+  if (target.latestIntelNote && target.latestIntelUpdatedAt) {
+    return { text: target.latestIntelNote, updatedAt: target.latestIntelUpdatedAt };
+  }
+  if (target.lastDebriefSummary && target.lastDebriefAt) {
+    return { text: target.lastDebriefSummary, updatedAt: target.lastDebriefAt };
+  }
+  if (target.lastMissionSummary && target.lastMissionAt) {
+    return { text: target.lastMissionSummary, updatedAt: target.lastMissionAt };
+  }
+  return null;
+}
+
+export function getReconDeltaSummary(state: SaveState): {
+  targetName: string;
+  filedAt: number;
+  filedLabel: string;
+  changes: string[];
+  conclusion: string;
+  isUnread: boolean;
+} | null {
+  const latest = state.campaign.latestIntelUpdate;
+  if (!latest) {
+    return null;
+  }
+  const changes: string[] = [];
+  changes.push(latest.resultQuality === "clear" ? "Recon result was clear." : latest.resultQuality === "partial" ? "Recon result was partial." : "Interpretation was inconclusive.");
+  changes.push(`Alertness now reads ${latest.alertLevel}.`);
+  changes.push(latest.assessment);
+  return {
+    targetName: latest.targetName,
+    filedAt: latest.updatedAt,
+    filedLabel: getQualitativeAgeLabel(state, latest.updatedAt),
+    changes: changes.slice(0, 4),
+    conclusion: latest.recommendation,
+    isUnread: state.uiReadState.lastViewedReconId !== latest.reconId
+  };
+}
+
+export function getNavAttention(state: SaveState, tab: CampaignTab): string | null {
+  switch (tab) {
+    case "debrief": {
+      const latestDebrief = getLatestDebriefMission(state);
+      return latestDebrief?.debriefGenerated && state.uiReadState.lastViewedDebriefMissionId !== latestDebrief.id ? "NEW" : null;
+    }
+    case "recon": {
+      if (getActiveRecon(state)) {
+        return "ACTIVE";
+      }
+      const latestRecon = getLatestCompletedRecon(state);
+      return latestRecon && state.uiReadState.lastViewedReconId !== latestRecon.id ? "NEW" : null;
+    }
+    case "maintenance": {
+      const urgentCount = state.aircraft.filter((aircraft) =>
+        (aircraft.status === "damaged" && !aircraft.repairJobId)
+        || (aircraft.status === "diverted" && !aircraft.recoveryJobId)
+      ).length;
+      const completedCount = state.repairJobs.filter((job) => job.completionApplied && job.completesAt > (state.uiReadState.lastViewedMaintenanceAt ?? 0)).length
+        + state.recoveryJobs.filter((job) => job.completionApplied && job.completesAt > (state.uiReadState.lastViewedMaintenanceAt ?? 0)).length;
+      if (urgentCount > 0) {
+        return `ACTION ${urgentCount}`;
+      }
+      if (completedCount > 0) {
+        return "NEW";
+      }
+      return null;
+    }
+    case "aircraft-crews": {
+      const count = state.campaign.personnelDecisions.filter((entry) => !entry.resolved).length
+        + state.aircraft.filter((aircraft) => getRoleCoverageProblems(state, aircraft.id).length > 0).length;
+      return count > 0 ? `ACTION ${count}` : null;
+    }
+    case "current-operation":
+      return getActiveMission(state) ? "ACTIVE" : null;
+    case "target-board": {
+      const latest = Math.max(...state.targets.map((target) => target.latestIntelUpdatedAt ?? target.lastDebriefAt ?? target.lastMissionAt ?? 0), 0);
+      return latest > (state.uiReadState.lastViewedTargetChangeAt ?? 0) ? "NEW" : null;
+    }
+    default:
+      return null;
+  }
+}
+
 export function getOperationsDeskSummary(state: SaveState): string[] {
   const now = getEffectiveNow(state);
   const exact = state.debug.showHiddenValues;
@@ -5705,6 +6288,46 @@ function findPreferredOperationalTarget(state: SaveState, phase: CampaignPhase):
 function hasOperationalPackage(state: SaveState): boolean {
   const assigned = state.planning.assignedAircraftIds.filter((aircraftId) => getAircraftAvailability(state, aircraftId).level !== "unavailable");
   return assigned.length > 0;
+}
+
+function chooseRecommendedAircraftIds(state: SaveState): string[] {
+  const ranked = state.aircraft
+    .map((aircraft) => ({
+      aircraft,
+      availability: getAircraftAvailability(state, aircraft.id),
+      lead: getLeadAircraftAssessment(state, aircraft.id)
+    }))
+    .filter((entry) => entry.availability.level !== "unavailable")
+    .sort((left, right) => {
+      const availabilityRank = (value: AvailabilityReport["level"]) => value === "available" ? 0 : 1;
+      const leadRank = (label: string) => label === "Trusted lead" ? 0 : label === "Workable lead" ? 1 : 2;
+      return availabilityRank(left.availability.level) - availabilityRank(right.availability.level)
+        || leadRank(left.lead.label) - leadRank(right.lead.label)
+        || right.aircraft.hiddenCondition - left.aircraft.hiddenCondition;
+    });
+  return ranked.slice(0, Math.min(4, ranked.length)).map((entry) => entry.aircraft.id);
+}
+
+function chooseRecommendedLeadAircraftId(state: SaveState, aircraftIds: string[]): string | null {
+  const ranked = aircraftIds
+    .map((aircraftId) => ({
+      aircraftId,
+      lead: getLeadAircraftAssessment(state, aircraftId),
+      availability: getAircraftAvailability(state, aircraftId),
+      aircraft: getAircraftById(state, aircraftId)
+    }))
+    .filter((entry) => entry.aircraft);
+  if (ranked.length === 0) {
+    return null;
+  }
+  ranked.sort((left, right) => {
+    const availabilityRank = (value: AvailabilityReport["level"]) => value === "available" ? 0 : 1;
+    const leadRank = (label: string) => label === "Trusted lead" ? 0 : label === "Workable lead" ? 1 : 2;
+    return leadRank(left.lead.label) - leadRank(right.lead.label)
+      || availabilityRank(left.availability.level) - availabilityRank(right.availability.level)
+      || ((right.aircraft?.hiddenCondition ?? 0) - (left.aircraft?.hiddenCondition ?? 0));
+  });
+  return ranked[0]!.aircraftId;
 }
 
 function createOperationalRecommendation(
@@ -6108,24 +6731,24 @@ export function applyRecommendedPlan(state: SaveState, now: number): string | nu
       if (recommendation.relatedTargetId && getTargetById(state, recommendation.relatedTargetId)) {
         setPlanningTarget(state, recommendation.relatedTargetId);
       }
-      state.selectedTab = "target-board";
+      setSelectedTab(state, "target-board");
       return null;
     case "go_aircraft_crews":
-      state.selectedTab = "aircraft-crews";
+      setSelectedTab(state, "aircraft-crews");
       return null;
     case "go_maintenance":
-      state.selectedTab = "maintenance";
+      setSelectedTab(state, "maintenance");
       return null;
     case "go_debrief":
-      state.selectedTab = "debrief";
+      setSelectedTab(state, "debrief");
       return null;
     case "start_recon":
       if (!recommendation.relatedTargetId || !getTargetById(state, recommendation.relatedTargetId)) {
-        state.selectedTab = "target-board";
+        setSelectedTab(state, "target-board");
         return null;
       }
       setPlanningTarget(state, recommendation.relatedTargetId);
-      state.selectedTab = "recon";
+      setSelectedTab(state, "recon");
       return startRecon(state, recommendation.relatedTargetId, recommendation.planReconType ?? "pre_strike", now);
     case "wait_next_event":
       return waitUntilNextEvent(state, now);
@@ -6135,8 +6758,8 @@ export function applyRecommendedPlan(state: SaveState, now: number): string | nu
       return letCurrentWorkFinish(state, now);
     case "go_mission_planning":
     default: {
-      if (!recommendation.relatedTargetId || !getTargetById(state, recommendation.relatedTargetId) || !hasOperationalPackage(state)) {
-        state.selectedTab = state.repairJobs.some((job) => !job.completionApplied) ? "maintenance" : "aircraft-crews";
+      if (!recommendation.relatedTargetId || !getTargetById(state, recommendation.relatedTargetId)) {
+        setSelectedTab(state, state.repairJobs.some((job) => !job.completionApplied) ? "maintenance" : "aircraft-crews");
         return null;
       }
       setPlanningTarget(state, recommendation.relatedTargetId);
@@ -6159,10 +6782,10 @@ export function applyRecommendedPlan(state: SaveState, now: number): string | nu
         ? plan.planSecondaryTargetId
         : null;
       setSecondaryTarget(state, validSecondary);
-      if (state.planning.leadAircraftId && getAircraftAvailability(state, state.planning.leadAircraftId).level === "unavailable") {
-        state.planning.leadAircraftId = null;
-      }
-      state.selectedTab = "mission-planning";
+      state.planning.assignedAircraftIds = chooseRecommendedAircraftIds(state);
+      state.planning.leadAircraftId = chooseRecommendedLeadAircraftId(state, state.planning.assignedAircraftIds);
+      cleanupPlanningState(state);
+      setSelectedTab(state, "mission-planning");
       return null;
     }
   }

@@ -351,6 +351,57 @@ export interface StaffConference {
   riskIfIgnored: string | null;
 }
 
+export interface AircraftReadinessSummary {
+  airframe: string;
+  crew: string;
+  tasking: string;
+  primaryReason: string;
+  optionalMaintenance: boolean;
+}
+
+export interface CommandBriefAction {
+  id: string;
+  title: string;
+  detail: string;
+  whyItMatters: string;
+  buttonLabel: string;
+  actionType: StaffActionType | "tab";
+  actionPayload: string | null;
+}
+
+export interface CommandBriefDelta {
+  id: string;
+  title: string;
+  location: string;
+  filedAt: number | null;
+  filedLabel: string;
+  whyItMatters: string;
+}
+
+export interface CommandBriefDecision {
+  question: string;
+  recommendedAction: string;
+  whyRecommended: string;
+  expectedOutcome: string;
+  unresolvedCost: string;
+  primaryButtonLabel: string;
+  recommendation: StaffRecommendation;
+}
+
+export interface CommandBrief {
+  nextDecision: CommandBriefDecision;
+  newSinceLastDecision: CommandBriefDelta[];
+  actionRequired: CommandBriefAction[];
+  details: {
+    executiveConclusion: string;
+    strongestSupport: string;
+    strongestObjection: string | null;
+    conference: StaffConference;
+    campaignSituation: string[];
+    campaignRecord: string[];
+  };
+}
+
 export interface LogEntry {
   id: string;
   at: number;
@@ -662,6 +713,15 @@ export interface TutorialState {
   suppressModalUntilAt: number | null;
 }
 
+export interface UiReadState {
+  lastViewedCommandUpdateAt: number | null;
+  lastViewedDebriefMissionId: string | null;
+  lastViewedReconId: string | null;
+  lastViewedTargetChangeAt: number | null;
+  lastViewedMaintenanceAt: number | null;
+  lastViewedPersonnelDecisionAt: number | null;
+}
+
 export interface TutorialStepDisplay {
   id: TutorialStepId;
   title: string;
@@ -722,6 +782,7 @@ export interface SaveState {
   notifications: UiNotification[];
   planning: PlanningState;
   tutorial: TutorialState;
+  uiReadState: UiReadState;
   debug: DebugState;
 }
 

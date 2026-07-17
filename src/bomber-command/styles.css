@@ -158,6 +158,33 @@ button.danger {
   min-width: 120px;
 }
 
+.nav-attention {
+  display: inline-flex;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(219, 181, 120, 0.18);
+  color: #e7d1a3;
+  font-size: 0.72rem;
+  letter-spacing: 0.05em;
+}
+
+.next-step-strip {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  border-color: rgba(219, 181, 120, 0.34);
+  background:
+    radial-gradient(circle at top right, rgba(186, 138, 74, 0.12), transparent 38%),
+    rgba(15, 18, 24, 0.9);
+  margin-bottom: 14px;
+}
+
+.tutorial-help {
+  border-color: rgba(148, 176, 198, 0.3);
+}
+
 .label {
   font-size: 0.85rem;
   letter-spacing: 0.08em;
@@ -487,6 +514,11 @@ button.danger {
   .tab-btn {
     min-width: 0;
     flex: 1 1 140px;
+  }
+
+  .next-step-strip {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .tutorial-overlay {
