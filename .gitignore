@@ -108,3 +108,5 @@ InitTestScene*.unity*
 # Web prototype tooling
 /node_modules/
 /dist/
+/bomber-build/
+/tmp/bomber-browser/

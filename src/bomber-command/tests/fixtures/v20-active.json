@@ -1,0 +1,376 @@
+{
+  "version": 20,
+  "seed": 1737,
+  "rng": 481925456,
+  "now": 1800000000000,
+  "offset": 0,
+  "nextId": 6,
+  "station": "Station 108 · East Fen",
+  "circumstance": "A wet dispersal and a dependable engineering section. Sunday Punch needs attention before the heavier requests.",
+  "aircraft": [
+    {
+      "id": "a0",
+      "name": "Lucky Lady",
+      "trait": "rugged",
+      "condition": 96,
+      "defect": false,
+      "lost": false,
+      "away": false,
+      "sorties": 0,
+      "history": [
+        "Accepted by the station engineering officer."
+      ]
+    },
+    {
+      "id": "a1",
+      "name": "Sunday Punch",
+      "trait": "accurate",
+      "condition": 58,
+      "defect": false,
+      "lost": false,
+      "away": false,
+      "sorties": 0,
+      "history": [
+        "Accepted by the station engineering officer."
+      ]
+    },
+    {
+      "id": "a2",
+      "name": "Skylark",
+      "trait": "economical",
+      "condition": 89,
+      "defect": false,
+      "lost": false,
+      "away": false,
+      "sorties": 0,
+      "history": [
+        "Accepted by the station engineering officer."
+      ]
+    },
+    {
+      "id": "a3",
+      "name": "Old Sinner",
+      "trait": "swift",
+      "condition": 97,
+      "defect": false,
+      "lost": false,
+      "away": false,
+      "sorties": 0,
+      "history": [
+        "Accepted by the station engineering officer."
+      ]
+    }
+  ],
+  "crews": [
+    {
+      "id": "c0",
+      "pilot": "Capt. Maddox",
+      "specialist": "Sgt. Ellis",
+      "strength": "formation",
+      "experience": 6,
+      "fatigue": 0,
+      "lost": false,
+      "injury": false,
+      "replacement": null,
+      "returned": false,
+      "sorties": 0,
+      "history": [
+        "Reported for the fourteen-assignment tour."
+      ]
+    },
+    {
+      "id": "c1",
+      "pilot": "Lt. Bell",
+      "specialist": "Sgt. Turner",
+      "strength": "bombing",
+      "experience": 1,
+      "fatigue": 0,
+      "lost": false,
+      "injury": false,
+      "replacement": null,
+      "returned": false,
+      "sorties": 0,
+      "history": [
+        "Reported for the fourteen-assignment tour."
+      ]
+    },
+    {
+      "id": "c2",
+      "pilot": "Lt. Rivera",
+      "specialist": "Sgt. Doyle",
+      "strength": "engineering",
+      "experience": 3,
+      "fatigue": 0,
+      "lost": false,
+      "injury": false,
+      "replacement": null,
+      "returned": false,
+      "sorties": 0,
+      "history": [
+        "Reported for the fourteen-assignment tour."
+      ]
+    },
+    {
+      "id": "c3",
+      "pilot": "Capt. Price",
+      "specialist": "Sgt. Morgan",
+      "strength": "navigation",
+      "experience": 5,
+      "fatigue": 24,
+      "lost": false,
+      "injury": false,
+      "replacement": null,
+      "returned": false,
+      "sorties": 0,
+      "history": [
+        "Reported for the fourteen-assignment tour."
+      ]
+    }
+  ],
+  "assignments": [
+    {
+      "title": "The coastal yards",
+      "objective": "Cut the railway sidings serving the coast.",
+      "why": "A short first assignment. Disrupting these supplies will give the group room to settle in.",
+      "hazard": 1,
+      "requested": 2,
+      "effect": "rail",
+      "weather": "clear"
+    },
+    {
+      "title": "Fighters on the ground",
+      "objective": "Strike the dispersal areas at a coastal fighter field.",
+      "why": "Aircraft destroyed here cannot meet tomorrow’s bomber stream.",
+      "hazard": 2,
+      "requested": 2,
+      "effect": "fighters",
+      "weather": "cloud"
+    },
+    {
+      "title": "The canal crossing",
+      "objective": "Interrupt freight at the canal marshalling yard.",
+      "why": "HQ needs a full section. The workshops ahead are a harder assignment.",
+      "hazard": 2,
+      "requested": 3,
+      "effect": "supplies",
+      "weather": "crosswind"
+    },
+    {
+      "title": "Engine works",
+      "objective": "Put the engine assembly halls out of operation.",
+      "why": "This is the first deep penetration. Experienced crews will earn their keep.",
+      "hazard": 4,
+      "requested": 3,
+      "effect": "fighters",
+      "weather": "crosswind"
+    },
+    {
+      "title": "A narrow window",
+      "objective": "Strike a repair depot while rolling stock is concentrated.",
+      "why": "A good result releases scarce transport for our own station.",
+      "hazard": 2,
+      "requested": 2,
+      "effect": "supplies",
+      "weather": "crosswind"
+    },
+    {
+      "title": "Beyond the estuary",
+      "objective": "Hit the railway approaches beyond the estuary.",
+      "why": "Traffic has shifted inland. Every effective aircraft slows that movement.",
+      "hazard": 3,
+      "requested": 3,
+      "effect": "rail",
+      "weather": "cloud"
+    },
+    {
+      "title": "The northern airfield",
+      "objective": "Crater the fighter field’s service and dispersal areas.",
+      "why": "The group is gathering for a larger effort. Reduce the opposition now.",
+      "hazard": 3,
+      "requested": 2,
+      "effect": "fighters",
+      "weather": "cloud"
+    },
+    {
+      "title": "The long haul",
+      "objective": "Attack the inland aircraft component works.",
+      "why": "HQ requests the whole flight. A smaller contribution is accepted, but leaves more work to other stations.",
+      "hazard": 4,
+      "requested": 4,
+      "effect": "supplies",
+      "weather": "crosswind"
+    },
+    {
+      "title": "A shorter run",
+      "objective": "Cut the coastal supply line a second time.",
+      "why": "A limited assignment offers a chance to rotate tired crews.",
+      "hazard": 1,
+      "requested": 2,
+      "effect": "rail",
+      "weather": "crosswind"
+    },
+    {
+      "title": "Closing the net",
+      "objective": "Attack a fighter repair and storage depot.",
+      "why": "Successful bombing will ease interception on the next assignment.",
+      "hazard": 3,
+      "requested": 3,
+      "effect": "fighters",
+      "weather": "clear"
+    },
+    {
+      "title": "The western junction",
+      "objective": "Block the rail junction feeding the inland factories.",
+      "why": "Three assignments will remain after this one. Preserve enough strength to finish.",
+      "hazard": 3,
+      "requested": 3,
+      "effect": "supplies",
+      "weather": "cloud"
+    },
+    {
+      "title": "The last push · I",
+      "objective": "Strike the forward fighter bases.",
+      "why": "The final three assignments are fixed. Today’s result can protect the last deep raid.",
+      "hazard": 3,
+      "requested": 3,
+      "effect": "fighters",
+      "weather": "cloud"
+    },
+    {
+      "title": "The last push · II",
+      "objective": "Attack the main assembly plant.",
+      "why": "The tour’s heaviest remaining objective. Tomorrow asks for only two aircraft.",
+      "hazard": 4,
+      "requested": 3,
+      "effect": "supplies",
+      "weather": "cloud"
+    },
+    {
+      "title": "Bring them home",
+      "objective": "Make one final strike against the coastal railway.",
+      "why": "Relief crews arrive after this assignment. Make the contribution you can sustain.",
+      "hazard": 2,
+      "requested": 2,
+      "effect": "rail",
+      "weather": "crosswind"
+    }
+  ],
+  "completed": 0,
+  "contribution": 0,
+  "requested": 0,
+  "support": 3,
+  "suppression": 0,
+  "engineeringUsed": 0,
+  "active": {
+    "slot": 1,
+    "startedAt": 1800000000000,
+    "returnsAt": 1800014400000,
+    "plan": {
+      "flights": [
+        {
+          "aircraft": "a3",
+          "crew": "c0"
+        },
+        {
+          "aircraft": "a0",
+          "crew": "c2"
+        }
+      ],
+      "route": "direct",
+      "orders": "preserve",
+      "priority": "a1"
+    },
+    "stoodDown": false,
+    "messages": [
+      "The package is airborne. Standing orders are in force."
+    ],
+    "report": {
+      "slot": 1,
+      "title": "The coastal yards",
+      "summary": "2 effective strikes from 2 dispatched. HQ requested 2.",
+      "requested": 2,
+      "sent": 2,
+      "hits": 2,
+      "results": [
+        {
+          "aircraft": "a3",
+          "crew": "c0",
+          "outcome": "home",
+          "damage": 13,
+          "injury": false,
+          "hit": true,
+          "fatigue": 34,
+          "note": "An effective strike; aircraft and crew home without incident."
+        },
+        {
+          "aircraft": "a0",
+          "crew": "c2",
+          "outcome": "home",
+          "damage": 6,
+          "injury": false,
+          "hit": true,
+          "fatigue": 38,
+          "note": "An effective strike; aircraft and crew home without incident."
+        }
+      ],
+      "notes": [
+        "Sunday Punch was allocated proper repair."
+      ],
+      "at": 1800014400000,
+      "stoodDown": false
+    }
+  },
+  "jobs": [
+    {
+      "id": 1,
+      "kind": "rest",
+      "at": 1800021600000,
+      "subject": "c3"
+    },
+    {
+      "id": 2,
+      "kind": "repair",
+      "at": 1800021600000,
+      "subject": "a1"
+    },
+    {
+      "id": 3,
+      "kind": "service",
+      "at": 1800014400000,
+      "subject": "a2"
+    },
+    {
+      "id": 4,
+      "kind": "signal",
+      "at": 1800007200000,
+      "subject": "",
+      "text": "Group reports the formation approaching the objective. A full accounting will follow at return."
+    },
+    {
+      "id": 5,
+      "kind": "return",
+      "at": 1800014400000,
+      "subject": ""
+    }
+  ],
+  "reports": [],
+  "decisions": [],
+  "notices": [],
+  "phase": "active",
+  "ending": null,
+  "plan": {
+    "flights": [
+      {
+        "aircraft": "a3",
+        "crew": "c0"
+      },
+      {
+        "aircraft": "a0",
+        "crew": "c2"
+      }
+    ],
+    "route": "direct",
+    "orders": "preserve",
+    "priority": "a1"
+  }
+}

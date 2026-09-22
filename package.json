@@ -5,7 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite --open /ouija-dev.html",
-    "dev:bomber": "vite --open /bomber_command.html",
+    "dev:bomber": "vite --config vite.bomber.config.ts --open /bomber_command.html",
+    "build:bomber": "npm run typecheck:bomber && vite build --config vite.bomber.config.ts",
+    "preview:bomber": "vite preview --config vite.bomber.config.ts --open /bomber_command.html",
+    "typecheck:bomber": "tsc -p tsconfig.bomber.json",
+    "test:bomber": "node --test src/bomber-command/tests/*.test.mjs",
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit"

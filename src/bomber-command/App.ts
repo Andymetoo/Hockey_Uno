@@ -1,1595 +1,198 @@
-import {
-  advanceCampaignDay,
-  assignReplacementCrewMember,
-  applyRecommendedPlan,
-  completeAllRepairs,
-  completeCurrentRecon,
-  createNewGame,
-  dismissActiveTutorialStep,
-  formatTimestamp,
-  getActiveMission,
-  getActiveMissionCrewIds,
-  getActiveRecon,
-  getAircraftAttentionState,
-  getAircraftAvailability,
-  getAircraftById,
-  getAircraftReadinessSummary,
-  acknowledgeVisibleTab,
-  getCommandBrief,
-  getCrewAircraftLabel,
-  getCrewById,
-  getCrewMembersForAircraft,
-  getCrewSeatLabel,
-  getCurrentOperationSummary,
-  getActiveTutorialStep,
-  getDirectiveProgressSummary,
-  getDisabledReasonForLaunch,
-  getEffectiveNow,
-  getGroundCrewPressureNote,
-  getPrimaryUsableOpportunity,
-  getHardUnavailablePersonnel,
-  getLeadAircraftAssessment,
-  getLatestDebriefMission,
-  getLatestCompletedRecon,
-  getMedicalActionLabel,
-  getMedicalRecoveryLabel,
-  getMedicalPersonnel,
-  getNavAttention,
-  getNextStepGuidance,
-  getOperationalStatusLabel,
-  getOperationalRhythm,
-  getPersonnelDecisionsForAircraft,
-  getPlanningStaffPreview,
-  getQualitativeAgeLabel,
-  getRecentConsequenceLedger,
-  getReconDeltaSummary,
-  getReplacementCoveringMember,
-  getReplacementPool,
-  getRestingPersonnel,
-  getRoleCoverageProblems,
-  getSecondaryTargetOptions,
-  getStaffActionLabel,
-  getStaffConference,
-  getTargetById,
-  getTargetCardLatestChange,
-  getTargetIntelAgeLabel,
-  getTargetOperationalSummary,
-  getTargetStrategicContext,
-  keepReplacementTemporary,
-  letCurrentWorkFinish,
-  launchMission,
-  loadState,
-  markReplacementPermanent,
-  markReplacementPermanentFromDecision,
-  reconcileState,
-  restoreOriginalCrewMember,
-  removeReplacementCrewMember,
-  resetState,
-  saveState,
-  setAttackDoctrine,
-  setLeadAircraft,
-  setLaunchMode,
-  setOperationType,
-  setPlanningTarget,
-  setRouteRisk,
-  setScheduleDelay,
-  setSecondaryTarget,
-  setSelectedTab,
-  setShowHiddenValues,
-  skipToDebrief,
-  skipToNextReport,
-  startRecovery,
-  startRecon,
-  startRepair,
-  standDownUntilMorning,
-  toggleAssignedAircraft,
-  toggleStandingOrder,
-  waitUntilNextEvent
-} from "./game.js";
-import type { AttackDoctrine, CampaignTab, CommandBriefAction, CrewMember, CrewRole, OperationType, ReconType, RepairTier, SaveState, StaffConference, StaffRecommendation, Target } from "./types";
+import type { Aircraft, Crew, Plan, Report, State } from './types.ts';
+import { advance, aircraftAvailable, aircraftIssue, choose, commit, createCampaign, crewAvailable, crewIssue, duration, endingText, flightFatigue, forecast, HOUR, nextMilestone, planErrors, proposePlan, repairCandidates, tourMemories } from './game.ts';
+import { circumstances, defectText, stationEvents, strengthText, traitText } from './content.ts';
+import { createStorage, decode } from './persistence.ts';
 
-type ActionHandler = (action: string, payload: string | null) => void;
-
-const TABS: Array<{ id: CampaignTab; label: string }> = [
-  { id: "command", label: "Command" },
-  { id: "target-board", label: "Target Board" },
-  { id: "aircraft-crews", label: "Aircraft & Crews" },
-  { id: "mission-planning", label: "Mission Planning" },
-  { id: "current-operation", label: "Current Operation" },
-  { id: "debrief", label: "Debrief / Assessment" },
-  { id: "maintenance", label: "Maintenance" },
-  { id: "recon", label: "Recon / Intelligence" },
-  { id: "event-log", label: "Event Log" },
-  { id: "debug", label: "Debug" }
-];
-
-function escapeHtml(text: string): string {
-  return text
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
-}
-
-function badgeClass(value: string): string {
-  return value.toLowerCase().replaceAll(/[^a-z0-9]+/g, "-");
-}
-
-function renderBadge(label: string, value: string): string {
-  return `<span class="badge ${badgeClass(value)}"><strong>${escapeHtml(label)}:</strong> ${escapeHtml(value)}</span>`;
-}
-
-function hiddenBlock(show: boolean, lines: string[]): string {
-  if (!show) {
-    return "";
-  }
-  return `<div class="hidden-panel"><strong>Hidden:</strong> ${lines.map((line) => escapeHtml(line)).join(" | ")}</div>`;
-}
-
-function renderDueTime(state: SaveState, timestamp: number): string {
-  if (state.debug.showHiddenValues) {
-    return formatTimestamp(state, timestamp);
-  }
-
-  const diffMinutes = Math.max(0, Math.round((timestamp - getEffectiveNow(state)) / 60000));
-  if (diffMinutes <= 1) {
-    return "imminently";
-  }
-  if (diffMinutes <= 4) {
-    return "shortly";
-  }
-  if (diffMinutes <= 9) {
-    return "before long";
-  }
-  return "later today";
-}
-
-function renderNotifications(state: SaveState): string {
-  if (state.notifications.length === 0) {
-    return "";
-  }
-
-  return `
-    <section class="toast-stack" aria-live="polite">
-      ${state.notifications.slice(0, 4).map((notification) => `
-        <div class="toast toast-${badgeClass(notification.kind)}">
-          ${escapeHtml(notification.text)}
-        </div>
-      `).join("")}
-    </section>
-  `;
-}
-
-function renderTutorialModal(state: SaveState): string {
-  const step = getActiveTutorialStep(state);
-  if (!step) {
-    return "";
-  }
-  const coreSteps = new Set(["welcome", "planning-basics", "mission-launched", "debrief-review", "first-loop-complete"]);
-  const goButton = step.suggestedTab && step.suggestedTab !== state.selectedTab
-    ? `<button data-action="tutorial-open-tab" data-payload="${step.suggestedTab}">${escapeHtml(step.suggestedTabLabel ? `Go to ${step.suggestedTabLabel}` : "Open Suggested Panel")}</button>`
-    : "";
-  return `
-    <details class="note tutorial-help" ${coreSteps.has(step.id) ? "open" : ""}>
-      <summary><strong>Guided Help</strong></summary>
-      <p><strong>${escapeHtml(step.title)}</strong></p>
-      <p class="muted">${escapeHtml(step.body)}</p>
-      <div class="button-row">
-        ${goButton}
-        <button data-action="tutorial-dismiss" class="active">Got It</button>
-      </div>
-    </details>
-  `;
-}
-
-function renderCrewRow(state: SaveState, aircraftId: string, member: CrewMember, airborneIds: Set<string>): string {
-  const airborne = airborneIds.has(member.id) ? `<span class="muted">Airborne with current operation</span>` : "";
-  const replacementActions = member.isReplacement && member.assignedAircraftId === aircraftId
-    ? `
-      <div class="button-row">
-        <button data-action="mark-permanent" data-payload="${member.id}" ${member.isPermanentReplacement ? "disabled" : ""}>Mark Permanent</button>
-        <button data-action="remove-replacement" data-payload="${member.id}">Remove Replacement</button>
-      </div>
-    `
-    : "";
-  return `
-    <div class="manifest-row">
-      <div>
-        <strong>${escapeHtml(member.rank)} ${escapeHtml(member.name.replace(`${member.rank} `, ""))}</strong>
-        <div class="muted">${escapeHtml(member.currentAssignmentRole ? member.currentAssignmentRole.replaceAll("_", " ") : roleOrSpecialty(member.role))}</div>
-        <div class="muted">${escapeHtml(member.notes)}</div>
-        ${airborne}
-      </div>
-      <div class="badge-row">
-        ${renderBadge("Status", member.status.replaceAll("_", " "))}
-        ${renderBadge("Fatigue", member.fatigue)}
-        ${renderBadge("Morale", member.morale)}
-        ${renderBadge("Experience", member.experience)}
-      </div>
-      ${replacementActions}
-    </div>
-  `;
-}
-
-function renderPersonnelStatusRow(state: SaveState, member: CrewMember): string {
-  const now = getEffectiveNow(state);
-  const covering = getReplacementCoveringMember(state, member);
-  return `
-    <div class="row-card">
-      <div>
-        <strong>${escapeHtml(member.name)}</strong>
-        <div class="muted">${escapeHtml(getCrewAircraftLabel(state, member))}</div>
-        <div class="muted">${escapeHtml(getCrewSeatLabel(member))}</div>
-        <div class="muted">${escapeHtml(getMedicalRecoveryLabel(member, now))}</div>
-        <div class="muted">${escapeHtml(covering ? `Replacement covering: ${covering.name}` : "Replacement covering: none")}</div>
-        <div class="muted">${escapeHtml(getMedicalActionLabel(state, member))}</div>
-        <div class="muted">${escapeHtml(member.notes)}</div>
-      </div>
-      <div class="badge-row">
-        ${renderBadge("Status", member.status.replaceAll("_", " "))}
-        ${renderBadge("Fatigue", member.fatigue)}
-        ${renderBadge("Morale", member.morale)}
-      </div>
-    </div>
-  `;
-}
-
-function roleOrSpecialty(role: CrewMember["role"]): string {
-  return role.replaceAll("_", " ");
-}
-
-function renderHeader(state: SaveState): string {
-  return `
-    <header class="hero panel">
-      <p class="eyebrow">Eighth Air Force Vertical Slice</p>
-      <h1>Bomber Command Prototype</h1>
-      <p class="subcopy">A text-first prototype focused on one playable operation loop with hazy reports, timed consequences, and save-safe reconciliation.</p>
-      <div class="summary-grid">
-        <div class="kv"><span class="k">Campaign Day</span><span class="v">${state.campaign.currentDay}</span></div>
-        <div class="kv"><span class="k">Directive</span><span class="v">${escapeHtml(state.campaign.commandDirective)}</span></div>
-        <div class="kv"><span class="k">Status</span><span class="v">${escapeHtml(getOperationalStatusLabel(state))}</span></div>
-      </div>
-    </header>
-  `;
-}
-
-function renderNav(state: SaveState): string {
-  return `
-    <nav class="tab-row panel">
-      ${TABS.map((tab) => `
-        <button class="tab-btn ${tab.id === state.selectedTab ? "active" : ""}" data-action="tab" data-payload="${tab.id}">
-          ${escapeHtml(tab.label)}
-          ${getNavAttention(state, tab.id) ? ` <span class="nav-attention">${escapeHtml(getNavAttention(state, tab.id) ?? "")}</span>` : ""}
-        </button>
-      `).join("")}
-    </nav>
-  `;
-}
-
-function renderStaffActionButton(recommendation: StaffRecommendation): string {
-  switch (recommendation.relatedActionType) {
-    case "go_debrief":
-      return `<button data-action="tab" data-payload="debrief">Go to Debrief</button>`;
-    case "go_maintenance":
-      return `<button data-action="tab" data-payload="maintenance">Go to Maintenance</button>`;
-    case "go_aircraft_crews":
-      return `<button data-action="tab" data-payload="aircraft-crews">Go to Aircraft &amp; Crews</button>`;
-    case "go_recon":
-      return `<button data-action="tab" data-payload="recon">Go to Recon</button>`;
-    case "go_target_board":
-      return `<button data-action="briefing-target-board" data-payload="${escapeHtml(recommendation.relatedTargetId ?? "")}">Go to Target Board</button>`;
-    case "go_mission_planning":
-      return `<button data-action="briefing-mission-planning" data-payload="${escapeHtml(recommendation.relatedTargetId ?? "")}">Go to Mission Planning</button>`;
-    case "wait_next_event":
-      return `<button data-action="wait-next-event">Wait until next event</button>`;
-    case "stand_down_morning":
-      return `<button data-action="stand-down-morning">Stand down until morning</button>`;
-    case "let_work_finish":
-      return `<button data-action="let-work-finish">Let current work finish</button>`;
-    case "start_recon":
-      if (!recommendation.relatedTargetId) {
-        return "";
-      }
-      return `<button data-action="briefing-start-recon" data-payload="${escapeHtml(`${recommendation.relatedTargetId}:${recommendation.planReconType ?? "pre_strike"}`)}">Start Recon</button>`;
-    default:
-      return "";
-  }
-}
-
-function renderBriefActionButton(item: CommandBriefAction): string {
-  if (item.actionType === "tab") {
-    return `<button data-action="tab" data-payload="${escapeHtml(item.actionPayload ?? "")}">${escapeHtml(item.buttonLabel)}</button>`;
-  }
-  switch (item.actionType) {
-    case "go_debrief":
-      return `<button data-action="tab" data-payload="debrief">${escapeHtml(item.buttonLabel)}</button>`;
-    case "go_maintenance":
-      return `<button data-action="tab" data-payload="maintenance">${escapeHtml(item.buttonLabel)}</button>`;
-    case "go_aircraft_crews":
-      return `<button data-action="tab" data-payload="aircraft-crews">${escapeHtml(item.buttonLabel)}</button>`;
-    case "go_recon":
-      return `<button data-action="tab" data-payload="recon">${escapeHtml(item.buttonLabel)}</button>`;
-    case "go_target_board":
-      return `<button data-action="tab" data-payload="target-board">${escapeHtml(item.buttonLabel)}</button>`;
-    case "go_mission_planning":
-      return `<button data-action="tab" data-payload="mission-planning">${escapeHtml(item.buttonLabel)}</button>`;
-    case "start_recon":
-      return `<button data-action="tab" data-payload="recon">${escapeHtml(item.buttonLabel)}</button>`;
-    case "wait_next_event":
-      return `<button data-action="wait-next-event">${escapeHtml(item.buttonLabel)}</button>`;
-    case "stand_down_morning":
-      return `<button data-action="stand-down-morning">${escapeHtml(item.buttonLabel)}</button>`;
-    case "let_work_finish":
-      return `<button data-action="let-work-finish">${escapeHtml(item.buttonLabel)}</button>`;
-    default:
-      return `<button data-action="tab" data-payload="command">${escapeHtml(item.buttonLabel)}</button>`;
-  }
-}
-
-function renderStaffRecommendation(recommendation: StaffRecommendation): string {
-  return `
-    <article class="briefing-card urgency-${recommendation.urgency}">
-      <div class="briefing-header">
-        <div>
-          <p class="eyebrow">${escapeHtml(recommendation.sourceOfficer)}</p>
-          <h3>${escapeHtml(recommendation.title)}</h3>
-        </div>
-        ${renderBadge("Urgency", recommendation.urgency)}
-      </div>
-      <p>${escapeHtml(recommendation.body)}</p>
-      ${recommendation.relatedActionType ? `<div class="button-row briefing-actions">${renderStaffActionButton(recommendation)}</div>` : ""}
-    </article>
-  `;
-}
-
-function renderStaffConference(state: SaveState, conference: StaffConference): string {
-  const officerLines = [
-    { label: "Operations Officer", text: conference.operationsComment },
-    { label: "Intelligence Officer", text: conference.intelligenceComment },
-    { label: "Engineering Officer", text: conference.engineeringComment },
-    { label: "Medical / Personnel Officer", text: conference.personnelComment },
-    { label: "Command Liaison", text: conference.commandComment }
-  ].filter((entry) => entry.text.trim().length > 0).slice(0, 4);
-  return `
-    <section class="note staff-conference-card">
-      <div class="briefing-header">
-        <div>
-          <p class="eyebrow">Staff Conference</p>
-          <h3>${escapeHtml(conference.phaseLabel)}</h3>
-        </div>
-        ${renderBadge("Phase", conference.phaseLabel)}
-      </div>
-      <p>${escapeHtml(conference.summary)}</p>
-      <div class="stack compact conference-comments">
-        <p><strong>Executive Officer:</strong> ${escapeHtml(conference.executiveComment)}</p>
-        ${officerLines.map((entry) => `<p><strong>${escapeHtml(entry.label)}:</strong> ${escapeHtml(entry.text)}</p>`).join("")}
-      </div>
-      <div class="briefing-card urgency-${conference.recommendedAction.urgency}">
-        <div class="briefing-header">
-          <div>
-            <p class="eyebrow">Recommended</p>
-            <h3>${escapeHtml(conference.recommendedAction.title)}</h3>
-          </div>
-          ${renderBadge("Urgency", conference.recommendedAction.urgency)}
-        </div>
-        <p>${escapeHtml(conference.recommendedAction.body)}</p>
-        ${conference.riskIfIgnored ? `<p class="warning">${escapeHtml(conference.riskIfIgnored)}</p>` : ""}
-        <div class="button-row briefing-actions">
-          <button class="active" data-action="use-recommended-plan">${escapeHtml(getStaffActionLabel(conference.recommendedAction))}</button>
-        </div>
-      </div>
-      <div class="stack compact">
-        <strong>Alternatives</strong>
-        <div class="briefing-grid">
-          ${conference.alternateActions.map((recommendation) => renderStaffRecommendation(recommendation)).join("")}
-        </div>
-      </div>
-    </section>
-  `;
-}
-
-function renderOfficerDiscussion(conference: StaffConference): string {
-  const officerLines = [
-    { label: "Executive Officer", text: conference.executiveComment },
-    { label: "Operations Officer", text: conference.operationsComment },
-    { label: "Intelligence Officer", text: conference.intelligenceComment },
-    { label: "Engineering Officer", text: conference.engineeringComment },
-    { label: "Medical / Personnel Officer", text: conference.personnelComment },
-    { label: "Command Liaison", text: conference.commandComment }
-  ].filter((entry) => entry.text.trim().length > 0);
-  return `
-    <div class="stack compact conference-comments">
-      ${officerLines.map((entry) => `<p><strong>${escapeHtml(entry.label)}:</strong> ${escapeHtml(entry.text)}</p>`).join("")}
-    </div>
-  `;
-}
-
-function renderCommandSituation(state: SaveState): string {
-  const directive = getDirectiveProgressSummary(state);
-  const rhythm = getOperationalRhythm(state);
-  const activeOpportunity = getPrimaryUsableOpportunity(state);
-  const latestInsightLines = state.campaign.insights
-    .slice()
-    .sort((left, right) => right.updatedAt - left.updatedAt || right.evidenceCount - left.evidenceCount)
-    .slice(0, 3);
-  return `
-    <div class="note">
-      <strong>Current Command Situation</strong>
-      <div class="badge-row">
-        ${renderBadge("Phase", state.campaign.finalSummaryMode ? "final summary" : state.campaign.campaignPhaseId)}
-        ${renderBadge("Day", String(state.campaign.currentDay))}
-        ${renderBadge("Rhythm", rhythm.label)}
-      </div>
-      <p>${escapeHtml(directive.momentum)}</p>
-      <p>${escapeHtml(directive.directiveState)}</p>
-      <p>${escapeHtml(directive.groupCondition)}</p>
-      <p>${escapeHtml(state.campaign.commandStanding)}</p>
-      <p>${escapeHtml(activeOpportunity ? activeOpportunity.description : state.campaign.resolutionState === "pending" ? "Campaign resolution is pending while committed work finishes." : "No major active opening is presently judged decisive.")}</p>
-      <p class="muted">${escapeHtml(state.campaign.campaignPhase)}</p>
-      ${latestInsightLines.length > 0 ? `
-        <div class="stack compact">
-          <strong>Latest Insights</strong>
-          ${latestInsightLines.map((insight) => `<p class="muted">${escapeHtml(insight.conclusion)}</p>`).join("")}
-        </div>
-      ` : ""}
-    </div>
-  `;
-}
-
-function buildQualitativeEvaluationSummary(state: SaveState): string {
-  const evaluation = state.campaign.evaluation;
-  if (!evaluation) {
-    const directive = getDirectiveProgressSummary(state).progress.replace("Progress: ", "");
-    const group = getDirectiveProgressSummary(state).groupCondition.replace("Group condition: ", "");
-    return `Campaign result filed. Directive assessment remained ${directive.toLowerCase()} Group condition ended ${group.toLowerCase()}`;
-  }
-  const directive = evaluation.directiveAssessment.replace(/^Directive assessment:\s*/i, "");
-  const group = evaluation.groupAssessment.replace(/^Group condition:\s*/i, "");
-  return `Campaign result filed. Directive assessment remained ${directive.toLowerCase()} Group condition ended ${group.toLowerCase()}`;
-}
-
-function sanitizeCampaignSummaryText(state: SaveState, text: string): string {
-  const evaluation = state.campaign.evaluation;
-  if (!evaluation) {
-    return text;
-  }
-  if (/directive progress at \d+|group effectiveness judged \d+/i.test(text)) {
-    return buildQualitativeEvaluationSummary(state);
-  }
-  return text;
-}
-
-function renderWhatChanged(state: SaveState): string {
-  const ledger = getRecentConsequenceLedger(state);
-  const events = state.campaign.events.slice(0, 2);
-  const latest = ledger[0];
-  return `
-    <div class="note">
-      <strong>What Changed</strong>
-      ${latest ? `
-        <div class="row-card">
-          <strong>${escapeHtml(latest.title)}</strong>
-          <p>${escapeHtml(latest.staffRead)}</p>
-          <p class="muted">${escapeHtml(latest.strategicConsequence)}</p>
-        </div>
-      ` : `<p class="muted">No formal consequence read has been filed yet.</p>`}
-      ${state.campaign.latestWaitNote ? `<p class="muted">${escapeHtml(state.campaign.latestWaitNote)}</p>` : ""}
-      ${ledger.slice(1, 3).map((entry) => `
-        <p class="muted">${escapeHtml(`${entry.title}: ${entry.recommendedPosture}`)}</p>
-      `).join("")}
-      ${events.map((event) => `<p class="muted">${escapeHtml(`${event.title}: ${sanitizeCampaignSummaryText(state, event.body)}`)}</p>`).join("")}
-    </div>
-  `;
-}
-
-function renderImmediateDecisions(state: SaveState, conference: StaffConference): string {
-  const recommendedType = conference.recommendedAction.relatedActionType;
-  const canWait = !state.campaign.finalSummaryMode && state.campaign.resolutionState === "active";
-  const buttons: string[] = [];
-  if (canWait && recommendedType !== "wait_next_event") {
-    buttons.push(`<button data-action="wait-next-event">Wait until next event</button>`);
-  }
-  if (canWait && recommendedType !== "stand_down_morning") {
-    buttons.push(`<button data-action="stand-down-morning">Stand down until morning</button>`);
-  }
-  if (canWait && recommendedType !== "let_work_finish") {
-    buttons.push(`<button data-action="let-work-finish">Let current work finish</button>`);
-  }
-  if (state.campaign.personnelDecisions.some((entry) => !entry.resolved)) {
-    buttons.push(`<button data-action="tab" data-payload="aircraft-crews">Resolve personnel decisions</button>`);
-  }
-  if (state.aircraft.some((aircraft) => aircraft.status === "damaged" || aircraft.status === "diverted")) {
-    buttons.push(`<button data-action="tab" data-payload="maintenance">Review maintenance</button>`);
-  }
-  if (state.campaign.finalSummaryMode) {
-    buttons.push(`<button data-action="start-new-campaign" class="active">Start New Campaign</button>`);
-  }
-  return `
-    <div class="note">
-      <strong>Immediate Decisions</strong>
-      <p>${escapeHtml(state.campaign.pendingDecisions.length > 0 ? state.campaign.pendingDecisions.join(" ") : "No new operational commitment is pending right now.")}</p>
-      <div class="button-row">
-        ${buttons.join("")}
-      </div>
-    </div>
-  `;
-}
-
-function renderCampaignRecord(state: SaveState): string {
-  const insights = state.campaign.insights.slice(0, 6);
-  const events = state.campaign.events.slice(0, 6);
-  const ledger = state.campaign.consequenceLedger.slice(0, 6);
-  return `
-    <details class="note">
-      <summary><strong>Campaign Record</strong></summary>
-      <div class="stack compact">
-        ${insights.length > 0 ? `<p><strong>Discovered Insights:</strong> ${escapeHtml(insights.map((insight) => insight.conclusion).join(" "))}</p>` : `<p class="muted">No durable campaign insights have been recorded yet.</p>`}
-        ${events.map((event) => `<p class="muted">${escapeHtml(`${event.title}: ${sanitizeCampaignSummaryText(state, event.body)}`)}</p>`).join("")}
-        ${ledger.map((entry) => `<p class="muted">${escapeHtml(`${entry.title}: ${entry.staffRead}`)}</p>`).join("")}
-      </div>
-    </details>
-  `;
-}
-
-function sanitizeEvaluationSummary(state: SaveState): string {
-  return sanitizeCampaignSummaryText(state, state.campaign.evaluation?.summary ?? buildQualitativeEvaluationSummary(state));
-}
-
-function renderFinalCampaignSummary(state: SaveState): string {
-  const evaluation = state.campaign.evaluation;
-  if (!evaluation) {
-    return `<section class="panel stack"><h2>Command</h2><p>Campaign summary unavailable.</p></section>`;
-  }
-  return `
-    <section class="panel stack">
-      <h2>Command</h2>
-      <div class="note">
-        <strong>Final Campaign Summary</strong>
-        <div class="badge-row">
-          ${renderBadge("Result", evaluation.judgment)}
-          ${renderBadge("End", evaluation.endCondition.replaceAll("_", " "))}
-        </div>
-        <p>${escapeHtml(sanitizeEvaluationSummary(state))}</p>
-        <p>${escapeHtml(evaluation.commandJudgment)}</p>
-        <p>${escapeHtml(evaluation.staffJudgment)}</p>
-        <p class="muted">${escapeHtml(evaluation.directiveAssessment)}</p>
-        <p class="muted">${escapeHtml(evaluation.groupAssessment)}</p>
-        <p class="muted">${escapeHtml(evaluation.lossesAssessment)}</p>
-        <p class="muted">${escapeHtml(evaluation.opportunityAssessment)}</p>
-        ${evaluation.notableChains.map((line) => `<p class="muted">${escapeHtml(line)}</p>`).join("")}
-      </div>
-      ${renderWhatChanged(state)}
-      ${renderImmediateDecisions(state, getStaffConference(state))}
-      ${renderCampaignRecord(state)}
-    </section>
-  `;
-}
-
-function renderCommandPanel(state: SaveState): string {
-  const conference = getStaffConference(state);
-  if (state.campaign.finalSummaryMode) {
-    return renderFinalCampaignSummary(state);
-  }
-  const brief = getCommandBrief(state);
-  return `
-    <section class="panel stack">
-      <h2>Command</h2>
-      <article class="briefing-card urgency-${conference.recommendedAction.urgency}">
-        <p class="eyebrow">Next Decision</p>
-        <h3>${escapeHtml(brief.nextDecision.question)}</h3>
-        <p><strong>Recommended course:</strong> ${escapeHtml(brief.nextDecision.recommendedAction)}</p>
-        <p><strong>Why staff recommends it:</strong> ${escapeHtml(brief.nextDecision.whyRecommended)}</p>
-        <p><strong>Expected to accomplish:</strong> ${escapeHtml(brief.nextDecision.expectedOutcome)}</p>
-        <p><strong>Cost or unresolved issue:</strong> ${escapeHtml(brief.nextDecision.unresolvedCost)}</p>
-        <div class="button-row briefing-actions">
-          <button class="active" data-action="use-recommended-plan">${escapeHtml(brief.nextDecision.primaryButtonLabel)}</button>
-        </div>
-      </article>
-      ${brief.newSinceLastDecision.length > 0 ? `
-        <section class="stack">
-          <h3>New Since Your Last Decision</h3>
-          <div class="briefing-grid">
-            ${brief.newSinceLastDecision.map((delta) => `
-              <article class="row-card">
-                <strong>${escapeHtml(delta.title)}</strong>
-                <p class="muted">${escapeHtml(delta.location)} • ${escapeHtml(delta.filedLabel)}</p>
-                <p>${escapeHtml(delta.whyItMatters)}</p>
-              </article>
-            `).join("")}
-          </div>
-        </section>
-      ` : ""}
-      ${brief.actionRequired.length > 0 ? `
-        <section class="stack">
-          <h3>Action Required</h3>
-          ${brief.actionRequired.map((item) => `
-            <article class="row-card">
-              <strong>${escapeHtml(item.title)}</strong>
-              <p>${escapeHtml(item.detail)}</p>
-              <p class="muted">${escapeHtml(item.whyItMatters)}</p>
-              <div class="button-row">${renderBriefActionButton(item)}</div>
-            </article>
-          `).join("")}
-        </section>
-      ` : ""}
-      <details class="note">
-        <summary><strong>Full Staff Discussion</strong></summary>
-        <p><strong>Executive conclusion:</strong> ${escapeHtml(brief.details.executiveConclusion)}</p>
-        <p><strong>Strongest supporting argument:</strong> ${escapeHtml(brief.details.strongestSupport)}</p>
-        ${brief.details.strongestObjection ? `<p><strong>Strongest objection:</strong> ${escapeHtml(brief.details.strongestObjection)}</p>` : ""}
-        ${renderOfficerDiscussion(conference)}
-      </details>
-      <details class="note">
-        <summary><strong>Alternative Courses</strong></summary>
-        <div class="briefing-grid">
-          ${conference.alternateActions.map((recommendation) => renderStaffRecommendation(recommendation)).join("") || "<p class=\"muted\">No major alternate course is presently competing with the main recommendation.</p>"}
-        </div>
-      </details>
-      <details class="note">
-        <summary><strong>Detailed Campaign Situation</strong></summary>
-        ${brief.details.campaignSituation.map((line) => `<p class="muted">${escapeHtml(line)}</p>`).join("")}
-      </details>
-      <details class="note">
-        <summary><strong>Campaign Record</strong></summary>
-        ${brief.details.campaignRecord.map((line) => `<p class="muted">${escapeHtml(line)}</p>`).join("") || "<p class=\"muted\">No campaign record entries are on file yet.</p>"}
-      </details>
-    </section>
-  `;
-}
-
-function renderTargetCard(state: SaveState, target: Target): string {
-  const selected = target.id === state.planning.selectedTargetId;
-  const strategic = getTargetStrategicContext(state, target.id);
-  const latestChange = getTargetCardLatestChange(state, target);
-  const targetUnread = Boolean(latestChange && (latestChange.updatedAt ?? 0) > (state.uiReadState.lastViewedTargetChangeAt ?? 0));
-  return `
-    <article class="target-card ${selected ? "selected" : ""}">
-      <div class="target-header">
-        <div>
-          <h3>${escapeHtml(target.name)}</h3>
-          <p class="muted">${escapeHtml(target.region)} • ${escapeHtml(target.type)} target</p>
-        </div>
-        <button class="${selected ? "selected-target-button" : ""}" data-action="select-target" data-payload="${target.id}">${selected ? "Plan Target" : "Select / Plan"}</button>
-      </div>
-      <div class="badge-row">
-        ${renderBadge("Condition", target.assessedCondition)}
-        ${renderBadge("Intel", getTargetIntelAgeLabel(state, target.id))}
-      </div>
-      <p><strong>Purpose:</strong> ${escapeHtml(strategic.strategicRole.replace("Strategic Role: ", ""))}</p>
-      <p><strong>Likely immediate benefit:</strong> ${escapeHtml(strategic.operationalEffect.replace("Likely Operational Effect: ", ""))}</p>
-      ${latestChange ? `<p>${targetUnread ? "<strong>NEW:</strong> " : ""}${escapeHtml(latestChange.text)} <span class="muted">Filed ${escapeHtml(getQualitativeAgeLabel(state, latestChange.updatedAt))}.</span></p>` : ""}
-      <details class="note">
-        <summary><strong>Full Dossier</strong></summary>
-        <p>${escapeHtml(getTargetOperationalSummary(target))}</p>
-        <p><strong>Likely Command Value:</strong> ${escapeHtml(strategic.commandValue.replace("Likely Command Value: ", ""))}</p>
-        <p><strong>Connections:</strong> ${escapeHtml(strategic.connections.replace("Connections: ", ""))}</p>
-        <p><strong>Weather:</strong> ${escapeHtml(target.weatherOutlook)}</p>
-        <p><strong>Suspected Effect:</strong> ${escapeHtml(target.suspectedEffects)}</p>
-        <p><strong>Evidence Basis:</strong> ${escapeHtml(target.evidence.slice(0, 4).join(" "))}</p>
-        ${target.latestIntelNote ? `<p><strong>Latest Intelligence:</strong> ${escapeHtml(target.latestIntelNote)}</p>` : ""}
-        ${target.latestIntelRecommendation ? `<p class="muted">${escapeHtml(target.latestIntelRecommendation)}</p>` : ""}
-      </details>
-      ${hiddenBlock(state.debug.showHiddenValues, [
-        `actual condition ${target.hiddenActualCondition}`,
-        `defense ${target.hiddenDefenseLevel}`,
-        `repair rate ${target.hiddenRepairRate}`,
-        `weather risk ${target.hiddenWeatherRisk}`
-      ])}
-    </article>
-  `;
-}
-
-function renderTargetBoard(state: SaveState): string {
-  return `
-    <section class="panel stack">
-      <h2>Target Board</h2>
-      <p class="muted">Folders are incomplete. Assessments are qualitative and sometimes contradictory, but the board should still be scannable at a glance.</p>
-      <div class="target-grid">
-        ${state.targets.map((target) => renderTargetCard(state, target)).join("")}
-      </div>
-    </section>
-  `;
-}
-
-function renderAircraftCrews(state: SaveState): string {
-  const replacementPool = getReplacementPool(state);
-  const medicalPersonnel = getMedicalPersonnel(state);
-  const restingPersonnel = getRestingPersonnel(state);
-  const unavailablePersonnel = getHardUnavailablePersonnel(state);
-  const airborneIds = new Set(getActiveMissionCrewIds(state));
-  return `
-    <section class="panel stack">
-      <h2>Aircraft & Crews</h2>
-      <div class="stack">
-        <h3>Aircraft</h3>
-        ${state.aircraft.map((aircraft) => {
-          const crew = getCrewById(state, aircraft.assignedCrewId);
-          const manifest = getCrewMembersForAircraft(state, aircraft.id);
-          const availability = getAircraftAvailability(state, aircraft.id);
-          const attention = getAircraftAttentionState(state, aircraft.id);
-          const wounded = manifest.filter((member) => member.status === "lightly_wounded" || member.status === "seriously_wounded").length;
-          const replacements = manifest.filter((member) => member.isReplacement).length;
-          const missing = manifest.filter((member) => member.status === "missing" || member.status === "kia" || member.status === "pow").length;
-          const coverageProblems = getRoleCoverageProblems(state, aircraft.id);
-          const personnelDecisions = getPersonnelDecisionsForAircraft(state, aircraft.id);
-          const isLost = aircraft.status === "lost";
-          const readiness = getAircraftReadinessSummary(state, aircraft.id);
-          return `
-            <details class="row-card aircraft-detail ${attention.needsAttention ? "needs-attention" : ""}" ${attention.shouldStartOpen ? "open" : ""}>
-              <summary class="aircraft-summary">
-                <div>
-                  <strong>${escapeHtml(aircraft.name)}</strong>
-                  <div class="muted">${escapeHtml(crew?.pilotName ?? "No pilot assigned")} • ${escapeHtml(readiness.primaryReason)}</div>
-                  <div class="muted">${wounded} wounded • ${missing} unavailable • ${replacements} replacements</div>
-                  <div class="muted">${escapeHtml(attention.needsAttention ? attention.reasons[0] ?? "Attention required." : "Open for the full crew manifest.")}</div>
-                </div>
-                <div class="badge-row">
-                  ${renderBadge("Status", aircraft.status)}
-                  ${renderBadge("Availability", availability.label)}
-                </div>
-              </summary>
-              <div class="stack compact">
-                <div class="aircraft-info-block">
-                  <strong>Aircraft Status</strong>
-                  <p class="muted">${escapeHtml(aircraft.conditionSummary)}</p>
-                  <p class="muted">${escapeHtml(`Airframe: ${readiness.airframe}. Crew: ${readiness.crew}. Tasking: ${readiness.tasking}.`)}</p>
-                  ${isLost ? `
-                    <p class="warning">This aircraft has been struck from the board. No replacement aircraft are available in this prototype slice.</p>
-                    <p class="muted">${escapeHtml(aircraft.lastOutcomeNote)}</p>
-                  ` : ""}
-                  <p class="muted">${escapeHtml(aircraft.crewCohesion)}</p>
-                  <p class="muted">Ground crew: ${escapeHtml(aircraft.assignedGroundCrewId)}</p>
-                </div>
-                <div class="crew-manifest-block">
-                  <strong>Crew Manifest</strong>
-                  <p class="muted">The following crew are currently assigned to this aircraft.</p>
-                  ${manifest.sort((a, b) => (a.currentAssignmentRole ?? "").localeCompare(b.currentAssignmentRole ?? "")).map((member) => renderCrewRow(state, aircraft.id, member, airborneIds)).join("")}
-                </div>
-                ${personnelDecisions.length > 0 ? `
-                  <div class="stack compact crew-problem-block">
-                    <strong>Recovered Originals Awaiting Decision</strong>
-                    ${personnelDecisions.map((decision) => {
-                      const original = state.crewMembers.find((member) => member.id === decision.crewMemberId);
-                      const replacement = state.crewMembers.find((member) => member.id === decision.replacementCrewMemberId);
-                      return `
-                        <div class="manifest-row">
-                          <div>
-                            <strong>${escapeHtml(decision.role.replaceAll("_", " "))}</strong>
-                            <div class="muted">${escapeHtml(original?.name ?? "Original crewman")} has recovered while ${escapeHtml(replacement?.name ?? "the replacement")} is still covering the seat.</div>
-                          </div>
-                          <div class="button-row">
-                            <button data-action="restore-original" data-payload="${decision.id}">Restore original</button>
-                            <button data-action="keep-replacement-temporary" data-payload="${decision.id}">Keep replacement temporary</button>
-                            <button data-action="resolve-mark-permanent" data-payload="${decision.id}">Mark replacement permanent</button>
-                          </div>
-                        </div>
-                      `;
-                    }).join("")}
-                  </div>
-                ` : ""}
-                ${coverageProblems.length > 0 ? `
-                  <div class="stack compact crew-problem-block">
-                    <strong>Open Crew Problems</strong>
-                    ${coverageProblems.map((problem) => `
-                      <div class="manifest-row">
-                        <div>
-                          <strong>${escapeHtml(problem.role.replaceAll("_", " "))}</strong>
-                          <div class="muted">${escapeHtml(problem.hasConflict ? "Multiple crew claim this station and the fit occupant needs sorting out." : "No fit crew member currently covers this position.")}</div>
-                        </div>
-                        <div class="button-row">
-                          ${replacementPool
-                            .filter((member) =>
-                              member.assignedAircraftId === null
-                              && ((member.role === "pilot" && (problem.role === "pilot" || problem.role === "copilot"))
-                                || (member.role === "copilot" && problem.role === "copilot")
-                                || member.role === problem.role
-                                || (member.role === "enlisted_airman" && ["engineer_top_turret", "radio_operator", "ball_turret", "left_waist", "right_waist", "tail_gunner"].includes(problem.role)))
-                            )
-                            .map((member) => `
-                              <button data-action="assign-replacement" data-payload="${member.id}:${aircraft.id}:${problem.role}">
-                                Assign ${escapeHtml(member.name)}
-                              </button>
-                            `).join("") || `<span class="disabled-reason">No suitable replacement available.</span>`}
-                        </div>
-                      </div>
-                    `).join("")}
-                  </div>
-                ` : ""}
-                ${hiddenBlock(state.debug.showHiddenValues, [`condition ${aircraft.hiddenCondition}`])}
-              </div>
-            </details>
-          `;
-        }).join("")}
-      </div>
-      <div class="two-col">
-        <div class="stack">
-          <h3>Replacement Pool</h3>
-          ${replacementPool.length === 0 ? `<p class="muted">No replacement crew members are currently unassigned.</p>` : replacementPool.map((member) => `
-            ${renderPersonnelStatusRow(state, member)}
-          `).join("")}
-        </div>
-        <div class="stack">
-          <h3>Medical Personnel</h3>
-          ${medicalPersonnel.length === 0 ? `<p class="muted">No crew members are currently under medical restriction.</p>` : medicalPersonnel.map((member) => `
-            ${renderPersonnelStatusRow(state, member)}
-          `).join("")}
-          <h3>Resting / Recovering</h3>
-          ${restingPersonnel.length === 0 ? `<p class="muted">No crew members are currently resting off the flight schedule.</p>` : restingPersonnel.map((member) => `
-            ${renderPersonnelStatusRow(state, member)}
-          `).join("")}
-          <h3>Unavailable / Missing</h3>
-          ${unavailablePersonnel.length === 0 ? `<p class="muted">No crew members are currently missing or otherwise hard unavailable.</p>` : unavailablePersonnel.map((member) => `
-            ${renderPersonnelStatusRow(state, member)}
-          `).join("")}
-        </div>
-      </div>
-    </section>
-  `;
-}
-
-function renderPlanning(state: SaveState): string {
-  const selectedTarget = getTargetById(state, state.planning.selectedTargetId);
-  const launchDisabled = getDisabledReasonForLaunch(state);
-  const secondaryOptions = selectedTarget ? getSecondaryTargetOptions(state, selectedTarget.id) : [];
-  const leadAssessment = getLeadAircraftAssessment(state, state.planning.leadAircraftId);
-  const staffPreview = getPlanningStaffPreview(state);
-  const topWarning = staffPreview.warnings[0] ?? (selectedTarget ? `${selectedTarget.name} remains under a ${getTargetIntelAgeLabel(state, selectedTarget.id)} file.` : "No target selected.");
-  return `
-    <section class="panel stack">
-      <h2>Mission Planning</h2>
-      <div class="row-card">
-        <strong>Proposed Order</strong>
-        <p><strong>Purpose:</strong> ${escapeHtml(staffPreview.operations)}</p>
-        <p><strong>Target:</strong> ${escapeHtml(selectedTarget?.name ?? "No target selected")}</p>
-        <p><strong>Operation:</strong> ${escapeHtml(state.planning.operationType.replaceAll("_", " "))}</p>
-        <p><strong>Route:</strong> ${escapeHtml(state.planning.routeRisk)}</p>
-        <p><strong>Doctrine:</strong> ${escapeHtml(state.planning.attackDoctrine.replaceAll("_", " "))}</p>
-        <p><strong>Package:</strong> ${state.planning.assignedAircraftIds.length} aircraft assigned</p>
-        <p><strong>Lead:</strong> ${escapeHtml(state.planning.leadAircraftId ? (getAircraftById(state, state.planning.leadAircraftId)?.name ?? "No lead selected") : "No lead selected")}</p>
-        <p class="warning"><strong>Primary concern:</strong> ${escapeHtml(topWarning)}</p>
-      </div>
-      <details class="note">
-        <summary><strong>Change Mission Profile</strong></summary>
-        <div class="control-group">
-          <span class="label">Operation Type</span>
-          <div class="button-row">
-            ${(["main_strike", "reduced_strike", "support_raid", "follow_up_attack", "harassment_diversion"] as const).map((operationType) => `
-              <button data-action="operation-type" data-payload="${operationType}" class="${state.planning.operationType === operationType ? "active" : ""}">
-                ${escapeHtml(operationType.replaceAll("_", " "))}
-              </button>
-            `).join("")}
-          </div>
-        </div>
-        <div class="control-group">
-          <span class="label">Secondary Target</span>
-          <div class="button-row">
-            <button data-action="secondary-target" data-payload="" class="${state.planning.secondaryTargetId === null ? "active" : ""}">No Secondary</button>
-            ${secondaryOptions.map((target) => `
-              <button data-action="secondary-target" data-payload="${target.id}" class="${state.planning.secondaryTargetId === target.id ? "active" : ""}">
-                ${escapeHtml(target.name)}
-              </button>
-            `).join("") || `<span class="disabled-reason">No connected or same-region secondary target is currently suitable.</span>`}
-          </div>
-        </div>
-        <div class="control-group">
-          <span class="label">Attack Doctrine</span>
-          <div class="button-row">
-            ${(["single_pass", "repeat_if_needed", "abort_unless_visual", "bomb_through_cloud"] as const).map((doctrine) => `
-              <button data-action="attack-doctrine" data-payload="${doctrine}" class="${state.planning.attackDoctrine === doctrine ? "active" : ""}">
-                ${escapeHtml(doctrine.replaceAll("_", " "))}
-              </button>
-            `).join("")}
-          </div>
-        </div>
-        <div class="control-group">
-          <span class="label">Route Risk</span>
-          <div class="button-row">
-            ${(["cautious", "standard", "direct"] as const).map((route) => `
-              <button data-action="route" data-payload="${route}" class="${state.planning.routeRisk === route ? "active" : ""}">
-                ${route}
-              </button>
-            `).join("")}
-          </div>
-        </div>
-        <div class="control-group">
-          <span class="label">Standing Orders</span>
-          <div class="check-grid">
-            ${Object.entries(state.planning.standingOrders).filter(([key]) => key !== "allowRepeatBombRun").map(([key, value]) => `
-              <label class="check-row">
-                <input type="checkbox" data-action="standing-order" data-payload="${key}" ${value ? "checked" : ""} />
-                <span>${escapeHtml(key.replaceAll(/([A-Z])/g, " $1").replace(/^./, (char) => char.toUpperCase()))}</span>
-              </label>
-            `).join("")}
-          </div>
-        </div>
-        <div class="control-group">
-          <span class="label">Launch Timing</span>
-          <div class="button-row">
-            <button data-action="launch-mode" data-payload="now" class="${state.planning.launchMode === "now" ? "active" : ""}">Launch Now</button>
-            <button data-action="launch-mode" data-payload="schedule" class="${state.planning.launchMode === "schedule" ? "active" : ""}">Schedule</button>
-            <button data-action="schedule-delay" data-payload="120000" class="${state.planning.scheduleDelayMs === 120000 ? "active" : ""}">+2 min</button>
-            <button data-action="schedule-delay" data-payload="300000" class="${state.planning.scheduleDelayMs === 300000 ? "active" : ""}">+5 min</button>
-          </div>
-        </div>
-      </details>
-      <details class="note">
-        <summary><strong>Change Aircraft Package</strong></summary>
-        <div class="assignment-list">
-          ${state.aircraft.map((aircraft) => {
-            const crew = getCrewById(state, aircraft.assignedCrewId);
-            const availability = getAircraftAvailability(state, aircraft.id);
-            const readiness = getAircraftReadinessSummary(state, aircraft.id);
-            const checked = state.planning.assignedAircraftIds.includes(aircraft.id);
-            const leadSelected = state.planning.leadAircraftId === aircraft.id;
-            return `
-              <div class="assignment-row ${availability.level}">
-                <div class="assignment-toggle-row">
-                  <input
-                    type="checkbox"
-                    data-action="toggle-aircraft"
-                    data-payload="${aircraft.id}"
-                    ${checked ? "checked" : ""}
-                    ${availability.level === "unavailable" && !checked ? "disabled" : ""}
-                  />
-                  <span class="assignment-title">${escapeHtml(aircraft.name)} • ${escapeHtml(crew?.pilotName ?? "Unknown crew")}</span>
-                  <button type="button" data-action="lead-aircraft" data-payload="${aircraft.id}" ${checked ? "" : "disabled"} class="${leadSelected ? "active" : ""}">
-                    ${leadSelected ? "Lead Aircraft" : "Set Lead"}
-                  </button>
-                </div>
-                <span class="assignment-meta">${escapeHtml(readiness.primaryReason)}</span>
-                <span class="assignment-meta">${escapeHtml(`Airframe: ${readiness.airframe}. Crew: ${readiness.crew}. Tasking: ${readiness.tasking}.`)}</span>
-              </div>
-            `;
-          }).join("")}
-        </div>
-      </details>
-      <details class="note">
-        <summary><strong>Full Staff Preview</strong></summary>
-        <p><strong>Operations:</strong> ${escapeHtml(staffPreview.operations)}</p>
-        <p><strong>Intelligence:</strong> ${escapeHtml(staffPreview.intelligence)}</p>
-        <p><strong>Engineering:</strong> ${escapeHtml(staffPreview.engineering)}</p>
-        <p><strong>Personnel:</strong> ${escapeHtml(staffPreview.personnel)}</p>
-        <p><strong>Command:</strong> ${escapeHtml(staffPreview.command)}</p>
-        <p><strong>Lead aircraft:</strong> ${escapeHtml(leadAssessment.summary)}</p>
-        ${staffPreview.warnings.length > 0 ? staffPreview.warnings.map((line) => `<p class="warning">${escapeHtml(line)}</p>`).join("") : ""}
-      </details>
-      <div class="button-row">
-        <button data-action="launch-mission" ${launchDisabled ? "disabled" : ""}>${state.planning.launchMode === "schedule" ? "Schedule Operation" : "Launch Operation"}</button>
-        ${launchDisabled ? `<span class="disabled-reason">${escapeHtml(launchDisabled)}</span>` : ""}
-      </div>
-    </section>
-  `;
-}
-
-function renderCurrentOperation(state: SaveState): string {
-  const mission = getActiveMission(state);
-  if (!mission) {
-    return `
-      <section class="panel stack">
-        <h2>Current Operation</h2>
-        <p>No active mission.</p>
-        <div class="disabled-reason">No active mission</div>
-      </section>
-    `;
-  }
-
-  const nextReport = mission.timelineEvents.filter((event) => !event.revealed).sort((a, b) => a.time - b.time)[0];
-  return `
-    <section class="panel stack">
-      <h2>Current Operation</h2>
-      <p>${escapeHtml(getCurrentOperationSummary(state))}</p>
-      <div class="badge-row">
-        ${renderBadge("Stage", mission.stage.replaceAll("_", " "))}
-        ${renderBadge("Operation", mission.plan.operationType.replaceAll("_", " "))}
-        ${renderBadge("Route", mission.plan.routeRisk)}
-        ${renderBadge("Doctrine", mission.plan.attackDoctrine.replaceAll("_", " "))}
-        ${renderBadge("Assigned", String(mission.plan.assignedAircraftIds.length))}
-      </div>
-      <p><strong>Target:</strong> ${escapeHtml(getTargetById(state, mission.plan.targetId)?.name ?? "Unknown")}</p>
-      ${mission.plan.secondaryTargetId ? `<p><strong>Secondary:</strong> ${escapeHtml(getTargetById(state, mission.plan.secondaryTargetId)?.name ?? "Unknown")}</p>` : ""}
-      ${mission.plan.leadAircraftId ? `<p><strong>Lead aircraft:</strong> ${escapeHtml(getAircraftById(state, mission.plan.leadAircraftId)?.name ?? "Unknown")}</p>` : ""}
-      <p><strong>Launch:</strong> ${escapeHtml(formatTimestamp(state, mission.plan.scheduledLaunchTime))}</p>
-      <p><strong>Next report:</strong> ${nextReport ? escapeHtml(renderDueTime(state, nextReport.time)) : "No further reports pending."}</p>
-      <div class="report-list">
-        ${mission.timelineEvents.filter((event) => event.revealed).map((event) => `
-          <div class="report-item">
-            <strong>${escapeHtml(event.stage.replaceAll("_", " "))}</strong>
-            <span class="muted">${escapeHtml(event.confidence)} • ${escapeHtml(event.source)}</span>
-            <p>${escapeHtml(event.publicReportText)}</p>
-          </div>
-        `).join("") || "<p class=\"muted\">No reports have arrived yet.</p>"}
-      </div>
-    </section>
-  `;
-}
-
-function renderDebrief(state: SaveState): string {
-  const mission = getLatestDebriefMission(state);
-  if (!mission || !mission.debriefGenerated) {
-    return `
-      <section class="panel stack">
-        <h2>Debrief / Assessment</h2>
-        <p>Debrief not ready.</p>
-        <div class="disabled-reason">Debrief not ready</div>
-      </section>
-    `;
-  }
-
-  const target = getTargetById(state, mission.plan.targetId);
-  const attackedTarget = getTargetById(state, mission.hiddenOutcome.attackedTargetId) ?? target;
-  const ledger = getRecentConsequenceLedger(state).find((entry) => entry.missionId === mission.id);
-  return `
-    <section class="panel stack">
-      <p class="eyebrow">Debrief Target</p>
-      <h2>Debrief: ${escapeHtml(target?.name ?? "Unknown target")}</h2>
-      <div class="row-card">
-        <strong>Top Summary</strong>
-        <p><strong>What happened:</strong> ${escapeHtml(mission.resultSummary)}</p>
-        <p><strong>What changed:</strong> ${escapeHtml(ledger?.strategicConsequence ?? attackedTarget?.assessedCondition ?? "No settled change filed.")}</p>
-        <p><strong>What it cost:</strong> ${escapeHtml(ledger?.groupCost ?? "No detailed group-cost summary filed.")}</p>
-        <p><strong>What remains uncertain:</strong> ${escapeHtml(attackedTarget?.suspectedEffects ?? "The full target effect remains uncertain.")}</p>
-        <p><strong>What staff recommends next:</strong> ${escapeHtml(ledger?.recommendedPosture ?? getStaffConference(state).recommendedAction.title)}</p>
-      </div>
-      <div class="badge-row">
-        ${renderBadge("Operation", mission.plan.operationType.replaceAll("_", " "))}
-        ${renderBadge("Doctrine", mission.plan.attackDoctrine.replaceAll("_", " "))}
-      </div>
-      <p><strong>Filed:</strong> ${escapeHtml(getQualitativeAgeLabel(state, mission.plan.scheduledLaunchTime))}</p>
-      <p><strong>Planned primary:</strong> ${escapeHtml(target?.name ?? "Unknown target")}</p>
-      ${mission.plan.secondaryTargetId ? `<p><strong>Planned secondary:</strong> ${escapeHtml(getTargetById(state, mission.plan.secondaryTargetId)?.name ?? "Unknown")}</p>` : ""}
-      ${mission.plan.leadAircraftId ? `<p><strong>Lead aircraft:</strong> ${escapeHtml(getAircraftById(state, mission.plan.leadAircraftId)?.name ?? "Unknown")}</p>` : ""}
-      <p><strong>Attack result:</strong> ${escapeHtml(mission.hiddenOutcome.targetDamage <= 0 ? "No clearly effective attack confirmed." : mission.hiddenOutcome.attackedSecondary ? `Crews believe the attack shifted to ${attackedTarget?.name ?? "the secondary target"}.` : `Crews believe the main effort hit ${attackedTarget?.name ?? "the primary target"}.`)}</p>
-      <p><strong>Mission summary:</strong> ${escapeHtml(mission.resultSummary)}</p>
-      <p>${escapeHtml(mission.debrief)}</p>
-      ${mission.plan.staffWarningsAtLaunch.length > 0 ? `
-        <div class="stack compact">
-          <strong>Staff Warnings At Launch</strong>
-          ${mission.plan.staffWarningsAtLaunch.map((line) => `<p class="muted">${escapeHtml(line)}</p>`).join("")}
-        </div>
-      ` : ""}
-      ${mission.debriefCasualtyLines.length > 0 ? `
-        <div class="stack compact">
-          <strong>Crew Consequences</strong>
-          ${mission.debriefCasualtyLines.map((line) => `<p>${escapeHtml(line)}</p>`).join("")}
-        </div>
-      ` : `<p class="muted">No specific crew casualties have been filed beyond fatigue and strain.</p>`}
-      ${ledger ? `
-        <div class="note">
-          <strong>Post-Operation Consequence Ledger</strong>
-          <p><strong>Staff read:</strong> ${escapeHtml(ledger.staffRead)}</p>
-          <p><strong>Command read:</strong> ${escapeHtml(ledger.commandRead)}</p>
-          <p><strong>Target read:</strong> ${escapeHtml(ledger.targetRead)}</p>
-          <p><strong>Group cost:</strong> ${escapeHtml(ledger.groupCost)}</p>
-          <p><strong>Strategic consequence:</strong> ${escapeHtml(ledger.strategicConsequence)}</p>
-          <p><strong>Recommended posture:</strong> ${escapeHtml(ledger.recommendedPosture)}</p>
-        </div>
-      ` : ""}
-      <p><strong>Target assessment:</strong> ${escapeHtml(attackedTarget?.assessedCondition ?? "No reliable assessment.")}</p>
-      <p><strong>Evidence:</strong> ${escapeHtml(attackedTarget?.evidence.slice(0, 4).join(" ") ?? "No evidence filed.")}</p>
-      <div class="button-row">
-        <button data-action="quick-recon" data-payload="${attackedTarget?.id ?? target?.id ?? ""}" ${state.campaign.activeReconId ? "disabled" : ""}>Order Post-Strike Recon</button>
-        ${state.campaign.activeReconId ? `<span class="disabled-reason">Recon section already occupied</span>` : ""}
-      </div>
-    </section>
-  `;
-}
-
-function renderMaintenance(state: SaveState): string {
-  const damagedAircraft = state.aircraft.filter((aircraft) => aircraft.status === "damaged" || aircraft.status === "under_repair");
-  const divertedAircraft = state.aircraft.filter((aircraft) => aircraft.status === "diverted" || aircraft.recoveryJobId);
-  const optionalAircraft = state.aircraft.filter((aircraft) => getAircraftReadinessSummary(state, aircraft.id).optionalMaintenance);
-  const activeRepairs = state.repairJobs.filter((job) => !job.completionApplied);
-  const activeRecoveries = state.recoveryJobs.filter((job) => !job.completionApplied);
-  const recentCompletedRepairs = state.repairJobs.filter((job) => job.completionApplied && job.completesAt > (state.uiReadState.lastViewedMaintenanceAt ?? 0));
-  const recentCompletedRecoveries = state.recoveryJobs.filter((job) => job.completionApplied && job.completesAt > (state.uiReadState.lastViewedMaintenanceAt ?? 0));
-  return `
-    <section class="panel stack">
-      <h2>Maintenance</h2>
-      <div class="stack">
-        <h3>Recently Completed</h3>
-        ${recentCompletedRepairs.length === 0 && recentCompletedRecoveries.length === 0 ? `<p class="muted">No unread maintenance completions are on file.</p>` : ""}
-        ${recentCompletedRepairs.map((job) => {
-          const aircraft = getAircraftById(state, job.aircraftId);
-          const readiness = getAircraftReadinessSummary(state, job.aircraftId);
-          return `<div class="row-card"><strong>${escapeHtml(aircraft?.name ?? "Aircraft")}</strong><p><strong>Repair:</strong> ${escapeHtml(job.repairTier)}</p><p>${escapeHtml(job.resultText)}</p><p class="muted">${escapeHtml(`Current readiness: ${readiness.primaryReason}`)}</p><p class="muted">${escapeHtml(getQualitativeAgeLabel(state, job.completesAt))}</p></div>`;
-        }).join("")}
-        ${recentCompletedRecoveries.map((job) => {
-          const aircraft = getAircraftById(state, job.aircraftId);
-          const readiness = getAircraftReadinessSummary(state, job.aircraftId);
-          return `<div class="row-card"><strong>${escapeHtml(aircraft?.name ?? "Aircraft")}</strong><p><strong>Recovery:</strong> diversion return</p><p>${escapeHtml(job.resultText)}</p><p class="muted">${escapeHtml(`Current readiness: ${readiness.primaryReason}`)}</p><p class="muted">${escapeHtml(getQualitativeAgeLabel(state, job.completesAt))}</p></div>`;
-        }).join("")}
-      </div>
-      <div class="stack">
-        <h3>Repair Required</h3>
-        ${damagedAircraft.length === 0 ? `<p class="muted">No aircraft currently require mandatory repair.</p>` : damagedAircraft.map((aircraft) => {
-        const activeJob = state.repairJobs.find((job) => job.aircraftId === aircraft.id && !job.completionApplied);
-        const pressureNote = getGroundCrewPressureNote(state, aircraft.id, activeJob?.repairTier);
-        return `
-          <div class="row-card">
-            <div>
-              <strong>${escapeHtml(aircraft.name)}</strong>
-              <div class="muted">${escapeHtml(aircraft.conditionSummary)}</div>
-              <div class="muted">${escapeHtml(aircraft.lastOutcomeNote)}</div>
-            </div>
-            ${activeJob ? `
-              <div class="stack compact">
-                ${renderBadge("Repair", activeJob.repairTier)}
-                <span class="muted">Due ${escapeHtml(renderDueTime(state, activeJob.completesAt))}</span>
-                <span class="muted">${escapeHtml(activeJob.riskNote)}</span>
-              </div>
-            ` : `
-              <div class="button-row">
-                <button data-action="repair" data-payload="${aircraft.id}:patch">Patch Repair</button>
-                <button data-action="repair" data-payload="${aircraft.id}:standard">Standard Repair</button>
-                <button data-action="repair" data-payload="${aircraft.id}:thorough">Thorough Inspection</button>
-              </div>
-            `}
-            ${pressureNote ? `<div class="warning">${escapeHtml(pressureNote)}</div>` : ""}
-            ${hiddenBlock(state.debug.showHiddenValues, [`condition ${aircraft.hiddenCondition}`])}
-          </div>
-        `;
-      }).join("")}
-      </div>
-      <div class="stack">
-        <h3>Active Work</h3>
-        ${activeRepairs.length === 0 && activeRecoveries.length === 0 ? `<p class="muted">No repair or recovery work is currently in progress.</p>` : ""}
-        ${activeRepairs.map((job) => `<div class="row-card"><strong>${escapeHtml(getAircraftById(state, job.aircraftId)?.name ?? "Aircraft")}</strong><p>${escapeHtml(job.riskNote)}</p><p class="muted">Due ${escapeHtml(renderDueTime(state, job.completesAt))}</p></div>`).join("")}
-        ${activeRecoveries.map((job) => `<div class="row-card"><strong>${escapeHtml(getAircraftById(state, job.aircraftId)?.name ?? "Aircraft")}</strong><p>${escapeHtml(job.summary)}</p><p class="muted">Due ${escapeHtml(renderDueTime(state, job.completesAt))}</p></div>`).join("")}
-      </div>
-      <div class="stack">
-        <h3>Away After Diversion</h3>
-        ${divertedAircraft.length === 0 ? `
-          <p class="muted">No aircraft are currently away at another field.</p>
-        ` : divertedAircraft.map((aircraft) => {
-          const activeRecovery = state.recoveryJobs.find((job) => job.aircraftId === aircraft.id && !job.completionApplied);
-          const pressureNote = getGroundCrewPressureNote(state, aircraft.id);
-          return `
-            <div class="row-card">
-              <div>
-                <strong>${escapeHtml(aircraft.name)}</strong>
-                <div class="muted">${escapeHtml(aircraft.conditionSummary)}</div>
-                <div class="muted">${escapeHtml(aircraft.lastOutcomeNote)}</div>
-              </div>
-              ${activeRecovery ? `
-                <div class="stack compact">
-                  ${renderBadge("Status", "recovering")}
-                  <span class="muted">${escapeHtml(activeRecovery.summary)}</span>
-                  <span class="muted">Due ${escapeHtml(renderDueTime(state, activeRecovery.completesAt))}</span>
-                </div>
-              ` : `
-                <div class="button-row">
-                  <button data-action="recover-aircraft" data-payload="${aircraft.id}">Recover from diversion</button>
-                </div>
-              `}
-              ${pressureNote ? `<div class="warning">${escapeHtml(pressureNote)}</div>` : ""}
-              ${hiddenBlock(state.debug.showHiddenValues, [`condition ${aircraft.hiddenCondition}`])}
-            </div>
-          `;
-        }).join("")}
-      </div>
-      <div class="stack">
-        <h3>Optional Inspection / Preventive Work</h3>
-        ${optionalAircraft.length === 0 ? `<p class="muted">No aircraft currently require maintenance or optional inspection.</p>` : optionalAircraft.map((aircraft) => `
-          <div class="row-card">
-            <strong>${escapeHtml(aircraft.name)}</strong>
-            <p>${escapeHtml(aircraft.conditionSummary)}</p>
-            <p class="muted">${escapeHtml(getAircraftReadinessSummary(state, aircraft.id).primaryReason)}</p>
-            <div class="button-row">
-              <button data-action="repair" data-payload="${aircraft.id}:thorough">Open Optional Inspection</button>
-            </div>
-          </div>
-        `).join("")}
-      </div>
-    </section>
-  `;
-}
-
-function renderRecon(state: SaveState): string {
-  const activeRecon = getActiveRecon(state);
-  const latestIntel = state.campaign.latestIntelUpdate;
-  const selectedTarget = getTargetById(state, state.planning.selectedTargetId);
-  const activeReconTarget = activeRecon ? getTargetById(state, activeRecon.targetId) : null;
-  const delta = getReconDeltaSummary(state);
-  return `
-    <section class="panel stack">
-      <h2>Recon / Intelligence</h2>
-      ${activeRecon ? `
-        <p><strong>Active recon target:</strong> ${escapeHtml(activeReconTarget?.name ?? "Unknown target")}</p>
-        ${activeReconTarget ? `<p class="muted">${escapeHtml(activeReconTarget.assessedCondition)} • file is ${escapeHtml(getTargetIntelAgeLabel(state, activeReconTarget.id))}</p>` : ""}
-      ` : `
-        <p><strong>Selected target for recon:</strong> ${escapeHtml(selectedTarget?.name ?? "No target selected")}</p>
-        ${selectedTarget ? `<p class="muted">${escapeHtml(selectedTarget.assessedCondition)} • file is ${escapeHtml(getTargetIntelAgeLabel(state, selectedTarget.id))}</p>` : ""}
-      `}
-      <p class="muted">Recon section can service one group priority at a time. Other theater reconnaissance continues outside your direct control.</p>
-      ${delta ?? latestIntel ? `
-        <div class="row-card">
-          <strong>${escapeHtml((delta?.isUnread ?? false) ? "New Intelligence" : "Latest Intelligence")} - ${escapeHtml(delta?.targetName ?? latestIntel?.targetName ?? "Target")}</strong>
-          <div class="badge-row">
-            ${latestIntel ? renderBadge("Result", latestIntel.resultQuality) : ""}
-            ${latestIntel ? renderBadge("Alert", latestIntel.alertLevel) : ""}
-          </div>
-          <p class="muted">Filed ${escapeHtml(delta?.filedLabel ?? (latestIntel ? getQualitativeAgeLabel(state, latestIntel.updatedAt) : "no recent filing"))}.</p>
-          ${delta ? delta.changes.map((line) => `<p>${escapeHtml(line)}</p>`).join("") : latestIntel ? `<p>${escapeHtml(latestIntel.assessment)}</p>` : ""}
-          ${latestIntel ? `
-            <details class="note">
-              <summary><strong>Full Interpretation</strong></summary>
-              <p><strong>Assessment:</strong> ${escapeHtml(latestIntel.assessment)}</p>
-              <p><strong>Evidence:</strong> ${escapeHtml(latestIntel.evidence)}</p>
-              <p><strong>Current file freshness:</strong> ${escapeHtml(getTargetIntelAgeLabel(state, latestIntel.targetId))}</p>
-            </details>
-          ` : ""}
-          <p><strong>Staff conclusion:</strong> ${escapeHtml(delta?.conclusion ?? latestIntel?.recommendation ?? "No fresh conclusion filed.")}</p>
-        </div>
-      ` : ""}
-      ${!latestIntel ? `<p class="muted">No recent intelligence update has been filed yet.</p>` : ""}
-      ${activeRecon ? `
-        <p>${escapeHtml(activeRecon.resultText)}</p>
-        <div class="badge-row">
-          ${renderBadge("Status", activeRecon.status)}
-          ${renderBadge("Type", activeRecon.type.replaceAll("_", " "))}
-        </div>
-        <p><strong>Recon operation:</strong> ${escapeHtml(activeReconTarget?.name ?? "Unknown target")}</p>
-        <p><strong>Interpretation due:</strong> ${escapeHtml(renderDueTime(state, activeRecon.interpretedAt))}</p>
-      ` : `
-        <p>No active recon.</p>
-        <div class="button-row">
-          <button data-action="recon" data-payload="${selectedTarget?.id ?? ""}:pre_strike" ${selectedTarget ? "" : "disabled"}>Pre-Strike Recon</button>
-          <button data-action="recon" data-payload="${selectedTarget?.id ?? ""}:weather_route" ${selectedTarget ? "" : "disabled"}>Weather / Route Recon</button>
-          <button data-action="recon" data-payload="${selectedTarget?.id ?? ""}:focused_followup" ${selectedTarget ? "" : "disabled"}>Focused Follow-Up</button>
-        </div>
-        <div class="stack compact">
-          <p class="muted">Pre-strike recon checks target activity and worth, but is more likely to stir alertness.</p>
-          <p class="muted">Weather / route recon favors flying conditions and doctrine advice with less target-alert risk.</p>
-          <p class="muted">Focused follow-up is slower, but aims at one unresolved question rather than a general look.</p>
-        </div>
-      `}
-    </section>
-  `;
-}
-
-function renderEventLog(state: SaveState): string {
-  return `
-    <section class="panel stack">
-      <h2>Event Log</h2>
-      <div class="log-list">
-        ${state.campaign.logEntries.map((entry) => `
-          <div class="log-item">
-            <span class="muted">${escapeHtml(entry.category)}</span>
-            <p>${escapeHtml(sanitizeCampaignSummaryText(state, entry.text))}</p>
-          </div>
-        `).join("")}
-      </div>
-    </section>
-  `;
-}
-
-function renderNextStepStrip(state: SaveState): string {
-  const guidance = getNextStepGuidance(state);
-  if (!guidance) {
-    return "";
-  }
-  return `
-    <section class="panel next-step-strip">
-      <div>
-        <p class="eyebrow">Recommended Next Step</p>
-        <strong>${escapeHtml(guidance.title)}</strong>
-        <p class="muted">${escapeHtml(guidance.reason)}</p>
-      </div>
-      <div class="button-row">
-        <button class="active" data-action="use-recommended-plan">${escapeHtml(guidance.buttonLabel)}</button>
-      </div>
-    </section>
-  `;
-}
-
-function renderGlobalTutorialHelp(state: SaveState): string {
-  return renderTutorialModal(state);
-}
-
-function renderDebug(state: SaveState): string {
-  return `
-    <section class="panel stack">
-      <h2>Debug</h2>
-      <div class="button-row">
-        <button data-action="save-now">Save Now</button>
-        <button data-action="skip-report">Skip To Next Report</button>
-        <button data-action="skip-debrief">Skip To Debrief</button>
-        <button data-action="complete-recon">Complete Current Recon</button>
-        <button data-action="complete-repairs">Complete All Repairs</button>
-        <button data-action="advance-day">Advance Campaign Day</button>
-        <button data-action="reset-save" class="danger">Reset Save</button>
-      </div>
-      <label class="check-row">
-        <input type="checkbox" data-action="toggle-hidden" ${state.debug.showHiddenValues ? "checked" : ""} />
-        <span>Show hidden values</span>
-      </label>
-      <div class="note">
-        <strong>Clock offset:</strong> ${Math.round(state.debug.clockOffsetMs / 60000)} minutes advanced for testing.
-      </div>
-      <div class="note">
-        <strong>Simulation audit:</strong> Mission stage timing is fixed by target type. Mission, recon, repair, and diversion-recovery outcomes are generated when they begin and then stored. Aircraft outcomes still depend on hidden condition, fatigue, defenses, route risk, visibility, and randomness.
-      </div>
-    </section>
-  `;
-}
-
-function renderActivePanel(state: SaveState): string {
-  switch (state.selectedTab) {
-    case "command":
-      return renderCommandPanel(state);
-    case "target-board":
-      return renderTargetBoard(state);
-    case "aircraft-crews":
-      return renderAircraftCrews(state);
-    case "mission-planning":
-      return renderPlanning(state);
-    case "current-operation":
-      return renderCurrentOperation(state);
-    case "debrief":
-      return renderDebrief(state);
-    case "maintenance":
-      return renderMaintenance(state);
-    case "recon":
-      return renderRecon(state);
-    case "event-log":
-      return renderEventLog(state);
-    case "debug":
-      return renderDebug(state);
-    default:
-      return renderCommandPanel(state);
-  }
-}
-
-function parsePayload(value: string | null): string | null {
-  return value && value.length > 0 ? value : null;
-}
+const esc = (value: unknown) => String(value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
+const hours = (ms: number) => ms <= 0 ? 'due now' : ms < HOUR ? `${Math.ceil(ms / 60_000)} min` : `${Math.ceil(ms / HOUR)} hr`;
+const percent = (n: number) => `${Math.round(n * 100)}%`;
+const experience = (c: Crew) => c.experience >= 6 ? 'Veteran' : c.experience >= 3 ? 'Seasoned' : 'Novice';
+const badge = (text: string, tone = '') => `<span class="badge ${tone}">${esc(text)}</span>`;
+const button = (action: string, label: string, cls = '', attrs = '') => `<button type="button" data-action="${action}" class="${cls}" ${attrs}>${label}</button>`;
 
 export function mountBomberCommand(root: HTMLElement): void {
-  let state = loadState() ?? createNewGame(Date.now());
-
-  const sync = (forceRender = false) => {
-    const now = getEffectiveNow(state);
-    const changed = reconcileState(state, now);
-    if (changed || forceRender) {
-      render();
-    }
-    saveState(state);
-  };
-
-  const performAction: ActionHandler = (action, payload) => {
-    const now = getEffectiveNow(state);
-    let error: string | null = null;
-
-    switch (action) {
-      case "tab":
-        if (payload) {
-          setSelectedTab(state, payload as CampaignTab);
-        }
-        break;
-      case "select-target":
-        if (payload) {
-          setPlanningTarget(state, payload);
-          setSelectedTab(state, "mission-planning");
-        }
-        break;
-      case "briefing-target-board":
-        if (payload) {
-          setPlanningTarget(state, payload);
-        }
-        setSelectedTab(state, "target-board");
-        break;
-      case "briefing-mission-planning":
-        if (payload) {
-          setPlanningTarget(state, payload);
-        }
-        setSelectedTab(state, "mission-planning");
-        break;
-      case "briefing-start-recon":
-        if (payload) {
-          const [targetId, type] = payload.split(":");
-          setPlanningTarget(state, targetId);
-          error = startRecon(state, targetId, (type ?? "pre_strike") as ReconType, now);
-          if (!error) {
-            setSelectedTab(state, "recon");
-          }
-        }
-        break;
-      case "toggle-aircraft":
-        if (payload) {
-          toggleAssignedAircraft(state, payload);
-        }
-        break;
-      case "route":
-        if (payload === "cautious" || payload === "standard" || payload === "direct") {
-          setRouteRisk(state, payload);
-        }
-        break;
-      case "operation-type":
-        if (payload) {
-          setOperationType(state, payload as OperationType);
-        }
-        break;
-      case "secondary-target":
-        setSecondaryTarget(state, payload);
-        break;
-      case "lead-aircraft":
-        if (payload) {
-          setLeadAircraft(state, payload);
-        }
-        break;
-      case "attack-doctrine":
-        if (payload) {
-          setAttackDoctrine(state, payload as AttackDoctrine);
-        }
-        break;
-      case "standing-order":
-        if (payload) {
-          toggleStandingOrder(state, payload as keyof SaveState["planning"]["standingOrders"]);
-        }
-        break;
-      case "launch-mode":
-        if (payload === "now" || payload === "schedule") {
-          setLaunchMode(state, payload);
-        }
-        break;
-      case "schedule-delay":
-        if (payload) {
-          setScheduleDelay(state, Number(payload));
-        }
-        break;
-      case "launch-mission":
-        error = launchMission(state, now);
-        break;
-      case "repair":
-        if (payload) {
-          const [aircraftId, tier] = payload.split(":");
-          error = startRepair(state, aircraftId ?? "", (tier ?? "standard") as RepairTier, now);
-        }
-        break;
-      case "assign-replacement":
-        if (payload) {
-          const [crewMemberId, aircraftId, role] = payload.split(":");
-          error = assignReplacementCrewMember(state, crewMemberId ?? "", aircraftId ?? "", (role ?? "pilot") as CrewRole);
-        }
-        break;
-      case "remove-replacement":
-        if (payload) {
-          error = removeReplacementCrewMember(state, payload);
-        }
-        break;
-      case "mark-permanent":
-        if (payload) {
-          error = markReplacementPermanent(state, payload);
-        }
-        break;
-      case "recover-aircraft":
-        if (payload) {
-          error = startRecovery(state, payload, now);
-        }
-        break;
-      case "recon":
-        if (payload) {
-          const [targetId, type] = payload.split(":");
-          error = startRecon(state, targetId ?? "", (type ?? "pre_strike") as ReconType, now);
-        }
-        break;
-      case "quick-recon":
-        if (payload) {
-          error = startRecon(state, payload, "post_strike", now);
-        }
-        break;
-      case "use-recommended-plan":
-        error = applyRecommendedPlan(state, now);
-        break;
-      case "wait-next-event":
-        error = waitUntilNextEvent(state, now);
-        break;
-      case "stand-down-morning":
-        error = standDownUntilMorning(state, now);
-        break;
-      case "let-work-finish":
-        error = letCurrentWorkFinish(state, now);
-        break;
-      case "restore-original":
-        if (payload) {
-          error = restoreOriginalCrewMember(state, payload);
-        }
-        break;
-      case "keep-replacement-temporary":
-        if (payload) {
-          error = keepReplacementTemporary(state, payload);
-        }
-        break;
-      case "resolve-mark-permanent":
-        if (payload) {
-          error = markReplacementPermanentFromDecision(state, payload);
-        }
-        break;
-      case "save-now":
-        saveState(state);
-        break;
-      case "skip-report":
-        error = skipToNextReport(state, now);
-        break;
-      case "skip-debrief":
-        error = skipToDebrief(state, now);
-        break;
-      case "complete-recon":
-        error = completeCurrentRecon(state, now);
-        break;
-      case "complete-repairs":
-        error = completeAllRepairs(state, now);
-        break;
-      case "advance-day":
-        error = advanceCampaignDay(state);
-        break;
-      case "toggle-hidden":
-        setShowHiddenValues(state, !state.debug.showHiddenValues);
-        break;
-      case "reset-save":
-        resetState();
-        state = createNewGame(Date.now());
-        break;
-      case "start-new-campaign":
-        resetState();
-        state = createNewGame(Date.now());
-        break;
-      case "tutorial-dismiss":
-        dismissActiveTutorialStep(state);
-        break;
-      case "tutorial-open-tab":
-        if (payload) {
-          setSelectedTab(state, payload as CampaignTab);
-        }
-        break;
-    }
-
-    if (error) {
-      state.campaign.logEntries.unshift({
-        id: `ui-error-${Date.now()}`,
-        at: now,
-        category: "system",
-        text: error
-      });
-    }
-
-    sync(true);
-  };
-
-  const bind = () => {
-    root.querySelectorAll<HTMLElement>("[data-action]").forEach((element) => {
-      if (element instanceof HTMLInputElement && element.type === "checkbox") {
-        element.addEventListener("change", () => {
-          performAction(element.dataset.action ?? "", parsePayload(element.dataset.payload ?? null));
-        });
-        return;
+  let store: ReturnType<typeof createStorage>;
+  let s: State;
+  let message = '', error = '', blocked = false;
+  let tab: 'today' | 'squadron' | 'tour' = 'today';
+  let modal: 'dispatch' | 'standdown' | 'new' | null = null;
+  let returnFocus = '';
+  const seed = () => crypto.getRandomValues(new Uint32Array(1))[0];
+  try {
+    store = createStorage(localStorage);
+    const loaded = store.load(); message = loaded.message; blocked = loaded.blocked;
+    s = loaded.state ?? createCampaign(seed(), Date.now());
+    if (!blocked) { advance(s, Date.now() + s.offset); store.save(s); }
+  } catch (e) {
+    root.innerHTML = `<main class="paper"><p class="eyebrow">Station records unavailable</p><h1>We couldn’t open the safe.</h1><p>${esc(e instanceof Error ? e.message : e)}</p><p>Allow this site to use browser storage, then reload. Your existing records have not been deliberately removed.</p>${button('reload', 'Reload page')}</main>`;
+    root.querySelector('button')?.addEventListener('click', () => location.reload()); return;
+  }
+  function transact(action: (draft: State) => void): boolean {
+    if (blocked) return false;
+    const draft = structuredClone(s);
+    try { advance(draft, Math.max(draft.now, Date.now() + draft.offset)); action(draft); store.save(draft); s = draft; error = ''; return true; }
+    catch (e) { error = e instanceof Error ? e.message : 'The order could not be saved.'; return false; }
+  }
+  function jobText(subject: string): string {
+    return s.jobs.filter(j => j.subject === subject && j.kind !== 'rest' && j.kind !== 'service').map(j => `${({ repair: 'Proper repair', inspection: 'Specialist inspection', medical: 'Medical clearance', recovery: 'Recovery', training: 'Training' } as Record<string, string>)[j.kind] ?? 'Station work'}: ${hours(j.at - s.now)}`).join(' · ');
+  }
+  function crewOptions(current: string): string {
+    return s.crews.filter(c => !c.lost).map(c => `<option value="${c.id}" ${c.id === current ? 'selected' : ''} ${!crewAvailable(s, c) ? 'disabled' : ''}>${esc(c.pilot)} · ${experience(c)} · ${c.fatigue} fatigue${!crewAvailable(s, c) ? ' · unavailable' : ''}</option>`).join('');
+  }
+  function aircraftCard(a: Aircraft, selectable = false): string {
+    const flight = s.plan.flights.find(f => f.aircraft === a.id);
+    const c = s.crews.find(c => c.id === flight?.crew);
+    const available = aircraftAvailable(s, a);
+    return `<article class="aircraft ${flight && selectable ? 'selected' : ''} ${a.lost ? 'lost' : ''}">
+      <div class="aircraft-heading"><div><span class="eyebrow">B-17 Flying Fortress</span><h3>${esc(a.name)}</h3></div>${selectable ? `<input aria-label="Assign ${esc(a.name)}" type="checkbox" data-aircraft="${a.id}" ${flight ? 'checked' : ''} ${!available ? 'disabled' : ''}>` : badge(a.lost ? 'Lost' : a.away ? 'Away' : `${a.sorties} sorties`)}</div>
+      <p class="issue ${a.defect || a.condition < 55 ? 'caution' : ''}">${esc(aircraftIssue(s, a))}</p>
+      ${a.defect ? `<p class="small">${defectText[a.defectType ?? 'oil'].cost}</p>` : ''}
+      <div class="condition"><span>Condition ${a.condition}</span><meter aria-label="${esc(a.name)} condition" min="0" max="100" low="55" high="75" optimum="100" value="${a.condition}">${a.condition}</meter></div>
+      <p class="small">${traitText[a.trait]}</p>${jobText(a.id) ? `<p class="work-note">${esc(jobText(a.id))}</p>` : ''}
+      ${selectable && flight ? `<label class="crew-select">Assigned crew<select data-crew="${a.id}" aria-label="Crew for ${esc(a.name)}">${crewOptions(flight.crew)}</select></label>${c ? `<p class="small">${esc(strengthText[c.strength])}</p><p class="issue ${c.fatigue >= 65 ? 'caution' : ''}">${esc(crewIssue(s, c))}</p>` : ''}` : ''}
+      ${!selectable ? `<details data-detail="aircraft-${a.id}"><summary>Aircraft record</summary><ol class="history">${a.history.map(t => `<li>${esc(t)}</li>`).join('')}</ol></details>` : ''}
+    </article>`;
+  }
+  function crewCard(c: Crew): string {
+    return `<article class="aircraft ${c.lost ? 'lost' : ''}"><div class="aircraft-heading"><h3>${esc(c.pilot)}’s crew</h3>${badge(experience(c))}</div><p class="issue">${esc(crewIssue(s, c))}</p><p>${esc(strengthText[c.strength])}</p><p class="small">Fatigue ${c.fatigue}/100 · Strain ${c.strain}/3 · ${c.sorties} sorties · Experience ${c.experience}/8${c.lesson ? " · Approach notes ready for the next flight" : ""}</p>${jobText(c.id) ? `<p class="work-note">${esc(jobText(c.id))}</p>` : ''}<details data-detail="crew-${c.id}"><summary>Crew record &amp; personnel</summary><p>The ten seats are filled automatically. ${esc(c.specialist)} is the crew’s radio operator${c.replacement ? `; ${esc(c.replacement)} is filling that seat` : ''}.</p><ol class="history">${c.history.map(t => `<li>${esc(t)}</li>`).join('')}</ol></details></article>`;
+  }
+  function report(r: Report, compact = false): string {
+    const home = r.results.filter(f => f.outcome === 'home' || f.outcome === 'abort').length;
+    const away = r.results.filter(f => f.outcome === 'divert').length;
+    const lost = r.results.filter(f => f.outcome === 'lost').length;
+    const resultRows = r.results.map((f, i) => `<li><strong>${esc(s.aircraft.find(a => a.id === f.aircraft)?.name)}</strong><span>${esc(s.crews.find(c => c.id === f.crew)?.pilot)} · ${esc(f.note)}</span>${f.outcome !== 'lost' ? `<small>${f.hit ? 'Effective strike' : 'No effective strike'} · ${f.damage} condition lost · ${f.fatigue} fatigue added${f.injury ? " · specialist injured" : ""}</small>` : ''}${f.details?.length ? `<details data-detail="flight-${r.slot}-${i}"><summary>Crew debrief &amp; consequences</summary>${f.details.map(line => `<p>${esc(line)}</p>`).join('')}</details>` : ''}</li>`).join('');
+    const body = `<p class="report-summary">${esc(r.summary)}</p>${r.sent ? `<div class="accounting"><span><b>${home}</b> returned to base</span><span><b>${away}</b> landed elsewhere</span><span class="${lost ? 'caution' : ''}"><b>${lost}</b> aircraft &amp; crews lost</span></div>` : ''}<ul class="flight-results">${resultRows}</ul>${r.notes.map(n => `<p class="report-note">${esc(n)}</p>`).join('')}`;
+    return compact ? `<details class="record" data-detail="report-${r.slot}"><summary><span>Assignment ${String(r.slot).padStart(2, '0')} · ${esc(r.title)}</span><span>${r.stoodDown ? 'Stood down' : `${r.hits}/${r.requested} effective`}</span></summary>${body}</details>` : `<section class="paper report"><p class="eyebrow">Return report · Assignment ${r.slot}</p><h2>${esc(r.title)}</h2>${body}</section>`;
+  }
+  function workList(): string {
+    const jobs = s.jobs.filter(j => !['signal', 'return', 'rest', 'service'].includes(j.kind)).sort((a, b) => a.at - b.at || a.id - b.id);
+    return jobs.length ? `<ul class="work-list">${jobs.map(j => `<li><span>${esc(s.aircraft.find(a => a.id === j.subject)?.name ?? s.crews.find(c => c.id === j.subject)?.pilot ?? 'Group transport')} · ${esc(({ repair: 'proper repair', inspection: 'specialist inspection', medical: 'medical clearance', recovery: 'recovery party', reinforcement: 'replacement delivery', training: 'approach training' } as Record<string, string>)[j.kind])}</span><b>${hours(j.at - s.now)}</b></li>`).join('')}</ul>` : '<p class="small">No specialist work outstanding. Off-duty crews rest automatically.</p>';
+  }
+  function activeView(): string {
+    const op = s.active!;
+    return `<section class="paper underway"><p class="eyebrow">${op.stoodDown ? 'Station stand-down' : 'Operation in progress'} · Assignment ${op.slot} of 14</p><h1>${esc(op.report.title)}</h1><div class="dispatch-stamp">${op.stoodDown ? 'STOOD DOWN' : 'DISPATCHED'}</div><p class="lead">${op.stoodDown ? 'The station is at work.' : `${op.plan.flights.length} aircraft away. The crews have their orders.`}</p><ol class="signals">${op.messages.map(m => `<li>${esc(m)}</li>`).join('')}</ol><div class="safe"><strong>Your orders are saved. It is safe to leave.</strong><p>The ${op.stoodDown ? 'station report' : 'return report'} is due in <span data-countdown="${op.returnsAt}">${hours(op.returnsAt - s.now)}</span>. No airborne decisions need your attendance. The next assignment waits for you.</p></div><div class="actions">${button('skip-return', op.stoodDown ? 'Advance to station report' : 'Advance to return report', 'primary')}<span class="small">Accelerated play · the same operation, resolved sooner</span></div><details data-detail="committed"><summary>Committed package &amp; standing orders</summary><p>${op.plan.route === 'direct' ? 'Direct approach' : 'Coastal dogleg'} · ${op.plan.orders === 'preserve' ? 'Bring the aircraft home' : 'Press the attack'}</p><ul>${op.plan.flights.map(f => `<li>${esc(s.aircraft.find(a => a.id === f.aircraft)?.name)} · ${esc(s.crews.find(c => c.id === f.crew)?.pilot)}</li>`).join('')}</ul></details></section><section class="paper"><p class="eyebrow">Meanwhile, on the station</p><h2>Work continues</h2>${workList()}</section>`;
+  }
+  function policies(): string {
+    return `<details class="orders" data-detail="orders" ${s.completed === 0 ? 'open' : ''}><summary>Standing orders · ${s.plan.route === 'direct' ? 'Direct approach' : 'Coastal dogleg'} · ${s.plan.orders === 'preserve' ? 'Bring the aircraft home' : 'Press the attack'}</summary><div class="policy-grid"><fieldset><legend>Approach</legend>${[
+      ['direct', 'Direct · 4 hours', 'Shorter flight, less fatigue. More exposure to fighters.'],
+      ['dogleg', 'Coastal dogleg · 6 hours', 'Less fighter exposure. Adds 14 fatigue and increases diversion risk through fuel pressure.'],
+    ].map(([id, title, detail]) => `<label class="policy"><input type="radio" name="route" value="${id}" ${s.plan.route === id ? 'checked' : ''}><span><strong>${title}</strong><small>${detail}</small></span></label>`).join('')}</fieldset><fieldset><legend>Standing orders</legend>${[
+      ['preserve', 'Bring the aircraft home', 'Turn back with mechanical trouble. One bombing pass; less combat exposure.'],
+      ['press', 'Press the attack', 'Continue with manageable faults and make another pass if needed. Better strike chance; more damage, losses and fatigue.'],
+    ].map(([id, title, detail]) => `<label class="policy"><input type="radio" name="orders" value="${id}" ${s.plan.orders === id ? 'checked' : ''}><span><strong>${title}</strong><small>${detail}</small></span></label>`).join('')}</fieldset></div></details>`;
+  }
+  function repairSummary(p: Plan, standDown = false): string {
+    const repairs = repairCandidates(s, p, standDown);
+    return repairs.length ? `Proper repair: ${repairs.map(a => a.name).join(', ')}. Work starts at commitment and finishes in six hours, restoring up to 38 condition, clearing faults and certifying the next two flights.` : s.engineeringUsed ? 'Engineering work already authorized uses this assignment’s available allocation. No further proper repair is included in this package.' : 'No proper repair allocated to this package. Aircraft on operations cannot use the repair bay.';
+  }
+  function planningView(): string {
+    const task = s.assignments[s.completed];
+    const upcoming = s.assignments[s.completed + 1];
+    const events = stationEvents(s);
+    const errors = planErrors(s, s.plan);
+    const last = s.reports.at(-1);
+    return `${last ? report(last) : `<section class="welcome"><p class="eyebrow">Your posting</p><p>${esc(s.circumstance)}</p><p>Four aircraft. Fourteen assignments. Your job is to make the contribution and bring the squadron through.</p></section>`}
+      <section class="paper assignment"><div class="section-head"><p class="eyebrow">Headquarters · Assignment ${s.completed + 1} of 14</p>${badge(s.completed >= 11 ? 'Final stretch' : s.completed < 3 ? 'Opening operations' : 'The continuing effort')}</div><h1>${esc(task.title)}</h1><p class="lead">${esc(task.objective)}</p><div class="brief-facts">${badge(`${task.requested} aircraft requested`)}${badge(['', 'Light opposition', 'Moderate opposition', 'Heavy opposition', 'Very heavy opposition'][task.hazard], task.hazard >= 3 ? 'warning' : '')}${badge(task.weather === 'cloud' ? 'Cloud over target' : task.weather === 'crosswind' ? 'Crosswinds on return' : 'Clear conditions')}</div><p>${esc(task.why)}</p><aside class="mission-circumstance"><strong>${circumstances[task.circumstance].title}</strong><p>${circumstances[task.circumstance].brief}</p></aside>${s.briefing ? `<p class="good">Approach notes from the earlier photographs are ready for this package.</p>` : ""}${s.extraBay ? `<p class="good">Group’s mobile engineering team adds one repair at this commitment.</p>` : ""}${s.suppression ? `<p class="good">Earlier operational work is reducing opposition on this assignment.</p>` : ''}${task.weather !== 'clear' ? `<p class="small">${task.weather === 'cloud' ? 'Cloud makes an effective strike less likely. Navigation experience and an extra pass can help.' : 'Crosswinds increase the chance of landing at another field, particularly after the longer approach.'}</p>` : ''}${upcoming ? `<aside class="next-demand"><strong>Looking ahead</strong> ${esc(upcoming.title)} · ${upcoming.requested} aircraft requested · ${upcoming.hazard >= 3 ? 'heavy' : 'lighter'} opposition. ${circumstances[upcoming.circumstance].title}.</aside>` : '<aside class="next-demand">This is the final assignment. Outstanding repairs, medical care and recovery will finish before the tour closes.</aside>'}</section>
+      <section class="station-decisions"><div class="section-head"><h2>On the station</h2><span class="small">${s.support} support available</span></div>${s.notices.length ? `<details class="station-updates" data-detail="today-updates"><summary>Latest station entry: ${esc(s.notices.at(-1))}</summary><ul class="history">${s.notices.slice(-4).map(n => `<li>${esc(n)}</li>`).join('')}</ul></details>` : ''}${events.length ? events.map(e => `<article class="decision"><p class="eyebrow">${['rush', 'inspection'].includes(e.kind) ? 'Engineering officer' : ['recovery', 'opportunity'].includes(e.kind) ? 'Operations officer' : 'Personnel officer'}</p><h3>${esc(e.title)}</h3><p>${esc(e.body)}</p><div class="choices">${e.choices.map(c => `<button type="button" data-decision="${e.key}" data-choice="${c.id}" ${c.disabled ? 'disabled' : ''}><strong>${esc(c.label)}</strong><small>${esc(c.detail)}</small></button>`).join('')}</div></article>`).join('') : `<p class="quiet">${s.decisions.filter(d => d.slot === s.completed).length >= 2 ? "Today’s two station decisions are entered. Remaining optional matters can wait for another assignment." : "No exceptional decisions today. Finch will handle routine service; off-duty crews will rest."}</p>`}<p class="small">You may leave these with the staff: no patch or support is authorized by default, and scheduled recovery continues.</p></section>
+      <section class="paper"><div class="section-head"><div><p class="eyebrow">Operations officer’s proposal</p><h2>Today’s package</h2></div>${button('propose', 'Use staff proposal', 'text-button')}</div><p>Choose the aircraft and crews to commit. Staff favors sound aircraft and rested crews; a smaller package leaves part of HQ’s request unfilled.</p><div class="aircraft-grid">${s.aircraft.filter(a => !a.lost).map(a => aircraftCard(a, true)).join('')}</div>${policies()}<details class="engineering" data-detail="engineering"><summary>Engineering priority · ${s.engineeringUsed ? 'allocation already committed' : `${1 + s.extraBay} proper repair allocation${s.extraBay ? "s" : ""} available`}</summary><label>First call on the bay<select data-priority aria-label="Engineering priority">${s.aircraft.filter(a => !a.lost && !a.away).map(a => `<option value="${a.id}" ${s.plan.priority === a.id ? 'selected' : ''}>${esc(a.name)} · condition ${a.condition}${a.defect ? ' · persistent defect' : ''}</option>`).join('')}</select></label><p>Routine service adds four condition to idle aircraft, up to 90; it cannot remove a persistent defect. Engineering work is allocated once per commitment, not once per day away.</p></details><p class="work-note">${esc(repairSummary(s.plan))}</p><div class="commit-summary"><div><strong>${s.plan.flights.length} of ${task.requested} requested aircraft</strong><p>${s.plan.flights.length < task.requested ? 'A reduced contribution; more strength kept at home.' : 'The requested package is covered if the aircraft reach the objective.'} Report in ${duration(s.plan) / HOUR} hours.</p></div>${button('review', 'Review &amp; dispatch →', 'primary', errors.length ? 'disabled' : '')}</div>${errors.length ? `<p class="caution" role="status">${esc(errors.join(' '))}</p>` : ''}<div class="standdown"><span>Need to recover? A stand-down uses this assignment and contributes nothing, but allows two proper repairs and clears one strain level from each off-duty crew.</span>${button('standdown', 'Review stand-down', 'text-button')}</div></section>`;
+  }
+  function conclusion(): string {
+    const lost = s.aircraft.filter(a => a.lost).length;
+    return `<section class="paper ending"><p class="eyebrow">${s.phase === 'closing' ? 'Relief is on its way' : 'Tour concluded'}</p><h1>${s.ending === 'losses' ? 'The empty dispersal' : 'The names on the board'}</h1><p class="lead">${endingText(s)}</p>${tourMemories(s).length ? `<details class="tour-memories" data-detail="tour-memories" open><summary>What this squadron will remember</summary>${tourMemories(s).map(line => `<p>${esc(line)}</p>`).join('')}</details>` : ""}<div class="accounting"><span><b>${s.contribution}/${s.requested}</b> effective / requested strikes</span><span><b>${s.crews.filter(c => !c.lost).length}</b> crews preserved</span><span><b>${lost}</b> aircraft &amp; crews lost</span></div><p>${s.completed} assignments resolved · ${s.reports.filter(r => r.stoodDown).length} deliberate stand-downs · ${s.aircraft.filter(a => !a.lost).length} aircraft preserved.</p>${s.crews.filter(c => !c.lost).map(c => `<p class="roll-call"><strong>${esc(c.pilot)}</strong> ${c.sorties} sorties · ${experience(c)}${c.injury ? ' · recovering in hospital' : ''}</p>`).join('')}${lost ? `<p class="caution">Remembered: ${s.crews.filter(c => c.lost).map(c => esc(c.pilot) + ' and the flying crew').join('; ')}.</p>` : '<p class="good">Every crew accounted for. That belongs in the record too.</p>'}${s.phase === 'closing' ? `<p>All remaining committed work will finish. It is safe to leave; no further assignments will be issued.</p>${workList()}${button('skip-all', 'Advance until everyone is accounted for', 'primary')}` : `<p>The station record is complete. You can review the Tour or begin another posting.</p>${button('new', 'Begin another tour', 'primary')}`}</section>`;
+  }
+  function today(): string { return s.active ? activeView() : s.phase !== 'active' ? `${s.reports.at(-1) ? report(s.reports.at(-1)!, true) : ""}${conclusion()}` : planningView(); }
+  function squadron(): string {
+    return `<section class="page-intro"><p class="eyebrow">The dispersal</p><h1>Aircraft &amp; their people</h1><p>Sleep reduces fatigue by twelve every six hours, down to a floor of twelve per strain level. Pressing, battle damage and exhausted flying build strain. An assignment off flying removes one level; promised leave clears all of it at that report. At 95 fatigue the medical officer grounds a crew. Injuries and diversions have their own return times.</p></section><div class="aircraft-grid">${s.aircraft.map(a => aircraftCard(a)).join('')}</div><section class="paper"><h2>The crews</h2><p>A crew can be assigned to any serviceable aircraft. Routine seat filling is automatic; specialists become your concern when their absence matters.</p><div class="aircraft-grid">${s.crews.map(crewCard).join('')}</div></section><section class="paper"><h2>Engineering &amp; recovery</h2><p>${s.support} support available. Support pays for temporary specialists, recovery transport and replacement aircraft. Effective strikes on supply objectives earn more.</p>${workList()}${s.notices.length ? `<details data-detail="station-log"><summary>Recent station entries</summary><ul class="history">${s.notices.map(n => `<li>${esc(n)}</li>`).join('')}</ul></details>` : ''}</section>`;
+  }
+  function tour(): string {
+    return `<section class="paper"><p class="eyebrow">The fourteen-assignment tour</p><h1>A record of this posting</h1><p>${s.completed} resolved · ${s.contribution} effective strikes against ${s.requested} requested so far.</p><p>A dispatch or deliberate stand-down uses one assignment when its report arrives. There are no missed-day penalties: time away finishes only work already begun. A damaged or temporarily absent squadron can recover.</p><div class="tour-track">${s.assignments.map((a, i) => `<div class="tour-slot ${i < s.completed ? 'complete' : i === s.completed ? 'current' : ''}"><b>${String(i + 1).padStart(2, '0')}</b><span>${i < s.completed ? s.reports[i].stoodDown ? 'Rest' : `${s.reports[i].hits} hits` : i === s.completed ? 'Today' : i >= 11 ? 'Final' : 'Ahead'}</span></div>`).join('')}</div>${s.phase !== 'active' ? `<p class="lead">${endingText(s)}</p>` : `<h2>Known demands</h2>${s.assignments.slice(s.completed, Math.max(s.completed + 2, 0)).map((a, i) => `<p><strong>${s.completed + i + 1}. ${esc(a.title)}</strong> · ${a.requested} aircraft · ${a.hazard >= 3 ? 'heavy' : 'lighter'} opposition</p>`).join('')}<p class="small">Final stretch: assignments 12 and 13 request three aircraft; assignment 14 requests two. Relief follows the final report and outstanding station work.</p>`}</section><section class="paper"><h2>Operational record</h2>${s.reports.length ? [...s.reports].reverse().map(r => report(r, true)).join('') : '<p>The record is open. Your first assignment is waiting on Today.</p>'}${s.decisions.length ? `<details data-detail="decisions"><summary>Decisions entered in the station book</summary><ol class="history">${s.decisions.map(d => `<li>Before assignment ${d.slot + 1}: ${esc(d.text)}</li>`).join('')}</ol></details>` : ''}</section><section class="paper"><h2>Station records</h2><p>Saved automatically in this browser. A new tour archives this one first. Keep a downloaded copy if you plan to clear browser data.</p><div class="actions">${button('export', 'Download save copy')}${button('new', 'Start a new tour', 'text-button')}</div><p class="small">Posting number ${s.seed}. Bomber Command is a fictional squadron campaign inspired by B-17 operations.</p></section>`;
+  }
+  function dialog(): string {
+    if (!modal) return '';
+    if (modal === 'new') return `<dialog aria-labelledby="dialog-title"><h2 id="dialog-title">Accept a new posting?</h2><p>The current tour will be archived in this browser before a fresh squadron is created. Its orders will no longer be the active tour.</p><div class="actions">${button('cancel', 'Keep this tour')}${button('confirm-new', 'Archive &amp; begin', 'primary')}</div></dialog>`;
+    const down = modal === 'standdown', p = s.plan;
+    const warnings = p.flights.map(f => {
+      const a = s.aircraft.find(a => a.id === f.aircraft)!, c = s.crews.find(c => c.id === f.crew)!;
+      const odds = forecast(s, a, c, p);
+      return `<li><strong>${esc(a.name)} · ${esc(c.pilot)}</strong><span>${a.condition} condition · ${c.fatigue} fatigue · ${c.strain} strain${a.defect ? ' · persistent defect' : ''} · ${flightFatigue(s, a, p)} flight fatigue expected</span><small>Estimated mechanical trouble ${percent(odds.mechanical)} · combat damage exposure ${percent(odds.exposure)} · effective bombing if reaching target ${percent(odds.accuracy)}</small></li>`;
+    }).join('');
+    return `<dialog aria-labelledby="dialog-title"><p class="eyebrow">Final commitment · Assignment ${s.completed + 1}</p><h2 id="dialog-title">${down ? 'Give the station a day to recover' : 'Sign the flying order'}</h2><p>${down ? 'No aircraft will fly. This assignment counts toward the fourteen and makes no contribution to HQ’s request.' : `${p.flights.length} aircraft against ${s.assignments[s.completed].requested} requested. ${p.route === 'direct' ? 'Direct approach' : 'Coastal dogleg'}; ${p.orders === 'preserve' ? 'bring the aircraft home' : 'press the attack'}.`}</p>${down ? '' : `<ul class="flight-results">${warnings}</ul>`}<p class="work-note">${esc(repairSummary(p, down))}</p><p>${down ? 'Station report in twelve hours.' : `Return report in ${duration(p) / HOUR} hours. The per-crew fatigue costs are listed above. ${p.orders === "press" ? "Pressing adds one operational strain on flights that reach the target; battle damage or high starting fatigue can add another." : "Battle damage or high starting fatigue can add operational strain."}`} Off-duty crews rest. Once saved, these orders stand; reloading will not change the operation.</p><p class="safe">You can leave after signing. No midflight attendance is needed.</p><div class="actions">${button('cancel', 'Back to the desk')}${button('confirm-dispatch', down ? 'Sign stand-down order' : 'Dispatch the package', 'primary')}</div></dialog>`;
+  }
+  function render(): void {
+    const opened = new Set(Array.from(root.querySelectorAll<HTMLDetailsElement>('details[open]')).map(d => d.dataset.detail));
+    const active = document.activeElement as HTMLElement | null;
+    const focusKey = active?.dataset.action ? `[data-action="${active.dataset.action}"]` : active?.dataset.aircraft ? `[data-aircraft="${active.dataset.aircraft}"]` : active?.dataset.crew ? `[data-crew="${active.dataset.crew}"]` : active?.dataset.priority !== undefined ? '[data-priority]' : active?.getAttribute('name') ? `[name="${active.getAttribute('name')}"][value="${(active as HTMLInputElement).value}"]` : null;
+    root.innerHTML = `<div class="desk"><header class="masthead"><a href="./bomber_command.html" class="brand" aria-label="Bomber Command home"><span class="roundel" aria-hidden="true">✦</span><span><span class="eyebrow">Eighth Air Force · Operations desk</span><strong>Bomber Command</strong></span></a><div class="posting"><span>${esc(s.station)}</span><b>${s.phase === 'ended' ? 'Tour complete' : s.active ? 'Orders in force' : `${14 - s.completed} assignments remaining`}</b></div></header><nav aria-label="Primary">${(['today', 'squadron', 'tour'] as const).map(t => `<button type="button" data-tab="${t}" ${tab === t ? 'aria-current="page"' : ''}>${t === 'today' ? 'Today' : t === 'squadron' ? 'Squadron' : 'Tour'}${t === 'today' && s.active ? '<span class="live-dot" aria-hidden="true"></span>' : ''}</button>`).join('')}<span class="saved">${error ? 'Save needs attention' : blocked ? 'Earlier save held safely' : 'Orders saved locally'}</span></nav>${message ? `<aside class="notice">${esc(message)} ${!blocked ? button('dismiss', 'Understood', 'text-button') : ''}</aside>` : ''}${error ? `<aside class="error" role="alert">${esc(error)} ${button('reload', 'Reload', 'text-button')}</aside>` : ''}<main id="main-content">${blocked ? `<section class="paper"><h1>A new edition of the station book</h1><p>Your saved record is held safely. Start a new tour only when you are ready to archive it.</p><div class="actions">${button('export', 'Download existing save')}${button('new', 'Begin a new tour', 'primary')}</div></section>` : tab === 'today' ? today() : tab === 'squadron' ? squadron() : tour()}</main><footer><span>A squadron. Fourteen assignments. The people you bring home.</span>${!blocked && s.jobs.length && !s.active && s.phase !== 'ended' ? button('skip-next', 'Advance to next station milestone →', 'text-button') : ''}<details data-detail="how-time"><summary>How time &amp; saves work</summary><p>Operations take four or six real hours; a stand-down takes twelve. Accelerated play moves the same clock to the selected milestone. All work keeps its original start time. The tour waits for your next commitment, however long you are away. Use one browser tab for your tour.</p></details></footer></div>${dialog()}`;
+    root.querySelector('[data-action="export"]')?.insertAdjacentHTML('afterend', `${button('import', 'Restore a saved tour')}<input type="file" data-save-file accept=".json,application/json" hidden aria-label="Saved tour file">`);
+    root.querySelectorAll<HTMLDetailsElement>('details').forEach(d => { if (opened.has(d.dataset.detail)) d.open = true; });
+    if (modal) { const d = root.querySelector('dialog')!; d.showModal(); d.addEventListener('cancel', e => { e.preventDefault(); modal = null; render(); restoreFocus(); }); }
+    else if (focusKey) root.querySelector<HTMLElement>(focusKey)?.focus({ preventScroll: true });
+  }
+  function restoreFocus(): void { if (returnFocus) root.querySelector<HTMLElement>(`[data-action="${returnFocus}"]`)?.focus(); }
+  root.addEventListener('click', e => {
+    const target = (e.target as HTMLElement).closest<HTMLButtonElement>('button');
+    if (!target || target.disabled) return;
+    if (target.dataset.tab) { tab = target.dataset.tab as typeof tab; render(); root.querySelector<HTMLElement>(`[data-tab="${tab}"]`)?.focus(); window.scrollTo(0, 0); return; }
+    if (target.dataset.decision) { transact(d => choose(d, target.dataset.decision!, target.dataset.choice!)); render(); root.querySelector<HTMLElement>('[data-decision]:not(:disabled), [data-action="propose"]')?.focus({ preventScroll: true }); return; }
+    const action = target.dataset.action;
+    if (action === 'review' || action === 'standdown' || action === 'new') { returnFocus = action; modal = action === 'review' ? 'dispatch' : action === 'standdown' ? 'standdown' : 'new'; }
+    if (action === 'cancel') modal = null;
+    if (action === 'confirm-dispatch') { const down = modal === 'standdown'; modal = null; transact(d => commit(d, d.plan, down)); }
+    if (action === 'propose') transact(d => { d.plan = proposePlan(d); d.planEdited = false; });
+    if (action === 'dismiss') message = '';
+    if (action === 'reload') { location.reload(); return; }
+    if (action === 'import') { root.querySelector<HTMLInputElement>('[data-save-file]')?.click(); return; }
+    if (action === 'skip-return' || action === 'skip-next' || action === 'skip-all') transact(d => {
+      let at = action === 'skip-return' ? d.active?.returnsAt : action === 'skip-all' ? Math.max(d.now, ...d.jobs.map(j => j.at)) : nextMilestone(d);
+      if (at != null) {
+        advance(d, at);
+        if (action === 'skip-all') while (d.jobs.length) advance(d, Math.max(...d.jobs.map(j => j.at)));
+        d.offset = Math.max(d.offset, d.now - Date.now());
       }
-
-      element.addEventListener("click", () => {
-        performAction(element.dataset.action ?? "", parsePayload(element.dataset.payload ?? null));
-      });
     });
-  };
-
-  const render = () => {
-    root.innerHTML = `
-      <main class="bomber-shell">
-        ${renderHeader(state)}
-        ${renderNotifications(state)}
-        ${renderNav(state)}
-        ${renderNextStepStrip(state)}
-        ${renderGlobalTutorialHelp(state)}
-        ${renderActivePanel(state)}
-      </main>
-    `;
-    bind();
-    acknowledgeVisibleTab(state, state.selectedTab);
-  };
-
+    if (action === 'confirm-new') {
+      try { const fresh = createCampaign(seed(), Date.now()); store.replace(fresh); s = fresh; blocked = false; message = 'The previous station record has been archived in this browser.'; error = ''; tab = 'today'; modal = null; }
+      catch (e) { error = String(e); modal = null; }
+    }
+    if (action === 'export') { const blob = new Blob([store.raw()], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `bomber-command-${s.seed}.json`; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); return; }
+    render(); if (action === 'cancel') restoreFocus();
+    if (['confirm-dispatch', 'skip-return', 'skip-all', 'confirm-new'].includes(action ?? '')) {
+      const main = root.querySelector<HTMLElement>('main')!; main.tabIndex = -1; main.focus({ preventScroll: true }); window.scrollTo(0, 0);
+    }
+  });
+  root.addEventListener('change', async e => {
+    const input = e.target as HTMLInputElement;
+    if (input.dataset.saveFile !== undefined) {
+      const file = input.files?.[0]; if (!file) return;
+      try {
+        if (file.size > 2_000_000) throw new Error('That file is too large to be a station record.');
+        const restored = decode(await file.text());
+        advance(restored, Math.max(restored.now, Date.now() + restored.offset));
+        store.replace(restored); s = restored; blocked = false; error = ''; tab = 'today';
+        message = 'Your saved tour has been restored. The previous active record was archived first.';
+      } catch (e) { error = `The file was not restored. ${e instanceof Error ? e.message : String(e)}`; }
+      render(); return;
+    }
+    transact(d => {
+      if (input.dataset.aircraft || input.dataset.crew || input.dataset.priority !== undefined) d.planEdited = true;
+      if (input.dataset.aircraft) {
+        const id = input.dataset.aircraft;
+        if (!input.checked) d.plan.flights = d.plan.flights.filter(f => f.aircraft !== id);
+        else { const c = d.crews.find(c => crewAvailable(d, c) && !d.plan.flights.some(f => f.crew === c.id)); if (!c) throw new Error('No unassigned crew is fit to fly. Rest a crew or change the package.'); d.plan.flights.push({ aircraft: id, crew: c.id }); }
+      }
+      if (input.dataset.crew) { const f = d.plan.flights.find(f => f.aircraft === input.dataset.crew)!; const other = d.plan.flights.find(x => x.crew === input.value); if (other) other.crew = f.crew; f.crew = input.value; }
+      if (input.dataset.priority !== undefined) d.plan.priority = input.value;
+      if (input.name === 'route') d.plan.route = input.value as Plan['route'];
+      if (input.name === 'orders') d.plan.orders = input.value as Plan['orders'];
+    }); render();
+  });
+  window.addEventListener('storage', e => { if (e.key?.startsWith('bomber-command-desk-v20') && !e.key.includes('archive')) { error = 'This tour changed in another tab. Reload before issuing orders.'; render(); } });
+  setInterval(() => {
+    if (blocked || modal || error) return;
+    const now = Date.now() + s.offset;
+    if ((nextMilestone(s) ?? Infinity) <= now) { transact(() => {}); render(); }
+    else root.querySelectorAll<HTMLElement>('[data-countdown]').forEach(el => { el.textContent = hours(Number(el.dataset.countdown) - now); });
+  }, 10_000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && !blocked && !modal && !error) { transact(() => {}); render(); } });
   render();
-  saveState(state);
-  window.setInterval(() => {
-    sync(false);
-  }, 1000);
 }
