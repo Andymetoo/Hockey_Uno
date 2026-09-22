@@ -12,11 +12,12 @@ const page = pages.find(p => p.type === 'page');
 assert.ok(page, 'Open a blank page in the isolated debugging browser');
 const ws = new WebSocket(page.webSocketDebuggerUrl);
 await new Promise(resolve => ws.addEventListener('open', resolve, { once: true }));
-let id = 0; const pending = new Map(), errors = [];
+let id = 0; const pending = new Map(), errors = [], networkErrors = [];
 ws.addEventListener('message', event => {
   const m = JSON.parse(event.data);
   if (m.id) { const p = pending.get(m.id); pending.delete(m.id); if (m.error) p.reject(m.error); else p.resolve(m.result); }
   if (m.method === 'Runtime.exceptionThrown') errors.push(m.params.exceptionDetails.text + ': ' + m.params.exceptionDetails.exception?.description);
+  if (m.method === 'Network.responseReceived' && (m.params.response.status >= 400 || (m.params.type === 'Script' && m.params.response.mimeType === 'video/mp2t'))) networkErrors.push(`${m.params.response.status} ${m.params.response.mimeType} ${m.params.response.url}`);
 });
 function command(method, params = {}) { return new Promise((resolve, reject) => { const n = ++id; pending.set(n, { resolve, reject }); ws.send(JSON.stringify({ id: n, method, params })); }); }
 async function evaluate(expression) { const r = await command('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true }); if (r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description ?? r.exceptionDetails.text); return r.result.value; }
@@ -32,7 +33,7 @@ async function screenshot(name) {
 }
 try {
   await mkdir('tmp/bomber-browser', { recursive: true });
-  await command('Runtime.enable'); await command('Page.enable');
+  await command('Runtime.enable'); await command('Page.enable'); await command('Network.enable');
   await command('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
   await command('Page.navigate', { url: base }); await waitFor('!!document.querySelector("nav")');
   // Only Bomber keys in this isolated profile are changed; sibling game data is never touched.
@@ -115,5 +116,6 @@ try {
   const migrated = await getState(); assert.equal(migrated.version, 21); assert.deepEqual(migrated.active.report, JSON.parse(oldRaw).active.report);
   assert.ok(await evaluate('document.body.innerText.includes("earlier station book was backed up")'));
   assert.deepEqual(errors, []);
+  assert.deepEqual(networkErrors, []);
   console.log(JSON.stringify({ browser: 'Chrome via CDP', url: base, desktop: '1280×900', mobile: '390×844', assignmentsCompleted: state.completed, effectiveStrikes: state.contribution, checks: 'views, overflow, policies, modal keyboard dismissal/focus, dispatch, reload, acceleration, full tour, archive, legacy transition, invalid import protection, save restoration, strain leave and relief, inspection and certification, v20 active-flight migration', runtimeErrors: errors.length, originalSeed: before.seed }, null, 2));
 } catch (e) { console.error(await evaluate('document.body.innerText')); throw e; } finally { ws.close(); }
