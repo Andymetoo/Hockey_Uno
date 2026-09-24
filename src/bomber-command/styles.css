@@ -445,6 +445,20 @@ legend {
 .report-summary {
   font-size:1.1rem
 }
+.report-assessment,.report-next,.package-outlook {
+  padding:16px 18px;
+  margin:16px 0;
+  border-left:3px solid #58745b;
+  background:#edf0e6
+}
+.report-next { border-left-color:#8d7543; background:#f2eddf }
+.report-assessment h3,.report-next h3 { margin-bottom:6px; font-size:1.05rem }
+.report-assessment p,.report-next p,.package-outlook p { margin:0; font:.82rem/1.6 system-ui,sans-serif }
+.report-next ul { margin:6px 0 0; padding-left:20px; font:.82rem/1.65 system-ui,sans-serif }
+.report-next li+li { margin-top:4px }
+.report-action { margin-top:20px }
+.package-outlook strong { font:.8rem system-ui,sans-serif }
+.package-outlook p { margin-top:5px }
 .accounting {
   display:grid;
   grid-template-columns:repeat(3,1fr);
@@ -481,6 +495,7 @@ legend {
   color:var(--muted);
   font-size:.72rem
 }
+.flight-highlight { margin:8px 0 0; font:.79rem/1.6 system-ui,sans-serif; color:var(--green) }
 .report-note {
   font:.8rem/1.6 system-ui,sans-serif
 }
@@ -671,6 +686,12 @@ dialog .actions {
 dialog p {
   font-size:.95rem
 }
+.tutorial-dialog { max-width:490px; border-radius:8px }
+.tutorial-dialog h2 { font-size:1.6rem }
+.tutorial-dialog p:not(.eyebrow) { line-height:1.65 }
+.tutorial-actions { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:24px }
+.tutorial-topics { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:18px 0 }
+.tutorial-topics button { text-align:left }
 @media(max-width:760px) {
   .desk {
     padding:0 18px
@@ -826,6 +847,20 @@ dialog p {
   dialog {
     padding:23px 20px
   }
+  .tutorial-dialog {
+    position:fixed;
+    inset:auto 0 0;
+    width:100%;
+    max-width:none;
+    max-height:min(76dvh,680px);
+    margin:0;
+    padding:22px 20px calc(20px + env(safe-area-inset-bottom));
+    border-radius:14px 14px 0 0;
+    overflow:auto
+  }
+  .tutorial-actions { flex-direction:column-reverse; align-items:stretch }
+  .tutorial-actions button { width:100% }
+  .tutorial-topics { grid-template-columns:1fr }
   .roundel {
     display:grid;
     width:42px;

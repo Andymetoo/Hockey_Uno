@@ -36,8 +36,45 @@ try {
   await command('Runtime.enable'); await command('Page.enable'); await command('Network.enable');
   await command('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
   await command('Page.navigate', { url: base }); await waitFor('!!document.querySelector("nav")');
+  const guided = createCampaign(3030, Date.now());
+  await evaluate(`localStorage.setItem(${JSON.stringify(SAVE_KEY)}, ${JSON.stringify(JSON.stringify(guided))})`); await load();
+  assert.equal(await evaluate('document.querySelector("dialog h2")?.textContent'), 'Your operations desk');
+  await screenshot('desktop-tutorial');
+  await action('tutorial-continue');
+  assert.equal(await evaluate('document.querySelector("dialog h2")?.textContent'), 'Build the package');
+  await action('tutorial-continue');
+  assert.deepEqual((await getState()).tutorial.seen, ['intro', 'planning']);
+  await action('review');
+  assert.equal(await evaluate('document.querySelector("dialog h2")?.textContent'), 'Check the commitment');
+  await action('tutorial-continue');
+  assert.equal(await evaluate('document.querySelector("dialog h2")?.textContent'), 'Sign the flying order');
+  await action('cancel');
+  await action('review'); await action('confirm-dispatch');
+  assert.equal(await evaluate('document.querySelector("dialog h2")?.textContent'), 'While they are away');
+  await action('tutorial-continue'); await load();
+  assert.equal(await evaluate('!!document.querySelector("dialog")'), false);
+  await action('skip-return');
+  assert.equal(await evaluate('document.querySelector("dialog h2")?.textContent'), 'Read the return report');
+  await action('tutorial-continue');
+  assert.ok(await evaluate('document.querySelector(".report-assessment")?.innerText.length > 30'));
+  assert.equal(await evaluate('!!document.querySelector(".flight-highlight")'), (await getState()).reports[0].results.some(f => f.details?.length));
+  await command('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+  await action('tutorial-help'); await click('[data-tutorial-open="return"]');
+  assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'), true);
+  assert.equal(await evaluate('(() => { const r = document.querySelector("dialog").getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth && r.bottom <= innerHeight + 1; })()'), true);
+  await screenshot('mobile-tutorial');
+  const guideViewport = await command('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
+  await writeFile('tmp/bomber-browser/mobile-tutorial-viewport.png', Buffer.from(guideViewport.data, 'base64'));
+  await action('tutorial-continue');
+  assert.deepEqual((await getState()).tutorial.seen, ['intro', 'planning', 'dispatch', 'underway', 'return']);
+  await action('tutorial-help');
+  await command('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
+  await command('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
+  assert.equal(await evaluate('document.activeElement.dataset.action'), 'tutorial-help');
+  await command('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
   // Only Bomber keys in this isolated profile are changed; sibling game data is never touched.
   const initial = createCampaign(2026, Date.now());
+  initial.tutorial.disabled = true;
   await evaluate(`localStorage.setItem(${JSON.stringify(SAVE_KEY)}, ${JSON.stringify(JSON.stringify(initial))})`); await load();
   assert.equal(await evaluate('document.querySelectorAll("[data-aircraft]").length'), 4);
   assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'), true);
@@ -68,6 +105,12 @@ try {
     if (await evaluate('document.querySelector("[data-action=review]").disabled')) await action('standdown');
     else await action('review');
     await action('confirm-dispatch'); await action('skip-return');
+    const returned = await getState();
+    if (returned.completed === 6 || returned.completed === 10) {
+      assert.ok(returned.assignments[returned.completed].followup);
+      assert.ok(await evaluate('document.querySelector("[data-tutorial-target=briefing]")?.innerText.includes("From the last operation")'));
+      await screenshot(`mobile-branch-${returned.completed + 1}`);
+    }
   }
   if ((await getState()).phase === 'closing') await action('skip-all');
   state = await getState(); assert.equal(state.phase, 'ended'); assert.equal(state.completed, 14);
@@ -96,6 +139,7 @@ try {
   assert.equal((await getState()).seed, initial.seed);
   // Exercise the connected strain -> leave -> relief and defect -> inspection -> certification paths.
   const content = createCampaign(2026, Date.now());
+  content.tutorial.disabled = true;
   content.crews[0].strain = 3; content.crews[0].fatigue = 70;
   content.aircraft[0].defect = true; content.aircraft[0].defectType = 'controls'; content.aircraft[0].condition = 60;
   content.assignments[0].circumstance = 'flak';
@@ -117,5 +161,5 @@ try {
   assert.ok(await evaluate('document.body.innerText.includes("earlier station book was backed up")'));
   assert.deepEqual(errors, []);
   assert.deepEqual(networkErrors, []);
-  console.log(JSON.stringify({ browser: 'Chrome via CDP', url: base, desktop: '1280×900', mobile: '390×844', assignmentsCompleted: state.completed, effectiveStrikes: state.contribution, checks: 'views, overflow, policies, modal keyboard dismissal/focus, dispatch, reload, acceleration, full tour, archive, legacy transition, invalid import protection, save restoration, strain leave and relief, inspection and certification, v20 active-flight migration', runtimeErrors: errors.length, originalSeed: before.seed }, null, 2));
+  console.log(JSON.stringify({ browser: 'Chrome via CDP', url: base, desktop: '1280×900', mobile: '390×844', assignmentsCompleted: state.completed, effectiveStrikes: state.contribution, checks: 'tutorial timing and viewport, reports, linked briefs, views, overflow, dispatch, reload, acceleration, full tour, save restoration and v20 migration', runtimeErrors: errors.length, originalSeed: before.seed }, null, 2));
 } catch (e) { console.error(await evaluate('document.body.innerText')); throw e; } finally { ws.close(); }

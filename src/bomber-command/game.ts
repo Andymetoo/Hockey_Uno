@@ -23,6 +23,7 @@ export function createCampaign(seed: number, now: number): State {
     contribution: 0, requested: 0, support: 3, suppression: 0, engineeringUsed: 0,
     active: null, jobs: [], reports: [], decisions: [], notices: [], phase: 'active', ending: null,
     briefing: false, extraBay: 0, opportunity: null, planEdited: false,
+    tutorial: { seen: [], disabled: false },
     plan: { flights: [], route: 'direct', orders: 'preserve', priority: '' },
   };
   const setting = Math.floor(random(s) * 3);
@@ -190,6 +191,27 @@ export function commit(s: State, p: Plan, standDown = false): void {
   s.briefing = false; s.extraBay = 0; s.opportunity = null;
   s.plan = structuredClone(plan);
 }
+function branchNextAssignment(s: State, effective: boolean): string | null {
+  const next = s.assignments[s.completed + 1];
+  if (!next) return null;
+  if (s.completed === 5) {
+    if (effective) {
+      Object.assign(next, { title: 'Dispersals on the move', objective: 'Strike fighter aircraft relocated after the rail disruption.', why: 'The earlier rail strike forced a hurried move. The crews have a brief chance to catch the aircraft at temporary dispersals.', circumstance: 'window' as const, followup: 'The rail strike changed the fighter objective. A short opening favors the direct approach.' });
+    } else {
+      Object.assign(next, { title: 'The northern airfield', objective: 'Crater the fighter field’s service and dispersal areas.', why: 'Rail traffic continued to supply the field. Reconnaissance now marks a gun belt on the direct corridor.', circumstance: 'flak' as const, followup: 'The rail objective stayed in service. The fighter field remains supplied, and a gun belt now shapes the approach.' });
+    }
+    return next.followup!;
+  }
+  if (s.completed === 9) {
+    if (effective) {
+      Object.assign(next, { title: 'The western junction: open corridor', objective: 'Block the rail junction feeding the inland factories.', why: 'The fighter repair raid has opened a brief chance to strike before defenses regroup.', circumstance: 'window' as const, followup: 'The fighter raid opened a short bombing window at the western junction. The direct route reaches it sooner.' });
+    } else {
+      Object.assign(next, { title: 'The western junction: under escort', objective: 'Block the rail junction feeding the inland factories.', why: 'Fighter repairs continued. Group has assigned escorts to the direct corridor.', circumstance: 'escort' as const, followup: 'The fighter repair objective stayed in service. Escorts will cover the direct corridor at the western junction.' });
+    }
+    return next.followup!;
+  }
+  return null;
+}
 function finishOperation(s: State): void {
   const op = s.active;
   if (!op) return;
@@ -235,19 +257,50 @@ function finishOperation(s: State): void {
   }
   s.suppression = 0;
   const task = s.assignments[s.completed];
+  const hasNext = s.completed < TOUR_LENGTH - 1;
+  let supportGained = 0;
   if (report.hits >= Math.ceil(task.requested * .65)) {
     if (task.effect === 'fighters' || task.effect === 'rail') {
-      s.suppression = task.effect === 'fighters' ? 1.5 : .75;
-      report.notes.push(task.effect === 'fighters' ? 'Fighter dispersals hit. Less interception expected on the next assignment.' : 'Supply traffic interrupted. The next assignment faces reduced opposition.');
+      s.suppression = hasNext ? task.effect === 'fighters' ? 1.5 : .75 : 0;
+      report.notes.push(hasNext ? task.effect === 'fighters' ? 'Fighter dispersals hit. Less interception expected on the next assignment.' : 'Rail traffic interrupted. The next assignment faces reduced opposition.' : 'Rail traffic interrupted on the final assignment.');
       if (task.effect === 'rail' && s.completed < 13) s.opportunity = { kind: 'photos', source: task.title, slot: s.completed + 1 };
     } else {
-      const gained = Math.min(1, 5 - s.support); s.support += gained;
-      report.notes.push(`Transport released by HQ: ${gained} support added for specialists and recovery.`);
+      supportGained = Math.min(1, 5 - s.support); s.support += supportGained;
+      report.notes.push(`Transport released by HQ: ${supportGained} support added for specialists and recovery.`);
       if (s.completed < 13) s.opportunity = { kind: 'transport', source: task.title, slot: s.completed + 1 };
     }
   } else if (!op.stoodDown) report.notes.push('The objective remains in service. No relief in opposition or additional support is expected.');
   if (s.opportunity) report.notes.push(s.opportunity.kind === 'photos' ? `Intelligence has useful approach and dispersal photographs from ${task.title}. Their use is on the next station agenda.` : 'Group offers a mobile workshop or a further transport allocation for the next commitment.');
   if (report.sent < report.requested && !op.stoodDown) report.notes.push(`The reduced package left ${report.requested - report.sent} requested aircraft unfilled. HQ records the contribution actually made.`);
+  const needed = Math.ceil(task.requested * .65);
+  const effective = !op.stoodDown && report.hits >= needed;
+  const targetName = task.title[0].toLowerCase() + task.title.slice(1);
+  const assessment = op.stoodDown ? 'No strike photographs were taken. The objective remains in service.'
+    : !effective ? `Photographs of ${targetName} show ${report.hits} confirmed concentration${report.hits === 1 ? '' : 's'}; ${needed} were needed to disrupt the objective. It remains in service.`
+    : task.effect === 'fighters' ? `Photographs show enough concentrations at ${targetName} to disrupt fighter operations. Less interception is expected on the next assignment.`
+    : task.effect === 'rail' ? hasNext ? `Photographs show confirmed hits at ${targetName}. Rail traffic is disrupted; the next assignment faces less opposition.` : `Photographs show confirmed hits at ${targetName}. Rail traffic is disrupted on the final assignment.`
+    : `Photographs show confirmed hits at ${targetName}. Supply traffic is disrupted, and Group has released transport support.`;
+  const next: string[] = [];
+  if (effective && task.effect !== 'supplies' && hasNext) next.push('Reduced opposition applies to the next assignment only.');
+  if (effective && task.effect === 'supplies') next.push(supportGained ? 'One support was added for station decisions.' : 'Support is already at the station limit of five.');
+  if (s.opportunity) next.push(s.opportunity.kind === 'photos' ? 'Decide how to use the photographs before the next commitment.' : 'Choose the mobile repair team or extra support before the next commitment.');
+  const diverted = report.results.filter(r => r.outcome === 'divert').map(r => s.aircraft.find(a => a.id === r.aircraft)!.name);
+  const grounded = report.results.filter(r => r.outcome !== 'lost').map(r => s.aircraft.find(a => a.id === r.aircraft)!).filter(a => !a.away && a.condition < 55).map(a => a.name);
+  const faulted = report.results.filter(r => r.outcome !== 'lost').map(r => s.aircraft.find(a => a.id === r.aircraft)!).filter(a => !a.away && a.condition >= 55 && a.defect).map(a => a.name);
+  const injured = report.results.filter(r => r.injury).map(r => s.crews.find(c => c.id === r.crew)!.specialist);
+  const strained = report.results.filter(r => r.outcome !== 'lost').map(r => s.crews.find(c => c.id === r.crew)!).filter(c => c.strain >= 2 || c.fatigue >= 65).map(c => c.pilot);
+  const losses = report.results.filter(r => r.outcome === 'lost').map(r => s.aircraft.find(a => a.id === r.aircraft)!.name);
+  if (diverted.length) next.push(`${diverted.join(', ')} ${diverted.length === 1 ? 'is' : 'are'} at a forward field; recovery is scheduled.`);
+  if (grounded.length) next.push(`${grounded.join(', ')} ${grounded.length === 1 ? 'needs' : 'need'} repair before flying again.`);
+  if (faulted.length) next.push(`${faulted.join(', ')} ${faulted.length === 1 ? 'has' : 'have'} a persistent fault; consider proper work before another flight.`);
+  if (injured.length) next.push(`${injured.join(', ')} ${injured.length === 1 ? 'is' : 'are'} in hospital; check the station decisions for crew options.`);
+  if (strained.length) next.push(`${strained.join(', ')} ${strained.length === 1 ? 'is' : 'are'} tired or strained; consider rotating the next crew package.`);
+  if (losses.length) next.push(`${losses.join(', ')} ${losses.length === 1 ? 'was' : 'were'} lost; check whether Group can provide a replacement.`);
+  const changedBrief = branchNextAssignment(s, effective);
+  if (changedBrief) next.push(changedBrief);
+  if (!hasNext) next.push('Outstanding recovery, repairs, and medical care will finish before the tour closes.');
+  if (!next.length) next.push('No exceptional station action is required. Review the next briefing and the crew roster.');
+  report.debrief = { assessment, next };
   s.contribution += report.hits; s.requested += report.requested;
   s.completed++; s.engineeringUsed = 0; s.reports.push(report); s.active = null;
   if (s.completed === TOUR_LENGTH) { s.phase = 'closing'; s.ending = 'tour'; }

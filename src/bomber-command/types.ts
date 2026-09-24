@@ -18,6 +18,7 @@ export interface Assignment {
   title: string; objective: string; why: string; hazard: number; weather: 'clear' | 'cloud' | 'crosswind';
   requested: number; effect: 'fighters' | 'supplies' | 'rail';
   circumstance: Circumstance;
+  followup?: string;
 }
 export interface Plan { flights: { aircraft: string; crew: string }[]; route: Route; orders: Orders; priority: string; }
 export interface FlightResult {
@@ -29,7 +30,9 @@ export interface FlightResult {
 export interface Report {
   slot: number; title: string; summary: string; requested: number; sent: number; hits: number;
   results: FlightResult[]; notes: string[]; at: number; stoodDown: boolean;
+  debrief?: { assessment: string; next: string[] };
 }
+export interface TutorialProgress { seen: string[]; disabled: boolean; stationAt?: number; }
 export interface Operation {
   slot: number; startedAt: number; returnsAt: number; plan: Plan; report: Report;
   messages: string[]; stoodDown: boolean;
@@ -46,6 +49,7 @@ export interface State {
   ending: 'tour' | 'losses' | null; plan: Plan;
   briefing: boolean; extraBay: number; planEdited: boolean;
   opportunity: { kind: 'photos' | 'transport'; source: string; slot: number } | null;
+  tutorial: TutorialProgress;
 }
 export interface Choice { id: string; label: string; detail: string; disabled?: boolean; }
 export interface StationEvent { key: string; kind: 'returning' | 'replacement' | 'recovery' | 'reinforcement' | 'rush' | 'mentor' | 'inspection' | 'strain' | 'opportunity'; subject: string; title: string; body: string; choices: Choice[]; }
