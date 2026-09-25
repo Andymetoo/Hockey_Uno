@@ -21,7 +21,8 @@ function validReport(r: unknown): boolean {
 }
 export function decode(raw: string): State {
   const v: unknown = JSON.parse(raw);
-  if (!object(v) || (v.version !== SAVE_VERSION && v.version !== 20)) throw new Error('This file belongs to a different edition of Bomber Command.');
+  if (!object(v) || (v.version !== SAVE_VERSION && v.version !== 21 && v.version !== 20)) throw new Error('This file belongs to a different edition of Bomber Command.');
+  const originalVersion = v.version;
   if (!fields(v, ['seed', 'rng', 'now', 'offset', 'nextId', 'completed', 'contribution', 'requested', 'support', 'suppression', 'engineeringUsed'], number) || !fields(v, ['station', 'circumstance'], text) || !['active', 'closing', 'ended'].includes(String(v.phase)) || ![null, 'tour', 'losses'].includes(v.ending as null) || !strings(v.notices) || !validPlan(v.plan)) throw new Error('The saved station record is incomplete.');
   if (!records(v.aircraft, a => fields(a, ['id', 'name'], text) && fields(a, ['condition', 'sorties'], number) && fields(a, ['defect', 'lost', 'away'], bool) && strings(a.history) && ['rugged', 'accurate', 'economical', 'swift'].includes(String(a.trait))) || !records(v.crews, c => fields(c, ['id', 'pilot', 'specialist'], text) && fields(c, ['experience', 'fatigue', 'sorties'], number) && fields(c, ['lost', 'injury', 'returned'], bool) && (c.replacement === null || text(c.replacement)) && strings(c.history) && ['navigation', 'bombing', 'engineering', 'formation'].includes(String(c.strength)))) throw new Error('The saved squadron record is incomplete.');
   if (!records(v.assignments, a => fields(a, ['title', 'objective', 'why'], text) && (a.followup === undefined || text(a.followup)) && fields(a, ['hazard', 'requested'], number) && ['clear', 'cloud', 'crosswind'].includes(String(a.weather)) && ['fighters', 'supplies', 'rail'].includes(String(a.effect))) || !records(v.jobs, j => fields(j, ['id', 'at'], number) && text(j.subject) && (j.text === undefined || text(j.text)) && (j.overhaul === undefined || bool(j.overhaul)) && ['signal', 'return', 'repair', 'inspection', 'service', 'rest', 'medical', 'recovery', 'reinforcement', 'training'].includes(String(j.kind))) || !records(v.decisions, d => text(d.key) && text(d.text) && number(d.slot)) || !Array.isArray(v.reports) || !v.reports.every(validReport)) throw new Error('The saved operations record is incomplete.');
@@ -29,13 +30,18 @@ export function decode(raw: string): State {
   const s = v as unknown as State;
   if (s.assignments.length !== 14 || !Number.isInteger(s.completed) || s.completed < 0 || s.completed > 14 || !s.aircraft.length || !s.crews.length || s.jobs.some(j => j.at < s.now) || new Set(s.jobs.map(j => j.id)).size !== s.jobs.length || s.jobs.some(j => j.id >= s.nextId) || s.reports.length !== s.completed || (s.active !== null && s.jobs.filter(j => j.kind === 'return').length !== 1)) throw new Error('The saved tour contains inconsistent accounting.');
   for (const r of [...s.reports, ...(s.active ? [s.active.report] : [])]) if (r.results.some(f => !s.aircraft.some(a => a.id === f.aircraft) || !s.crews.some(c => c.id === f.crew))) throw new Error('A saved flight has no matching aircraft or crew.');
-  if (v.version === 20) {
+  if (originalVersion === 20) {
     // Do not redraw the assignment deck, alter the queue, or rewrite committed outcomes.
     s.version = SAVE_VERSION; s.briefing = false; s.extraBay = 0; s.opportunity = null; s.planEdited = true;
     for (const a of s.aircraft) { a.defectType = a.defect ? 'oil' : null; a.certified = 0; a.recovered = false; }
     for (const c of s.crews) { c.strain = 0; c.leaveThrough = 0; c.lesson = false; c.replacementSorties = 0; }
     for (const a of s.assignments) a.circumstance = 'ordinary';
   }
+  if (originalVersion === 20 || originalVersion === 21) {
+    s.version = SAVE_VERSION; s.nextMorningAt = s.now; s.legacyTour = true; s.branches = []; s.threads = [];
+  }
+  if (!number(s.nextMorningAt) || !bool(s.legacyTour) || !Array.isArray(s.branches) || !s.branches.every(b => object(b) && number(b.slot) && text(b.choice) && text(b.promise) && (b.fulfilled === null || bool(b.fulfilled))) || !Array.isArray(s.threads) || !s.threads.every(t => object(t) && ['injury', 'fault', 'novice', 'diversion'].includes(String(t.family)) && text(t.subject) && text(t.stage) && number(t.dueSlot) && text(t.note))) throw new Error('The campaign record is incomplete.');
+  if (new Set(s.branches.map(b => b.slot)).size !== s.branches.length || s.branches.some(b => ![2, 6, 9].includes(b.slot) || b.slot > s.completed) || new Set(s.threads.map(t => t.family)).size !== s.threads.length || s.threads.some(t => t.dueSlot < 0 || t.dueSlot > 14 || !(t.family === 'injury' || t.family === 'novice' ? s.crews.some(c => c.id === t.subject) : s.aircraft.some(a => a.id === t.subject)))) throw new Error('The campaign record has inconsistent participants or choices.');
   if (v.tutorial === undefined) s.tutorial = { seen: s.completed || s.active ? ['intro', 'planning', 'dispatch', 'underway', 'return', 'station', 'problem'] : [], disabled: false };
   if (!object(s.tutorial) || !strings(s.tutorial.seen) || !bool(s.tutorial.disabled) || (s.tutorial.stationAt !== undefined && (!Number.isInteger(s.tutorial.stationAt) || s.tutorial.stationAt < 0 || s.tutorial.stationAt > 13))) throw new Error('The saved tutorial record is incomplete.');
   const integer = (n: unknown, low: number, high: number) => typeof n === 'number' && Number.isInteger(n) && n >= low && n <= high;
@@ -56,9 +62,9 @@ export function createStorage(storage: StoragePort) {
       if (expected) {
         try {
           const state = decode(expected);
-          const migrating = JSON.parse(expected).version === 20;
-          if (migrating) archive(expected, 'before-content-pass');
-          return { state, message: migrating ? 'Your tour continues. The earlier station book was backed up before this update; committed flights and their reports are unchanged. New readiness rules apply to future commitments.' : '', blocked: false };
+          const migrating = JSON.parse(expected).version !== SAVE_VERSION;
+          if (migrating) archive(expected, 'before-campaign-pass');
+          return { state, message: migrating ? 'Your tour continues with its original squadron, assignment deck, and committed outcomes. The earlier station book was backed up. New branches, story threads, and the six-aircraft opening begin with a fresh tour.' : '', blocked: false };
         }
         catch { return { state: null, message: 'Your existing save cannot be opened by this edition. It remains untouched. Download a copy, or begin a new tour; a backup will be kept first.', blocked: true }; }
       }

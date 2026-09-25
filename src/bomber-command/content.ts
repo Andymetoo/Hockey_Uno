@@ -73,6 +73,25 @@ export function stationEvents(s: State): StationEvent[] {
   if (s.phase !== 'active' || s.active) return [];
   if (s.decisions.filter(d => d.slot === s.completed).length >= 2) return [];
   const events: StationEvent[] = [];
+  if (!s.legacyTour && [2, 6, 9].includes(s.completed) && !s.branches.some(b => b.slot === s.completed)) {
+    const slot = s.completed;
+    events.push({ key: `branch-${slot}`, kind: 'branch', subject: '', title: slot === 2 ? 'Where the fighters went' : slot === 6 ? 'A request from the crossing' : 'Two readings of the photographs',
+      body: slot === 2 ? 'The coastal raids have moved enemy fighters. Operations can pursue them, stay with the engine works, or ask Group to coordinate a covered sweep. This choice sets the next assignment.' : slot === 6 ? 'A threatened crossing needs help while the inland component works remain on the board. This choice sets the next assignment.' : 'The suspected stores may be active, while the western junction is confirmed. This choice sets the next assignment.',
+      choices: slot === 2 ? [
+        { id: 'mobile', label: 'Pursue the moving fighters', detail: 'Next: three aircraft, heavy opposition, short weather opening. A successful raid eases later interception.' },
+        { id: 'main', label: 'Stay with the engine works', detail: 'Next: three aircraft, very heavy opposition. Keep support and strike the established industrial target.' },
+        { id: 'escort', label: 'Coordinate an escorted sweep', detail: 'Spend one support. Next: three aircraft, moderate opposition and escort cover on the direct corridor.', disabled: s.support < 1 },
+      ] : slot === 6 ? [
+        { id: 'relief', label: 'Help the crossing', detail: 'Next: two aircraft and moderate opposition; gain one support now. The inland works pass to another station.' },
+        { id: 'main', label: 'Keep the inland works', detail: 'Next: four aircraft and very heavy opposition. No support changes hands.' },
+        { id: 'recon', label: 'Survey the inland route', detail: 'Spend one support. Next: four aircraft, heavy opposition, and a short approach opening.', disabled: s.support < 1 },
+      ] : [
+        { id: 'junction', label: 'Strike the confirmed junction', detail: 'Next: three aircraft; known guns cover the direct approach. Rail disruption can ease the following raid.' },
+        { id: 'main', label: 'Act on the stores report', detail: 'Next: three aircraft against dispersed, uncertain stores. An effective strike earns transport support.' },
+        { id: 'verify', label: 'Verify the junction first', detail: 'Spend one support. Next: three aircraft, lighter opposition, and a short opening.', disabled: s.support < 1 },
+      ] });
+  }
+  if (!s.legacyTour && [4, 11].includes(s.completed) && !s.decisions.some(d => d.key === `mission-${s.completed}`)) events.push({ key: `mission-${s.completed}`, kind: 'mission', subject: '', title: s.completed === 4 ? 'Escort or the weather gap' : 'An alternate aiming point', body: s.completed === 4 ? 'The escorts can meet the direct route, but the weather officer sees an earlier opening. Operations needs one instruction for this assignment.' : 'The forward fighter bases have a secondary service area. It is easier to reach, but hitting it will not suppress as many fighters.', choices: s.completed === 4 ? [ { id: 'escort', label: 'Meet the escorts', detail: 'Direct corridor gets escort cover; the cloud remains over the target.' }, { id: 'window', label: 'Take the weather opening', detail: 'Direct route gains bombing accuracy. There is no escort advantage.' } ] : [ { id: 'main', label: 'Keep the main dispersals', detail: 'Heavy opposition; an effective fighter raid reduces next assignment opposition.' }, { id: 'alternate', label: 'Take the service area', detail: 'Moderate opposition and a two-aircraft request; an effective strike helps supply instead of fighter suppression.' } ] });
   const available = (key: string, cooldown = 99) => !s.decisions.some(d => d.key === key && s.completed - d.slot < cooldown);
   const onStation = (id: string) => !s.jobs.some(j => (j.kind === 'recovery' && j.text === id) || (j.kind === 'training' && j.subject === id));
   const bayFree = s.engineeringUsed < 1 + s.extraBay && !s.jobs.some(j => j.kind === 'repair' || j.kind === 'inspection');
@@ -119,10 +138,10 @@ export function stationEvents(s: State): StationEvent[] {
       ],
     });
   }
-  if (s.aircraft.filter(a => !a.lost).length < 4 && s.aircraft.some(a => a.lost) && available('reinforcement', 4) && !s.jobs.some(j => j.kind === 'reinforcement')) events.push({
-    key: 'reinforcement', kind: 'reinforcement', subject: s.aircraft.find(a => a.lost)!.id,
-    title: 'A ferry aircraft is available', body: 'Group can send a replacement B-17 and a new crew. It will not bring back the people already lost.',
-    choices: [ { id: 'request', label: 'Call in the replacement', detail: 'Costs two support. A sound aircraft and novice crew arrive in twelve hours.', disabled: s.support < 2 }, { id: 'wait', label: 'Carry on with the squadron', detail: 'Keep support for medical or recovery needs. Another request is possible after four assignments.' } ],
+  if (!s.legacyTour && s.aircraft.length < 8 && s.completed >= 4 && [4, 8].includes(s.completed) && available(`reinforcement-${s.completed}`, 4) && !s.jobs.some(j => j.kind === 'reinforcement') || s.legacyTour && s.aircraft.filter(a => !a.lost).length < 4 && s.aircraft.some(a => a.lost) && available('reinforcement', 4) && !s.jobs.some(j => j.kind === 'reinforcement')) events.push({
+    key: s.legacyTour ? 'reinforcement' : `reinforcement-${s.completed}`, kind: 'reinforcement', subject: s.aircraft.find(a => a.lost)?.id ?? '',
+    title: 'A ferry aircraft is available', body: 'Group can send one aircraft and a new crew. The same transport allocation could instead pay for recovery and specialists. No more than eight aircraft will be posted to this squadron.',
+    choices: [ { id: 'request', label: 'Call in the aircraft', detail: 'Costs two support. A sound aircraft and novice crew arrive in twelve hours.', disabled: s.support < 2 }, { id: 'wait', label: 'Keep the transport reserve', detail: 'No support spent. The offer lapses; another may come later.' } ],
   });
   if (s.opportunity && s.opportunity.slot === s.completed && available(`opportunity-${s.completed}`)) events.push({
     key: `opportunity-${s.completed}`, kind: 'opportunity', subject: '',
@@ -136,14 +155,18 @@ export function stationEvents(s: State): StationEvent[] {
       { id: 'support', label: 'Keep the transport allocation', detail: 'Add one support for specialists and recovery, up to the station limit of five.', disabled: s.support >= 5 },
     ],
   });
-  const novice = s.crews.find(c => !c.lost && !c.injury && !c.lesson && c.leaveThrough <= s.completed && onStation(c.id) && c.experience < 5 && c.fatigue < 35);
+  const novice = s.crews.find(c => (s.legacyTour || s.threads.some(t => t.family === 'novice' && t.stage === 'offered' && t.subject === c.id)) && !c.lost && !c.injury && !c.lesson && c.leaveThrough <= s.completed && onStation(c.id) && c.experience < 5 && c.fatigue < 35);
   const veteran = s.crews.find(c => !c.lost && !c.injury && c.leaveThrough <= s.completed && onStation(c.id) && c.experience >= 6 && c.fatigue < 50);
-  if (s.completed >= 2 && novice && veteran && available('mentor', 4)) events.push({
+  if (s.completed >= 2 && novice && veteran && available('mentor', 4) && (s.legacyTour || s.threads.some(t => t.family === 'novice' && t.stage === 'offered' && t.subject === novice.id))) events.push({
     key: 'mentor', kind: 'mentor', subject: novice.id, title: 'An afternoon at the plotting table',
     body: `${veteran.pilot} offers to work through the approaches with ${novice.pilot}. Both crews would be held off the next operation for training.`,
     choices: [ { id: 'train', label: 'Give them the afternoon', detail: 'Costs one support. Gain two experience and an eight-point bombing advantage on the next flight. Both crews are unavailable for six hours; others must cover an immediate dispatch.', disabled: s.support < 1 }, { id: 'fly', label: 'Keep both crews available', detail: 'No training gain. Preserve support and both crews for today’s assignment.' } ],
   });
+  const leadership = s.threads.find(t => t.family === 'novice' && t.stage === 'trained' && s.completed >= t.dueSlot);
+  const leader = leadership && s.crews.find(c => c.id === leadership.subject);
+  if (leader && !leader.lost && !leader.injury && leader.sorties >= 2 && !s.decisions.some(d => d.key === `leadership-${leader.id}`)) events.push({ key: `leadership-${leader.id}`, kind: 'leadership', subject: leader.id, title: `${leader.pilot} asks for responsibility`, body: `${leader.pilot} and ${leader.specialist} have flown together since the plotting-table session. They can prepare this assignment's approach for the squadron, or take a promised assignment off.`, choices: [ { id: 'lead', label: 'Let the crew brief the approach', detail: 'Their prepared notes improve bombing accuracy on this assignment; the responsibility adds one strain to this crew.' }, { id: 'rest', label: 'Promise an assignment off', detail: 'Keep the crew off this assignment; clear their strain and fatigue at its report. No squadron briefing bonus.' } ] });
   // Do not bury an earned, expiring opportunity behind several similar repair findings.
-  const opportunity = events.find(e => e.kind === 'opportunity');
-  return opportunity ? [events.find(e => e !== opportunity), opportunity].filter((e): e is StationEvent => !!e) : events.slice(0, 2);
+  const priority = (e: StationEvent) => ['branch', 'mission', 'leadership'].includes(e.kind) ? 0 : e.kind === 'opportunity' ? 1 : e.kind === 'reinforcement' ? 2 : s.threads.some(t => t.subject === e.subject && ['replacement', 'returning', 'recovery', 'inspection', 'mentor'].includes(e.kind) && s.completed >= t.dueSlot) ? 3 : 4;
+  const threeOffers = events.some(e => e.kind === 'mission') && events.some(e => e.kind === 'opportunity') && events.some(e => e.kind === 'reinforcement');
+  return events.sort((a, b) => priority(a) - priority(b)).slice(0, threeOffers ? 3 : 2);
 }

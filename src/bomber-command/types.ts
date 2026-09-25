@@ -41,7 +41,10 @@ export type JobKind = 'signal' | 'return' | 'repair' | 'inspection' | 'service' 
 export interface Job { id: number; at: number; kind: JobKind; subject: string; text?: string; overhaul?: boolean; }
 export interface DecisionRecord { key: string; slot: number; text: string; }
 export interface State {
-  version: 21; seed: number; rng: number; now: number; offset: number; nextId: number;
+  version: 22; seed: number; rng: number; now: number; offset: number; nextId: number;
+  nextMorningAt: number; legacyTour: boolean;
+  branches: { slot: number; choice: string; promise: string; fulfilled: boolean | null }[];
+  threads: { family: 'injury' | 'fault' | 'novice' | 'diversion'; subject: string; stage: string; dueSlot: number; note: string }[];
   station: string; circumstance: string; aircraft: Aircraft[]; crews: Crew[]; assignments: Assignment[];
   completed: number; contribution: number; requested: number; support: number; suppression: number;
   engineeringUsed: number; active: Operation | null; jobs: Job[]; reports: Report[];
@@ -52,4 +55,4 @@ export interface State {
   tutorial: TutorialProgress;
 }
 export interface Choice { id: string; label: string; detail: string; disabled?: boolean; }
-export interface StationEvent { key: string; kind: 'returning' | 'replacement' | 'recovery' | 'reinforcement' | 'rush' | 'mentor' | 'inspection' | 'strain' | 'opportunity'; subject: string; title: string; body: string; choices: Choice[]; }
+export interface StationEvent { key: string; kind: 'branch' | 'mission' | 'leadership' | 'returning' | 'replacement' | 'recovery' | 'reinforcement' | 'rush' | 'mentor' | 'inspection' | 'strain' | 'opportunity'; subject: string; title: string; body: string; choices: Choice[]; }

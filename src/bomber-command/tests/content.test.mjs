@@ -6,7 +6,7 @@ import { makeAssignments, stationEvents } from '../content.ts';
 import { createStorage, decode, SAVE_KEY } from '../persistence.ts';
 
 const START = 1_800_000_000_000;
-const fresh = (seed = 73) => createCampaign(seed, START);
+const fresh = (seed = 73) => { const s = createCampaign(seed, START); s.legacyTour = true; s.threads = []; return s; };
 const finish = s => advance(s, s.active.returnsAt);
 const drain = s => { let n = 0; while (s.jobs.length) { assert.ok(n++ < 200); advance(s, nextMilestone(s)); } };
 const job = (s, kind, delay, subject, text) => s.jobs.push({ id: s.nextId++, at: s.now + delay * HOUR, kind, subject, ...(text ? { text } : {}) });
@@ -131,7 +131,7 @@ test('a lost replacement crew does not erase the original specialist or their me
   assert.equal(c.replacement, 'Sgt. Walsh'); assert.ok(s.notices.some(t => t.includes('reassignment by Group')));
 });
 test('a single old loss does not permit building an unlimited reserve fleet', () => {
-  const s = fresh(); s.aircraft[0].lost = true; s.crews[0].lost = true;
+  const s = fresh(); for (let i = 0; i < 3; i++) { s.aircraft[i].lost = true; s.crews[i].lost = true; }
   select(s, 'reinforcement', 'request'); advance(s, START + 12 * HOUR);
   s.completed = 5; assert.equal(s.aircraft.filter(a => !a.lost).length, 4); assert.ok(!stationEvents(s).some(e => e.kind === 'reinforcement'));
 });
@@ -143,12 +143,12 @@ test('automatic proposals refresh after work; a manually edited package stays un
 });
 test('v20 migration preserves every committed result, job timestamp and random position', () => {
   const raw = readFileSync(new URL('./fixtures/v20-active.json', import.meta.url), 'utf8'), original = JSON.parse(raw), s = decode(raw);
-  assert.equal(s.version, 21); assert.deepEqual(s.active, original.active); assert.deepEqual(s.jobs, original.jobs); assert.equal(s.rng, original.rng);
+  assert.equal(s.version, 22); assert.deepEqual(s.active, original.active); assert.deepEqual(s.jobs, original.jobs); assert.equal(s.rng, original.rng);
   assert.ok(s.assignments.every(a => a.circumstance === 'ordinary'));
   const reload = decode(JSON.stringify(s)); finish(s); finish(reload); assert.deepEqual(s, reload);
   const map = new Map([[SAVE_KEY, raw]]), storage = { getItem: k => map.get(k) ?? null, setItem: (k, v) => map.set(k, v) };
   const repo = createStorage(storage); const loaded = repo.load(); assert.ok(loaded.message.includes('backed up')); assert.equal(map.get(SAVE_KEY), raw);
-  repo.save(loaded.state); assert.ok([...map].some(([k, v]) => k.includes('before-content-pass') && v === raw));
+  repo.save(loaded.state); assert.ok([...map].some(([k, v]) => k.includes('before-campaign-pass') && v === raw));
 });
 test('malformed content fields are rejected instead of silently resetting consequences', () => {
   const s = fresh(); s.crews[0].strain = -1; assert.throws(() => decode(JSON.stringify(s)));

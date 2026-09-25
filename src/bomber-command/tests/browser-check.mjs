@@ -76,7 +76,7 @@ try {
   const initial = createCampaign(2026, Date.now());
   initial.tutorial.disabled = true;
   await evaluate(`localStorage.setItem(${JSON.stringify(SAVE_KEY)}, ${JSON.stringify(JSON.stringify(initial))})`); await load();
-  assert.equal(await evaluate('document.querySelectorAll("[data-aircraft]").length'), 4);
+  assert.equal(await evaluate('document.querySelectorAll("[data-aircraft]").length'), 6);
   assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'), true);
   await screenshot('desktop-today');
   const before = await getState();
@@ -101,12 +101,15 @@ try {
   await click('[data-tab="squadron"]'); await screenshot('mobile-squadron'); await click('[data-tab="today"]');
   // Complete the tour with real UI actions, taking a stand-down only when no fit package exists.
   while ((state = await getState()).phase === 'active') {
+    if (await evaluate('!!document.querySelector("[data-action=prepare-morning]")')) await action('prepare-morning');
+    const branch = await evaluate('document.querySelector("[data-event-kind=branch]")?.dataset.decision');
+    if (branch) await click(`[data-decision="${branch}"]:not(:disabled)`);
     await action('propose');
     if (await evaluate('document.querySelector("[data-action=review]").disabled')) await action('standdown');
     else await action('review');
     await action('confirm-dispatch'); await action('skip-return');
     const returned = await getState();
-    if (returned.completed === 6 || returned.completed === 10) {
+    if ([3, 7, 10].includes(returned.completed)) {
       assert.ok(returned.assignments[returned.completed].followup);
       assert.ok(await evaluate('document.querySelector("[data-tutorial-target=briefing]")?.innerText.includes("From the last operation")'));
       await screenshot(`mobile-branch-${returned.completed + 1}`);
@@ -157,7 +160,7 @@ try {
   // Migrate an actual pre-pass fixture, including the active operation, in the running UI.
   const oldRaw = await readFile(new URL('./fixtures/v20-active.json', import.meta.url), 'utf8');
   await evaluate(`localStorage.setItem(${JSON.stringify(SAVE_KEY)}, ${JSON.stringify(oldRaw)})`); await load();
-  const migrated = await getState(); assert.equal(migrated.version, 21); assert.deepEqual(migrated.active.report, JSON.parse(oldRaw).active.report);
+  const migrated = await getState(); assert.equal(migrated.version, 22); assert.deepEqual(migrated.active.report, JSON.parse(oldRaw).active.report);
   assert.ok(await evaluate('document.body.innerText.includes("earlier station book was backed up")'));
   assert.deepEqual(errors, []);
   assert.deepEqual(networkErrors, []);

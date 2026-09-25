@@ -4,7 +4,7 @@ import { advance, commit, createCampaign, proposePlan } from '../game.ts';
 import { decode } from '../persistence.ts';
 import { autoTutorial, nextTutorial, tutorialSteps } from '../tutorial.ts';
 
-const fresh = () => createCampaign(2026, 1_800_000_000_000);
+const fresh = () => { const s = createCampaign(2026, 1_800_000_000_000); s.legacyTour = true; s.threads = []; return s; };
 const finish = s => advance(s, s.active.returnsAt);
 const standDowns = (s, count) => { for (let i = 0; i < count; i++) { commit(s, proposePlan(s), true); finish(s); } };
 

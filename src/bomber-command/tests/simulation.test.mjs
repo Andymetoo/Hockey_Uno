@@ -6,7 +6,7 @@ import { createStorage, decode, LEGACY_KEY, SAVE_KEY } from '../persistence.ts';
 
 const START = 1_800_000_000_000;
 const copy = s => structuredClone(s);
-const fresh = seed => createCampaign(seed ?? 42, START);
+const fresh = seed => { const s = createCampaign(seed ?? 42, START); s.legacyTour = true; s.threads = []; return s; };
 const finish = s => { if (s.active) advance(s, s.active.returnsAt); };
 const drain = s => { let count = 0; while (s.jobs.length) { assert.ok(count++ < 150); advance(s, nextMilestone(s)); } };
 const addJob = (s, kind, hours, subject, text) => s.jobs.push({ id: s.nextId++, at: s.now + hours * HOUR, kind, subject, ...(text ? { text } : {}) });
@@ -193,7 +193,7 @@ test('legacy saves are preserved byte-for-byte and new editions use a separate k
   const storage = memoryStorage(); const raw = '{"version":11,"old":"record"}'; storage.setItem(LEGACY_KEY, raw);
   const repo = createStorage(storage); assert.ok(repo.load().message.includes('preserved')); repo.save(fresh());
   assert.equal(storage.getItem(LEGACY_KEY), raw); assert.equal(storage.getItem(`${LEGACY_KEY}-before-desk`), raw);
-  assert.equal(decode(storage.getItem(SAVE_KEY)).version, 21);
+  assert.equal(decode(storage.getItem(SAVE_KEY)).version, 22);
 });
 test('unreadable or future saves are not overwritten; replacement archives the exact record', () => {
   const storage = memoryStorage(); const raw = '{"version":999}'; storage.setItem(SAVE_KEY, raw);
