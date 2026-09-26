@@ -1,5 +1,7 @@
 import { SAVE_VERSION } from './game.ts';
 import type { State } from './types.ts';
+import { snapshotThreads } from './history.ts';
+import { validateCampaignContent } from './save-content.ts';
 
 export const SAVE_KEY = 'bomber-command-desk-v20';
 export const LEGACY_KEY = 'bomber-command-save-v1';
@@ -21,7 +23,7 @@ function validReport(r: unknown): boolean {
 }
 export function decode(raw: string): State {
   const v: unknown = JSON.parse(raw);
-  if (!object(v) || (v.version !== SAVE_VERSION && v.version !== 21 && v.version !== 20)) throw new Error('This file belongs to a different edition of Bomber Command.');
+  if (!object(v) || (v.version !== SAVE_VERSION && v.version !== 22 && v.version !== 21 && v.version !== 20)) throw new Error('This file belongs to a different edition of Bomber Command.');
   const originalVersion = v.version;
   if (!fields(v, ['seed', 'rng', 'now', 'offset', 'nextId', 'completed', 'contribution', 'requested', 'support', 'suppression', 'engineeringUsed'], number) || !fields(v, ['station', 'circumstance'], text) || !['active', 'closing', 'ended'].includes(String(v.phase)) || ![null, 'tour', 'losses'].includes(v.ending as null) || !strings(v.notices) || !validPlan(v.plan)) throw new Error('The saved station record is incomplete.');
   if (!records(v.aircraft, a => fields(a, ['id', 'name'], text) && fields(a, ['condition', 'sorties'], number) && fields(a, ['defect', 'lost', 'away'], bool) && strings(a.history) && ['rugged', 'accurate', 'economical', 'swift'].includes(String(a.trait))) || !records(v.crews, c => fields(c, ['id', 'pilot', 'specialist'], text) && fields(c, ['experience', 'fatigue', 'sorties'], number) && fields(c, ['lost', 'injury', 'returned'], bool) && (c.replacement === null || text(c.replacement)) && strings(c.history) && ['navigation', 'bombing', 'engineering', 'formation'].includes(String(c.strength)))) throw new Error('The saved squadron record is incomplete.');
@@ -40,13 +42,24 @@ export function decode(raw: string): State {
   if (originalVersion === 20 || originalVersion === 21) {
     s.version = SAVE_VERSION; s.nextMorningAt = s.now; s.legacyTour = true; s.branches = []; s.threads = [];
   }
+  if (originalVersion !== SAVE_VERSION) {
+    // Capture only the recorded endpoint. Never infer earlier choices or draw new facts.
+    s.version = SAVE_VERSION; s.contentVersion = 0; s.campaign = null; s.stories = []; s.duties = [];
+    snapshotThreads(s);
+    for (const t of s.threads) {
+      t.milestones = [{ slot: s.completed, stage: 'imported', text: `Earlier station book: ${t.note}` }];
+      if (['home', 'deferred'].includes(t.stage)) t.status = 'resolved';
+    }
+    if (s.briefing) s.briefingSource = 'The briefing already entered in the earlier station book';
+  }
   if (!number(s.nextMorningAt) || !bool(s.legacyTour) || !Array.isArray(s.branches) || !s.branches.every(b => object(b) && number(b.slot) && text(b.choice) && text(b.promise) && (b.fulfilled === null || bool(b.fulfilled))) || !Array.isArray(s.threads) || !s.threads.every(t => object(t) && ['injury', 'fault', 'novice', 'diversion'].includes(String(t.family)) && text(t.subject) && text(t.stage) && number(t.dueSlot) && text(t.note))) throw new Error('The campaign record is incomplete.');
   if (new Set(s.branches.map(b => b.slot)).size !== s.branches.length || s.branches.some(b => ![2, 6, 9].includes(b.slot) || b.slot > s.completed) || new Set(s.threads.map(t => t.family)).size !== s.threads.length || s.threads.some(t => t.dueSlot < 0 || t.dueSlot > 14 || !(t.family === 'injury' || t.family === 'novice' ? s.crews.some(c => c.id === t.subject) : s.aircraft.some(a => a.id === t.subject)))) throw new Error('The campaign record has inconsistent participants or choices.');
   if (v.tutorial === undefined) s.tutorial = { seen: s.completed || s.active ? ['intro', 'planning', 'dispatch', 'underway', 'return', 'station', 'problem'] : [], disabled: false };
   if (!object(s.tutorial) || !strings(s.tutorial.seen) || !bool(s.tutorial.disabled) || (s.tutorial.stationAt !== undefined && (!Number.isInteger(s.tutorial.stationAt) || s.tutorial.stationAt < 0 || s.tutorial.stationAt > 13))) throw new Error('The saved tutorial record is incomplete.');
   const integer = (n: unknown, low: number, high: number) => typeof n === 'number' && Number.isInteger(n) && n >= low && n <= high;
-  if (!bool(s.briefing) || !bool(s.planEdited) || !integer(s.extraBay, 0, 1) || !s.aircraft.every(a => [null, 'oil', 'controls', 'sight'].includes(a.defectType) && integer(a.certified, 0, 2) && bool(a.recovered)) || !s.crews.every(c => integer(c.strain, 0, 3) && integer(c.leaveThrough, 0, 14) && bool(c.lesson) && integer(c.replacementSorties, 0, 14)) || !s.assignments.every(a => ['ordinary', 'escort', 'window', 'dispersed', 'fuel', 'flak'].includes(a.circumstance)) || (s.opportunity !== null && (!object(s.opportunity) || !['photos', 'transport'].includes(s.opportunity.kind) || !text(s.opportunity.source) || !integer(s.opportunity.slot, 0, 13)))) throw new Error('The saved readiness record is incomplete.');
+  if (!bool(s.briefing) || !bool(s.planEdited) || !integer(s.extraBay, 0, 2) || !s.aircraft.every(a => [null, 'oil', 'controls', 'sight'].includes(a.defectType) && integer(a.certified, 0, 2) && bool(a.recovered)) || !s.crews.every(c => integer(c.strain, 0, 3) && integer(c.leaveThrough, 0, 14) && bool(c.lesson) && integer(c.replacementSorties, 0, 14)) || !s.assignments.every(a => ['ordinary', 'escort', 'window', 'dispersed', 'fuel', 'flak'].includes(a.circumstance)) || (s.opportunity !== null && (!object(s.opportunity) || !['photos', 'transport'].includes(s.opportunity.kind) || !text(s.opportunity.source) || !integer(s.opportunity.slot, 0, 13)))) throw new Error('The saved readiness record is incomplete.');
   for (const r of [...s.reports, ...(s.active ? [s.active.report] : [])]) if (r.results.some(f => (f.details !== undefined && !strings(f.details)) || (f.credits !== undefined && (!Array.isArray(f.credits) || !f.credits.every(x => ['training', 'repair', 'briefing', 'orders', 'restraint'].includes(x)))) || (f.newDefect !== undefined && ![null, 'oil', 'sight', 'controls'].includes(f.newDefect)) || (f.strain !== undefined && !integer(f.strain, 0, 2)))) throw new Error('The saved flight findings are incomplete.');
+  validateCampaignContent(s);
   return s;
 }
 export function createStorage(storage: StoragePort) {
@@ -64,7 +77,7 @@ export function createStorage(storage: StoragePort) {
           const state = decode(expected);
           const migrating = JSON.parse(expected).version !== SAVE_VERSION;
           if (migrating) archive(expected, 'before-campaign-pass');
-          return { state, message: migrating ? 'Your tour continues with its original squadron, assignment deck, and committed outcomes. The earlier station book was backed up. New branches, story threads, and the six-aircraft opening begin with a fresh tour.' : '', blocked: false };
+          return { state, message: migrating ? 'Your tour continues with its original squadron, assignment deck, random position, scheduled work, and committed outcomes. The earlier station book was backed up verbatim. Recorded story endpoints are preserved. Delayed commitments, new story families, and contextual duties begin with a fresh tour.' : '', blocked: false };
         }
         catch { return { state: null, message: 'Your existing save cannot be opened by this edition. It remains untouched. Download a copy, or begin a new tour; a backup will be kept first.', blocked: true }; }
       }

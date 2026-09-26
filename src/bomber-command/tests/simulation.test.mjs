@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { advance, aircraftAvailable, choose, commit, createCampaign, crewAvailable, duration, forecast, HOUR, nextMilestone, planErrors, proposePlan, repairCandidates } from '../game.ts';
+import { advance, aircraftAvailable, choose, commit, createCampaign, SAVE_VERSION, crewAvailable, duration, forecast, HOUR, nextMilestone, planErrors, proposePlan, repairCandidates } from '../game.ts';
 import { stationEvents } from '../content.ts';
 import { createStorage, decode, LEGACY_KEY, SAVE_KEY } from '../persistence.ts';
 
@@ -193,7 +193,7 @@ test('legacy saves are preserved byte-for-byte and new editions use a separate k
   const storage = memoryStorage(); const raw = '{"version":11,"old":"record"}'; storage.setItem(LEGACY_KEY, raw);
   const repo = createStorage(storage); assert.ok(repo.load().message.includes('preserved')); repo.save(fresh());
   assert.equal(storage.getItem(LEGACY_KEY), raw); assert.equal(storage.getItem(`${LEGACY_KEY}-before-desk`), raw);
-  assert.equal(decode(storage.getItem(SAVE_KEY)).version, 22);
+  assert.equal(decode(storage.getItem(SAVE_KEY)).version, SAVE_VERSION);
 });
 test('unreadable or future saves are not overwritten; replacement archives the exact record', () => {
   const storage = memoryStorage(); const raw = '{"version":999}'; storage.setItem(SAVE_KEY, raw);

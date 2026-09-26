@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { advance, aircraftAvailable, choose, commit, createCampaign, crewAvailable, forecast, flightFatigue, HOUR, nextMilestone, proposePlan, repairCandidates, tourMemories } from '../game.ts';
+import { advance, aircraftAvailable, choose, commit, createCampaign, SAVE_VERSION, crewAvailable, forecast, flightFatigue, HOUR, nextMilestone, proposePlan, repairCandidates, tourMemories } from '../game.ts';
 import { makeAssignments, stationEvents } from '../content.ts';
 import { createStorage, decode, SAVE_KEY } from '../persistence.ts';
 
@@ -143,7 +143,7 @@ test('automatic proposals refresh after work; a manually edited package stays un
 });
 test('v20 migration preserves every committed result, job timestamp and random position', () => {
   const raw = readFileSync(new URL('./fixtures/v20-active.json', import.meta.url), 'utf8'), original = JSON.parse(raw), s = decode(raw);
-  assert.equal(s.version, 22); assert.deepEqual(s.active, original.active); assert.deepEqual(s.jobs, original.jobs); assert.equal(s.rng, original.rng);
+  assert.equal(s.version, SAVE_VERSION); assert.deepEqual(s.active, original.active); assert.deepEqual(s.jobs, original.jobs); assert.equal(s.rng, original.rng);
   assert.ok(s.assignments.every(a => a.circumstance === 'ordinary'));
   const reload = decode(JSON.stringify(s)); finish(s); finish(reload); assert.deepEqual(s, reload);
   const map = new Map([[SAVE_KEY, raw]]), storage = { getItem: k => map.get(k) ?? null, setItem: (k, v) => map.set(k, v) };

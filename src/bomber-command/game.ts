@@ -1,9 +1,14 @@
 import type { Aircraft, Crew, FlightResult, JobKind, Plan, State } from './types.ts';
 import { defectText, makeAssignments, stationEvents } from './content.ts';
+import { identifyCrew, recordThread, snapshotThreads, threadActive } from './history.ts';
+import { createCampaignState, recordCampaignChoice, finishCampaignOperation, campaignObjective, campaignResolutionNotes } from './campaign.ts';
+import { advanceStories, applyStoryChoice, storyDuty } from './stories.ts';
+import { selectOperationalEvent, resolveOperationalEvent, expireOperationalEvent } from './operations.ts';
+import { advanceOldStories, applyOldStoryChoice } from './old-stories.ts';
 
 export const HOUR = 3_600_000;
 export const TOUR_LENGTH = 14;
-export const SAVE_VERSION = 22;
+export const SAVE_VERSION = 23;
 export const DAY = 24 * HOUR;
 export function nextOperationalMorning(at: number): number { return Math.floor((at - 8 * HOUR) / DAY + 1) * DAY + 8 * HOUR; }
 export function prepareMorning(s: State): void { if (s.active || s.phase !== 'active') return; advance(s, Math.max(s.now, s.nextMorningAt)); }
@@ -23,6 +28,7 @@ export function createCampaign(seed: number, now: number): State {
   const s: State = {
     version: SAVE_VERSION, seed: seed >>> 0, rng: seed >>> 0, now, offset: 0, nextId: 1,
     nextMorningAt: now, legacyTour: false, branches: [], threads: [],
+    contentVersion: 1, campaign: createCampaignState(seed), stories: [], duties: [],
     station: '', circumstance: '', aircraft: [], crews: [], assignments: [], completed: 0,
     contribution: 0, requested: 0, support: 3, suppression: 0, engineeringUsed: 0,
     active: null, jobs: [], reports: [], decisions: [], notices: [], phase: 'active', ending: null,
@@ -51,11 +57,13 @@ export function createCampaign(seed: number, now: number): State {
   if (setting === 1) s.support = 4;
   s.assignments = makeAssignments(() => random(s));
   if (random(s) < .8) s.threads.push({ family: 'novice', subject: 'c1', stage: 'offered', dueSlot: 2, note: 'Bell and Turner are learning the formation. A veteran may offer a plotting-table session.' });
+  snapshotThreads(s);
   s.plan = proposePlan(s);
   return s;
 }
 export function aircraftIssue(s: State, a: Aircraft): string {
   if (a.lost) return 'Lost on operations';
+  const duty = storyDuty(s, 'aircraft', a.id); if (duty) return `${duty.label} · returns after assignment ${duty.through}`;
   if (a.away) return 'At a forward field';
   if (s.active?.plan.flights.some(f => f.aircraft === a.id)) return 'On operations';
   if (s.jobs.some(j => j.subject === a.id && ['repair', 'inspection'].includes(j.kind))) return 'In the repair bay';
@@ -67,10 +75,11 @@ export function aircraftIssue(s: State, a: Aircraft): string {
   return 'Ready for assignment';
 }
 export function aircraftAvailable(s: State, a: Aircraft): boolean {
-  return !a.lost && !a.away && a.condition >= 55 && !s.jobs.some(j => j.subject === a.id && ['repair', 'inspection'].includes(j.kind)) && !s.active?.plan.flights.some(f => f.aircraft === a.id);
+  return !a.lost && !a.away && !storyDuty(s, 'aircraft', a.id) && a.condition >= 55 && !s.jobs.some(j => j.subject === a.id && ['repair', 'inspection'].includes(j.kind)) && !s.active?.plan.flights.some(f => f.aircraft === a.id);
 }
 export function crewIssue(s: State, c: Crew): string {
   if (c.lost) return 'Crew lost';
+  const duty = storyDuty(s, 'crew', c.id); if (duty) return `${duty.label} · returns after assignment ${duty.through}`;
   if (c.leaveThrough > s.completed) return 'Promised this assignment off · returns after its report';
   if (s.active?.plan.flights.some(f => f.crew === c.id)) return 'On operations';
   if (s.jobs.some(j => j.kind === 'training' && j.subject === c.id)) return 'At the plotting table';
@@ -81,7 +90,7 @@ export function crewIssue(s: State, c: Crew): string {
   return c.fatigue >= 65 ? 'Very tired · extra exposure and strain' : c.strain > 0 ? `Operational strain ${c.strain}/3 · sleep alone will not clear it` : c.fatigue >= 35 ? 'Tired · fit with reservations' : 'Rested and fit';
 }
 export function crewAvailable(s: State, c: Crew): boolean {
-  return !c.lost && c.leaveThrough <= s.completed && (!c.injury || !!c.replacement) && c.fatigue < 95 &&
+  return !c.lost && !storyDuty(s, 'crew', c.id) && c.leaveThrough <= s.completed && (!c.injury || !!c.replacement) && c.fatigue < 95 &&
     !s.active?.plan.flights.some(f => f.crew === c.id) &&
     !s.jobs.some(j => (j.kind === 'training' && j.subject === c.id) || (j.kind === 'recovery' && j.text === c.id));
 }
@@ -148,7 +157,7 @@ function flightOutcome(s: State, a: Aircraft, c: Crew, p: Plan): FlightResult {
   } else if (c.replacement) facts.push(`${c.replacement} was aboard; ${c.specialist} remained ashore.`);
   const details: string[] = [], credits: NonNullable<FlightResult['credits']> = [];
   if (!lost && hit && c.lesson && aim >= forecast(s, a, { ...c, lesson: false }, p).accuracy) { credits.push('training'); details.push(`${c.pilot} used the practiced approach. The training made the difference to the bombing concentration.`); }
-  if (!lost && hit && s.briefing && aim >= forecast({ ...s, briefing: false }, a, c, p).accuracy) { credits.push('briefing'); details.push('The landmarks from the earlier strike photographs made the difference to this concentration.'); }
+  if (!lost && hit && s.briefing && aim >= forecast({ ...s, briefing: false }, a, c, p).accuracy) { credits.push('briefing'); details.push(`${s.briefingSource ?? 'The recorded squadron briefing'} made the difference to this concentration.`); }
   if (!lost && !trouble && a.certified && mechanical < forecast(s, { ...a, certified: 0 }, c, p).mechanical) { credits.push('repair'); details.push(`Finch’s certified work on ${a.name} prevented a mechanical interruption on this flight.`); }
   if (hit && p.orders === 'press' && (trouble || aim >= forecast(s, a, c, { ...p, orders: 'preserve' }).accuracy)) { credits.push('orders'); details.push('The additional commitment under the pressing order secured this effective strike.'); }
   if (!lost && !abort && p.orders === 'preserve' && !struck && combat < forecast(s, a, c, { ...p, orders: 'press' }).exposure) { credits.push('restraint'); details.push('Leaving after the first pass kept this aircraft clear of the additional combat exposure.'); }
@@ -156,12 +165,13 @@ function flightOutcome(s: State, a: Aircraft, c: Crew, p: Plan): FlightResult {
   if (c.lesson && !credits.includes('training') && !lost) details.push(`${c.pilot} flew with the practiced approach notes; ${hit ? 'the crew placed an effective concentration' : 'the preparation could not secure an effective strike this time'}.`);
   if (strain && !lost) details.push(`The flight added ${Math.min(3 - c.strain, strain)} operational strain. Sleep helps fatigue; an assignment off flying is needed to clear strain.`);
   if (outcome === 'home' && !struck && !trouble && hit && !details.length && !a.defect && a.condition - damage >= 75) details.push([`${c.replacement ?? c.specialist} logged the homeward fixes. Nothing required the station’s intervention.`, `${c.pilot} signed the aircraft over to Finch. Routine servicing is all that separates this return from the next assignment.`, 'The crew ate together after debrief. No exceptional action is needed for this return.'][Math.min(2, Math.floor(wear * 3))]);
-  return { aircraft: a.id, crew: c.id, outcome, damage, injury: hurt, hit, fatigue, note: facts.join(' '), details, newDefect, strain, credits };
+  return { aircraft: a.id, crew: c.id, aircraftName: a.name, pilotName: c.pilot, specialistName: c.replacement ?? c.specialist, specialistId: (c.replacement ? c.replacementId : c.specialistId) ?? `${c.id}:specialist`, outcome, damage, injury: hurt, hit, fatigue, note: facts.join(' '), details, newDefect, strain, credits };
 }
 export function repairCandidates(s: State, p: Plan, standDown = false): Aircraft[] {
   const flying = new Set(standDown ? [] : p.flights.map(f => f.aircraft));
-  const bays = Math.max(0, (standDown ? 2 : 1) + s.extraBay - s.engineeringUsed - s.jobs.filter(j => j.kind === 'repair' || (j.kind === 'inspection' && s.engineeringUsed === 0)).length);
-  return s.aircraft.filter(a => !a.lost && !a.away && !flying.has(a.id) && (a.condition < 90 || a.defect || a.recovered) && !s.jobs.some(j => j.subject === a.id && ['repair', 'inspection'].includes(j.kind)))
+  const busyBays = s.jobs.filter(j => ['repair', 'inspection'].includes(j.kind)).length;
+  const bays = Math.max(0, (standDown ? 2 : 1) + s.extraBay - Math.max(s.engineeringUsed, busyBays));
+  return s.aircraft.filter(a => !a.lost && !a.away && !storyDuty(s, 'aircraft', a.id) && !flying.has(a.id) && (a.condition < 90 || a.defect || a.recovered) && !s.jobs.some(j => j.subject === a.id && ['repair', 'inspection'].includes(j.kind)))
     .sort((a, b) => (a.id === p.priority ? -1 : b.id === p.priority ? 1 : (a.condition - (a.defect ? 35 : 0)) - (b.condition - (b.defect ? 35 : 0)))).slice(0, bays);
 }
 export function applyBranch(s: State, choice: string, automatic = false): void {
@@ -185,29 +195,39 @@ export function applyBranch(s: State, choice: string, automatic = false): void {
     else if (choice === 'main') { Object.assign(next, { title: 'Factory stores', objective: 'Strike the suspected stores behind the fighter repair depot.', effect: 'supplies', hazard: 3, requested: 3, circumstance: 'dispersed', why: 'The stores may be active; the junction remains a confirmed alternative. Separate aiming points make the attack harder.', followup: 'You accepted the disputed stores report and diverted from the confirmed junction.' }); promise = 'Disrupt the suspected stores'; }
     else throw new Error('Unknown campaign choice.');
   }
-  if (automatic) next.followup = `No campaign direction was entered. Operations kept the original objective. ${next.followup ?? ''}`;
+  if (automatic) next.followup = `No campaign direction was entered. ${slot === 9 && choice === 'junction' ? 'Operations selected the confirmed junction.' : 'Operations kept the standing objective.'} ${next.followup ?? ''}`;
   s.branches.push({ slot, choice, promise, fulfilled: null });
+  recordCampaignChoice(s, slot, choice);
   note(s, next.followup!);
 }
 function updateThreads(s: State, report: State['reports'][number]): void {
+  snapshotThreads(s);
   for (const t of s.threads) {
     const c = s.crews.find(c => c.id === t.subject), a = s.aircraft.find(a => a.id === t.subject);
-    if (c?.lost && t.family === 'novice') { t.stage = 'lost'; t.note = `${c.pilot}'s crew was lost before the offered responsibility could be settled.`; }
-    if (c?.lost && t.family === 'injury') { t.stage = 'ashore'; t.note = c.replacement ? `${c.specialist} survived ashore while ${c.pilot}'s crew and ${c.replacement} were lost.` : `${c.pilot}'s crew was lost before the medical return.`; }
-    if (a?.lost && ['fault', 'diversion'].includes(t.family)) { t.stage = 'lost'; t.note = `${a.name} was lost before the station could close its ${t.family === 'fault' ? 'engineering' : 'recovery'} record.`; }
-    if (t.family === 'novice' && t.stage === 'offered' && s.completed > t.dueSlot + 2) { t.stage = 'outgrown'; t.note = `${c?.pilot ?? 'The crew'} gained experience in operations without the proposed plotting-table session.`; }
+    if (!threadActive(t)) {
+      if ((c?.lost || a?.lost) && !t.milestones?.some(m => m.stage === 'later-loss')) recordThread(s, t, 'later-loss', `${c?.pilot ?? a?.name} was lost later, on assignment ${report.slot}. The earlier resolution remains in the station book.`);
+      if (t.family === 'fault' && report.results.some(r => r.aircraft === t.subject && r.credits?.includes('repair'))) recordThread(s, t, 'proved', `Assignment ${report.slot}: Finch's certified work prevented an interruption on ${a?.name}.`);
+      continue;
+    }
+    if (c?.lost && t.family === 'novice') recordThread(s, t, 'lost', `${c.pilot}'s crew was lost before the offered responsibility could be settled.`);
+    if (c?.lost && t.family === 'injury') recordThread(s, t, 'ashore', c.replacement ? `${c.specialist} survived ashore while ${c.pilot}'s crew and ${c.replacement} were lost.` : `${c.pilot}'s crew was lost after the medical return.`);
+    if (a?.lost && ['fault', 'diversion'].includes(t.family)) recordThread(s, t, 'lost', `${a.name} was lost while the ${t.family === 'fault' ? 'engineering finding' : 'recovery record'} was still open.`);
+    if (t.family === 'novice' && t.stage === 'offered' && s.completed > t.dueSlot + 2) { recordThread(s, t, 'deferred', `${c?.pilot ?? 'The crew'} kept the operational roster. The plotting-table offer lapsed; responsibility can still be earned in flight.`); t.dueSlot = s.completed; }
+    if (s.completed >= 14 && threadActive(t) && !s.jobs.some(j => j.subject === t.subject && ['medical','repair','inspection','recovery'].includes(j.kind))) recordThread(s, t, 'closed', `${t.note} Relief has taken over this open matter; no further flying is required from this squadron.`);
   }
+  if (s.completed > 10 || s.threads.filter(threadActive).length + (s.stories ?? []).filter(t => t.status === 'active').length >= 3) return;
   const candidates: { family: State['threads'][number]['family']; subject: string; note: string }[] = [];
   for (const r of report.results) {
     const c = s.crews.find(x => x.id === r.crew)!, a = s.aircraft.find(x => x.id === r.aircraft)!;
     if (r.injury && !c.lost) candidates.push({ family: 'injury', subject: c.id, note: `${c.specialist} is in hospital; ${c.pilot} must wait or take a temporary specialist.` });
-    if (r.newDefect && !a.lost) candidates.push({ family: 'fault', subject: a.id, note: `${a.name} has ${defectText[r.newDefect].name.toLowerCase()}; Finch wants a lasting repair.` });
-    if (r.outcome === 'divert' && !a.lost) candidates.push({ family: 'diversion', subject: a.id, note: `${a.name} is at a forward field with ${c.pilot}. Its return is still uncertain.` });
+    if (r.newDefect && !a.lost) candidates.push({ family: 'fault', subject: a.id, note: `${a.name} has ${defectText[r.newDefect].name.toLowerCase()}. Finch: “A clean run-up doesn't explain what they heard at height.” The finding needs a decision and work to prove it.` });
+    if (r.outcome === 'divert' && !a.lost) candidates.push({ family: 'diversion', subject: a.id, note: `${a.name} is at a forward field with ${c.pilot}. The crew has reported in; the recovery schedule and field work still need settling.` });
   }
   const eligible = candidates.filter(x => !s.threads.some(t => t.family === x.family));
-  if (eligible.length && s.threads.length < 4 && random(s) < .8) {
+  if (eligible.length && random(s) < .8) {
     const x = eligible[Math.floor(random(s) * eligible.length)];
     s.threads.push({ ...x, stage: 'open', dueSlot: s.completed, });
+    snapshotThreads(s);
     note(s, x.note);
   }
 }
@@ -215,7 +235,9 @@ export function commit(s: State, p: Plan, standDown = false): void {
   if (s.phase !== 'active' || s.active) throw new Error('There is already work on the board.');
   if (!s.legacyTour && s.now < s.nextMorningAt) throw new Error('Prepare the next operational morning before issuing another assignment.');
   if (!standDown) { const errors = planErrors(s, p); if (errors.length) throw new Error(errors.join(' ')); }
-  if (!s.legacyTour && [2, 6, 9].includes(s.completed) && !s.branches.some(b => b.slot === s.completed)) applyBranch(s, 'main', true);
+  if (!s.legacyTour && [2, 6, 9].includes(s.completed) && !s.branches.some(b => b.slot === s.completed)) applyBranch(s, s.contentVersion === 1 && s.completed === 9 ? 'junction' : 'main', true);
+  snapshotThreads(s);
+  expireOperationalEvent(s);
   const plan = structuredClone(p);
   if (standDown) plan.flights = [];
   const task = s.assignments[s.completed];
@@ -227,7 +249,7 @@ export function commit(s: State, p: Plan, standDown = false): void {
     schedule(s, 'repair', s.now + 6 * HOUR, a.id);
   }
   for (const a of s.aircraft) {
-    if (!a.lost && !a.away && !plan.flights.some(f => f.aircraft === a.id) && !s.jobs.some(j => j.subject === a.id && ['service', 'repair', 'inspection'].includes(j.kind))) schedule(s, 'service', s.now + 4 * HOUR, a.id);
+    if (!a.lost && !a.away && !storyDuty(s, 'aircraft', a.id) && !plan.flights.some(f => f.aircraft === a.id) && !s.jobs.some(j => j.subject === a.id && ['service', 'repair', 'inspection'].includes(j.kind))) schedule(s, 'service', s.now + 4 * HOUR, a.id);
   }
   for (const f of plan.flights) {
     // A crew cannot rest in flight; the next rest interval starts at landing.
@@ -242,9 +264,9 @@ export function commit(s: State, p: Plan, standDown = false): void {
     report: { slot: s.completed + 1, title: task.title, summary, requested: task.requested, sent: results.length, hits, results, notes: repairs.map(a => `${a.name} was allocated proper repair.`), at: returnsAt, stoodDown: standDown } };
   if (!standDown) schedule(s, 'signal', s.now + duration(plan) / 2, '', 'Group reports the formation approaching the objective. A full accounting will follow at return.');
   schedule(s, 'return', returnsAt);
-  if (s.briefing) s.active.report.notes.push('The crews carried approach notes prepared from the earlier strike photographs.');
-  if (s.extraBay) s.active.report.notes.push(`Group’s mobile team was available; ${repairs.length} aircraft were assigned proper work.`);
-  s.briefing = false; s.extraBay = 0; s.opportunity = null;
+  if (s.briefing) s.active.report.notes.push(`The crews carried approach notes: ${s.briefingSource ?? 'the recorded squadron preparation'}.`);
+  if (s.extraBay) s.active.report.notes.push(`${s.extraBaySources?.join('; ') ?? 'The authorized visiting workshop'} provided ${s.extraBay} additional repair allocation${s.extraBay === 1 ? '' : 's'}; ${repairs.length} aircraft were assigned proper work.`);
+  s.briefing = false; delete s.briefingSource; s.extraBay = 0; delete s.extraBaySources; s.opportunity = null;
   s.plan = structuredClone(plan);
 }
 function branchNextAssignment(s: State, effective: boolean): string | null {
@@ -301,11 +323,11 @@ function finishOperation(s: State): void {
     resting(s, c);
   }
   for (const c of s.crews.filter(c => !c.lost && !op.plan.flights.some(f => f.crew === c.id))) {
-    if (c.leaveThrough === op.slot) {
+    if (c.leaveThrough === op.slot && !storyDuty(s, 'crew', c.id)) {
       c.strain = 0; c.fatigue = 0;
       const news = `${c.pilot}’s promised assignment off is complete. The medical officer records no remaining operational strain.`;
       c.history.push(news); report.notes.push(news); note(s, news);
-    } else if (c.strain > 0) {
+    } else if (c.strain > 0 && !storyDuty(s, 'crew', c.id)) {
       c.strain--; c.fatigue = Math.max(c.strain * 12, c.fatigue - 12);
       report.notes.push(`${c.pilot} sat this assignment out; one level of strain has cleared.`);
     }
@@ -315,7 +337,10 @@ function finishOperation(s: State): void {
   const task = s.assignments[s.completed];
   const hasNext = s.completed < TOUR_LENGTH - 1;
   let supportGained = 0;
-  if (report.hits >= Math.ceil(task.requested * .65)) {
+  const objective = campaignObjective(s, report);
+  report.objectiveEffective = objective.effective;
+  if (objective.assessment && !objective.effective && report.hits) report.summary = `${report.hits} bombing concentrations; the stores were empty, so no objective was disrupted.`;
+  if (objective.effective) {
     if (task.effect === 'fighters' || task.effect === 'rail') {
       s.suppression = hasNext ? task.effect === 'fighters' ? 1.5 : .75 : 0;
       report.notes.push(hasNext ? task.effect === 'fighters' ? 'Fighter dispersals hit. Less interception expected on the next assignment.' : 'Rail traffic interrupted. The next assignment faces reduced opposition.' : 'Rail traffic interrupted on the final assignment.');
@@ -325,11 +350,11 @@ function finishOperation(s: State): void {
       report.notes.push(`Transport released by HQ: ${supportGained} support added for specialists and recovery.`);
       if (s.completed < 13) s.opportunity = { kind: 'transport', source: task.title, slot: s.completed + 1 };
     }
-  } else if (!op.stoodDown) report.notes.push('The objective remains in service. No relief in opposition or additional support is expected.');
+  } else if (!op.stoodDown) report.notes.push(objective.assessment ? 'The empty stores produced no disruption or transport release. Other recorded commitments still stand.' : 'The objective remains in service. No relief in opposition or additional support is expected.');
   if (s.opportunity) report.notes.push(s.opportunity.kind === 'photos' ? `Intelligence has useful approach and dispersal photographs from ${task.title}. Their use is on the next station agenda.` : 'Group offers a mobile workshop or a further transport allocation for the next commitment.');
   if (report.sent < report.requested && !op.stoodDown) report.notes.push(`The reduced package left ${report.requested - report.sent} requested aircraft unfilled. HQ records the contribution actually made.`);
   const needed = Math.ceil(task.requested * .65);
-  const effective = !op.stoodDown && report.hits >= needed;
+  const effective = objective.effective;
   const targetName = task.title[0].toLowerCase() + task.title.slice(1);
   const assessment = op.stoodDown ? 'No strike photographs were taken. The objective remains in service.'
     : !effective ? `Photographs of ${targetName} show ${report.hits} confirmed concentration${report.hits === 1 ? '' : 's'}; ${needed} were needed to disrupt the objective. It remains in service.`
@@ -353,15 +378,19 @@ function finishOperation(s: State): void {
   if (strained.length) next.push(`${strained.join(', ')} ${strained.length === 1 ? 'is' : 'are'} tired or strained; consider rotating the next crew package.`);
   if (losses.length) next.push(`${losses.join(', ')} ${losses.length === 1 ? 'was' : 'were'} lost; check whether Group can provide a replacement.`);
   const branch = s.branches.find(b => b.slot + 1 === s.completed);
-  if (branch) { branch.fulfilled = effective; next.push(effective ? `The ${task.title.toLowerCase()} objective was disrupted; the earlier commitment was met.` : `The ${task.title.toLowerCase()} objective remains in service; the earlier commitment was not met.`); }
+  if (branch) { branch.fulfilled = effective; next.push(effective ? `The ${task.title.toLowerCase()} objective was disrupted; the earlier commitment was met.` : objective.assessment ? 'The stores report proved stale; the earlier commitment could not be met.' : `The ${task.title.toLowerCase()} objective remains in service; the earlier commitment was not met.`); }
   const changedBrief = s.legacyTour ? branchNextAssignment(s, effective) : null;
   if (changedBrief) next.push(changedBrief);
   if (!hasNext) next.push('Outstanding recovery, repairs, and medical care will finish before the tour closes.');
   if (!next.length) next.push('No exceptional station action is required. Review the next briefing and the crew roster.');
-  report.debrief = { assessment, next };
+  report.debrief = { assessment: objective.assessment ?? assessment, next };
   s.contribution += report.hits; s.requested += report.requested;
   s.completed++; s.engineeringUsed = 0; s.reports.push(report); s.active = null;
   if (!s.legacyTour) updateThreads(s, report);
+  advanceOldStories(s, report);
+  finishCampaignOperation(s, report);
+  advanceStories(s, report, () => random(s));
+  selectOperationalEvent(s, () => random(s));
   if (s.completed === TOUR_LENGTH) { s.phase = 'closing'; s.ending = 'tour'; }
   s.plan = proposePlan(s);
   s.planEdited = false;
@@ -377,7 +406,7 @@ function applyJob(s: State, j: State['jobs'][number]): void {
       certify(a, j.kind === 'repair' ? 38 : 12);
       const news = `${a.name}: ${j.kind === 'repair' ? 'proper repair' : 'specialist inspection'} complete. Finch signed off the ${finding}; condition ${a.condition}. Certified work protects the next two flights.`;
       a.history.push(news); note(s, news);
-      const t = s.threads.find(t => t.family === 'fault' && t.subject === a.id); if (t) { t.stage = 'repaired'; t.note = `${a.name} returned from Finch's bay with the finding cleared and two certified flights ahead.`; }
+      const t = s.threads.find(t => t.family === 'fault' && t.subject === a.id); if (t) recordThread(s, t, 'repaired', `${a.name} returned from Finch's bay with the finding cleared and two certified flights ahead.`);
     } break;
     case 'service': if (a && !a.lost && !a.away) a.condition = Math.max(a.condition, Math.min(90, a.condition + 4)); break;
     case 'rest': if (c && !c.lost) { c.fatigue = Math.max(c.strain * 12, c.fatigue - 12); resting(s, c); } break;
@@ -385,14 +414,14 @@ function applyJob(s: State, j: State['jobs'][number]): void {
       c.injury = false; c.returned = !c.lost && !!c.replacement;
       const news = c.lost ? `${c.specialist} is cleared by the medical officer. The original specialist survived ashore when ${c.pilot}’s flying crew was lost, and is now available for reassignment by Group.` : `${c.specialist} is cleared for duty at the station${c.replacement ? `; ${c.replacement} still holds the flying place with ${c.pilot}` : ''}.`;
       c.history.push(news); note(s, news);
-      const t = s.threads.find(t => t.family === 'injury' && t.subject === c.id); if (t) { t.stage = c.lost ? 'ashore' : c.replacement ? 'returned' : 'recovered'; t.note = c.lost ? `${c.specialist} survived ashore and has been cleared; ${c.pilot}'s flying crew was lost.` : c.replacement ? `${c.specialist} is medically cleared; ${c.replacement} still holds the flying place with ${c.pilot}.` : `${c.specialist} has rejoined ${c.pilot} after medical clearance.`; }
+      const t = s.threads.find(t => t.family === 'injury' && t.subject === c.id); if (t) recordThread(s, t, c.lost ? 'ashore' : c.replacement ? 'returned' : 'recovered', c.lost ? `${c.specialist} survived ashore and has been cleared; ${c.pilot}'s flying crew was lost.` : c.replacement ? `${c.specialist} is medically cleared; ${c.replacement} still holds the flying place with ${c.pilot}.` : `${c.specialist} has rejoined ${c.pilot} after medical clearance.`);
     } break;
     case 'recovery': if (a && !a.lost) {
       a.away = false; a.recovered = !j.overhaul; if (j.overhaul) certify(a, 30);
       const crew = s.crews.find(c => c.id === j.text);
       const news = `${a.name}${crew ? ` and ${crew.pilot}’s crew` : ''} returned from the forward field. ${j.overhaul ? 'The extra workshop time restored the aircraft and cleared its faults.' : 'Field checks are complete; Finch has not yet certified the work.'}`;
       a.history.push(news); note(s, news);
-      const t = s.threads.find(t => t.family === 'diversion' && t.subject === a.id); if (t) { t.stage = j.overhaul ? 'overhauled' : 'home'; t.note = `${a.name} and ${crew?.pilot ?? 'the crew'} returned from the forward field. ${j.overhaul ? 'Certified field work is complete.' : 'Finch still needs to verify the field checks.'}`; }
+      const t = s.threads.find(t => t.family === 'diversion' && t.subject === a.id); if (t) { recordThread(s, t, j.overhaul ? 'overhauled' : 'home', `${a.name} and ${crew?.pilot ?? 'the crew'} returned from the forward field. ${j.overhaul ? 'Certified field work is complete.' : 'Finch still needs to verify the field checks. The ferry crew has offered its notes for the next recovery.'}`); t.dueSlot = Math.min(13, s.completed + 1); }
     } break;
     case 'training': if (c && !c.lost) { c.experience = Math.min(8, c.experience + Number(j.text)); if (Number(j.text) > 0) c.lesson = true; const news = `${c.pilot}: ${Number(j.text) > 0 ? 'approach training complete; practiced notes are ready for the next flight' : 'instruction complete; the crew is released back to operations'}.`; c.history.push(news); note(s, news); } break;
     case 'reinforcement': {
@@ -413,7 +442,13 @@ function checkEnding(s: State): void {
   // Repair, fatigue, injury and diversion never constitute permanent collapse.
   if (s.phase === 'active' && !s.active && s.aircraft.every(a => a.lost) && s.support < 2 && !s.jobs.some(j => j.kind === 'reinforcement')) { s.phase = 'closing'; s.ending = 'losses'; }
   if (s.phase === 'closing' && !s.jobs.length && !s.active) {
-    for (const c of s.crews) if (c.returned && c.replacement) { c.replacement = null; c.returned = false; }
+    for (const c of s.crews) if (c.returned && c.replacement) {
+      const t = s.threads.find(t => t.family === 'injury' && t.subject === c.id);
+      if (t && threadActive(t)) recordThread(s, t, 'restored', `At relief, ${c.specialist} rejoined ${c.pilot}; ${c.replacement} returned to Group's pool. No further sortie was required.`);
+      c.history.push(`At relief, ${c.specialist} resumed the seat; ${c.replacement} returned to Group.`);
+      c.replacement = null; c.replacementId = null; c.returned = false;
+    }
+    for (const t of s.threads.filter(threadActive)) recordThread(s, t, 'closed', `${t.note} The incoming station staff have received the record at relief.`);
     s.phase = 'ended';
   }
 }
@@ -439,9 +474,13 @@ export function choose(s: State, key: string, choiceId: string): void {
   const event = stationEvents(s).find(e => e.key === key);
   const choice = event?.choices.find(c => c.id === choiceId);
   if (!event || !choice || choice.disabled) throw new Error('That station decision is no longer available.');
+  snapshotThreads(s);
   s.planEdited = true;
   const a = s.aircraft.find(a => a.id === event.subject), c = s.crews.find(c => c.id === event.subject);
   switch (event.kind) {
+    case 'story': applyStoryChoice(s, event, choiceId); break;
+    case 'thread': applyOldStoryChoice(s, event, choiceId); break;
+    case 'operational': resolveOperationalEvent(s, key, choiceId); break;
     case 'branch': applyBranch(s, choiceId); break;
     case 'mission':
       if (s.completed === 4) s.assignments[s.completed].circumstance = choiceId === 'window' ? 'window' : 'escort';
@@ -449,18 +488,18 @@ export function choose(s: State, key: string, choiceId: string): void {
       break;
     case 'leadership': {
       const t = s.threads.find(t => t.family === 'novice' && t.subject === c!.id)!;
-      t.stage = choiceId === 'lead' ? 'led' : 'rested'; t.note = choiceId === 'lead' ? `${c!.pilot} prepared the squadron's approach and took responsibility for the briefing.` : `${c!.pilot} sat out an assignment and recovered before taking further responsibility.`;
-      if (choiceId === 'lead') { s.briefing = true; c!.strain = Math.min(3, c!.strain + 1); }
+      recordThread(s, t, choiceId === 'lead' ? 'led' : 'rested', choiceId === 'lead' ? `${c!.pilot} prepared the squadron's approach and took responsibility for the briefing.` : `${c!.pilot} was promised this assignment off before taking further responsibility.`);
+      if (choiceId === 'lead') { s.briefing = true; s.briefingSource = `${c!.pilot} and ${c!.specialist}'s crew-led approach briefing`; c!.strain = Math.min(3, c!.strain + 1); }
       else { c!.leaveThrough = s.completed + 1; s.plan.flights = s.plan.flights.filter(f => f.crew !== c!.id); }
     } break;
     case 'rush': if (choiceId === 'rush') { a!.condition = 68; a!.defect = true; a!.defectType = 'oil'; a!.certified = 0; s.engineeringUsed++; a!.history.push(`Before assignment ${s.completed + 1}: field patch authorized; an oil-pressure fault remains until proper repair.`); } else { s.plan.priority = a!.id; s.plan.flights = s.plan.flights.filter(f => f.aircraft !== a!.id); } break;
-    case 'replacement': if (choiceId === 'assign') { s.support--; const names = ['Sgt. Walsh', 'Sgt. Reed', 'Sgt. Hughes', 'Sgt. Grant', 'Sgt. Nolan', 'Sgt. Burke', 'Sgt. Webb', 'Sgt. Hale']; c!.replacement = names.find(name => !s.crews.some(crew => crew.specialist === name || crew.replacement === name)) ?? `Sgt. Lane`; c!.replacementSorties = 0; c!.history.push(`${c!.replacement} temporarily replaced ${c!.specialist}.`); } { const t = s.threads.find(t => t.family === 'injury' && t.subject === c!.id); if (t) { t.stage = choiceId === 'assign' ? 'substitute' : 'waiting'; t.note = choiceId === 'assign' ? `${c!.replacement} is flying with ${c!.pilot} while ${c!.specialist} recovers.` : `${c!.pilot} is waiting for ${c!.specialist} to return from hospital.`; } } break;
-    case 'returning': { const original = c!.specialist, substitute = c!.replacement!; if (choiceId === 'restore') { s.support = Math.min(5, s.support + 1); c!.experience = Math.min(8, c!.experience + 1); c!.history.push(`${original} reclaimed the flying place; ${substitute} returned to Group’s pool.`); } else { c!.history.push(`${original} transferred to training; ${substitute} stayed with the crew.`); c!.specialist = substitute; c!.strain = Math.max(0, c!.strain - 1); c!.fatigue = Math.max(c!.strain * 12, c!.fatigue - 20); } const t = s.threads.find(t => t.family === 'injury' && t.subject === c!.id); if (t) { t.stage = choiceId === 'restore' ? 'restored' : 'retained'; t.note = choiceId === 'restore' ? `${original} returned to ${c!.pilot}'s crew; ${substitute} went back to Group.` : `${original} moved to instruction; ${substitute} remained with ${c!.pilot}.`; } c!.replacement = null; c!.returned = false; c!.replacementSorties = 0; } break;
+    case 'replacement': if (choiceId === 'assign') { s.support--; const names = ['Sgt. Walsh', 'Sgt. Reed', 'Sgt. Hughes', 'Sgt. Grant', 'Sgt. Nolan', 'Sgt. Burke', 'Sgt. Webb', 'Sgt. Hale']; c!.replacement = names.find(name => !s.crews.some(crew => crew.specialist === name || crew.replacement === name)) ?? `Sgt. Lane`; c!.replacementId = `${c!.id}:specialist:replacement:${s.completed}:${c!.replacement}`; c!.replacementSorties = 0; c!.history.push(`${c!.replacement} temporarily replaced ${c!.specialist}.`); } { const t = s.threads.find(t => t.family === 'injury' && t.subject === c!.id); if (t) { if (c!.replacement && !t.participants?.some(p => p.id === c!.replacementId)) t.participants!.push({ role: 'temporary specialist', kind: 'person', id: c!.replacementId!, name: c!.replacement }); recordThread(s, t, choiceId === 'assign' ? 'substitute' : 'waiting', choiceId === 'assign' ? `${c!.replacement} is flying with ${c!.pilot} while ${c!.specialist} recovers.` : `${c!.pilot} is waiting for ${c!.specialist} to return from hospital.`); } } break;
+    case 'returning': { const original = c!.specialist, substitute = c!.replacement!; if (choiceId === 'restore') { s.support = Math.min(5, s.support + 1); c!.experience = Math.min(8, c!.experience + 1); c!.history.push(`${original} reclaimed the flying place; ${substitute} returned to Group’s pool.`); } else { c!.history.push(`${original} transferred to training; ${substitute} stayed with the crew.`); c!.specialist = substitute; c!.specialistId = c!.replacementId ?? `${c!.id}:specialist:${substitute}`; c!.strain = Math.max(0, c!.strain - 1); c!.fatigue = Math.max(c!.strain * 12, c!.fatigue - 20); } const t = s.threads.find(t => t.family === 'injury' && t.subject === c!.id); if (t) { recordThread(s, t, choiceId === 'restore' ? 'restored' : 'retained', choiceId === 'restore' ? `${original} returned to ${c!.pilot}'s crew; ${substitute} went back to Group.` : `${original} moved to instruction; ${substitute} remained with ${c!.pilot}.`); } c!.replacement = null; c!.replacementId = null; c!.returned = false; c!.replacementSorties = 0; } break;
     case 'recovery': {
       const job = s.jobs.find(j => j.kind === 'recovery' && j.subject === a!.id);
       if (job && choiceId === 'expedite') { s.support--; job.at = Math.max(s.now + HOUR, job.at - 18 * HOUR); }
       if (job && choiceId === 'overhaul') { s.support--; job.at += 6 * HOUR; job.overhaul = true; }
-      const t = s.threads.find(t => t.family === 'diversion' && t.subject === a!.id); if (t) { t.stage = choiceId; t.note = choiceId === 'overhaul' ? `${a!.name} will stay six extra hours for a certified field overhaul.` : choiceId === 'expedite' ? `Station transport is bringing ${a!.name} home early; Finch will check the field work.` : `${a!.name} is returning on the scheduled recovery party.`; }
+      const t = s.threads.find(t => t.family === 'diversion' && t.subject === a!.id); if (t) recordThread(s, t, choiceId, choiceId === 'overhaul' ? `${a!.name} will stay six extra hours for a certified field overhaul.` : choiceId === 'expedite' ? `Station transport is bringing ${a!.name} home early; Finch will check the field work.` : `${a!.name} is returning on the scheduled recovery party.`);
     } break;
     case 'inspection':
       if (choiceId === 'bench') {
@@ -468,16 +507,16 @@ export function choose(s: State, key: string, choiceId: string): void {
         s.jobs = s.jobs.filter(j => !(j.kind === 'service' && j.subject === a!.id));
         s.plan.flights = s.plan.flights.filter(f => f.aircraft !== a!.id);
       } else if (choiceId === 'queue') { s.plan.priority = a!.id; s.plan.flights = s.plan.flights.filter(f => f.aircraft !== a!.id); }
-      { const t = s.threads.find(t => t.family === 'fault' && t.subject === a!.id); if (t) { t.stage = choiceId; t.note = choiceId === 'carry' ? `${a!.name} remains available with Finch's unresolved finding.` : `${a!.name} has been reserved for ${choiceId === 'bench' ? 'specialist inspection' : 'proper repair'}.`; } }
+      { const t = s.threads.find(t => t.family === 'fault' && t.subject === a!.id); if (t) recordThread(s, t, choiceId, choiceId === 'carry' ? `${a!.name} remains available with Finch's unresolved finding.` : `${a!.name} has been reserved for ${choiceId === 'bench' ? 'specialist inspection' : 'proper repair'}.`); }
       break;
     case 'strain':
       if (choiceId === 'leave') { c!.leaveThrough = s.completed + 1; s.plan.flights = s.plan.flights.filter(f => f.crew !== c!.id); }
       if (choiceId === 'debrief') { s.support--; c!.strain--; c!.fatigue = Math.max(c!.strain * 12, c!.fatigue - 12); }
       break;
     case 'opportunity':
-      if (choiceId === 'brief') s.briefing = true;
+      if (choiceId === 'brief') { s.briefing = true; s.briefingSource = `Approach landmarks photographed over ${s.opportunity?.source ?? 'the earlier objective'}`; }
       if (choiceId === 'share') s.suppression += .5;
-      if (choiceId === 'bay') s.extraBay++;
+      if (choiceId === 'bay') { s.extraBay++; (s.extraBaySources ??= []).push(`Group's mobile workshop, released by the strike on ${s.opportunity?.source ?? 'the earlier objective'}`); }
       if (choiceId === 'support') s.support = Math.min(5, s.support + 1);
       s.opportunity = null;
       break;
@@ -488,7 +527,7 @@ export function choose(s: State, key: string, choiceId: string): void {
       schedule(s, 'training', s.now + 6 * HOUR, c!.id, '2'); schedule(s, 'training', s.now + 6 * HOUR, veteran.id, '0');
       if (!s.legacyTour) { c!.leaveThrough = s.completed + 1; veteran.leaveThrough = s.completed + 1; }
       s.plan.flights = s.plan.flights.filter(f => f.crew !== c!.id && f.crew !== veteran.id);
-    } { const t = s.threads.find(t => t.family === 'novice' && t.subject === c!.id); if (t) { t.stage = choiceId === 'train' ? 'trained' : 'deferred'; t.dueSlot = s.completed + 2; t.note = choiceId === 'train' ? `${c!.pilot} worked with a veteran at the plotting table. Later sorties will show whether the lesson holds.` : `${c!.pilot} kept flying without the offered plotting-table session.`; } } break;
+    } { const t = s.threads.find(t => t.family === 'novice' && t.subject === c!.id); if (t) { recordThread(s, t, choiceId === 'train' ? 'trained' : 'deferred', choiceId === 'train' ? `${c!.pilot} worked with a veteran at the plotting table. Later sorties will show whether the lesson holds.` : `${c!.pilot} kept flying without the offered plotting-table session. Two sorties can still earn responsibility for a briefing.`); t.dueSlot = s.completed + 2; } } break;
   }
   const text = `${event.title} — ${choice.label}.`;
   s.decisions.push({ key, slot: s.completed, text }); note(s, text);
@@ -504,7 +543,7 @@ export function endingText(s: State): string {
   return s.ending === 'losses' ? 'The squadron is withdrawn. No aircraft remain and Group has no further support to offer.' : fraction >= .65 ? 'A tour well carried. Your squadron made a substantial contribution, and the relief crews inherit its hard-won experience.' : fraction >= .4 ? 'The squadron held its place. There were gaps in the contribution, but the work you completed mattered.' : 'A difficult tour. Much of the requested work fell to other stations. The people brought home still have a future beyond this airfield.';
 }
 export function tourEvaluation(s: State): { objectives: number; losses: number; commitments: number; possible: number; grade: 'excellent' | 'strong' | 'mixed' | 'failed' } {
-  const objectives = s.reports.filter(r => !r.stoodDown && r.hits >= Math.ceil(r.requested * .65)).length;
+  const objectives = s.reports.filter(r => r.objectiveEffective ?? (!r.stoodDown && r.hits >= Math.ceil(r.requested * .65))).length;
   const losses = Math.max(s.crews.filter(c => c.lost).length, s.aircraft.filter(a => a.lost).length);
   const possible = s.branches.filter(b => b.slot + 1 < s.completed).length;
   const commitments = s.branches.filter(b => b.fulfilled).length;
@@ -512,7 +551,7 @@ export function tourEvaluation(s: State): { objectives: number; losses: number; 
   return { objectives, losses, commitments, possible, grade };
 }
 export function tourMemories(s: State): string[] {
-  const lines: string[] = [];
+  const lines: string[] = [...campaignResolutionNotes(s), ...(s.stories ?? []).filter(a => a.status !== 'active').map(a => a.note), ...s.threads.filter(t => !threadActive(t)).map(t => t.note)];
   const surviving = s.crews.filter(c => !c.lost).sort((a, b) => b.sorties - a.sorties);
   for (const c of s.crews.filter(c => c.lost && c.replacement)) lines.push(`${c.specialist} survived ashore${c.injury ? ' and remains in medical care' : ''}. ${c.replacement} was flying with ${c.pilot} when that crew was lost.`);
   if (surviving[0]?.sorties) lines.push(`${surviving[0].pilot} brings ${surviving[0].sorties} sorties home. ${surviving[0].specialist} is on the surviving crew roll${surviving[0].replacement ? `, with ${surviving[0].replacement} still filling the flying place` : ''}.`);

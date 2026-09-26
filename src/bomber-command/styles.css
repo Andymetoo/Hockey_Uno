@@ -889,6 +889,64 @@ dialog p {
 .flight-results details p { margin-bottom: 9px; }
 .choices:has(>button:nth-child(3)) { grid-template-columns: 1fr; }
 .station-updates { margin: 0 0 18px; }
+.desk-summary {
+  border-top: 4px solid var(--green);
+  background: #f2f2e5;
+}
+.desk-summary h2 { margin-bottom: 0; }
+.desk-latest { margin-top: 1rem; }
+.commitment-preview {
+  font: .84rem/1.6 system-ui, sans-serif;
+  border-left: 3px solid #89967c;
+  padding: 10px 15px;
+  margin: 16px 0;
+  background: #e7ecdf;
+}
+.commitment-preview ul { padding-left: 19px; margin: 8px 0 0; }
+.commitment-preview li + li { margin-top: 6px; }
+.desk-summary details { margin-top: 16px; }
+.duty-list { list-style: none; padding: 0; margin: 18px 0 0; }
+.duty-list li {
+  display: grid;
+  gap: 4px;
+  padding: 11px 0;
+  border-top: 1px solid var(--line);
+  font: .8rem/1.55 system-ui, sans-serif;
+}
+.duty-list span { color: var(--muted); }
+.story-record { border-top: 1px solid var(--line); padding: 23px 0; }
+.story-record:last-child { padding-bottom: 0; }
+.story-record .section-head { gap: 12px; margin-bottom: 0; }
+.story-record h3 { margin-bottom: 0; }
+.story-people {
+  font: .76rem/1.6 system-ui, sans-serif;
+  color: var(--muted);
+  margin: 9px 0 14px;
+}
+.story-milestones { list-style: none; margin: 16px 0 0; padding: 0 0 0 20px; border-left: 2px solid #abb49f; }
+.story-milestones li { margin-bottom: 18px; position: relative; }
+.story-milestones li:last-child { margin-bottom: 0; }
+.story-milestones li::before {
+  content: '';
+  position: absolute;
+  left: -25px;
+  top: 7px;
+  width: 8px;
+  height: 8px;
+  border: 1px solid var(--green);
+  border-radius: 50%;
+  background: var(--paper);
+}
+.story-milestones li > span { font: .72rem/1.5 system-ui, sans-serif; color: var(--muted); }
+.story-milestones p { margin: 5px 0 0; }
+.operational-decisions { border-top: 1px solid var(--line); margin-top: 24px; padding-top: 18px; }
+.story-record, .desk-summary, .decision, .choices button { overflow-wrap: anywhere; }
+@media(max-width:520px) {
+  .desk-summary .section-head, .story-record .section-head { align-items: flex-start; flex-direction: column; }
+  .commitment-preview { padding: 10px 12px; }
+  .story-milestones { padding-left: 17px; }
+  .story-milestones li::before { left: -22px; }
+}
 @media(prefers-reduced-motion:no-preference) {
   button {
     transition:background-color .12s ease,border-color .12s ease

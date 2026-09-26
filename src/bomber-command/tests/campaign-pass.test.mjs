@@ -50,7 +50,8 @@ test('three campaign branches change actual assignments and preserve a fixed led
       commit(s, proposePlan(s), true); finish(s); morning(s);
       assert.equal(s.completed, slot + 1);
       commit(s, proposePlan(s)); s.active.report.results.forEach(r => { r.hit = true; r.outcome = 'home'; }); s.active.report.hits = s.active.report.results.length; finish(s);
-      assert.equal(s.branches.find(b => b.slot === slot).fulfilled, true);
+      const emptyStores = slot === 9 && id === 'main' && s.campaign.intelligence.find(i => i.id === 'stores').truth === 'empty';
+      assert.equal(s.branches.find(b => b.slot === slot).fulfilled, !emptyStores);
       assert.equal(s.completed, slot + 2);
       assert.notDeepEqual(s.assignments[slot + 1], before);
     }

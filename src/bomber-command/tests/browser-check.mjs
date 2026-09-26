@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { createCampaign } from '../game.ts';
+import { createCampaign, SAVE_VERSION } from '../game.ts';
 import { SAVE_KEY, LEGACY_KEY } from '../persistence.ts';
 
 const base = process.env.BOMBER_URL ?? 'http://127.0.0.1:5174/bomber_command.html';
@@ -30,6 +30,25 @@ async function screenshot(name) {
   const metrics = await command('Page.getLayoutMetrics');
   const result = await command('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true, clip: { x: 0, y: 0, width: metrics.cssContentSize.width, height: metrics.cssContentSize.height, scale: 1 } });
   await writeFile(`tmp/bomber-browser/${name}.png`, Buffer.from(result.data, 'base64'));
+}
+async function checkNarrowViews() {
+  for (const width of [390, 320]) {
+    await command('Emulation.setDeviceMetricsOverride', { width, height: 844, deviceScaleFactor: 1, mobile: true });
+    for (const tab of ['squadron', 'tour', 'today']) {
+      await click(`[data-tab="${tab}"]`);
+      assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'), true, `${tab} overflows at ${width}px`);
+      await screenshot(`content-${width}-${tab}`);
+    }
+  }
+  await click('[data-tab="today"]');
+  await command('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 });
+  await command('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 });
+  assert.equal(await evaluate('document.activeElement.dataset.tab'), 'squadron');
+  assert.equal(await evaluate('getComputedStyle(document.activeElement).outlineStyle'), 'solid');
+  await command('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: '\r', unmodifiedText: '\r' });
+  await command('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
+  assert.equal(await evaluate('document.querySelector("nav [aria-current=page]").dataset.tab'), 'squadron');
+  await click('[data-tab="today"]');
 }
 try {
   await mkdir('tmp/bomber-browser', { recursive: true });
@@ -104,6 +123,21 @@ try {
     if (await evaluate('!!document.querySelector("[data-action=prepare-morning]")')) await action('prepare-morning');
     const branch = await evaluate('document.querySelector("[data-event-kind=branch]")?.dataset.decision');
     if (branch) await click(`[data-decision="${branch}"]:not(:disabled)`);
+    for (let decision = 0; decision < 2; decision++) {
+      if (!await evaluate('!!document.querySelector("[data-decision]:not(:disabled)")')) break;
+      await click('[data-decision]:not(:disabled)');
+    }
+    const instructed = await getState();
+    for (const duty of instructed.duties.filter(d => d.through > instructed.completed)) {
+      assert.ok(!instructed.plan.flights.some(f => f.crew === duty.crew || f.aircraft === duty.aircraft), 'Support duty removes its participants from the proposed package');
+    }
+    if (state.completed === 7) {
+      assert.ok(await evaluate('!!document.querySelector(".desk-summary")'));
+      await checkNarrowViews();
+      await click('[data-tab="tour"]');
+      assert.ok(await evaluate('document.querySelectorAll(".story-milestones li").length >= 3'));
+      await click('[data-tab="today"]');
+    }
     await action('propose');
     if (await evaluate('document.querySelector("[data-action=review]").disabled')) await action('standdown');
     else await action('review');
@@ -111,7 +145,7 @@ try {
     const returned = await getState();
     if ([3, 7, 10].includes(returned.completed)) {
       assert.ok(returned.assignments[returned.completed].followup);
-      assert.ok(await evaluate('document.querySelector("[data-tutorial-target=briefing]")?.innerText.includes("From the last operation")'));
+      assert.ok(await evaluate('document.querySelector("[data-tutorial-target=briefing]")?.innerText.includes("Affecting this assignment")'));
       await screenshot(`mobile-branch-${returned.completed + 1}`);
     }
   }
@@ -160,9 +194,9 @@ try {
   // Migrate an actual pre-pass fixture, including the active operation, in the running UI.
   const oldRaw = await readFile(new URL('./fixtures/v20-active.json', import.meta.url), 'utf8');
   await evaluate(`localStorage.setItem(${JSON.stringify(SAVE_KEY)}, ${JSON.stringify(oldRaw)})`); await load();
-  const migrated = await getState(); assert.equal(migrated.version, 22); assert.deepEqual(migrated.active.report, JSON.parse(oldRaw).active.report);
+  const migrated = await getState(); assert.equal(migrated.version, SAVE_VERSION); assert.deepEqual(migrated.active.report, JSON.parse(oldRaw).active.report);
   assert.ok(await evaluate('document.body.innerText.includes("earlier station book was backed up")'));
   assert.deepEqual(errors, []);
   assert.deepEqual(networkErrors, []);
-  console.log(JSON.stringify({ browser: 'Chrome via CDP', url: base, desktop: '1280×900', mobile: '390×844', assignmentsCompleted: state.completed, effectiveStrikes: state.contribution, checks: 'tutorial timing and viewport, reports, linked briefs, views, overflow, dispatch, reload, acceleration, full tour, save restoration and v20 migration', runtimeErrors: errors.length, originalSeed: before.seed }, null, 2));
+  console.log(JSON.stringify({ browser: 'Chrome via CDP', url: base, desktop: '1280×900', mobile: ['390×844', '320×844'], assignmentsCompleted: state.completed, effectiveStrikes: state.contribution, checks: 'tutorial timing and viewport, reports, linked briefs, campaign and story histories, views, overflow at 390/320, Tab and Enter navigation, Escape focus return, dispatch, reload, acceleration, full tour, save restoration and v20 migration', runtimeErrors: errors.length, originalSeed: before.seed }, null, 2));
 } catch (e) { console.error(await evaluate('document.body.innerText')); throw e; } finally { ws.close(); }

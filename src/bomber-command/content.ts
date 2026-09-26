@@ -1,4 +1,9 @@
 import type { Assignment, Circumstance, Defect, State, StationEvent } from './types.ts';
+import { campaignChoiceDetail } from './campaign.ts';
+import { storyEvents, storyPriority, storyDuty } from './stories.ts';
+import { operationalEvent } from './operations.ts';
+import { threadActive } from './history.ts';
+import { oldStoryEvents } from './old-stories.ts';
 
 const targets: Omit<Assignment, 'weather' | 'circumstance'>[] = [
   { title: 'The coastal yards', objective: 'Cut the railway sidings serving the coast.', why: 'A short first assignment. Disrupting these supplies will give the group room to settle in.', hazard: 1, requested: 2, effect: 'rail' },
@@ -93,7 +98,7 @@ export function stationEvents(s: State): StationEvent[] {
   }
   if (!s.legacyTour && [4, 11].includes(s.completed) && !s.decisions.some(d => d.key === `mission-${s.completed}`)) events.push({ key: `mission-${s.completed}`, kind: 'mission', subject: '', title: s.completed === 4 ? 'Escort or the weather gap' : 'An alternate aiming point', body: s.completed === 4 ? 'The escorts can meet the direct route, but the weather officer sees an earlier opening. Operations needs one instruction for this assignment.' : 'The forward fighter bases have a secondary service area. It is easier to reach, but hitting it will not suppress as many fighters.', choices: s.completed === 4 ? [ { id: 'escort', label: 'Meet the escorts', detail: 'Direct corridor gets escort cover; the cloud remains over the target.' }, { id: 'window', label: 'Take the weather opening', detail: 'Direct route gains bombing accuracy. There is no escort advantage.' } ] : [ { id: 'main', label: 'Keep the main dispersals', detail: 'Heavy opposition; an effective fighter raid reduces next assignment opposition.' }, { id: 'alternate', label: 'Take the service area', detail: 'Moderate opposition and a two-aircraft request; an effective strike helps supply instead of fighter suppression.' } ] });
   const available = (key: string, cooldown = 99) => !s.decisions.some(d => d.key === key && s.completed - d.slot < cooldown);
-  const onStation = (id: string) => !s.jobs.some(j => (j.kind === 'recovery' && j.text === id) || (j.kind === 'training' && j.subject === id));
+  const onStation = (id: string) => !storyDuty(s, 'crew', id) && !s.jobs.some(j => (j.kind === 'recovery' && j.text === id) || (j.kind === 'training' && j.subject === id));
   const bayFree = s.engineeringUsed < 1 + s.extraBay && !s.jobs.some(j => j.kind === 'repair' || j.kind === 'inspection');
   for (const c of s.crews.filter(c => !c.lost)) {
     if (c.returned && c.replacement && onStation(c.id) && available(`return-${c.id}-${c.sorties}`)) events.push({
@@ -116,7 +121,7 @@ export function stationEvents(s: State): StationEvent[] {
       ],
     });
   }
-  for (const a of s.aircraft.filter(a => !a.lost)) {
+  for (const a of s.aircraft.filter(a => !a.lost && !storyDuty(s, 'aircraft', a.id))) {
     if (a.away && available(`recover-${a.id}-${a.sorties}`)) events.push({
       key: `recover-${a.id}-${a.sorties}`, kind: 'recovery', subject: a.id,
       title: `${a.name} at a forward field`, body: `The aircraft and crew are accounted for. A recovery party is arranged. ${s.jobs.find(j => j.kind === 'recovery' && j.subject === a.id) ? 'Local workshops can release the aircraft sooner with transport, or do more lasting work if we accept a delay.' : 'Operations is checking the recovery arrangements.'}`,
@@ -148,7 +153,7 @@ export function stationEvents(s: State): StationEvent[] {
     title: s.opportunity.kind === 'photos' ? 'Something useful in the photographs' : 'Group offers a transport allocation',
     body: `Earned by the effective strike on ${s.opportunity.source}. ${s.opportunity.kind === 'photos' ? 'The photographs include clear approach landmarks and fighter dispersals. There is time to prepare one set of material before this assignment.' : 'Finch can take a mobile engineering team, or you can keep the allocation for personnel and recovery.'}`,
     choices: s.opportunity.kind === 'photos' ? [
-      { id: 'brief', label: 'Prepare the crews’ approach notes', detail: 'Improve this assignment’s bombing chance by seven percentage points. Consumed by the next commitment; no extra attendance needed.' },
+      { id: 'brief', label: 'Prepare the crews’ approach notes', detail: 'Improve this assignment’s bombing chance by seven percentage points. Consumed by the next commitment; no extra attendance needed.', disabled: s.briefing },
       { id: 'share', label: 'Send the dispersal photographs to Group', detail: 'Reduce opposition on this assignment by another half level. Forego the local accuracy benefit.' },
     ] : [
       { id: 'bay', label: 'Take the mobile engineering team', detail: 'One additional proper repair at the next commitment. A flying aircraft still cannot occupy a repair bay.' },
@@ -160,13 +165,27 @@ export function stationEvents(s: State): StationEvent[] {
   if (s.completed >= 2 && novice && veteran && available('mentor', 4) && (s.legacyTour || s.threads.some(t => t.family === 'novice' && t.stage === 'offered' && t.subject === novice.id))) events.push({
     key: 'mentor', kind: 'mentor', subject: novice.id, title: 'An afternoon at the plotting table',
     body: `${veteran.pilot} offers to work through the approaches with ${novice.pilot}. Both crews would be held off the next operation for training.`,
-    choices: [ { id: 'train', label: 'Give them the afternoon', detail: 'Costs one support. Gain two experience and an eight-point bombing advantage on the next flight. Both crews are unavailable for six hours; others must cover an immediate dispatch.', disabled: s.support < 1 }, { id: 'fly', label: 'Keep both crews available', detail: 'No training gain. Preserve support and both crews for today’s assignment.' } ],
+    choices: [ { id: 'train', label: 'Give them the afternoon', detail: 'Costs one support. Gain two experience and an eight-point bombing advantage on the next flight. Training takes six hours; both crews are held off this assignment, even if the work finishes before dispatch.', disabled: s.support < 1 }, { id: 'fly', label: 'Keep both crews available', detail: 'No training gain. Preserve support and both crews for today’s assignment.' } ],
   });
-  const leadership = s.threads.find(t => t.family === 'novice' && t.stage === 'trained' && s.completed >= t.dueSlot);
+  const leadership = s.threads.find(t => t.family === 'novice' && ['trained', 'deferred'].includes(t.stage) && threadActive(t) && s.completed >= t.dueSlot);
   const leader = leadership && s.crews.find(c => c.id === leadership.subject);
-  if (leader && !leader.lost && !leader.injury && leader.sorties >= 2 && !s.decisions.some(d => d.key === `leadership-${leader.id}`)) events.push({ key: `leadership-${leader.id}`, kind: 'leadership', subject: leader.id, title: `${leader.pilot} asks for responsibility`, body: `${leader.pilot} and ${leader.specialist} have flown together since the plotting-table session. They can prepare this assignment's approach for the squadron, or take a promised assignment off.`, choices: [ { id: 'lead', label: 'Let the crew brief the approach', detail: 'Their prepared notes improve bombing accuracy on this assignment; the responsibility adds one strain to this crew.' }, { id: 'rest', label: 'Promise an assignment off', detail: 'Keep the crew off this assignment; clear their strain and fatigue at its report. No squadron briefing bonus.' } ] });
+  if (leader && !leader.lost && !leader.injury && onStation(leader.id) && leader.leaveThrough <= s.completed && leader.sorties >= 2 && !s.decisions.some(d => d.key === `leadership-${leader.id}`)) events.push({ key: `leadership-${leader.id}`, kind: 'leadership', subject: leader.id, title: `${leader.pilot} asks for responsibility`, body: `${leader.pilot} and ${leader.specialist} have ${leadership.stage === 'trained' ? 'put the plotting-table work into practice' : 'learned their approaches on operations'}. They can prepare this assignment's approach for the squadron, or take a promised assignment off.`, choices: [ { id: 'lead', label: 'Let the crew brief the approach', detail: 'Their prepared notes improve bombing accuracy by seven percentage points on this assignment; the responsibility adds one strain to this crew.', disabled: s.briefing }, { id: 'rest', label: 'Promise an assignment off', detail: 'Keep the crew off this assignment; clear their strain and fatigue at its report. No squadron briefing bonus.' } ] });
   // Do not bury an earned, expiring opportunity behind several similar repair findings.
-  const priority = (e: StationEvent) => ['branch', 'mission', 'leadership'].includes(e.kind) ? 0 : e.kind === 'opportunity' ? 1 : e.kind === 'reinforcement' ? 2 : s.threads.some(t => t.subject === e.subject && ['replacement', 'returning', 'recovery', 'inspection', 'mentor'].includes(e.kind) && s.completed >= t.dueSlot) ? 3 : 4;
-  const threeOffers = events.some(e => e.kind === 'mission') && events.some(e => e.kind === 'opportunity') && events.some(e => e.kind === 'reinforcement');
-  return events.sort((a, b) => priority(a) - priority(b)).slice(0, threeOffers ? 3 : 2);
+  if (s.contentVersion === 1) {
+    for (const e of events.filter(e => e.kind === 'branch')) {
+      for (const c of e.choices) c.detail = campaignChoiceDetail(s.completed, c.id) ?? c.detail;
+      if (s.completed === 9) e.choices.find(c => c.id === 'verify')!.label = 'Check whether the stores are occupied';
+      e.body += ' The choice also creates a later commitment, shown below each order.';
+    }
+    events.push(...storyEvents(s));
+    const continuing = oldStoryEvents(s);
+    for (const e of continuing) {
+      const duplicate = events.findIndex(x => x.subject === e.subject && x.kind === 'inspection');
+      if (duplicate >= 0) events.splice(duplicate, 1);
+    }
+    events.push(...continuing);
+    const operational = operationalEvent(s); if (operational) events.push(operational);
+  }
+  const priority = (e: StationEvent) => ['branch', 'mission', 'leadership', 'thread'].includes(e.kind) ? 0 : e.kind === 'story' ? storyPriority(s, e) : e.kind === 'returning' ? .5 : e.kind === 'reinforcement' ? 1 : s.threads.some(t => threadActive(t) && t.subject === e.subject && ['replacement', 'recovery', 'inspection', 'mentor'].includes(e.kind) && s.completed >= t.dueSlot) ? 1.5 : e.kind === 'operational' ? 2 : e.kind === 'opportunity' ? 3 : 4;
+  return events.sort((a, b) => priority(a) - priority(b)).slice(0, 2 - s.decisions.filter(d => d.slot === s.completed).length);
 }
