@@ -1,50 +1,27 @@
-﻿export type Direction = 'north' | 'east' | 'south' | 'west';
-export type ObjectiveKind = 'escape' | 'diary' | 'keepsake';
+export type Direction = 'north' | 'east' | 'south' | 'west';
 export type ItemId = 'moth-key' | 'thorn-key' | 'crowbar' | 'exit-key' | 'diary' | 'keepsake';
-export type TileKind = 'wall' | 'floor' | 'furniture' | 'container' | 'candle' | 'door' | 'stairs' | 'altar' | 'exit';
+export type ObjectiveKind = 'escape' | 'diary' | 'keepsake';
+export type TileKind = 'wall' | 'floor' | 'door' | 'stairs' | 'exit' | 'altar';
 export interface Position { roomId: string; x: number; y: number }
-export interface Tile { kind: TileKind; label?: string; connectionId?: string; containerId?: string; candleId?: string }
-export interface Reward { power?: number; item?: ItemId; treasure?: number }
-export interface Lead { kind: 'room' | 'haunting' | 'candle' | 'container' | 'connection'; id: string }
-export interface Container { id: string; label: string; x: number; y: number; opened: boolean; reward: Reward; note?: string; leads?: Lead[] }
-export interface Candle { id: string; name: string; position: Position; restores: number; used: boolean }
-export interface Haunting {
-  id: string; name: string; position: Position; resistance: number; banished: boolean;
-  reward: Reward; benefit: string; requires?: ItemId; resolution?: 'keepsake';
-  /** Actual object/passage identifiers protected by this physical bottleneck. */
-  guards?: string[];
-}
-export interface Room {
-  id: string; name: string; floor: number; width: number; height: number; pattern: string;
-  tiles: Tile[]; containers: Container[]; discovered: boolean[]; visited: boolean;
-  /** Schematic placement, used by generation to align passage directions. */
-  mapX: number; mapY: number;
-}
-export interface Connection { id: string; a: Position; b: Position; kind: 'door' | 'stairs'; gate?: 'moth-key' | 'thorn-key' | 'crowbar'; opened: boolean }
-export interface Objective { kind: ObjectiveKind; title: string; description: string; completed: boolean; altar?: Position; hauntingId?: string; ritualCost: number }
-export interface PuzzleCluster { id: string; members: Lead[]; vantage: Position }
-export interface GameSnapshot {
-  version: number; seed: string; rng: number;
-  rooms: Room[]; connections: Connection[]; hauntings: Haunting[]; candles: Candle[]; clusters: PuzzleCluster[];
-  player: Position; entrance: Position;
-  steps: number; decisions: number;
-  light: number; maxLight: number; ritualPower: number;
-  inventory: ItemId[]; treasure: number; objective: Objective;
-  journal: string[]; log: string[]; status: 'active' | 'won';
-}
-export interface GameState extends GameSnapshot { undo: GameSnapshot[] }
+export interface Tile { kind: TileKind; connectionId?: string }
+export interface Room { id: string; name: string; floor: number; width: number; height: number; tiles: Tile[]; discovered: boolean[]; visited: boolean }
+export interface Connection { id: string; a: Position; b: Position; kind: 'door' | 'stairs'; gate?: ItemId; opened: boolean }
+export type SpiritKind = 'shade' | 'wisp' | 'armour' | 'revenant';
+export interface Haunting { id: string; name: string; kind: SpiritKind; position: Position; tier: number; hp: number; maxHp: number; attack: number; regen: number; xp: number; reward?: ItemId; boss: boolean }
+export type SupplyKind = 'food' | 'candle' | 'tonic' | 'oil' | 'power' | 'cache' | 'treasure' | 'note';
+export interface Supply { id: string; name: string; kind: SupplyKind; position: Position; used: boolean; amount: number; item?: ItemId; text?: string }
+export interface Objective { kind: ObjectiveKind; title: string; description: string; completed: boolean; altar?: Position }
+export interface Resources { health: number; maxHealth: number; light: number; maxLight: number; power: number; level: number; xp: number; tonics: number; oils: number; ward: boolean; empowered: boolean; treasure: number }
+/** Only mutable data is retained in undo. Geometry is stored once per save. */
+export interface UndoFrame { player: Position; resources: Resources; turns: number; discovered: boolean[][]; visited: boolean[]; hp: number[]; used: boolean[]; opened: boolean[]; inventory: ItemId[]; completed: boolean; status: 'active' | 'won' | 'dead'; journal: string[]; log: string[] }
+export interface GameSnapshot { version: number; seed: string; variant: number; rooms: Room[]; connections: Connection[]; hauntings: Haunting[]; supplies: Supply[]; player: Position; entrance: Position; resources: Resources; turns: number; inventory: ItemId[]; objective: Objective; journal: string[]; log: string[]; status: 'active' | 'won' | 'dead' }
+export interface GameState extends GameSnapshot { undo: UndoFrame[] }
 export type Action =
-  | { type: 'move'; direction: Direction }
-  | { type: 'travel'; connectionId: string }
-  | { type: 'banish'; hauntingId: string }
-  | { type: 'refill'; candleId: string }
-  | { type: 'search'; containerId: string }
-  | { type: 'unlock'; connectionId: string }
-  | { type: 'settle' }
-  | { type: 'leave' }
-  | { type: 'undo' };
-export interface ActionResult { state: GameState; committed: boolean; consequential: boolean; message: string; discoveredChoice: boolean }
-export interface Interaction {
-  id: string; label: string; name: string; detail: string; action: Action;
-  available: boolean; adjacent: boolean; position: Position; resolved: boolean;
-}
+ | { type: 'move'; to: Position }
+ | { type: 'travel'; connectionId: string; from: Position }
+ | { type: 'unlock'; connectionId: string }
+ | { type: 'attack'; hauntingId: string; mode: 'strike' | 'flare'; acceptDeath?: boolean }
+ | { type: 'use'; supplyId: string }
+ | { type: 'tonic' | 'oil' | 'ward' | 'settle' | 'leave' | 'undo' };
+export interface ActionResult { state: GameState; committed: boolean; message: string; lethal?: boolean }
+export interface CombatPreview { damage: number; incoming: number; healthAfter: number; enemyAfter: number; lightCost: number; lethal: boolean; kills: boolean; affordable: boolean }

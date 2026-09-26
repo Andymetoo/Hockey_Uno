@@ -1,301 +1,71 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { act, banishCost, refillPreview, illuminated, interactions, objectiveReady } from '../game.ts';
-import { TUNING } from '../content.ts';
-import { refreshExploration } from '../world.ts';
-import { addCandle, addContainer, addHaunting, baseFixture, cheapestFirstFixture, clone, connectRooms, markTile, orderingFixture, position } from './fixtures.mjs';
+import { act, previewAttack, supplyPreview } from '../game.ts';
+import { baseFixture, addHaunting, addSupply, position } from './fixtures.mjs';
 
-function perform(state, action, consequential = action.type !== 'undo') {
-  const before = clone(state);
-  const result = act(state, action);
-  assert.deepEqual(state, before, 'actions never mutate their input');
-  assert.equal(result.committed, true, `${JSON.stringify(action)}: ${result.message}`);
-  assert.equal(result.consequential, consequential, JSON.stringify(action));
-  return result.state;
-}
-
-function refused(state, action, reason) {
-  const before = clone(state);
-  const result = act(state, action);
-  assert.equal(result.committed, false, JSON.stringify(action));
-  assert.deepEqual(result.state, before, 'refused actions spend and change nothing');
-  assert.deepEqual(state, before);
-  if (reason) assert.match(result.message, reason);
-  return result;
-}
-
-test('banishment charges the displayed resistance-minus-power cost once and grants the defined reward', () => {
-  let state = baseFixture();
-  const spirit = addHaunting(state, 'ritual-teacher', position(4, 3), 3, { power: 1, treasure: 2, item: 'moth-key' });
-  assert.equal(banishCost(state, spirit), 2);
-  const detail = interactions(state).find(interaction => interaction.action.type === 'banish');
-  assert.ok(detail?.available);
-  assert.match(`${detail.label} ${detail.detail}`, /2/);
-  state = perform(state, { type: 'banish', hauntingId: spirit.id });
-  assert.equal(state.light, 2);
-  assert.equal(state.ritualPower, 2);
-  assert.equal(state.treasure, 2);
-  assert.deepEqual(state.inventory, ['moth-key']);
-  assert.equal(state.hauntings[0].banished, true);
-  assert.equal(state.decisions, 1);
-  assert.equal(state.undo.length, 1);
-  refused(state, { type: 'banish', hauntingId: spirit.id });
-  state.ritualPower = 20;
-  assert.equal(banishCost(state, spirit), 1);
+test('deterministic simultaneous attacks match preview, including killing blow', () => {
+ const s = baseFixture(); const h = addHaunting(s, { hp: 6, maxHp: 6 }); const p = previewAttack(s, h, 'strike');
+ const r = act(s, { type: 'attack', hauntingId: h.id, mode: 'strike' });
+ assert.equal(r.state.resources.health, p.healthAfter); assert.equal(r.state.hauntings[0].hp, 0); assert.equal(r.state.resources.health, 18); assert.equal(r.state.resources.xp, 1); assert.deepEqual(r.state.player, h.position);
 });
-
-test('banishment requires discovery, orthogonal physical adjacency, its specific item, and sufficient light', () => {
-  const state = baseFixture();
-  const spirit = addHaunting(state, 'bound-spirit', position(4, 3), 8, {}, { requires: 'keepsake' });
-  refused(state, { type: 'banish', hauntingId: spirit.id });
-  state.inventory.push('keepsake');
-  refused(state, { type: 'banish', hauntingId: spirit.id }, /light|need|cost/i);
-  spirit.resistance = 3;
-  state.player = position(3, 2);
-  refused(state, { type: 'banish', hauntingId: spirit.id }, /near|adjacent|beside|reach|next/i);
-  state.player = position(3, 3);
-  state.rooms[0].discovered[3 * 7 + 4] = false;
-  refused(state, { type: 'banish', hauntingId: spirit.id });
-  state.rooms[0].discovered[3 * 7 + 4] = true;
-  assert.equal(perform(state, { type: 'banish', hauntingId: spirit.id }).light, 2);
+test('lethal confirmation is atomic; cancelled attack does not change fog, time, or history', () => {
+ const s = baseFixture(); s.resources.health = 4; const h = addHaunting(s, { hp: 6, maxHp: 6, xp: 3 }); const copy = structuredClone(s);
+ const a = { type: 'attack', hauntingId: h.id, mode: 'strike' }; const r = act(s, a);
+ assert.equal(r.lethal, true); assert.equal(r.committed, false); assert.deepEqual(s, copy);
+ const fatal = act(s, { ...a, acceptDeath: true }); assert.equal(fatal.state.status, 'dead'); assert.equal(fatal.state.resources.level, 1); assert.equal(fatal.state.resources.health, 0); assert.deepEqual(act(fatal.state, { type: 'undo' }).state, s);
 });
-
-test('walking and discovery leave stationary hauntings and resources unchanged, with no automatic contact attack', () => {
-  let state = baseFixture();
-  addHaunting(state, 'sentinel', position(4, 3), 3, { power: 1 });
-  const spirit = clone(state.hauntings[0]);
-  refused(state, { type: 'move', direction: 'east' });
-  for (const direction of ['north', 'west', 'south', 'east', 'south', 'north']) {
-    state = perform(state, { type: 'move', direction }, false);
-    assert.deepEqual(state.hauntings[0], spirit);
-    assert.equal(state.light, 4);
-    assert.equal(state.status, 'active');
-    assert.equal(state.undo.length, 0);
-  }
-  assert.equal(state.decisions, 0);
-  assert.equal(state.steps, 6);
+test('level-up follows surviving kill, grows stats, carries excess XP, restores both resources', () => {
+ const s = baseFixture(); s.resources.health = 5; s.resources.light = 0; const h = addHaunting(s, { hp: 6, xp: 4 });
+ const r = act(s, { type: 'attack', hauntingId: h.id, mode: 'strike' }).state;
+ assert.equal(r.resources.level, 2); assert.equal(r.resources.xp, 1); assert.equal(r.resources.power, 8); assert.equal(r.resources.health, 25); assert.equal(r.resources.light, 10);
 });
-
-test('candle use is deliberate, capped, previewed for waste, and possible only once from an adjacent tile', () => {
-  let state = baseFixture();
-  const candle = addCandle(state, 'wax-stub', position(4, 3), 3);
-  assert.deepEqual(refillPreview(state, candle), { received: 1, wasted: 2, total: 5 });
-  state = perform(state, { type: 'move', direction: 'north' }, false);
-  assert.equal(state.candles[0].used, false);
-  assert.equal(state.light, 4);
-  refused(state, { type: 'refill', candleId: candle.id });
-  state = perform(state, { type: 'move', direction: 'south' }, false);
-  refused(state, { type: 'move', direction: 'east' });
-  state = perform(state, { type: 'refill', candleId: candle.id });
-  assert.equal(state.light, 5);
-  assert.equal(state.candles[0].used, true);
-  refused(state, { type: 'refill', candleId: candle.id });
+test('attacked spirit does not regenerate; every other wounded spirit does', () => {
+ const s = baseFixture(); const h = addHaunting(s); addHaunting(s, { id: 'other', position: position(5, 5), hp: 10, maxHp: 20 });
+ const r = act(s, { type: 'attack', hauntingId: h.id, mode: 'strike' }).state;
+ assert.equal(r.hauntings[0].hp, 11); assert.equal(r.hauntings[1].hp, 12);
+ const move = act(r, { type: 'move', to: position(1, 2) }).state; assert.equal(move.hauntings[0].hp, 13); assert.equal(move.hauntings[1].hp, 14);
 });
-
-test('zero light remains playable and does not reduce exploration visibility or regenerate through movement', () => {
-  let state = baseFixture();
-  state.light = 0;
-  state.rooms[0].discovered.fill(false);
-  addCandle(state, 'last-candle', position(4, 3), 3);
-  refreshExploration(state);
-  assert.equal(illuminated(state, 4, 3), true);
-  const remembered = clone(state.rooms[0].discovered);
-  for (const direction of ['north', 'west', 'south', 'east']) state = perform(state, { type: 'move', direction }, false);
-  assert.equal(state.light, 0);
-  assert.equal(state.status, 'active');
-  remembered.forEach((known, index) => { if (known) assert.equal(state.rooms[0].discovered[index], true); });
-  assert.equal(perform(state, { type: 'refill', candleId: 'last-candle' }).light, 3);
+test('food takes exactly one recovery turn for wounded spirits, independent of distance', () => {
+ const s = baseFixture(); const h = addHaunting(s, { hp: 2, maxHp: 64 }); const x = addSupply(s); s.resources.health = 3;
+ const r = act(s, { type: 'use', supplyId: x.id }).state; assert.equal(r.turns, 1); assert.equal(r.hauntings[0].hp, 4); assert.equal(r.resources.health, 17);
 });
-
-test('the exact ordering fixture requires lesser spirit, candle, then stronger spirit', () => {
-  let state = orderingFixture();
-  assert.equal(banishCost(state, state.hauntings[0]), 2);
-  assert.equal(banishCost(state, state.hauntings[1]), 6);
-  refused(state, { type: 'banish', hauntingId: 'stronger' });
-  state = perform(state, { type: 'banish', hauntingId: 'lesser' });
-  assert.equal(state.light, 2);
-  assert.equal(state.ritualPower, 2);
-  state = perform(state, { type: 'refill', candleId: 'three-light-candle' });
-  assert.equal(state.light, 5);
-  state = perform(state, { type: 'banish', hauntingId: 'stronger' });
-  assert.equal(state.light, 0);
-  assert.equal(state.ritualPower, 2);
-  assert.equal(objectiveReady(state), true);
-  let wrong = orderingFixture();
-  wrong = perform(wrong, { type: 'refill', candleId: 'three-light-candle' });
-  wrong = perform(wrong, { type: 'banish', hauntingId: 'lesser' });
-  assert.equal(wrong.light, 3);
-  refused(wrong, { type: 'banish', hauntingId: 'stronger' }, /light|need|cost/i);
-  assert.equal(wrong.status, 'active');
+test('no passive player recovery, defeated spirits stay defeated, invalid actions do nothing', () => {
+ const s = baseFixture(); s.resources.health = 7; addHaunting(s, { hp: 0 });
+ const r = act(s, { type: 'move', to: position(1, 2) }).state; assert.equal(r.resources.health, 7); assert.equal(r.hauntings[0].hp, 0);
+ assert.equal(act(r, { type: 'move', to: r.player }).state, r);
 });
-
-test('taking the cheapest encounter first prevents the necessary refill route paying for the objective', () => {
-  const opening = cheapestFirstFixture();
-  assert.equal(banishCost(opening, opening.hauntings[0]), 1);
-  assert.equal(banishCost(opening, opening.hauntings[1]), 3);
-  refused(opening, { type: 'move', direction: 'east' });
-  refused(opening, { type: 'refill', candleId: 'guarded-candle' });
-  for (const takeTreasure of [false, true]) {
-    let state = clone(opening);
-    if (takeTreasure) state = perform(state, { type: 'banish', hauntingId: 'treasure' });
-    state = perform(state, { type: 'banish', hauntingId: 'candle-keeper' });
-    state = perform(state, { type: 'move', direction: 'east' }, false);
-    state = perform(state, { type: 'refill', candleId: 'guarded-candle' });
-    assert.equal(state.light, takeTreasure ? 4 : 5);
-    assert.equal(banishCost(state, state.hauntings[2]), 5);
-    if (takeTreasure) refused(state, { type: 'banish', hauntingId: 'last-guardian' });
-    else {
-      state = perform(state, { type: 'banish', hauntingId: 'last-guardian' });
-      assert.equal(objectiveReady(state), true);
-      assert.equal(state.hauntings[0].banished, false);
-    }
-  }
+test('flare ignores armour and retaliation but spends light; insufficient light is rejected', () => {
+ const s = baseFixture(); const h = addHaunting(s, { kind: 'armour' });
+ assert.equal(previewAttack(s, h, 'strike').damage, 4);
+ const r = act(s, { type: 'attack', hauntingId: h.id, mode: 'flare' }).state;
+ assert.equal(r.hauntings[0].hp, 7); assert.equal(r.resources.health, 22); assert.equal(r.resources.light, 4);
+ r.resources.light = 3; assert.equal(act(r, { type: 'attack', hauntingId: h.id, mode: 'flare' }).committed, false);
 });
-
-test('local fixtures expose relevant costs, rewards, and candles before commitment', () => {
-  for (const state of [orderingFixture(), cheapestFirstFixture()]) {
-    const exposed = interactions(state);
-    for (const haunting of state.hauntings) {
-      const entry = exposed.find(item => item.action.type === 'banish' && item.action.hauntingId === haunting.id);
-      assert.ok(entry, `${state.seed}: ${haunting.id} must be inspectable from the opening`);
-      assert.match(`${entry.label} ${entry.detail}`, new RegExp(String(banishCost(state, haunting))));
-      assert.ok(entry.name.includes(haunting.name));
-    }
-    for (const candle of state.candles) assert.ok(exposed.some(item => item.action.type === 'refill' && item.action.candleId === candle.id));
-    assert.equal(state.decisions, 0);
-    assert.equal(state.undo.length, 0);
-  }
+test('ward and oil cost preparation turns, trigger regeneration, and consume only on their stated attacks', () => {
+ let s = baseFixture(); const h = addHaunting(s, { hp: 10, maxHp: 30, attack: 5 });
+ s = act(s, { type: 'ward' }).state; assert.equal(s.resources.light, 5); assert.equal(s.hauntings[0].hp, 12);
+ s = act(s, { type: 'oil' }).state; assert.equal(s.hauntings[0].hp, 14); assert.equal(s.resources.oils, 0);
+ s = act(s, { type: 'attack', hauntingId: h.id, mode: 'flare' }).state;
+ assert.equal(s.resources.ward, true); assert.equal(s.resources.empowered, false); assert.equal(s.hauntings[0].hp, 0);
+ const h2 = addHaunting(s, { id: 'h2', position: position(5, 5), attack: 5 });
+ s = act(s, { type: 'attack', hauntingId: h2.id, mode: 'strike' }).state; assert.equal(s.resources.health, 19); assert.equal(s.resources.ward, false);
 });
-
-test('discovered spirits and candles remain inspectable from remembered scenery for free', () => {
-  let state = orderingFixture();
-  state = perform(state, { type: 'move', direction: 'south' }, false);
-  state = perform(state, { type: 'move', direction: 'south' }, false);
-  const before = clone(state);
-  const entries = interactions(state);
-  assert.ok(entries.some(item => item.action.type === 'banish' && item.action.hauntingId === 'stronger' && !item.adjacent));
-  assert.ok(entries.some(item => item.action.type === 'refill' && !item.adjacent));
-  assert.deepEqual(state, before);
+test('supply preview caps restoration; eating frees tile, collection stores bottles', () => {
+ const s = baseFixture(); const f = addSupply(s); s.resources.health = 20;
+ assert.deepEqual(supplyPreview(s, f), { received: 2, wasted: 12, total: 22 });
+ const c = addSupply(s, 'candle', { position: position(1, 2) }); assert.deepEqual(supplyPreview(s, c), { received: 2, wasted: 6, total: 10 });
+ const t = addSupply(s, 'tonic', { position: position(2, 2) }); const r = act(s, { type: 'use', supplyId: t.id }).state; assert.equal(r.resources.tonics, 2); assert.equal(r.resources.health, 20);
 });
-
-test('searches grant fixed rewards once; key and crowbar gates are explicit and keep reusable items', () => {
-  for (const gate of ['moth-key', 'thorn-key', 'crowbar']) {
-    let state = baseFixture();
-    const connection = connectRooms(state, { gate });
-    addContainer(state, 'tool-cupboard', position(3, 2), { item: gate, power: 1 });
-    state = perform(state, { type: 'search', containerId: 'tool-cupboard' });
-    assert.equal(state.ritualPower, 2);
-    refused(state, { type: 'search', containerId: 'tool-cupboard' });
-    refused(state, { type: 'unlock', connectionId: connection.id });
-    state = perform(state, { type: 'move', direction: 'east' }, false);
-    refused(state, { type: 'move', direction: 'east' });
-    state = perform(state, { type: 'unlock', connectionId: connection.id });
-    assert.ok(state.inventory.includes(gate));
-    assert.equal(state.connections[0].opened, true);
-    state = perform(state, { type: 'move', direction: 'east' }, false);
-    assert.deepEqual(state.player, connection.b, 'open passage movement travels automatically');
-    state = perform(state, { type: 'travel', connectionId: connection.id }, false);
-    assert.deepEqual(state.player, connection.a);
-    assert.ok(state.inventory.includes(gate));
-    assert.equal(state.rooms[0].containers[0].opened, true);
-  }
+test('full history survives over twelve decisions and restores exact starting fog/resources', () => {
+ const s = baseFixture(); let current = s;
+ for (let i = 0; i < 30; i++) current = act(current, { type: 'move', to: i % 2 ? position(3, 3) : position(1, 2) }).state;
+ assert.equal(current.undo.length, 30);
+ while (current.undo.length) current = act(current, { type: 'undo' }).state;
+ assert.deepEqual(current, s);
 });
-
-test('undo restores the complete pre-decision snapshot including dependent rewards, exploration, and position', () => {
-  const opening = orderingFixture();
-  let state = perform(opening, { type: 'banish', hauntingId: 'lesser' });
-  const afterLesser = clone(state);
-  state = perform(state, { type: 'refill', candleId: 'three-light-candle' });
-  state = perform(state, { type: 'banish', hauntingId: 'stronger' });
-  state = perform(state, { type: 'move', direction: 'east' }, false);
-  state = perform(state, { type: 'move', direction: 'south' }, false);
-  state = perform(state, { type: 'undo' });
-  assert.deepEqual(state.player, opening.player);
-  assert.equal(state.hauntings[1].banished, false);
-  assert.equal(state.inventory.includes('exit-key'), false);
-  assert.equal(state.light, 5);
-  state = perform(state, { type: 'undo' });
-  assert.deepEqual(state, afterLesser);
-  state = perform(state, { type: 'undo' });
-  assert.deepEqual(state, opening);
-  refused(state, { type: 'undo' });
-  state = perform(state, { type: 'banish', hauntingId: 'lesser' });
-  assert.equal(state.ritualPower, 2);
-});
-
-test('undo history is bounded, has no nested history, and ignores ordinary walking', () => {
-  let state = baseFixture({ width: 21, height: 7 });
-  state.player = position(1, 3);
-  for (let x = 1; x <= TUNING.undoLimit + 3; x++) addContainer(state, `shelf-${x}`, position(x, 2), { treasure: 1 });
-  for (let x = 1; x <= TUNING.undoLimit + 3; x++) {
-    if (x > 1) state = perform(state, { type: 'move', direction: 'east' }, false);
-    state = perform(state, { type: 'search', containerId: `shelf-${x}` });
-  }
-  assert.equal(state.undo.length, TUNING.undoLimit);
-  assert.ok(state.undo.every(snapshot => !Object.hasOwn(snapshot, 'undo')));
-  for (let count = 0; count < TUNING.undoLimit; count++) state = perform(state, { type: 'undo' });
-  assert.equal(state.treasure, 3);
-  refused(state, { type: 'undo' });
-});
-
-test('undo reverses dependent container rewards and an opened gate without duplicating the tool', () => {
-  let state = baseFixture();
-  const connection = connectRooms(state, { gate: 'crowbar' });
-  addContainer(state, 'crowbar-case', position(3, 2), { item: 'crowbar' });
-  addContainer(state, 'study-ledger', position(2, 3, 'study'), { power: 1, treasure: 3 });
-  const opening = clone(state);
-  state = perform(state, { type: 'search', containerId: 'crowbar-case' });
-  state = perform(state, { type: 'move', direction: 'east' }, false);
-  state = perform(state, { type: 'unlock', connectionId: connection.id });
-  state = perform(state, { type: 'move', direction: 'east' }, false);
-  state = perform(state, { type: 'search', containerId: 'study-ledger' });
-  assert.equal(state.treasure, 3);
-  state = perform(state, { type: 'undo' });
-  assert.equal(state.treasure, 0);
-  assert.equal(state.ritualPower, 1);
-  assert.equal(state.rooms[1].containers[0].opened, false);
-  state = perform(state, { type: 'undo' });
-  assert.equal(state.connections[0].opened, false);
-  assert.deepEqual(state.player, position(4, 3));
-  assert.deepEqual(state.inventory, ['crowbar']);
-  state = perform(state, { type: 'undo' });
-  assert.deepEqual(state, opening);
-  state = perform(state, { type: 'search', containerId: 'crowbar-case' });
-  assert.deepEqual(state.inventory, ['crowbar']);
-});
-
-test('objectives require their item and return; settling the keepsake resolves its associated haunting', () => {
-  for (const kind of ['escape', 'diary', 'keepsake']) {
-    let state = baseFixture();
-    state.objective.kind = kind;
-    assert.equal(objectiveReady(state), false);
-    state.player = clone(state.entrance);
-    refused(state, { type: 'leave' });
-    state.inventory.push(kind === 'escape' ? 'exit-key' : kind);
-    if (kind === 'keepsake') {
-      state.objective.altar = position(3, 2);
-      state.objective.hauntingId = 'owner';
-      state.objective.ritualCost = 1;
-      markTile(state, state.objective.altar, { kind: 'altar' });
-      addHaunting(state, 'owner', position(4, 2), 99, {}, { resolution: 'keepsake' });
-      state.player = position(3, 3);
-      assert.equal(objectiveReady(state), false);
-      state = perform(state, { type: 'settle' });
-      assert.equal(state.light, 3);
-      assert.equal(state.objective.completed, true);
-      assert.equal(state.hauntings[0].banished, true);
-      const reverted = perform(state, { type: 'undo' });
-      assert.equal(reverted.objective.completed, false);
-      assert.equal(reverted.hauntings[0].banished, false);
-    }
-    assert.equal(objectiveReady(state), true);
-    state.player = position(3, 3);
-    refused(state, { type: 'leave' });
-    state.player = clone(state.entrance);
-    state = perform(state, { type: 'leave' });
-    assert.equal(state.status, 'won');
-    assert.equal(state.objective.completed, true);
-    refused(state, { type: 'move', direction: 'north' });
-    assert.equal(perform(state, { type: 'undo' }).status, 'active');
-  }
+test('objective requires the right item and return, and locket also needs memorial', () => {
+ let s = baseFixture(); s.player = { ...s.entrance };
+ assert.equal(act(s, { type: 'leave' }).committed, false); s.inventory.push('exit-key'); assert.equal(act(s, { type: 'leave' }).state.status, 'won');
+ s.objective.kind = 'keepsake'; s.objective.altar = position(5, 5); s.inventory = ['keepsake'];
+ assert.equal(act(s, { type: 'leave' }).committed, false); s = act(s, { type: 'settle' }).state; assert.equal(act(s, { type: 'leave' }).state.status, 'won');
 });

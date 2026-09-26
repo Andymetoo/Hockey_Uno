@@ -1,186 +1,107 @@
-﻿import { DIRECTIONS, ITEMS, TUNING } from './content.ts';
-import type { Action, ActionResult, Candle, Connection, GameSnapshot, GameState, Haunting, Interaction, Position, Reward } from './types.ts';
-import { adjacent, discoveredChoices, known, leadText, refreshExploration, samePosition, tileAt, traversable } from './world.ts';
-export { illuminated, samePosition, tileAt } from './world.ts';
-
-export const banishCost = (state: GameSnapshot, haunting: Haunting): number => Math.max(1, haunting.resistance - state.ritualPower);
-export function refillPreview(state: GameSnapshot, candle: Candle): { received: number; wasted: number; total: number } {
-  const received = Math.min(candle.restores, state.maxLight - state.light);
-  return { received, wasted: candle.restores - received, total: state.light + received };
+import { ITEMS, TUNING, xpNeeded } from './content.ts';
+import type { Action, ActionResult, CombatPreview, GameSnapshot, GameState, Haunting, Supply, UndoFrame } from './types.ts';
+import { known, refreshExploration, samePosition, traversable } from './world.ts';
+export function capture(s: GameSnapshot): UndoFrame {
+ return { player: { ...s.player }, resources: { ...s.resources }, turns: s.turns, discovered: s.rooms.map(r => [...r.discovered]), visited: s.rooms.map(r => r.visited), hp: s.hauntings.map(h => h.hp), used: s.supplies.map(x => x.used), opened: s.connections.map(c => c.opened), inventory: [...s.inventory], completed: s.objective.completed, status: s.status, journal: [...s.journal], log: [...s.log] };
 }
-export function rewardText(reward: Reward): string {
-  const parts: string[] = [];
-  if (reward.power) parts.push(`+${reward.power} ritual power (permanent)`);
-  if (reward.item) parts.push(ITEMS[reward.item].name);
-  if (reward.treasure) parts.push(`${reward.treasure} treasure`);
-  return parts.join('; ') || 'No item reward';
+export function restore(s: GameState, f: UndoFrame): void {
+ s.player = { ...f.player }; s.resources = { ...f.resources }; s.turns = f.turns;
+ s.rooms.forEach((r, i) => { r.discovered = [...f.discovered[i]]; r.visited = f.visited[i]; });
+ s.hauntings.forEach((h, i) => { h.hp = f.hp[i]; }); s.supplies.forEach((x, i) => { x.used = f.used[i]; }); s.connections.forEach((c, i) => { c.opened = f.opened[i]; });
+ s.inventory = [...f.inventory]; s.objective.completed = f.completed; s.status = f.status; s.journal = [...f.journal]; s.log = [...f.log];
 }
-export function objectiveReady(state: GameSnapshot): boolean {
-  return state.objective.kind === 'keepsake' ? state.objective.completed : state.inventory.includes(state.objective.kind === 'escape' ? 'exit-key' : 'diary');
+export function cloneGame(s: GameState): GameState {
+ // Geometry and coordinates are immutable after generation. Copy only mutable state.
+ return { ...s, player: { ...s.player }, resources: { ...s.resources }, rooms: s.rooms.map(r => ({ ...r, discovered: [...r.discovered] })), hauntings: s.hauntings.map(h => ({ ...h })), supplies: s.supplies.map(x => ({ ...x })), connections: s.connections.map(c => ({ ...c })), objective: { ...s.objective }, inventory: [...s.inventory], journal: [...s.journal], log: [...s.log], undo: [...s.undo] };
 }
-export function snapshot(state: GameState): GameSnapshot {
-  const { undo: _history, ...core } = state;
-  return structuredClone(core);
+export function previewAttack(s: GameSnapshot, h: Haunting, mode: 'strike' | 'flare'): CombatPreview {
+ const r = s.resources; const lightCost = mode === 'flare' ? TUNING.flareCost : 0;
+ const damage = Math.max(1, r.power + (r.empowered ? TUNING.oilBonus : 0) + (mode === 'flare' ? 4 : h.kind === 'armour' ? -2 : 0));
+ const incoming = mode === 'flare' ? 0 : r.ward ? Math.ceil(h.attack / 2) : h.attack;
+ return { damage, incoming, healthAfter: Math.max(0, r.health - incoming), enemyAfter: Math.max(0, h.hp - damage), lightCost, lethal: r.health <= incoming, kills: damage >= h.hp, affordable: r.light >= lightCost };
 }
-function log(state: GameSnapshot, message: string): void { state.log = [...state.log, message].slice(-TUNING.maxLogEntries); }
-function addLead(state: GameSnapshot, text: string): void { if (!state.journal.includes(text)) state.journal.push(text); }
-function grant(state: GameSnapshot, reward: Reward): void {
-  state.ritualPower += reward.power ?? 0;
-  state.treasure += reward.treasure ?? 0;
-  if (reward.item && !state.inventory.includes(reward.item)) {
-    state.inventory.push(reward.item);
-    for (const c of state.connections.filter(c => !c.opened && c.gate === reward.item && (known(state, c.a) || known(state, c.b)))) {
-      const p = known(state, c.a) ? c.a : c.b;
-      addLead(state, `${ITEMS[reward.item].name} can open the ${c.kind === 'stairs' ? 'stairway' : 'passage'} recorded in the ${state.rooms.find(r => r.id === p.roomId)!.name}.`);
-    }
-  }
-  if (state.objective.kind !== 'keepsake') state.objective.completed = objectiveReady(state);
+export function supplyPreview(s: GameSnapshot, supply: Supply): { received: number; wasted: number; total: number } {
+ const r = s.resources; const amount = supply.kind === 'food' ? Math.ceil(r.maxHealth * .6) : supply.amount;
+ const current = supply.kind === 'food' ? r.health : r.light; const cap = supply.kind === 'food' ? r.maxHealth : r.maxLight;
+ const received = Math.min(cap - current, amount); return { received, wasted: amount - received, total: current + received };
 }
-function endpoint(state: GameSnapshot, c: Connection): Position | undefined {
-  return [c.a, c.b].find(p => p.roomId === state.player.roomId && known(state, p)) ?? [c.a, c.b].find(p => known(state, p));
-}
-const otherEnd = (c: Connection, p: Position): Position => samePosition(c.a, p) ? c.b : c.a;
-const requirement = (c: Connection): string => c.gate === 'crowbar' ? 'Boarded passage: requires the reusable crowbar.' : `Locked passage: requires ${c.gate ? ITEMS[c.gate].name : 'a key'}.`;
-
-/** Inspection lists only remembered entities. Distance and affordability are separate facts. */
-export function interactions(state: GameSnapshot): Interaction[] {
-  const result: Interaction[] = [];
-  const add = (id: string, name: string, label: string, detail: string, action: Action, position: Position, canUse: boolean, resolved = false): void => {
-    if (!known(state, position)) return;
-    const near = adjacent(state.player, position);
-    result.push({ id, name, label, detail: `${detail}${!near && !resolved ? ' Approach an adjacent tile to act.' : ''}`, action, position, adjacent: near, available: state.status === 'active' && near && canUse && !resolved, resolved });
-  };
-  for (const h of state.hauntings) {
-    const cost = banishCost(state, h);
-    const specific = h.resolution === 'keepsake' ? 'Release at the memorial with the silver locket; it cannot be banished by force.' : h.requires ? `Requires ${ITEMS[h.requires].name}.` : 'No additional item required.';
-    add(`banish-${h.id}`, h.name, `Banish · ${cost} light`, h.banished ? `${h.name} has been released. This tile is clear.` : `Resistance ${h.resistance}. Cost ${cost} light at power ${state.ritualPower}. Reward: ${rewardText(h.reward)}. ${h.benefit} ${specific}${state.light < cost && !h.resolution ? ` Need ${cost - state.light} more light.` : ''}`, { type: 'banish', hauntingId: h.id }, h.position, !h.resolution && state.light >= cost && (!h.requires || state.inventory.includes(h.requires)), h.banished);
+export function objectiveReady(s: GameSnapshot): boolean { return s.objective.kind === 'keepsake' ? s.objective.completed : s.inventory.includes(s.objective.kind === 'diary' ? 'diary' : 'exit-key'); }
+/** One authority for interactive play, generation witnesses and save replay. */
+export function act(original: GameState, action: Action, record = true): ActionResult {
+ const reject = (message: string, lethal = false): ActionResult => ({ state: original, committed: false, message, lethal });
+ if (action.type === 'undo') {
+  if (!original.undo.length) return reject('No earlier turn to restore.');
+  const s = cloneGame(original); restore(s, s.undo.pop()!); return { state: s, committed: true, message: 'Previous turn restored, including discovery and regeneration.' };
+ }
+ if (original.status !== 'active') return reject('This run has ended. Undo, restart this house, or start a new one.');
+ const s = cloneGame(original); const r = s.resources; let message = ''; let attacked = '';
+ if (action.type === 'move') {
+  if (!traversable(s, action.to) || samePosition(s.player, action.to)) return reject('Choose a different discovered empty tile. Distance and intervening obstacles do not matter.');
+  s.player = { ...action.to }; message = 'Moved. One turn.';
+ } else if (action.type === 'travel') {
+  const c = s.connections.find(c => c.id === action.connectionId);
+  if (!c || !c.opened || !known(s, action.from) || (!samePosition(c.a, action.from) && !samePosition(c.b, action.from))) return reject('Discover and open this passage first.');
+  const destination = samePosition(c.a, action.from) ? c.b : c.a;
+  if (!traversable(s, destination, false)) return reject('That landing is occupied.');
+  s.player = { ...destination }; message = `Entered ${s.rooms.find(room => room.id === destination.roomId)!.name}.`;
+ } else if (action.type === 'unlock') {
+  const c = s.connections.find(c => c.id === action.connectionId);
+  if (!c || c.opened || (!known(s, c.a) && !known(s, c.b))) return reject('No discovered locked passage here.');
+  if (c.gate && !s.inventory.includes(c.gate)) return reject(`Requires ${ITEMS[c.gate].name}.`);
+  c.opened = true; message = 'Passage unlocked. The tool stays in your pockets. Travel through when ready.';
+ } else if (action.type === 'attack') {
+  const h = s.hauntings.find(h => h.id === action.hauntingId);
+  if (!h || h.hp <= 0 || !known(s, h.position)) return reject('Choose a discovered living spirit.');
+  const p = previewAttack(s, h, action.mode);
+  if (!p.affordable) return reject(`A flare requires ${p.lightCost} light.`);
+  if (p.lethal && !action.acceptDeath) return reject(`This will kill you: ${r.health} health, ${p.incoming} incoming damage.`, true);
+  h.hp = p.enemyAfter; r.health = p.healthAfter; r.light -= p.lightCost; r.empowered = false;
+  if (action.mode === 'strike') r.ward = false;
+  attacked = h.id; message = `${h.name}: dealt ${p.damage}, received ${p.incoming}.`;
+  if (!r.health) { s.status = 'dead'; message += ' You died before experience or healing could help.'; }
+  else if (!h.hp) {
+   s.player = { ...h.position }; r.xp += h.xp; message += ` Banished. +${h.xp} experience.`;
+   if (h.reward && !s.inventory.includes(h.reward)) { s.inventory.push(h.reward); message += ` Found ${ITEMS[h.reward].name}.`; }
+   while (r.xp >= xpNeeded(r.level)) { r.xp -= xpNeeded(r.level); r.level++; r.maxHealth += 3; r.power += 2; r.health = r.maxHealth; r.light = r.maxLight; message += ` Level ${r.level}: +2 power, +3 maximum health; health and light restored.`; }
   }
-  for (const c of state.candles) {
-    const preview = refillPreview(state, c);
-    add(`refill-${c.id}`, c.name, `Use candle · receive ${preview.received} light`, c.used ? 'This candle is spent. It will not replenish.' : `Restore ${c.restores} light once. Receive ${preview.received}; ${preview.wasted} would be wasted. Result: ${preview.total}/${state.maxLight} light.`, { type: 'refill', candleId: c.id }, c.position, !c.used, c.used);
+ } else if (action.type === 'use') {
+  const x = s.supplies.find(x => x.id === action.supplyId);
+  if (!x || x.used || !known(s, x.position)) return reject('Choose a discovered unused supply.');
+  x.used = true; s.player = { ...x.position };
+  if (x.kind === 'food' || x.kind === 'candle') {
+   const p = supplyPreview(original, x); if (x.kind === 'food') r.health = p.total; else r.light = p.total;
+   message = `${x.name}: restored ${p.received} ${x.kind === 'food' ? 'health' : 'light'}; ${p.wasted} wasted. Tile cleared.`;
+  } else {
+   if (x.kind === 'tonic') r.tonics += x.amount;
+   if (x.kind === 'oil') r.oils += x.amount;
+   if (x.kind === 'power') r.power += x.amount;
+   if (x.kind === 'treasure') r.treasure += x.amount;
+   if (x.item && !s.inventory.includes(x.item)) s.inventory.push(x.item);
+   if (x.text) s.journal.push(x.text);
+   message = `${x.name}: ${x.item ? ITEMS[x.item].name + ' collected.' : x.kind === 'power' ? '+' + x.amount + ' permanent power.' : x.kind === 'note' ? x.text : 'collected.'}`;
   }
-  for (const room of state.rooms) for (const c of room.containers) {
-    const clues = c.leads?.map(l => leadText(state, l)).join('; ');
-    add(`search-${c.id}`, c.label, 'Search and collect', c.opened ? `Already searched. ${c.note ?? ''}` : `Contains: ${rewardText(c.reward)}.${c.note ? ` ${c.note}` : ''}${clues ? ` Leads: ${clues}.` : ''}`, { type: 'search', containerId: c.id }, { roomId: room.id, x: c.x, y: c.y }, !c.opened, c.opened);
-  }
-  for (const c of state.connections) {
-    const p = endpoint(state, c);
-    if (!p || !known(state, p)) continue;
-    const target = otherEnd(c, p);
-    const targetRoom = state.rooms.find(r => r.id === target.roomId)!;
-    if (!c.opened) add(`unlock-${c.id}`, `${c.gate === 'crowbar' ? 'Boarded' : c.gate ? ITEMS[c.gate].name : 'Locked'} ${c.kind === 'stairs' ? 'stairway' : 'door'}`, c.gate === 'crowbar' ? 'Remove boards' : 'Unlock passage', `${requirement(c)} ${c.gate && state.inventory.includes(c.gate) ? 'You have the tool; it is not consumed.' : 'Return when you have its tool.'}`, { type: 'unlock', connectionId: c.id }, p, !!c.gate && state.inventory.includes(c.gate));
-    else add(`travel-${c.id}`, c.kind === 'stairs' ? `Stairs ${targetRoom.floor > state.rooms.find(r => r.id === p.roomId)!.floor ? 'up' : 'down'}` : 'Open doorway', 'Cross passage', `${targetRoom.visited ? `Leads to ${targetRoom.name}.` : 'Leads to an unexplored room.'} Walking onto this tile crosses automatically. Travel costs no light.`, { type: 'travel', connectionId: c.id }, p, samePosition(state.player, p) && traversable(state, target));
-  }
-  if (state.objective.altar) add('settle', 'Memorial', `Release the bound soul${state.objective.ritualCost ? ` · ${state.objective.ritualCost} light` : ''}`, state.objective.completed ? 'The locket rests here. Its owner is released and their tile is clear.' : `Bring the silver locket here to release its owner. Cost: ${state.objective.ritualCost} light.`, { type: 'settle' }, state.objective.altar, state.inventory.includes('keepsake') && state.light >= state.objective.ritualCost, state.objective.completed);
-  add('leave', 'Front door', 'Leave the house', objectiveReady(state) ? 'Your objective is complete. Escape through the front door.' : state.objective.description, { type: 'leave' }, state.entrance, objectiveReady(state));
-  return result;
-}
-
-/** Atomic deterministic decisions; walking has no resource or haunting side effects. */
-export function act(state: GameState, action: Action): ActionResult {
-  const invalid = (message: string): ActionResult => ({ state, committed: false, consequential: false, message, discoveredChoice: false });
-  if (action.type === 'undo') {
-    if (!state.undo.length) return invalid('No decision to undo yet. Walking does not add undo entries.');
-    const restored: GameState = { ...structuredClone(state.undo[state.undo.length - 1]), undo: state.undo.slice(0, -1) };
-    return { state: restored, committed: true, consequential: false, message: 'Decision undone. Position, resources, discoveries and world restored to that snapshot.', discoveredChoice: false };
-  }
-  if (state.status !== 'active') return invalid('This adventure is complete. Undo a decision or start another house.');
-  let destination: Position | undefined;
-  let message = '';
-  const consequential = action.type !== 'move' && action.type !== 'travel';
-  const room = state.rooms.find(r => r.id === state.player.roomId)!;
-  switch (action.type) {
-    case 'move': {
-      const d = DIRECTIONS[action.direction];
-      if (!d) return invalid('Choose a cardinal direction.');
-      destination = { roomId: room.id, x: state.player.x + d.x, y: state.player.y + d.y };
-      if (!traversable(state, destination)) {
-        const h = state.hauntings.find(h => !h.banished && samePosition(h.position, destination!));
-        return invalid(h ? `${h.name} blocks this tile. Inspect it and choose whether to banish it.` : 'That way is blocked. No light spent.');
-      }
-      const tile = tileAt(room, destination.x, destination.y)!;
-      const c = state.connections.find(c => c.id === tile.connectionId);
-      if (c?.opened) {
-        const target = otherEnd(c, destination);
-        if (!traversable(state, target)) return invalid('The far side is blocked. No light spent.');
-        destination = { ...target };
-      }
-      message = destination.roomId !== state.player.roomId ? `Entered the ${state.rooms.find(r => r.id === destination!.roomId)!.name}.` : 'Walking costs no light.';
-      break;
-    }
-    case 'travel': {
-      const c = state.connections.find(c => c.id === action.connectionId);
-      if (!c || !c.opened || (!samePosition(c.a, state.player) && !samePosition(c.b, state.player))) return invalid('Stand on an open passage to cross.');
-      destination = { ...otherEnd(c, state.player) };
-      if (!traversable(state, destination)) return invalid('The far side is blocked.');
-      message = `Entered the ${state.rooms.find(r => r.id === destination!.roomId)!.name}.`;
-      break;
-    }
-    case 'banish': {
-      const h = state.hauntings.find(h => h.id === action.hauntingId);
-      if (!h || h.banished || !known(state, h.position) || !adjacent(state.player, h.position)) return invalid('Stand beside a discovered, unresolved haunting.');
-      if (h.resolution) return invalid('This soul must be released at the memorial with the silver locket.');
-      if (h.requires && !state.inventory.includes(h.requires)) return invalid(`This banishment requires ${ITEMS[h.requires].name}.`);
-      const cost = banishCost(state, h);
-      if (state.light < cost) return invalid(`Banishment costs ${cost} light. You have ${state.light}; need ${cost - state.light} more. Nothing was spent.`);
-      message = `Banished ${h.name}: spent ${cost} light. ${rewardText(h.reward)}. ${h.benefit}`;
-      break;
-    }
-    case 'refill': {
-      const c = state.candles.find(c => c.id === action.candleId);
-      if (!c || c.used || !known(state, c.position) || !adjacent(state.player, c.position)) return invalid('Stand beside an unused, discovered candle.');
-      const p = refillPreview(state, c);
-      message = `Used ${c.name}: received ${p.received} light; ${p.wasted} wasted. The candle is spent.`;
-      break;
-    }
-    case 'search': {
-      const c = room.containers.find(c => c.id === action.containerId);
-      if (!c || c.opened || !known(state, { roomId: room.id, x: c.x, y: c.y }) || !adjacent(state.player, { roomId: room.id, x: c.x, y: c.y })) return invalid('Stand beside an unopened, discovered object.');
-      message = `Searched ${c.label}: ${rewardText(c.reward)}.${c.note ? ` ${c.note}` : ''}`;
-      break;
-    }
-    case 'unlock': {
-      const c = state.connections.find(c => c.id === action.connectionId);
-      const p = c && endpoint(state, c);
-      if (!c || c.opened || !c.gate || !p || !known(state, p) || !adjacent(state.player, p)) return invalid('Stand beside a closed passage.');
-      if (!state.inventory.includes(c.gate)) return invalid(requirement(c));
-      message = `Opened the ${c.kind === 'stairs' ? 'stairway' : 'passage'} with ${ITEMS[c.gate].name}. The tool is reusable.`;
-      break;
-    }
-    case 'settle':
-      if (state.objective.kind !== 'keepsake' || !state.objective.altar || state.objective.completed || !adjacent(state.player, state.objective.altar) || !state.inventory.includes('keepsake')) return invalid('Bring the silver locket to the memorial.');
-      if (state.light < state.objective.ritualCost) return invalid(`The ritual needs ${state.objective.ritualCost} light. Nothing was spent.`);
-      message = 'The locket returns to its owner. The bound soul is released; its tile is now clear. Return to the front door.';
-      break;
-    case 'leave':
-      if (!adjacent(state.player, state.entrance) || !objectiveReady(state)) return invalid(state.objective.description);
-      message = 'Your task is complete. The front door opens onto the morning. You escaped.';
-      break;
-    default: return invalid('That action is unavailable.');
-  }
-  const before = snapshot(state);
-  const next: GameState = { ...structuredClone(before), undo: consequential ? [...state.undo, before].slice(-TUNING.undoLimit) : [...state.undo] };
-  if (destination) { next.player = destination; next.steps++; }
-  if (action.type === 'banish') {
-    const h = next.hauntings.find(h => h.id === action.hauntingId)!;
-    next.light -= banishCost(next, h); h.banished = true; grant(next, h.reward);
-  } else if (action.type === 'refill') {
-    const c = next.candles.find(c => c.id === action.candleId)!;
-    next.light = refillPreview(next, c).total; c.used = true;
-  } else if (action.type === 'search') {
-    const c = next.rooms.find(r => r.id === room.id)!.containers.find(c => c.id === action.containerId)!;
-    c.opened = true; grant(next, c.reward);
-    for (const lead of c.leads ?? []) addLead(next, `${c.label}: ${leadText(next, lead)}.`);
-    if (c.note) addLead(next, c.note);
-  } else if (action.type === 'unlock') next.connections.find(c => c.id === action.connectionId)!.opened = true;
-  else if (action.type === 'settle') {
-    next.light -= next.objective.ritualCost; next.objective.completed = true;
-    const h = next.hauntings.find(h => h.id === next.objective.hauntingId);
-    if (h && !h.banished) { h.banished = true; grant(next, h.reward); }
-  } else if (action.type === 'leave') { next.objective.completed = true; next.status = 'won'; }
-  if (consequential) { next.decisions++; log(next, message); }
-  const previousChoices = discoveredChoices(state);
-  refreshExploration(next);
-  const discoveredChoice = [...discoveredChoices(next)].some(id => !previousChoices.has(id));
-  return { state: next, committed: true, consequential, message, discoveredChoice };
+ } else if (action.type === 'tonic') {
+  if (!r.tonics) return reject('No tonic in your pockets.'); if (r.health === r.maxHealth) return reject('Already at full health.');
+  const heal = Math.min(r.maxHealth - r.health, Math.ceil(r.maxHealth / 2)); r.tonics--; r.health += heal; message = `Tonic restored ${heal} health. Wounded spirits recover this turn.`;
+ } else if (action.type === 'oil') {
+  if (!r.oils || r.empowered) return reject('You need an oil bottle and no oil already prepared.');
+  r.oils--; r.empowered = true; message = 'Oil prepared: +4 damage on your next strike or flare. Wounded spirits recover this turn.';
+ } else if (action.type === 'ward') {
+  if (r.ward || r.light < TUNING.wardCost) return reject('Ward needs 3 light and no existing ward.');
+  r.light -= TUNING.wardCost; r.ward = true; message = 'Ward prepared: halve the next strike’s incoming damage, rounded up. Wounded spirits recover this turn.';
+ } else if (action.type === 'settle') {
+  if (s.objective.kind !== 'keepsake' || s.objective.completed || !s.objective.altar || !known(s, s.objective.altar) || !s.inventory.includes('keepsake')) return reject('Bring the silver locket to the discovered memorial.');
+  s.objective.completed = true; message = 'The locket rests at the memorial. Return to the entrance.';
+ } else if (action.type === 'leave') {
+  if (!samePosition(s.player, s.entrance)) return reject('Return to the entrance first.');
+  if (!objectiveReady(s)) return reject(s.objective.description);
+  s.status = 'won'; message = 'You step out into the morning. The house falls silent.';
+ }
+ s.turns++;
+ let recovered = 0;
+ for (const h of s.hauntings) if (h.id !== attacked && h.hp > 0 && h.hp < h.maxHp) { const amount = Math.min(h.regen, h.maxHp - h.hp); h.hp += amount; if (known(s, h.position)) recovered += amount; }
+ if (recovered) message += ` Other wounded spirits recovered ${recovered} health in total.`;
+ refreshExploration(s); s.log = [message, ...s.log].slice(0, TUNING.maxLogEntries);
+ if (record) s.undo.push(capture(original)); else s.undo = [];
+ return { state: s, committed: true, message };
 }

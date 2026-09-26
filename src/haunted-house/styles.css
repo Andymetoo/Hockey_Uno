@@ -303,3 +303,47 @@ h1, h2, h3, p { margin: 0; }
   .hh-menu > .hh-eyebrow { font-size: 10px; letter-spacing: .5px; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; scroll-behavior: auto !important; } }
+
+/* Combat and destination-based discovery. Keep the original monochrome house palette. */
+.hh-combat-resources { gap: 18px; flex-wrap: wrap; }
+.hh-combat-resources strong { font-size: 22px; font-weight: normal; white-space: nowrap; }
+.hh-combat-resources small { font-size: 12px; }
+.hh-room-tabs { display: flex; flex-wrap: wrap; gap: 5px; padding: 12px; border-bottom: 1px solid var(--hh-line); }
+.hh-room-tabs .hh-button { font-size: 11px; padding: 7px 9px; }
+.hh-board-scroll { width: 100%; overflow-x: auto; }
+.hh-board-scroll .hh-board-frame { min-width: calc(var(--hh-room-width) * 32px + 20px); padding: 12px 8px; }
+.hh-board-help { padding: 0 16px 14px; }
+.hh-tier { position: absolute; bottom: 1px; right: 1px; font: bold 10px/1 var(--hh-mono); background: var(--hh-bg); color: var(--hh-ink); padding: 2px; }
+.hh-feedback { min-height: 3em; font-size: 13px; line-height: 1.6; margin: 0 0 16px; padding: 12px; border-left: 2px solid var(--hh-muted); }
+.hh-danger { padding: 10px; border: 1px solid var(--hh-ink); font-weight: bold; margin: 10px 0; }
+.hh-known { margin-top: 22px; }
+.hh-known h2 { font: 24px var(--hh-serif); margin-bottom: 10px; }
+.hh-table-scroll { width: 100%; overflow-x: auto; }
+.hh-known table { border-collapse: collapse; width: 100%; font-size: 12px; margin-top: 10px; }
+.hh-known th, .hh-known td { padding: 7px 5px; text-align: left; border-bottom: 1px solid var(--hh-line); }
+.hh-known th { color: var(--hh-muted); }
+.hh-known td:not(:first-child) { white-space: nowrap; }
+.hh-known .hh-button { font-size: 12px; text-align: left; padding: 8px 3px; }
+.hh-sidebar .hh-action-detail { margin-top: 0; }
+.hh-action-detail > .hh-button { margin-top: 12px; width: 100%; }
+.hh-action-detail .hh-detail-buttons { margin: 12px 0; }
+.hh-action-detail p + p { margin-top: 10px; }
+.hh-controls { flex-wrap: wrap; gap: 8px; }
+.hh-events ol { padding-left: 20px; color: var(--hh-muted); font-size: 12px; line-height: 1.7; }
+.hh-events li { margin-top: 8px; }
+.hh-seed-input { display: block; margin: 20px 0; font-size: 13px; }
+.hh-seed-input input { display: block; width: 100%; padding: 12px; margin-top: 8px; background: var(--hh-bg); color: var(--hh-ink); border: 1px solid var(--hh-line); font: inherit; }
+.hh-rules { padding-left: 20px; font-size: 13px; line-height: 1.8; }
+.hh-rules li { padding-left: 5px; margin-bottom: 14px; }
+.hh-dialog-content > .hh-button { margin: 12px 8px 0 0; }
+.hh-menu > .hh-button { margin: 12px 5px; }
+@media (max-width: 680px) {
+ .hh-sidebar { display: flex; }
+ .hh-combat-resources { gap: 10px 16px; padding: 10px 12px; }
+ .hh-combat-resources > div { flex: 1 0 18%; }
+ .hh-combat-resources strong { font-size: 18px; }
+ .hh-combat-resources .hh-undo { min-height: 44px; max-width: none; width: 100%; }
+ .hh-run-controls .hh-button { min-height: 44px; }
+ .hh-action-detail { scroll-margin-top: 140px; }
+ .hh-room-tabs .hh-button { min-height: 44px; }
+}

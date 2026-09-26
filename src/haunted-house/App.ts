@@ -1,350 +1,194 @@
-import { DIRECTIONS, ITEMS, TUNING } from './content.ts';
-import { createGame } from './generation.ts';
-import { act, banishCost, interactions, refillPreview, rewardText } from './game.ts';
-import { planRoute } from './movement.ts';
-import { illuminated, samePosition, tileAt } from './world.ts';
-import type { Action, Direction, GameState, Interaction, Position, Room, Tile } from './types.ts';
+import HouseWorker from './generation.worker.ts?worker&inline';
+import { DIRECTIONS, ITEMS, RULES, SPIRITS, TUNING, xpNeeded } from './content.ts';
+import { act, objectiveReady, previewAttack, supplyPreview } from './game.ts';
+import { known, illuminated, samePosition, tileAt, traversable } from './world.ts';
+import { parseSave } from './persistence.ts';
 import type { LoadResult, SaveResult } from './persistence.ts';
-
+import type { Action, Direction, GameState, Position, Room, SupplyKind } from './types.ts';
 type Services = { load: () => LoadResult; save: (state: GameState) => SaveResult; newSeed: () => string };
-type Overlay = 'help' | 'legend' | 'journal' | 'new' | 'restart';
-const escape = (value: unknown) => String(value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
-const directionKeys: Record<string, Direction> = { ArrowUp: 'north', w: 'north', ArrowRight: 'east', d: 'east', ArrowDown: 'south', s: 'south', ArrowLeft: 'west', a: 'west' };
-const arrows: Record<Direction, string> = { north: '↑', east: '→', south: '↓', west: '←' };
-const symbols: Record<Tile['kind'], string> = { wall: '▧', floor: '·', furniture: '▥', container: '▣', candle: '♧', door: '∩', stairs: '≋', altar: '◇', exit: '⇧' };
+const escape = (v: unknown): string => String(v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+const supplyGlyphs: Record<SupplyKind, string> = { food: '♨', candle: '♧', tonic: '♙', oil: '◈', power: '✦', cache: '▣', treasure: '◇', note: '▤' };
 const mansion = `<svg class="hh-mansion" viewBox="0 0 440 230" fill="none" aria-hidden="true"><defs><pattern id="hh-hatch" width="5" height="5" patternUnits="userSpaceOnUse"><path d="M0 5L5 0" stroke="currentColor" stroke-width=".6"/></pattern></defs><circle cx="313" cy="54" r="31" stroke="currentColor"/><path d="M300 25a31 31 0 0 0 36 43" fill="currentColor" opacity=".1"/><path d="M27 205h386M53 199V114l53-44 45 38V81l69-61 68 61v27l45-38 54 44v85M58 114h91m142 0h91M151 82h137M169 81v118m101-118v118M72 199v-72h61v72m173 0v-72h61v72M182 199v-70h76v70M162 105h116M155 199h130" stroke="currentColor" stroke-width="2"/><path d="M53 114l53-44 45 38v6H53Zm238 0 42-44 54 44h-96ZM151 81l69-61 68 61H151Z" fill="url(#hh-hatch)"/><path d="M99 63V44h16v33M323 77V43h15v31M206 198v-41a14 14 0 0 1 28 0v41M205 80V61h30v19M82 155v-17h14v17Zm28 0v-17h14v17Zm207 0v-17h14v17Zm28 0v-17h14v17ZM191 120v-19h14v19Zm45 0v-17h14v17Z" stroke="currentColor" stroke-width="2"/><path d="M213 175h3M194 205l-14 18m64-18 15 18M28 199v-29l-9-9m9 21 12-11m365 28v-36l9-8m-9 25-11-10" stroke="currentColor"/><path d="M30 89h35m-17-8h29m282 17h41M12 211h112m176 0h120" stroke="currentColor" opacity=".35"/></svg>`;
 const hauntingGlyph = '<svg class="hh-haunting-glyph" viewBox="0 0 24 28" aria-hidden="true"><path d="M3 26V12a9 9 0 0 1 18 0v14l-5-3-4 3-4-3-5 3Z" fill="currentColor"/><path d="M8 11v5m8-5v5" stroke="var(--hh-panel)" stroke-width="3"/></svg>';
 const candleGlyph = '<svg class="hh-candle-glyph" viewBox="0 0 20 28" aria-hidden="true"><path d="M10 1c1 4 5 6 4 9-1 5-8 5-8 0 0-3 3-5 4-9Z" fill="currentColor"/><path d="M6 16h8v10H6zM3 27h14" fill="none" stroke="currentColor" stroke-width="2"/></svg>';
-
 export function mountGame(root: HTMLElement, services: Services): void {
-  root.innerHTML = '<div class="hh-view"></div><div class="hh-announcement" aria-live="polite" aria-atomic="true"></div>';
-  const view = root.querySelector<HTMLElement>('.hh-view')!;
-  const liveRegion = root.querySelector<HTMLElement>('.hh-announcement')!;
-  let saved = services.load();
-  const legacyRaw = saved.kind === 'legacy' ? saved.raw : saved.kind === 'loaded' ? saved.legacyRaw : undefined;
-  let state: GameState | undefined;
-  let overlay: Overlay | undefined;
-  let selectedInteraction: string | undefined;
-  let saveStatus = 'No active house';
-  let saveFailed = false;
-  let announcement = '';
-  let feedback = '';
-  let returnFocus = '';
-  let pendingRoute: Action[] = [];
-  let routeTimer: number | undefined;
-  let routeDestination: Position | undefined;
-
-  const button = (label: string, action: string, extra = '', className = '') => `<button type="button" class="hh-button ${className}" data-action="${action}" ${extra.includes('data-focus=') ? '' : `data-focus="${action}"`} ${extra}>${label}</button>`;
-  const roomOf = (game: GameState) => game.rooms.find(room => room.id === game.player.roomId)!;
-  const floorName = (floor: number) => floor === 0 ? 'Ground floor' : `Floor ${floor + 1}`;
-  const knownPosition = (game: GameState, position: Position) => {
-    const room = game.rooms.find(candidate => candidate.id === position.roomId);
-    return !!room?.discovered[position.y * room.width + position.x];
-  };
-
-  function cancelRoute(): void {
-    if (routeTimer !== undefined) window.clearTimeout(routeTimer);
-    routeTimer = undefined;
-    pendingRoute = [];
-    routeDestination = undefined;
+ const saved = services.load();
+ let state: GameState | undefined; let roomId = ''; let selected = ''; let mode: 'strike' | 'flare' = 'strike';
+ let modal: 'help' | 'journal' | 'new' | 'restart' | 'lethal' | 'import' | undefined; let pending: Action | undefined; let imported: GameState | undefined;
+ let worker: Worker | undefined; let busy = false; let feedback = ''; let saveStatus = ''; let returnFocus = '';
+ root.innerHTML = '<div class="hh-view"></div><div class="hh-announcement" aria-live="polite" aria-atomic="true"></div>';
+ const view = root.querySelector<HTMLElement>('.hh-view')!; const live = root.querySelector<HTMLElement>('.hh-announcement')!;
+ const button = (label: string, action: string, extra = '', cls = '') => `<button type="button" class="hh-button ${cls}" data-action="${action}" data-focus="${escape(action)}" ${extra}>${label}</button>`;
+ const pKey = (p: Position) => `${p.roomId}-${p.x}-${p.y}`;
+ function persist(): void { if (state) saveStatus = services.save(state).message; }
+ function commit(action: Action): void {
+  if (!state || busy) return;
+  const result = act(state, action); feedback = result.message;
+  if (result.lethal) { pending = action; open('lethal'); return; }
+  if (result.committed) {
+   state = result.state; roomId = state.player.roomId; persist();
+   if (action.type === 'undo') selected = '';
+   if (action.type === 'attack' && state.hauntings.find(h => h.id === action.hauntingId)?.hp === 0) selected = '';
+   if (action.type === 'use') selected = '';
   }
-
-  function persist(): void {
-    if (!state) return;
-    const result = services.save(state);
-    saveFailed = !result.ok;
-    saveStatus = result.message;
-    if (result.ok) saved = { kind: 'loaded', state };
-  }
-
-  function start(restart: boolean): void {
-    cancelRoute();
-    try {
-      state = createGame(restart && state ? state.seed : services.newSeed());
-      overlay = undefined;
-      selectedInteraction = undefined;
-      feedback = 'The house is still. Inspect what waits nearby before choosing your first ritual.';
-      announcement = `${state.objective.description} You are in ${roomOf(state).name}. Light ${state.light} of ${state.maxLight}. Ritual power ${state.ritualPower}.`;
-      persist();
-      render('board');
-    } catch (error) {
-      overlay = undefined;
-      feedback = `The house could not be prepared. ${error instanceof Error ? error.message : 'Please try again.'}`;
-      announcement = feedback;
-      render();
+  render(action.type === 'move' || action.type === 'undo' ? 'tile-' + pKey(state.player) : undefined);
+ }
+ function start(seed: string): void {
+  worker?.terminate(); modal = undefined; busy = true; feedback = 'Preparing and checking your house…'; render();
+  try {
+   worker = new HouseWorker();
+   worker.onmessage = event => {
+    if (event.data.attempt) { feedback = `Preparing and checking house · attempt ${event.data.attempt}. You can cancel while it works.`; render(); return; }
+    busy = false; worker?.terminate(); worker = undefined;
+    if (event.data.error) { feedback = event.data.error; render(); return; }
+    state = event.data.state; roomId = state!.player.roomId; selected = ''; mode = 'strike';
+    feedback = 'Begin by clicking discovered empty tiles to reveal their neighbors. Inspect spirits before committing to a fight.'; persist(); render('tile-' + pKey(state!.player));
+   };
+   worker.onerror = () => { busy = false; worker?.terminate(); worker = undefined; feedback = 'Could not prepare the house. Reload the page and try again. Your previous save is unchanged.'; render(); };
+   worker.postMessage(seed);
+  } catch { busy = false; feedback = 'This browser could not start house generation. Your previous save is unchanged.'; render(); }
+ }
+ function open(kind: NonNullable<typeof modal>): void { returnFocus = (document.activeElement as HTMLElement | null)?.dataset.focus ?? ''; modal = kind; render(); }
+ function close(): void { modal = undefined; pending = undefined; imported = undefined; render(returnFocus); }
+ function download(raw: string, name: string): void { const url = URL.createObjectURL(new Blob([raw], { type: 'application/json' })); const a = document.createElement('a'); a.href = url; a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); }
+ function roomTile(game: GameState, room: Room, x: number, y: number): string {
+  const p = { roomId: room.id, x, y }, seen = known(game, p), player = samePosition(game.player, p), tile = tileAt(room, x, y)!;
+  const h = seen ? game.hauntings.find(h => h.hp > 0 && samePosition(h.position, p)) : undefined;
+  const s = seen ? game.supplies.find(s => !s.used && samePosition(s.position, p)) : undefined;
+  const c = seen ? game.connections.find(c => c.id === tile.connectionId) : undefined;
+  let symbol = tile.kind === 'wall' ? '▧' : tile.kind === 'door' ? '∩' : tile.kind === 'stairs' ? '≋' : tile.kind === 'altar' ? '◇' : tile.kind === 'exit' ? '⇧' : '·';
+  let label = tile.kind === 'floor' ? 'Empty floor. Click to move, one turn.' : tile.kind;
+  if (h) { label = `${h.name}, ${h.hp}/${h.maxHp} health, ${h.attack} attack, ${h.xp} XP. Inspect freely.`; symbol = hauntingGlyph; }
+  if (s) { label = `${s.name}. Inspect freely.`; symbol = s.kind === 'candle' ? candleGlyph : supplyGlyphs[s.kind]; }
+  if (c) { label = `${c.kind}, ${c.opened ? 'open' : `locked: ${c.gate ? ITEMS[c.gate].name : 'closed'}`}. Inspect passage.`; }
+  const id = h ? `h:${h.id}` : s ? `s:${s.id}` : c ? `c:${c.id}` : tile.kind;
+  return `<button type="button" role="gridcell" tabindex="${player || (game.player.roomId !== room.id && seen && room.discovered.findIndex(Boolean) === y * room.width + x) ? '0' : '-1'}" class="hh-tile ${seen ? illuminated(game, p) ? 'is-lit' : 'is-memory' : 'is-dark'} ${seen ? 'is-' + tile.kind : ''} ${player ? 'is-player' : ''} ${h ? 'is-haunting' : ''} ${selected === id ? 'is-selected-target' : ''}" data-action="tile" data-room="${escape(room.id)}" data-x="${x}" data-y="${y}" data-focus="tile-${escape(pKey(p))}" aria-label="${escape(`Column ${x + 1}, row ${y + 1}. ${player ? 'You are here. ' : ''}${seen ? label : 'Unknown tile.'}`)}" title="${escape(seen ? label : 'Unknown tile')}">${player ? '<span class="hh-player">@</span>' : seen ? symbol : ''}${h ? `<small class="hh-tier">${h.boss ? '★' : h.tier}</small>` : ''}${c && !c.opened ? '<small class="hh-tier">×</small>' : ''}</button>`;
+ }
+ function resources(game: GameState): string {
+  const r = game.resources;
+  return `<section class="hh-resource-strip hh-combat-resources" aria-label="Your resources"><div><span class="hh-resource-label">Health</span><strong>${r.health}/${r.maxHealth}</strong></div><div><span class="hh-resource-label">Power</span><strong>${r.power}${r.empowered ? ' +4' : ''}</strong></div><div><span class="hh-resource-label">Light</span><strong>${r.light}/${r.maxLight}</strong></div><div><span class="hh-resource-label">Level ${r.level}</span><strong>${r.xp}/${xpNeeded(r.level)} <small>XP</small></strong></div>${button('↶ Undo turn', 'undo', game.undo.length ? '' : 'disabled', 'hh-undo')}</section>`;
+ }
+ function board(game: GameState): string {
+  const room = game.rooms.find(r => r.id === roomId) ?? game.rooms[0];
+  return `<section class="hh-room-panel"><header class="hh-room-heading"><div><p class="hh-eyebrow">${room.floor ? 'Upper floor' : 'Ground floor'} · turn ${game.turns}</p><h2>${escape(room.name)}</h2></div></header><nav class="hh-room-tabs" aria-label="Discovered rooms">${game.rooms.filter(r => r.discovered.some(Boolean)).map(r => button(`${escape(r.name)}${r.id === game.player.roomId ? ' · @' : ''}`, 'room', `data-id="${r.id}" aria-pressed="${r.id === room.id}"`, r.id === room.id ? 'is-selected' : '')).join('')}</nav><div class="hh-board-scroll"><div class="hh-board-frame" style="--hh-room-width:${room.width}"><div class="hh-board" role="grid" aria-label="${escape(room.name)}" style="--hh-columns:${room.width}">${Array.from({ length: room.height }, (_, y) => `<div role="row" class="hh-grid-row">${Array.from({ length: room.width }, (_, x) => roomTile(game, room, x, y)).join('')}</div>`).join('')}</div></div></div><p class="hh-board-caption">Click known empty floor · one turn at any distance</p><p class="hh-context-hint hh-board-help">Room tabs and inspection are free. Arrow keys browse tiles; Enter selects. WASD moves one tile. Z undoes.</p><div class="hh-controls">${button('Return to entrance · 1 turn', 'return', samePosition(game.player, game.entrance) || game.status !== 'active' ? 'disabled' : '')}${button('Leave house', 'leave', game.status !== 'active' || !objectiveReady(game) || !samePosition(game.player, game.entrance) ? 'disabled' : '', 'hh-primary')}</div></section>`;
+ }
+ function details(game: GameState): string {
+  const r = game.resources; let body = ''; let title = 'Inspect a spirit or supply';
+  if (selected.startsWith('h:')) {
+   const h = game.hauntings.find(h => h.id === selected.slice(2));
+   if (h && h.hp > 0 && known(game, h.position)) {
+    title = h.name; const p = previewAttack(game, h, mode); const melee = previewAttack(game, h, 'strike');
+    const hits = Math.ceil(h.hp / melee.damage); // Explicitly conditional; preparation and spell choices change it.
+    body = `<p>${escape(SPIRITS[h.kind].description)}</p><dl class="hh-ritual-preview"><div><dt>Health</dt><dd>${h.hp}/${h.maxHp}</dd></div><div><dt>Attack</dt><dd>${h.attack}</dd></div><div><dt>Reward</dt><dd>${h.xp} XP</dd></div></dl><p>Recovers ${h.regen} health on each turn you do something else. ${h.reward ? `Carries ${escape(ITEMS[h.reward].name)}.` : ''}</p><div class="hh-detail-buttons">${button('Strike', 'strike-mode', `aria-pressed="${mode === 'strike'}"`, mode === 'strike' ? 'is-selected' : '')}${button('Flare · 4 light', 'flare-mode', `aria-pressed="${mode === 'flare'}"`, mode === 'flare' ? 'is-selected' : '')}</div><p class="hh-consequence"><strong>Next ${mode}:</strong> deal ${p.damage}; receive ${p.incoming}.<br>You: ${r.health} → ${p.healthAfter} health.<br>Spirit: ${h.hp} → ${p.enemyAfter} health.${mode === 'flare' ? `<br>Light: ${r.light} → ${Math.max(0, r.light - p.lightCost)}.` : ''}</p>${p.lethal ? '<p class="hh-danger">This attack will kill you, even if the spirit dies too.</p>' : p.kills ? `<p>Will banish it.${r.xp + h.xp >= xpNeeded(r.level) ? ' Then you level up and fully recover.' : ''}</p>` : ''}${!r.empowered && !r.ward ? `<p class="hh-muted">Uninterrupted strikes: ${hits} hits, ${hits * h.attack} total incoming damage. Assumes no spells, healing or buffs.</p>` : ''}${button(`${mode === 'strike' ? 'Strike' : 'Cast flare'}${p.kills ? ' · finishing hit' : ''}`, 'attack', !p.affordable || game.status !== 'active' ? 'disabled' : '', 'hh-primary')}`;
+   }
+  } else if (selected.startsWith('s:')) {
+   const x = game.supplies.find(s => s.id === selected.slice(2));
+   if (x && !x.used && known(game, x.position)) {
+    title = x.name;
+    if (x.kind === 'food' || x.kind === 'candle') { const p = supplyPreview(game, x); body = `<p>Restore ${p.received} ${x.kind === 'food' ? 'health' : 'light'}; <strong>${p.wasted} wasted</strong>. One use. Clears the tile and reveals its neighbors.</p><p class="hh-consequence">After use: ${p.total}/${x.kind === 'food' ? r.maxHealth : r.maxLight}. Wounded spirits regenerate this turn.</p>`; }
+    else body = `<p>${escape(x.item ? `Contains ${ITEMS[x.item].name}. Reusable; never consumed by a lock.` : x.kind === 'power' ? `Gain ${x.amount} permanent power.` : x.kind === 'tonic' ? 'Collect a pocket tonic. Drink it later to restore half your maximum health.' : x.kind === 'oil' ? 'Collect consecrated oil. Prepare it later for +4 damage on one attack.' : x.kind === 'treasure' ? `Collect ${x.amount} optional treasure.` : x.text ?? '')}</p>`;
+    body += button(x.kind === 'food' ? 'Eat now · 1 turn' : x.kind === 'candle' ? 'Use candle · 1 turn' : 'Collect · 1 turn', 'use', game.status !== 'active' ? 'disabled' : '', 'hh-primary');
+   }
+  } else if (selected.startsWith('c:')) {
+   const c = game.connections.find(c => c.id === selected.slice(2));
+   if (c) {
+    const from = [c.a, c.b].find(p => p.roomId === roomId && known(game, p)) ?? [c.a, c.b].find(p => known(game, p));
+    if (from) {
+     const to = samePosition(from, c.a) ? c.b : c.a; title = c.kind === 'stairs' ? 'Staircase' : 'Doorway';
+     body = `<p>${c.opened ? `Open. Leads to the ${escape(game.rooms.find(r => r.id === to.roomId)!.name)}.` : `Requires ${escape(c.gate ? ITEMS[c.gate].name : 'opening')}. ${c.gate && game.inventory.includes(c.gate) ? 'You have it.' : 'Check your journal for its last known location.'}`}</p>${button(c.opened ? 'Travel through · 1 turn' : 'Unlock · 1 turn', c.opened ? 'travel' : 'unlock', game.status !== 'active' || (!c.opened && c.gate && !game.inventory.includes(c.gate)) ? 'disabled' : '', 'hh-primary')}${c.opened && !samePosition(game.player, from) ? button('Stand in this doorway · 1 turn', 'stand', game.status !== 'active' ? 'disabled' : '') : ''}`;
     }
+   }
+  } else if (selected === 'altar') { title = 'Memorial'; body = `<p>Return the silver locket to its owner, then leave through the entrance. Placing it costs one turn and no resources.</p>${button(game.objective.completed ? 'Locket placed' : 'Place locket · 1 turn', 'settle', !game.inventory.includes('keepsake') || game.objective.completed || game.status !== 'active' ? 'disabled' : '', 'hh-primary')}`; }
+  else if (selected === 'exit') { title = 'Front door'; body = `<p>${escape(game.objective.description)}</p><p>${objectiveReady(game) ? 'Your objective is ready. Return here and leave.' : 'Your task is still unfinished.'}</p>`; }
+  return `<section class="hh-action-detail" aria-label="Inspection"><p class="hh-eyebrow">Inspection costs no turns</p><h3>${escape(title)}</h3>${body || '<p>Explore available empty tiles, then compare health, attack, experience and supplies. Nothing moves while you think.</p>'}</section>`;
+ }
+ function pocket(game: GameState): string {
+  const r = game.resources, off = game.status !== 'active';
+  return `<section class="hh-inventory"><h2 class="hh-eyebrow">In your pockets</h2><div class="hh-action-options">${button(`Tonic ×${r.tonics} · heal ${Math.min(r.maxHealth - r.health, Math.ceil(r.maxHealth / 2))}`, 'tonic', off || !r.tonics || r.health === r.maxHealth ? 'disabled' : '')}${button(`Oil ×${r.oils} · ${r.empowered ? 'prepared' : '+4 next hit'}`, 'oil', off || !r.oils || r.empowered ? 'disabled' : '')}${button(r.ward ? 'Ward prepared' : 'Ward · 3 light', 'ward', off || r.ward || r.light < TUNING.wardCost ? 'disabled' : '')}</div><p class="hh-pocket-note">Each use takes one turn. Ward halves your next strike’s incoming damage. Oil boosts your next attack.</p><ul class="hh-items">${game.inventory.map(id => `<li>${ITEMS[id].symbol} ${escape(ITEMS[id].name)}</li>`).join('')}</ul><p class="hh-treasure">${r.treasure} optional treasure</p></section>`;
+ }
+ function comparison(game: GameState): string {
+  const spirits = game.hauntings.filter(h => h.hp > 0 && known(game, h.position));
+  return `<section class="hh-known"><h2>Known spirits</h2><p class="hh-muted">Compare freely across the house. Select one to inspect or act.</p><div class="hh-table-scroll"><table><thead><tr><th>Spirit</th><th>HP</th><th>Hit</th><th>XP</th></tr></thead><tbody>${spirits.map(h => `<tr><td>${button(escape(h.name), 'inspect', `data-id="h:${h.id}"`, 'hh-quiet')}</td><td>${h.hp}/${h.maxHp}</td><td>${h.attack}</td><td>${h.xp}</td></tr>`).join('')}</tbody></table></div>${spirits.length ? '' : '<p class="hh-muted">No living spirits discovered yet.</p>'}</section>`;
+ }
+ function menu(): string {
+  return `<main class="hh-menu"><div class="hh-menu-art">${mansion}</div><p class="hh-eyebrow">A quiet house. A finite chance.</p><h1>Haunted<br><em>House</em></h1><p class="hh-menu-copy">Uncover its rooms. Weigh each encounter.<br>Spend your strength carefully and find your way out.</p><div class="hh-menu-buttons">${saved.kind === 'loaded' ? button('Continue saved house', 'continue', '', 'hh-primary') : ''}${button('Enter a new house', 'new', '', saved.kind === 'loaded' ? '' : 'hh-primary')}${button('Import a save', 'choose-import')}</div>${saved.kind === 'error' ? `<p class="hh-storage-warning">${escape(saved.message)}</p>${saved.raw ? button('Download unreadable save', 'download-unreadable') : ''}` : ''}${saved.archives.length ? '<p class="hh-menu-saved">Earlier-rule saves are preserved. Start a new house for combat and discovery rules.</p>' + saved.archives.map((a, i) => button(`Download ${escape(a.key.endsWith('v2') ? 'v2' : 'v1')} save`, 'archive', `data-index="${i}"`)).join('') : ''}<p class="hh-menu-footnote">Deterministic combat · one turn per action · autosave · full-run undo</p></main>`;
+ }
+ function gameView(game: GameState): string {
+  return `<main class="hh-main"><header class="hh-game-title"><div><p class="hh-eyebrow">Explore. Calculate. Commit.</p><h1>Haunted House</h1></div><div class="hh-run-controls">${button('Restart seed', 'restart', '', 'hh-quiet')}${button('New house', 'new', '', 'hh-quiet')}${button('Export save', 'export', '', 'hh-quiet')}</div></header>${resources(game)}<section class="hh-objective"><span class="hh-objective-mark">◇</span><div><p class="hh-eyebrow">${escape(game.objective.title)}</p><p>${escape(game.objective.description)}</p></div></section>${game.status !== 'active' ? `<section class="hh-ending"><h2>${game.status === 'won' ? 'Morning, at last.' : 'The house keeps you.'}</h2><p>${game.status === 'won' ? `Escaped in ${game.turns} turns with ${game.resources.treasure} treasure.` : 'Your health reached zero. Undo the fatal turn, restart this seed, or try another house.'}</p></section>` : ''}<p class="hh-feedback" role="status">${escape(feedback)}</p><div class="hh-game-layout"><div class="hh-exploration">${board(game)}${comparison(game)}</div><aside class="hh-sidebar">${details(game)}${pocket(game)}${button('Journal and remembered supplies', 'journal')}</aside></div><section class="hh-events"><div class="hh-section-heading"><h2>Recent turns</h2><span class="hh-save-status">${escape(saveStatus)}</span></div><ol>${game.log.map(line => `<li>${escape(line)}</li>`).join('')}</ol><p class="hh-seed">Seed: ${escape(game.seed)} · house ${game.variant + 1}</p></section></main>`;
+ }
+ function dialog(): string {
+  if (!modal) return '';
+  let title = ''; let body = '';
+  if (modal === 'help') { title = 'How the house works'; body = `<ol class="hh-rules">${RULES.map(r => `<li>${escape(r)}</li>`).join('')}</ol><p>Legend: @ you · ghost + number: spirit and tier · ♨ food · ♧ candle · ♙ tonic · ◈ oil · ✦ power · ▣ key chest · ∩ doorway · ≋ stairs · ◇ memorial or treasure · ⇧ entrance.</p>`; }
+  if (modal === 'journal') { title = 'Your journal'; body = state ? `<ul class="hh-journal-notes">${state.journal.map(n => `<li>${escape(n)}</li>`).join('')}</ul><div class="hh-journal-targets">${state.supplies.filter(s => !s.used && known(state!, s.position)).map(s => button(`${escape(s.name)} · ${escape(state!.rooms.find(r => r.id === s.position.roomId)!.name)}`, 'inspect', `data-id="s:${s.id}"`)).join('')}</div><p class="hh-seed">${escape(state.seed)}</p>` : '<p>Your notes will appear here after entering a house.</p>'; }
+  if (modal === 'new' || modal === 'restart') { title = modal === 'restart' ? 'Restart this house?' : 'Enter a new house?'; body = `<p>${modal === 'restart' ? 'The same layout and ingredients will return, with all your progress reset.' : 'A new house will replace your current combat save. Older-rule saves remain preserved.'}</p>${state ? button('Export current save first', 'export') : saved.kind === 'error' && saved.raw ? button('Download unreadable save first', 'download-unreadable') : saved.kind === 'loaded' ? button('Export saved house first', 'export-saved') : ''}${modal === 'new' ? '<label class="hh-seed-input">Seed (optional)<input id="hh-seed" maxlength="100" autocomplete="off" placeholder="Leave blank for a new house"></label>' : ''}${button('Enter house', 'confirm-start', '', 'hh-primary')}`; }
+  if (modal === 'lethal') { title = 'This will kill you'; body = `<p class="hh-danger">${escape(feedback)}</p><p>Strikes resolve together. Killing the spirit or earning a level will not prevent this death. Cancelling costs no turn.</p>${button('Attack anyway', 'confirm-lethal')}`; }
+  if (modal === 'import') { title = 'Replace current house?'; body = `<p>Import seed ${escape(imported?.seed)} at turn ${imported?.turns}. This replaces the current combat save.</p>${state ? button('Export current save first', 'export') : ''}${button('Import this house', 'confirm-import', '', 'hh-primary')}`; }
+  return `<dialog class="hh-dialog" aria-labelledby="hh-dialog-title"><header><h2 id="hh-dialog-title">${title}</h2>${button('Close', 'close-dialog')}</header><div class="hh-dialog-content">${body}</div><footer>${button(modal === 'lethal' ? 'Cancel attack' : 'Close', 'close-dialog')}</footer></dialog>`;
+ }
+ function render(focus?: string): void {
+  const oldFocus = focus ?? (document.activeElement as HTMLElement | null)?.dataset.focus;
+  view.innerHTML = `<div class="hh-shell"><header class="hh-topbar"><a class="hh-home" href="./index.html">← Minigames</a><span class="hh-topbar-brand">Haunted House</span><nav>${button('Rules', 'help', '', 'hh-nav-button')}${button('Journal', 'journal', '', 'hh-nav-button')}</nav></header>${busy ? `<main class="hh-menu"><div class="hh-menu-art">${mansion}</div><h2>Opening the house</h2><p class="hh-menu-copy" role="status">${escape(feedback)}</p>${button('Cancel generation', 'cancel-generation')}</main>` : state ? gameView(state) : menu()}${!state && !busy && feedback ? `<p class="hh-menu-feedback" role="status">${escape(feedback)}</p>` : ''}${!busy ? dialog() : ''}<input id="hh-import" type="file" accept="application/json,.json" hidden></div>`;
+  live.textContent = feedback;
+  const d = view.querySelector<HTMLDialogElement>('dialog');
+  if (d) { d.showModal(); d.addEventListener('cancel', event => { event.preventDefault(); close(); }); d.querySelector<HTMLButtonElement>('[data-action="close-dialog"]')?.focus(); }
+  else if (oldFocus) Array.from(view.querySelectorAll<HTMLElement>('[data-focus]')).find(e => e.dataset.focus === oldFocus)?.focus({ preventScroll: true });
+ }
+ root.addEventListener('click', event => {
+  const b = (event.target as HTMLElement).closest<HTMLButtonElement>('button[data-action]'); if (!b || b.disabled) return;
+  const action = b.dataset.action!;
+  if (busy) { if (action === 'cancel-generation') { worker?.terminate(); worker = undefined; busy = false; feedback = 'Generation cancelled. Your previous save is unchanged.'; render(); } return; }
+  if (action === 'help' || action === 'journal' || action === 'new' || action === 'restart') { open(action); return; }
+  if (action === 'close-dialog') { close(); return; }
+  if (action === 'confirm-start') { const seed = modal === 'restart' && state ? state.seed : view.querySelector<HTMLInputElement>('#hh-seed')?.value.trim() || services.newSeed(); start(seed); return; }
+  if (action === 'confirm-lethal' && pending?.type === 'attack') { const a = { ...pending, acceptDeath: true }; modal = undefined; pending = undefined; commit(a); return; }
+  if (action === 'continue' && saved.kind === 'loaded') { state = saved.state; roomId = state.player.roomId; saveStatus = `Loaded · turn ${state.turns}`; feedback = 'Your exact position, resources and discovery have been restored.'; render(); return; }
+  if (action === 'export' && state) { download(JSON.stringify(state), `haunted-house-${state.seed.replace(/[^a-zA-Z0-9_-]/g, '_')}.json`); return; }
+  if (action === 'export-saved' && saved.kind === 'loaded') { download(JSON.stringify(saved.state), 'haunted-house-saved.json'); return; }
+  if (action === 'archive') { const a = saved.archives[Number(b.dataset.index)]; if (a) download(a.raw, `${a.key}.json`); return; }
+  if (action === 'download-unreadable' && saved.kind === 'error' && saved.raw) { download(saved.raw, 'haunted-house-unreadable.json'); return; }
+  if (action === 'choose-import') { view.querySelector<HTMLInputElement>('#hh-import')?.click(); return; }
+  if (action === 'confirm-import' && imported) { state = imported; roomId = state.player.roomId; selected = ''; imported = undefined; modal = undefined; feedback = 'Save imported.'; persist(); render(); return; }
+  if (!state) return;
+  if (action === 'inspect') { selected = b.dataset.id!; modal = undefined; render(); view.querySelector('.hh-action-detail')?.scrollIntoView({ block: 'nearest' }); return; }
+  if (modal) return;
+  if (action === 'undo') { commit({ type: 'undo' }); return; }
+  if (action === 'room') { roomId = b.dataset.id!; selected = ''; render(); return; }
+  if (action === 'strike-mode' || action === 'flare-mode') { mode = action === 'strike-mode' ? 'strike' : 'flare'; render(); return; }
+  if (action === 'tile') {
+   const p = { roomId: b.dataset.room!, x: Number(b.dataset.x), y: Number(b.dataset.y) };
+   if (!known(state, p)) { feedback = 'Unknown tiles cannot be selected. Move to discovered empty floor to expand the edge of discovery.'; render(); return; }
+   const h = state.hauntings.find(h => h.hp > 0 && samePosition(h.position, p)), s = state.supplies.find(s => !s.used && samePosition(s.position, p));
+   const tile = tileAt(state.rooms.find(r => r.id === p.roomId)!, p.x, p.y)!;
+   if (h || s || tile.connectionId || tile.kind === 'altar' || (tile.kind === 'exit' && samePosition(state.player, p))) {
+    selected = h ? `h:${h.id}` : s ? `s:${s.id}` : tile.connectionId ? `c:${tile.connectionId}` : tile.kind; render();
+    if (window.matchMedia('(max-width: 680px)').matches) view.querySelector('.hh-action-detail')?.scrollIntoView({ block: 'nearest' });
+   } else if (traversable(state, p)) { selected = ''; commit({ type: 'move', to: p }); }
+   return;
   }
-
-  function requestStart(kind: 'new' | 'restart'): void {
-    cancelRoute();
-    if (state?.status === 'active' || saved.kind === 'error' || (!state && saved.kind === 'loaded' && saved.state.status === 'active')) openOverlay(kind);
-    else start(kind === 'restart');
-  }
-
-  function commit(action: Action): void {
-    cancelRoute();
-    if (!state || (state.status !== 'active' && action.type !== 'undo')) return;
-    const result = act(state, action);
-    state = result.state;
-    feedback = result.message;
-    announcement = `${feedback}${result.consequential || action.type === 'undo' ? ` Light ${state.light} of ${state.maxLight}. Ritual power ${state.ritualPower}.` : ''}`;
-    if (action.type === 'undo') selectedInteraction = undefined;
-    if (result.committed) persist();
-    render(action.type === 'undo' ? 'board' : undefined);
-  }
-
-  function walkTo(position: Position, approach = false): void {
-    cancelRoute();
-    if (!state || state.status !== 'active' || overlay) return;
-    const route = planRoute(state, position, approach);
-    if (route === null) {
-      feedback = 'No known clear route reaches that position. Explore nearby or open a passage first.';
-      announcement = feedback;
-      render();
-      return;
-    }
-    if (!route.length) {
-      feedback = approach ? 'You are within reach. Choose the action when you are ready.' : 'You are already here.';
-      announcement = feedback;
-      render();
-      return;
-    }
-    pendingRoute = route;
-    routeDestination = position;
-    feedback = approach ? 'Walking within reach. The action remains yours to choose.' : 'Walking through known, clear space.';
-    render();
-    routeTimer = window.setTimeout(walkStep, TUNING.routeStepMs);
-  }
-
-  function walkStep(): void {
-    routeTimer = undefined;
-    if (!state || overlay || state.status !== 'active' || !pendingRoute.length) { cancelRoute(); return; }
-    const previousRoom = state.player.roomId;
-    const result = act(state, pendingRoute.shift()!);
-    state = result.state;
-    if (result.committed) persist();
-    const stopped = !result.committed || result.discoveredChoice || state.player.roomId !== previousRoom || !pendingRoute.length;
-    if (stopped) {
-      cancelRoute();
-      feedback = result.discoveredChoice ? 'Something new is within sight. Inspect it before continuing.' : result.message;
-      announcement = feedback;
-    }
-    render();
-    if (!stopped) routeTimer = window.setTimeout(walkStep, TUNING.routeStepMs);
-  }
-
-  function openOverlay(kind: Overlay): void {
-    cancelRoute();
-    returnFocus = (document.activeElement as HTMLElement | null)?.dataset.focus ?? '';
-    overlay = kind;
-    render();
-  }
-
-  function closeOverlay(): void {
-    overlay = undefined;
-    render(returnFocus);
-  }
-
-  function selectInteraction(id: string): void {
-    cancelRoute();
-    selectedInteraction = id;
-    overlay = undefined;
-    render(`interaction-${id}`);
-    if (window.matchMedia('(max-width: 680px)').matches) root.querySelector('.hh-action-detail')?.scrollIntoView({ block: 'nearest' });
-  }
-
-  function visibleTile(game: GameState, room: Room, x: number, y: number, selectedPosition?: Position): string {
-    const known = room.discovered[y * room.width + x];
-    const lit = illuminated(game, x, y);
-    const position = { roomId: room.id, x, y };
-    const player = samePosition(game.player, position);
-    const tile = tileAt(room, x, y)!;
-    const container = known && tile.containerId ? room.containers.find(item => item.id === tile.containerId) : undefined;
-    const connection = known && tile.connectionId ? game.connections.find(item => item.id === tile.connectionId) : undefined;
-    const haunting = known ? game.hauntings.find(item => !item.banished && samePosition(item.position, position)) : undefined;
-    const candle = known ? game.candles.find(item => samePosition(item.position, position)) : undefined;
-    let name = known ? tile.label ?? tile.kind : 'Unexplored darkness';
-    if (container) name = `${container.label}, ${container.opened ? 'searched' : 'unsearched'}`;
-    if (connection) name = `${tile.kind === 'stairs' ? 'Staircase' : 'Doorway'}, ${connection.opened || !connection.gate ? 'open' : `requires ${ITEMS[connection.gate].name}`}`;
-    if (haunting) name = haunting.resolution === 'keepsake'
-      ? `${haunting.name}, bound soul. Release at the memorial with the silver locket. Select to inspect`
-      : `${haunting.name}, stationary haunting. Resistance ${haunting.resistance}. Banish for ${banishCost(game, haunting)} light. Select to inspect`;
-    if (candle) name = `${candle.name}, ${candle.used ? 'used' : `restores ${candle.restores} light once`}. Select to inspect`;
-    const label = `Column ${x + 1}, row ${y + 1}. ${player ? 'You are here. ' : ''}${name}.${known ? lit ? ' In sight.' : ' Remembered.' : ''}`;
-    const mark = haunting ? hauntingGlyph : candle ? candle.used ? '<span aria-hidden="true">♙</span>' : candleGlyph : `<span aria-hidden="true">${container?.opened ? '□' : symbols[tile.kind]}</span>`;
-    const symbol = player ? '<span class="hh-player" aria-hidden="true">@</span>' : known ? mark : '<span aria-hidden="true">&nbsp;</span>';
-    return `<button type="button" role="gridcell" tabindex="${player ? '0' : '-1'}" class="hh-tile ${known ? lit ? 'is-lit' : 'is-memory' : 'is-dark'} ${known ? `is-${tile.kind}` : ''} ${player ? 'is-player' : ''} ${haunting ? 'is-haunting' : ''} ${candle?.used ? 'is-used' : ''} ${selectedPosition && samePosition(selectedPosition, position) ? 'is-selected-target' : ''} ${routeDestination && samePosition(routeDestination, position) ? 'is-destination' : ''}" data-action="tile" data-x="${x}" data-y="${y}" data-focus="${player ? 'board' : `tile-${x}-${y}`}" aria-label="${escape(label)}" title="${escape(label)}">${symbol}${connection?.gate && !connection.opened ? '<span class="hh-gate-mark" aria-hidden="true">×</span>' : ''}</button>`;
-  }
-
-  function resources(game: GameState): string {
-    return `<section class="hh-resource-strip" aria-label="Ritual resources"><div class="hh-light-resource"><span class="hh-resource-icon">${candleGlyph}</span><div><span class="hh-resource-label">Light</span><strong class="hh-light-value">${game.light}<span> / ${game.maxLight}</span></strong></div><span class="hh-light-pips" aria-hidden="true">${Array.from({ length: game.maxLight }, (_, index) => `<i class="${index < game.light ? 'is-full' : ''}"></i>`).join('')}</span></div><div class="hh-power-resource"><span class="hh-resource-label">Ritual power</span><strong class="hh-power-value">${game.ritualPower}</strong></div>${button('↶ <span>Undo last decision</span>', 'undo', `title="Restore the complete state before your last decision, including movement and exploration since then." ${!game.undo.length ? 'disabled' : ''}`, 'hh-undo')}</section>`;
-  }
-
-  function board(game: GameState): string {
-    const room = roomOf(game);
-    const selectedPosition = interactions(game).find(item => item.id === selectedInteraction)?.position;
-    return `<section class="hh-room-panel" aria-labelledby="hh-room-title"><header class="hh-room-heading"><div><p class="hh-eyebrow">${floorName(room.floor)}</p><h2 id="hh-room-title">${escape(room.name)}</h2></div><span class="hh-room-number" title="Current position">${String(game.player.x + 1).padStart(2, '0')} / ${String(game.player.y + 1).padStart(2, '0')}</span></header><div class="hh-board-frame" style="--hh-room-width:${room.width}"><div class="hh-board" role="grid" aria-label="${escape(room.name)} room map" style="--hh-columns:${room.width}">${Array.from({ length: room.height }, (_, y) => `<div role="row" class="hh-grid-row">${Array.from({ length: room.width }, (_, x) => visibleTile(game, room, x, y, selectedPosition)).join('')}</div>`).join('')}</div></div><div class="hh-board-caption"><span><i class="hh-light-swatch"></i> In sight</span><span><i class="hh-memory-swatch"></i> Remembered</span><span><i class="hh-dark-swatch"></i> Unknown</span></div><div class="hh-controls"><div class="hh-dpad" aria-label="Movement controls">${(['north', 'west', 'south', 'east'] as Direction[]).map(direction => button(arrows[direction], `direction-${direction}`, `aria-label="Move ${direction}" ${game.status !== 'active' ? 'disabled' : ''}`, `hh-direction hh-${direction}`)).join('')}</div><div class="hh-control-actions">${pendingRoute.length ? button('Stop walking', 'cancel-route', '', 'hh-route-stop') : '<span class="hh-walking-note">Walking is free.</span>'}<span class="hh-key-hint">Arrow keys / WASD to step</span><span class="hh-key-hint">Click a known floor to walk</span><span class="hh-key-hint">Esc cancels a route</span></div></div></section>`;
-  }
-
-  function inventory(game: GameState): string {
-    return `<section class="hh-inventory" aria-labelledby="hh-inventory-title"><p class="hh-eyebrow" id="hh-inventory-title">In your pockets</p>${game.inventory.length ? `<ul class="hh-items">${game.inventory.map(id => `<li title="${escape(ITEMS[id].description)}"><span aria-hidden="true">${ITEMS[id].symbol}</span>${escape(ITEMS[id].name)}${id === 'keepsake' && game.objective.completed ? ' · placed' : ''}</li>`).join('')}</ul>` : '<p class="hh-empty-inventory">No keys or tools. Yet.</p>'}<p class="hh-pocket-note">Keys and the crowbar are reusable.</p><p class="hh-treasure">${game.treasure} curious treasure${game.treasure === 1 ? '' : 's'} collected</p></section>`;
-  }
-
-  function interactionDetail(game: GameState, item: Interaction): string {
-    const action = item.action;
-    const room = game.rooms.find(candidate => candidate.id === item.position.roomId)!;
-    const haunting = action.type === 'banish' ? game.hauntings.find(candidate => candidate.id === action.hauntingId) : undefined;
-    const candle = action.type === 'refill' ? game.candles.find(candidate => candidate.id === action.candleId) : undefined;
-    let preview = '';
-    let actionLabel = item.label;
-    if (haunting?.resolution === 'keepsake') {
-      preview = `<p>${item.resolved ? 'The locket has returned to its owner. This tile is now clear.' : 'This soul is bound to the silver locket. Bring it to the memorial to release its owner.'}</p><p class="hh-consequence">${item.resolved ? 'Its haunting is settled.' : `Memorial ritual: ${game.objective.ritualCost} light. Force cannot release this soul.`}</p>`;
-      actionLabel = 'Resolve at the memorial';
-    } else if (haunting) {
-      const cost = banishCost(game, haunting);
-      preview = `<dl class="hh-ritual-preview"><div><dt>Resistance</dt><dd>${haunting.resistance}</dd></div><div><dt>Your power</dt><dd>${game.ritualPower}</dd></div><div><dt>Light cost</dt><dd>${cost}</dd></div></dl><p class="hh-reward"><strong>Reward:</strong> ${escape(rewardText(haunting.reward))}</p><p>${escape(haunting.benefit)}</p>${haunting.requires ? `<p class="hh-requirement">Requires ${escape(ITEMS[haunting.requires].name)}${game.inventory.includes(haunting.requires) ? ' · carried' : ' · not yet found'}.</p>` : ''}${!item.resolved ? `<p class="hh-consequence">${game.light >= cost ? `Light after banishment: ${game.light - cost} / ${game.maxLight}.` : `Needs ${cost} light; you have ${game.light}. ${cost > game.maxLight ? 'Increase ritual power to bring its cost within your capacity.' : 'A candle or more ritual power could help.'}`}</p>` : ''}`;
-      actionLabel = `Banish · ${cost} light`;
-    } else if (candle) {
-      const refill = refillPreview(game, candle);
-      preview = `<p class="hh-refill-preview">Restore <strong>${candle.restores} light</strong>. ${candle.used ? 'This candle has already been used.' : `You would receive <strong>${refill.received}</strong>; <strong>${refill.wasted}</strong> would be wasted.`}</p>${!candle.used ? `<p class="hh-consequence">Light after use: ${refill.total} / ${game.maxLight}. One use only.</p>` : ''}`;
-      actionLabel = `Use candle · receive ${refill.received} light`;
-    }
-    const travel = action.type === 'travel';
-    const canApproach = (!item.adjacent || travel) && item.position.roomId === game.player.roomId && planRoute(game, item.position, !travel) !== null;
-    const details = preview ? item.resolved && !candle && !haunting?.resolution ? item.detail : '' : item.detail;
-    return `<div class="hh-action-detail" id="hh-selected-detail"><p class="hh-eyebrow">${item.resolved ? 'Resolved' : item.adjacent ? 'Within reach' : 'Remembered'} · ${escape(room.name)}</p><h3 id="hh-selected-title">${escape(item.name)}</h3>${preview}${details ? `<p class="hh-detail-description">${escape(details)}</p>` : ''}${!item.adjacent && !item.resolved ? `<p class="hh-muted">${canApproach ? 'Move within reach to act.' : room.id === game.player.roomId ? 'No known clear approach yet. Explore or open a route.' : `Return to ${escape(room.name)} to act.`}</p>` : ''}${game.status === 'active' && !item.resolved ? `<div class="hh-detail-buttons">${canApproach ? button(travel ? 'Walk through passage' : 'Walk within reach', 'approach') : ''}${!travel || !canApproach ? button(escape(actionLabel), 'commit-interaction', `data-kind="${action.type}" ${!item.available ? 'disabled' : ''}`, 'hh-primary') : ''}</div>` : ''}<div class="hh-detail-dismiss">${button('Close inspection', 'cancel-action', '', 'hh-quiet')}</div></div>`;
-  }
-
-  function actions(game: GameState): string {
-    const discovered = interactions(game);
-    const selected = discovered.find(item => item.id === selectedInteraction);
-    const local = discovered.filter(item => item.position.roomId === game.player.roomId && !item.resolved);
-    return `<section class="hh-interactions" aria-labelledby="hh-actions-title"><div class="hh-section-heading"><h2 id="hh-actions-title">In this room</h2><span>Inspect freely</span></div><div class="hh-action-options">${local.map(item => button(`${item.action.type === 'banish' ? '<span class="hh-option-glyph">!</span> ' : ''}${escape(item.name)}`, 'select-interaction', `data-id="${escape(item.id)}" data-focus="interaction-${escape(item.id)}" aria-pressed="${selected?.id === item.id}"`, selected?.id === item.id ? 'is-selected' : '')).join('')}</div>${selected ? interactionDetail(game, selected) : `<p class="hh-context-hint">${local.length ? 'Choose a marked spirit, candle, or object to see its exact cost and benefit.' : 'A quiet corner. Explore the edges, or revisit a known lead in your journal.'}</p>`}${game.light === 0 && game.status === 'active' ? '<p class="hh-zero-note">No light remains. You can still explore, inspect, reach an unused candle, or undo a decision.</p>' : ''}</section>`;
-  }
-
-  function leads(game: GameState): string {
-    const discovered = interactions(game);
-    const blocked = discovered.filter(item => !item.resolved && item.action.type === 'unlock');
-    return `<section class="hh-journal-prompt"><div class="hh-section-heading"><h2>The house so far</h2><span aria-hidden="true">⌑</span></div><p>${game.rooms.filter(room => room.visited).length} rooms visited. ${discovered.filter(item => !item.resolved && item.action.type === 'banish').length} known hauntings.</p>${game.journal.length ? `<p class="hh-latest-lead">${escape(game.journal[game.journal.length - 1])}</p>` : '<p>What you discover stays in your journal.</p>'}${blocked.length ? `<ul class="hh-blocked-leads">${blocked.slice(0, 3).map(item => `<li>${button(escape(item.name), 'select-interaction', `data-id="${escape(item.id)}" data-focus="lead-${escape(item.id)}"`, 'hh-lead-button')}</li>`).join('')}</ul>` : ''}${button('Open your journal <span aria-hidden="true">→</span>', 'journal')}</section>`;
-  }
-
-  function journal(game: GameState): string {
-    const discovered = interactions(game);
-    return `<p class="hh-dialog-intro">A record of what you have seen. Inspect any remembered presence or object; its location and state persist.</p>${game.journal.length ? `<ul class="hh-journal-notes">${game.journal.map(note => `<li>${escape(note)}</li>`).join('')}</ul>` : ''}<div class="hh-journal">${game.rooms.filter(room => room.visited).map(room => {
-      const local = discovered.filter(item => item.position.roomId === room.id);
-      const links = game.connections.filter(connection => [connection.a, connection.b].some(endpoint => endpoint.roomId === room.id && knownPosition(game, endpoint)));
-      return `<section class="hh-journal-room"><div class="hh-section-heading"><h3>${escape(room.name)} ${room.id === game.player.roomId ? '<span class="hh-here">YOU</span>' : ''}</h3><span>${floorName(room.floor)}</span></div>${links.length ? `<ul>${links.map(connection => {
-        const other = connection.a.roomId === room.id ? connection.b : connection.a;
-        const destination = game.rooms.find(candidate => candidate.id === other.roomId)!;
-        return `<li><span aria-hidden="true">${connection.kind === 'stairs' ? '≋' : '∩'}</span><div><strong>${destination.visited ? escape(destination.name) : 'Unvisited room'}</strong><small>${connection.kind === 'stairs' ? 'Staircase' : 'Doorway'} · ${connection.opened || !connection.gate ? 'open' : `requires ${escape(ITEMS[connection.gate].name)}`}</small></div></li>`;
-      }).join('')}</ul>` : ''}${local.length ? `<div class="hh-journal-targets">${local.map(item => button(`${item.resolved ? '✓ ' : ''}${escape(item.name)}`, 'select-interaction', `data-id="${escape(item.id)}" data-focus="journal-${escape(item.id)}"`, 'hh-journal-target')).join('')}</div>` : '<p class="hh-muted">No objects recorded here.</p>'}</section>`;
-    }).join('')}</div><p class="hh-rule-note">Undo restores the complete state before a decision, including your position and everything explored since that snapshot. It never changes the house or rerolls its contents.</p>${legacyRaw !== undefined ? button('Download earlier-rules save', 'download-legacy', '', 'hh-quiet') : ''}<p class="hh-seed">House seed: <code>${escape(game.seed)}</code></p>`;
-  }
-
-  function help(): string {
-    return `<p class="hh-dialog-intro">Discover what the house offers. Spend your light where it opens the possibilities you need, then complete your errand and return home.</p><ol class="hh-rules"><li><strong>Explore without a clock.</strong> Arrow keys, WASD, or the touch controls move one tile. Click a revealed floor to walk there through known, clear space. A route stops when a new choice appears. Click another destination to replace it, or press Escape to stop. Walking uses no light.</li><li><strong>Inspect before committing.</strong> Click a marked haunting, candle, or object to learn its cost, reward, and requirements. Inspection is free, including remembered objects in your journal. Use “Walk within reach” to approach it. Movement never triggers a ritual or consumes a candle.</li><li><strong>Hauntings hold their ground.</strong> A haunting blocks its tile until banished. It cannot pursue or hurt you. Stand directly beside it and choose “Banish” to spend the displayed light and receive its reward. Nothing is spent if you cannot afford the action.</li><li><strong>Power lasts; light is spent.</strong> A banishment costs resistance minus ritual power, with a minimum of 1 light. Selected rewards permanently increase power for this adventure. Costs update immediately. Your light capacity stays at ${TUNING.maxLight}.</li><li><strong>Save a candle for the right moment.</strong> Each candle restores its stated amount once, only when you choose to use it. The preview shows what you receive and what would overflow your capacity. Light does not return through walking, revisiting, or reloading.</li><li><strong>Rewards change your options.</strong> A more expensive haunting may open access to replenishment, a tool, or a stronger ritual. You can leave optional treasure and hauntings behind. Search objects deliberately. Named keys and the crowbar are reusable; unlock a gate explicitly, then walk through the open passage or stairs.</li><li><strong>Find your way home.</strong> Follow the objective shown above the map. Escaping needs the front-door key. A missing diary must be brought back. A keepsake must be placed at its memorial to resolve its owner's haunting before you leave. The memorial shows any ritual cost.</li><li><strong>Reconsider a decision.</strong> “Undo last decision” restores the complete state before a banishment, candle, collection, unlock, or objective action. Movement and exploration since then are also restored. Up to ${TUNING.undoLimit} decisions are kept, including after closing the page. Contents never reroll. Zero light does not end the adventure: explore safely, look for a reachable candle, or undo.</li></ol><p class="hh-rule-note">The map stays visible even at zero light. Bright tiles are in sight; hatched tiles are remembered. Autosave records committed changes and undo; the footer reports any failure. “Restart” resets this same house. “New house” replaces the current adventure with a different one.</p>`;
-  }
-
-  function legend(): string {
-    const entries = [['@', 'You', 'Your current tile.'], ['·', 'Floor', 'Click a known, reachable tile to walk there.'], [hauntingGlyph, 'Haunting', 'Stationary. Blocks its tile. Inspect its exact cost, requirement, and reward.'], [candleGlyph, 'Candle', 'A finite refill. Inspect the restoration and overflow; choose when to use it.'], ['♙', 'Used candle', 'Its light has already been received.'], ['▧', 'Wall', 'Impassable.'], ['▥', 'Furniture', 'A solid furnishing that shapes the room.'], ['▣', 'Searchable object', 'Stand beside it, inspect, then collect its contents deliberately.'], ['□', 'Searched object', 'Its contents remain collected.'], ['∩', 'Doorway', 'Walk onto an open passage to travel. A × marks a gate that needs a named key or crowbar.'], ['≋', 'Staircase', 'Walk onto it to travel between floors.'], ['◇', 'Memorial', 'A keepsake and a ritual may release its associated haunting.'], ['⇧', 'Entrance / exit', 'Return and choose to leave when your objective is complete.']];
-    return `<p class="hh-dialog-intro">Every discovered presence stays marked until you resolve it.</p><dl class="hh-legend">${entries.map(([symbol, name, description]) => `<div><dt><span aria-hidden="true">${symbol}</span>${name}</dt><dd>${description}</dd></div>`).join('')}</dl><div class="hh-legend-memory"><p><strong>Bright:</strong> currently in sight.</p><p><strong>Dim and hatched:</strong> remembered tiles and objects.</p><p><strong>Dark:</strong> unexplored; contents are unknown.</p></div>`;
-  }
-
-  function dialog(): string {
-    if (!overlay) return '';
-    const confirming = overlay === 'new' || overlay === 'restart';
-    const title = overlay === 'help' ? 'How to read the house' : overlay === 'legend' ? 'Read the room' : overlay === 'journal' ? 'Your house journal' : overlay === 'restart' ? 'Return to the beginning?' : 'Enter a new house?';
-    const unreadable = saved.kind === 'error';
-    const content = overlay === 'help' ? help() : overlay === 'legend' ? legend() : overlay === 'journal' && state ? journal(state) : `<p class="hh-dialog-intro">${unreadable ? 'Your existing save could not be read. Starting a new house may replace that saved data.' : overlay === 'restart' ? 'This resets the same house, its contents, and your progress to the beginning. Your undo history will be cleared.' : 'A different house and adventure will replace your current run and undo history.'}</p>${unreadable && saved.kind === 'error' ? `<div class="hh-storage-warning"><p>${escape(saved.message)}</p>${saved.raw !== undefined ? button('Download unreadable save', 'download-save') : ''}</div>` : ''}<div class="hh-confirm-buttons">${button('Keep current save', 'close-dialog', '', 'hh-primary')}${button(overlay === 'restart' ? 'Restart this house' : 'Start new house', 'confirm-start')}</div>`;
-    return `<dialog class="hh-dialog ${confirming ? 'hh-confirm-dialog' : ''}" aria-labelledby="hh-dialog-title"><header><div><p class="hh-eyebrow">Haunted House</p><h2 id="hh-dialog-title">${title}</h2></div>${button('×', 'close-dialog', 'aria-label="Close dialog"', 'hh-close')}</header><div class="hh-dialog-content">${content}</div>${!confirming ? `<footer>${button('Back to the house', 'close-dialog', '', 'hh-primary')}</footer>` : ''}</dialog>`;
-  }
-
-  function menu(): string {
-    return `<main class="hh-menu"><div class="hh-menu-art">${mansion}</div><p class="hh-eyebrow">A quiet game of exploration & ritual</p><h1>Haunted<br><em>House</em></h1><p class="hh-menu-copy">A little light. A house full of possibilities.<br>Choose what you leave behind.</p><div class="hh-menu-buttons">${saved.kind === 'loaded' ? button('Continue saved game <span aria-hidden="true">→</span>', 'continue', '', 'hh-primary') : ''}${button('New house <span aria-hidden="true">→</span>', 'new', '', saved.kind === 'loaded' ? '' : 'hh-primary')}</div>${saved.kind === 'loaded' ? `<p class="hh-menu-saved">${escape(saved.state.objective.title)} · ${saved.state.decisions} decisions${saved.state.status === 'won' ? ' · Escaped' : ''}</p>` : ''}${saved.kind === 'error' ? `<div class="hh-storage-warning"><strong>Saved house unavailable</strong><p>${escape(saved.message)} Your saved data has been preserved.</p>${saved.raw !== undefined ? button('Download unreadable save', 'download-save') : ''}</div>` : ''}${saved.kind === 'legacy' ? `<div class="hh-storage-warning"><strong>A house from earlier rules</strong><p>${escape(saved.message)} Start a new house to play this adventure. Your earlier save will remain intact.</p>${button('Download earlier-rules save', 'download-legacy')}</div>` : ''}${feedback ? `<p class="hh-menu-feedback">${escape(feedback)}</p>` : ''}<p class="hh-menu-footnote">No clock. Finite light. Time to think.</p></main>`;
-  }
-
-  function game(game: GameState): string {
-    return `<main class="hh-main"><div class="hh-game-title"><div><p class="hh-eyebrow">A house with something to hide</p><h1>Haunted House</h1></div><div class="hh-run-controls">${button('New house', 'new', '', 'hh-quiet')}${button('Restart', 'restart', 'aria-label="Restart this house"', 'hh-quiet')}</div></div>${resources(game)}<section class="hh-objective" aria-labelledby="hh-objective-title"><span class="hh-objective-mark" aria-hidden="true">◇</span><div><p class="hh-eyebrow" id="hh-objective-title">${escape(game.objective.title)}</p><p>${escape(game.objective.description)}</p></div>${game.objective.completed ? '<span class="hh-objective-complete">Complete</span>' : ''}</section>${game.status === 'won' ? `<section class="hh-ending" aria-labelledby="hh-ending-title"><p class="hh-eyebrow">The night is behind you</p><h2 id="hh-ending-title">You made it home.</h2><p>You completed ${escape(game.objective.title.toLowerCase())} with ${game.treasure} treasure${game.treasure === 1 ? '' : 's'}, ${game.light} light remaining, and ${game.decisions} decisions.</p><div>${button('New house', 'new', '', 'hh-primary')}${button('Try this house again', 'restart')}</div></section>` : ''}<div class="hh-game-layout"><div class="hh-exploration">${board(game)}</div><aside class="hh-sidebar">${actions(game)}${inventory(game)}${leads(game)}</aside></div><section class="hh-events" aria-labelledby="hh-events-title"><div class="hh-section-heading"><h2 id="hh-events-title">Whispers & discoveries</h2><span>${game.decisions} decisions · ${game.steps} steps</span></div>${feedback ? `<p class="hh-feedback">${escape(feedback)}</p>` : ''}<ol>${game.log.slice(-5).reverse().map((event, index) => `<li class="${index === 0 ? 'is-latest' : ''}">${escape(event)}</li>`).join('')}</ol></section><footer class="hh-game-footer"><span class="hh-save-status ${saveFailed ? 'is-error' : ''}">${saveFailed ? '!' : '✓'} ${escape(saveStatus)}</span><span>Seed <code>${escape(game.seed)}</code></span></footer></main>`;
-  }
-
-  function render(focus?: string): void {
-    const active = focus ?? (document.activeElement as HTMLElement | null)?.dataset.focus;
-    view.innerHTML = `<div class="hh-shell"><header class="hh-topbar"><a href="./index.html" class="hh-home"><span aria-hidden="true">←</span> Minigames</a><span class="hh-topbar-brand">HH <span aria-hidden="true">/</span> ${state ? 'The adventure' : 'Est. after dark'}</span><nav aria-label="Game information">${state ? button('Journal', 'journal', '', 'hh-nav-button') : ''}${button('Rules', 'help', '', 'hh-nav-button')}${button('Legend', 'legend', '', 'hh-nav-button')}</nav></header>${state ? game(state) : menu()}${dialog()}</div>`;
-    liveRegion.textContent = announcement;
-    const modal = root.querySelector<HTMLDialogElement>('dialog');
-    if (modal) {
-      modal.showModal();
-      modal.addEventListener('cancel', event => { event.preventDefault(); closeOverlay(); });
-    } else if (active) {
-      const focusTarget = root.querySelector<HTMLElement>(`[data-focus="${CSS.escape(active)}"]`) ?? root.querySelector<HTMLElement>('[data-focus="board"]');
-      focusTarget?.focus({ preventScroll: true });
-    }
-  }
-
-  function download(raw: string, filename: string): void {
-    const url = URL.createObjectURL(new Blob([raw], { type: 'text/plain' }));
-    const link = document.createElement('a'); link.href = url; link.download = filename; link.click();
-    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-  }
-
-  root.addEventListener('click', event => {
-    if ((event.target as HTMLElement).closest('a.hh-home')) { cancelRoute(); return; }
-    const target = (event.target as HTMLElement).closest<HTMLButtonElement>('button[data-action]');
-    if (!target || target.disabled) return;
-    const action = target.dataset.action!;
-    if (action === 'help' || action === 'legend' || action === 'journal') { openOverlay(action); return; }
-    if (action === 'close-dialog') { closeOverlay(); return; }
-    if (action === 'new' || action === 'restart') { requestStart(action); return; }
-    if (action === 'confirm-start') { start(overlay === 'restart'); return; }
-    if (action === 'download-save' && saved.kind === 'error' && saved.raw !== undefined) { download(saved.raw, 'haunted-house-unreadable-save.txt'); return; }
-    if (action === 'download-legacy' && legacyRaw !== undefined) { download(legacyRaw, 'haunted-house-earlier-rules-save.txt'); return; }
-    if (action === 'continue' && saved.kind === 'loaded') {
-      cancelRoute(); state = saved.state; saveStatus = `Loaded · ${state.decisions} decisions`; saveFailed = false;
-      announcement = `Continued your saved house. ${roomOf(state).name}. Light ${state.light} of ${state.maxLight}. Ritual power ${state.ritualPower}.`;
-      render('board'); return;
-    }
-    if (!state) return;
-    if (action === 'select-interaction') { selectInteraction(target.dataset.id!); return; }
-    if (overlay) return;
-    if (action === 'undo') { commit({ type: 'undo' }); return; }
-    if (action === 'cancel-action') { cancelRoute(); selectedInteraction = undefined; render(); return; }
-    if (state.status !== 'active') return;
-    if (action.startsWith('direction-')) commit({ type: 'move', direction: action.slice(10) as Direction });
-    else if (action === 'tile') {
-      cancelRoute();
-      const position = { roomId: state.player.roomId, x: Number(target.dataset.x), y: Number(target.dataset.y) };
-      const tile = tileAt(roomOf(state), position.x, position.y);
-      if (!knownPosition(state, position)) {
-        const direction = (Object.keys(DIRECTIONS) as Direction[]).find(key => DIRECTIONS[key].x === position.x - state!.player.x && DIRECTIONS[key].y === position.y - state!.player.y);
-        if (direction) commit({ type: 'move', direction });
-        else { feedback = 'Explore closer before plotting a route into the unknown.'; announcement = feedback; render(); }
-        return;
-      }
-      const item = interactions(state).find(candidate => samePosition(candidate.position, position) && candidate.action.type !== 'travel' && !(candidate.resolved && candidate.action.type === 'banish'));
-      if (item) selectInteraction(item.id);
-      else if (tile && ['floor', 'door', 'stairs', 'exit'].includes(tile.kind)) { selectedInteraction = undefined; walkTo(position); }
-      else { feedback = `${tile?.label ?? 'A solid part of the room'}. Choose an open floor to walk.`; announcement = feedback; render(); }
-    } else if (action === 'cancel-route') { cancelRoute(); feedback = 'Stopped. Take your time.'; announcement = feedback; render(); }
-    else if (action === 'approach') {
-      const item = interactions(state).find(candidate => candidate.id === selectedInteraction);
-      if (item) walkTo(item.position, item.action.type !== 'travel');
-    } else if (action === 'commit-interaction') {
-      const item = interactions(state).find(candidate => candidate.id === selectedInteraction);
-      if (item?.available) commit(item.action);
-    }
-  });
-
-  document.addEventListener('keydown', event => {
-    if (event.key === 'Escape' && !overlay && pendingRoute.length) { event.preventDefault(); cancelRoute(); feedback = 'Stopped. Take your time.'; announcement = feedback; render(); return; }
-    if (!state || state.status !== 'active' || overlay || event.ctrlKey || event.altKey || event.metaKey) return;
-    const target = event.target as HTMLElement;
-    if (target.closest('input, textarea, select, [contenteditable="true"], dialog')) return;
-    const direction = directionKeys[event.key] ?? directionKeys[event.key.toLowerCase()];
-    if (!direction) return;
-    event.preventDefault();
-    if (event.repeat) return;
-    commit({ type: 'move', direction });
-  });
-  document.addEventListener('visibilitychange', () => { if (document.hidden) { cancelRoute(); render(); } });
-  render();
+  if (action === 'attack') commit({ type: 'attack', hauntingId: selected.slice(2), mode });
+  else if (action === 'use') commit({ type: 'use', supplyId: selected.slice(2) });
+  else if (action === 'unlock') commit({ type: 'unlock', connectionId: selected.slice(2) });
+  else if (action === 'travel') { const c = state.connections.find(c => c.id === selected.slice(2)); const from = c && ([c.a, c.b].find(p => p.roomId === roomId && known(state!, p)) ?? [c.a, c.b].find(p => known(state!, p))); if (c && from) { selected = ''; commit({ type: 'travel', connectionId: c.id, from }); } }
+  else if (action === 'stand') { const c = state.connections.find(c => c.id === selected.slice(2)); const from = c && ([c.a, c.b].find(p => p.roomId === roomId && known(state!, p)) ?? [c.a, c.b].find(p => known(state!, p))); if (from) commit({ type: 'move', to: from }); }
+  else if (action === 'return') commit({ type: 'move', to: state.entrance });
+  else if (['tonic', 'oil', 'ward', 'settle', 'leave'].includes(action)) commit({ type: action as 'tonic' | 'oil' | 'ward' | 'settle' | 'leave' });
+ });
+ root.addEventListener('change', async event => {
+  const input = event.target as HTMLInputElement; if (input.id !== 'hh-import' || !input.files?.[0]) return;
+  const file = input.files[0]; if (file.size > 12000000) { feedback = 'Save file is too large.'; render(); return; }
+  const result = parseSave(await file.text());
+  if (result.kind === 'loaded') { imported = result.state; open('import'); } else { feedback = result.kind === 'error' ? result.message : 'Could not read save.'; render(); }
+ });
+ root.addEventListener('keydown', event => {
+  if (busy || modal || !state || event.ctrlKey || event.altKey || event.metaKey || (event.target as HTMLElement).closest('input,textarea,select')) return;
+  const key = event.key.toLowerCase();
+  if (key === 'z') { event.preventDefault(); if (!event.repeat) commit({ type: 'undo' }); return; }
+  const directions: Record<string, Direction> = { w: 'north', a: 'west', s: 'south', d: 'east' };
+  if (directions[key]) { event.preventDefault(); if (event.repeat) return; const d = DIRECTIONS[directions[key]]; commit({ type: 'move', to: { ...state.player, x: state.player.x + d.x, y: state.player.y + d.y } }); return; }
+  const arrows: Record<string, Direction> = { ArrowUp: 'north', ArrowDown: 'south', ArrowLeft: 'west', ArrowRight: 'east' };
+  const cell = (event.target as HTMLElement).closest<HTMLElement>('[data-action="tile"]');
+  if (arrows[event.key] && cell) { event.preventDefault(); const d = DIRECTIONS[arrows[event.key]], x = Number(cell.dataset.x) + d.x, y = Number(cell.dataset.y) + d.y; view.querySelector<HTMLElement>(`[data-action="tile"][data-x="${x}"][data-y="${y}"]`)?.focus(); }
+ });
+ render();
 }
