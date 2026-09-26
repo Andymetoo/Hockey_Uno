@@ -10,6 +10,11 @@
     "preview:bomber": "vite preview --config vite.bomber.config.ts --open /bomber_command.html",
     "typecheck:bomber": "tsc -p tsconfig.bomber.json",
     "test:bomber": "node --test src/bomber-command/tests/*.test.mjs",
+    "dev:haunted": "vite --config vite.haunted.config.ts --open /haunted_house.html",
+    "build:haunted": "npm run typecheck:haunted && vite build --config vite.haunted.config.ts",
+    "preview:haunted": "vite preview --config vite.haunted.config.ts --open /haunted_house.html",
+    "typecheck:haunted": "tsc -p tsconfig.haunted.json",
+    "test:haunted": "node --test src/haunted-house/tests/*.test.mjs",
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit"

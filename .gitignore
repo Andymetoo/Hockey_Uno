@@ -110,3 +110,5 @@ InitTestScene*.unity*
 /dist/
 /bomber-build/
 /tmp/bomber-browser/
+/haunted-build/
+/.haunted-checks/

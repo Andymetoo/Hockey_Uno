@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#141513" />
+  <meta name="description" content="A candle, a quiet house, and something you cannot see. A turn-based exploration and deduction game." />
+  <title>Haunted House</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23141513'/%3E%3Cpath d='M4 15L16 3L28 15V29H4ZM10 15V20H14V15ZM19 15V20H23V15ZM14 24V29H18V24Z' fill='%23ebe8db' fill-rule='evenodd'/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="./haunted-build/haunted-house.css" />
+</head>
+<body>
+  <div id="app"><main style="max-width:40rem;margin:15vh auto;padding:2rem;font-family:Georgia,serif">
+    <h1>Haunted House</h1><p>Opening the front door…</p>
+    <p id="boot-help" hidden>The house could not open. Reload the page to try again. <a href="./index.html">Return to the games</a>.</p>
+  </main></div>
+  <noscript>Haunted House needs JavaScript to explore rooms and save your adventure.</noscript>
+  <script>window.setTimeout(function(){var help=document.getElementById('boot-help');if(help)help.hidden=false;},6000);</script>
+  <script defer src="./haunted-build/haunted-house.js"></script>
+</body>
+</html>
