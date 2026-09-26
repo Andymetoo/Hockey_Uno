@@ -7,8 +7,9 @@ import { readFile, mkdir, writeFile } from 'node:fs/promises';
 import { resolve, extname, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createGame } from '../generation.ts';
-import { act, candle, interactions } from '../game.ts';
-import { SAVE_KEY } from '../persistence.ts';
+import { act, interactions } from '../game.ts';
+import { SAVE_KEY, LEGACY_KEY } from '../persistence.ts';
+import { orderingFixture, baseFixture, addHaunting, addCandle, position } from './fixtures.mjs';
 
 const root = fileURLToPath(new URL('../../../', import.meta.url));
 const artifacts = resolve(root, '.haunted-checks');
@@ -105,130 +106,166 @@ try {
   for (const page of ['hockey_card_proto.html', 'bomber_command.html', 'OuijaSimulator.html', 'haunted_house.html']) assert.ok(await evaluate(`!!document.querySelector('a[href="${page}"]')`));
   await click('a[href="haunted_house.html"]');
   await waitFor('!!document.querySelector("[data-action=new]")');
-  await evaluate(`localStorage.removeItem(${JSON.stringify(SAVE_KEY)}); localStorage.setItem('unrelated-game-fixture', 'untouched')`);
-  await reload(); await screenshot('desktop-menu');
+  await evaluate(`localStorage.removeItem(${JSON.stringify(SAVE_KEY)}); localStorage.removeItem(${JSON.stringify(LEGACY_KEY)}); localStorage.setItem('unrelated-game-fixture', 'untouched')`);
+  await reload(); await screenshot('desktop-menu-v2');
   await action('new');
-  assert.equal((await readState()).turn, 0);
-  await inject(createGame('browser-verification'));
-  const initial = await readState();
-  assert.equal(await evaluate('document.querySelectorAll(".hh-tile").length'), 81);
-  assert.equal(await evaluate('document.querySelectorAll(".hh-tile.is-lit").length'), 5);
-  assert.equal(await evaluate('[...document.querySelectorAll(".hh-tile.is-dark")].every(tile => tile.getAttribute("aria-label").includes("Unexplored darkness"))'), true);
-  await screenshot('desktop-game');
+  assert.equal((await readState()).light, 4);
+  assert.equal((await readState()).ritualPower, 1);
+  assert.equal(await evaluate('/guttering|movement beat|charm|strike a match|spirit moves in/i.test(document.body.innerText)'), false);
+  await screenshot('desktop-game-v2');
 
-  await key('ArrowUp');
-  assert.deepEqual((await readState()).player, { ...initial.player, y: initial.player.y - 1 });
-  assert.equal((await readState()).turn, 1);
-  assert.equal(await evaluate('scrollY'), 0, 'movement must not scroll');
-  await key('ArrowUp', true);
-  assert.equal((await readState()).turn, 1, 'held keys cannot chain turns');
-  await action('help'); await key('ArrowDown');
-  assert.equal((await readState()).turn, 1, 'rules do not spend turns');
-  assert.ok(await evaluate('document.querySelector("dialog").innerText.includes("orthogonally")'));
-  await key('Escape');
-  assert.equal(await evaluate('!!document.querySelector("dialog")'), false);
-  assert.equal(await evaluate('document.activeElement.dataset.action'), 'help');
+  const tileClick = (x, y) => click(`[data-action=tile][data-x="${x}"][data-y="${y}"]`);
+  const select = id => click(`[data-action=select-interaction][data-id="${id}"]`);
+  let fixture = orderingFixture();
+  await inject(fixture);
+  await tileClick(4, 3);
+  assert.equal((await readState()).decisions, 0, 'inspection is free');
+  assert.ok(await evaluate('document.querySelector(".hh-action-detail").getBoundingClientRect().left > document.querySelector(".hh-board").getBoundingClientRect().right'), 'desktop decisions sit beside the map');
+  assert.ok(await evaluate('document.querySelector(".hh-resource-icon svg").getBoundingClientRect().height < 40'), 'resource glyph stays compact');
+  await screenshot('desktop-decision-v2');
+  assert.ok(await evaluate('/6 light/.test(document.body.innerText)'), 'initial strong guardian cost is shown');
+  assert.ok(await evaluate('document.querySelector("[data-action=commit-interaction]")?.disabled'), 'insufficient light disables commitment');
+  await tileClick(3, 2);
+  assert.ok(await evaluate('/2.*wasted/.test(document.body.innerText)'), 'candle preview shows wasted restoration');
+  assert.equal((await readState()).candles[0].used, false);
+  await tileClick(2, 3); await action('commit-interaction');
+  assert.equal((await readState()).light, 2); assert.equal((await readState()).ritualPower, 2);
+  await tileClick(3, 2); await action('commit-interaction');
+  assert.equal((await readState()).light, 5);
+  await tileClick(4, 3); await action('commit-interaction');
+  assert.equal((await readState()).light, 0); assert.equal((await readState()).status, 'active');
+  const solvedCluster = await readState();
+  await reload(); await action('continue'); assert.deepEqual(await readState(), solvedCluster);
+  await key('ArrowRight');
+  assert.equal((await readState()).light, 0, 'zero light still permits movement');
+  await action('undo');
+  assert.deepEqual(await readState(), act(solvedCluster, { type: 'undo' }).state, 'undo restores snapshot position/discovery too');
+  await tileClick(4, 3); await action('commit-interaction');
+  await key('ArrowLeft'); await key('ArrowLeft'); await key('ArrowDown'); await key('ArrowDown');
+  await select('leave'); await action('commit-interaction');
+  assert.equal((await readState()).status, 'won'); await screenshot('victory-v2');
+  await action('undo'); assert.equal((await readState()).status, 'active');
+
+  // Bad ordering stays loadable, with an understandable local affordability problem.
+  await inject(orderingFixture());
+  await tileClick(3, 2); await action('commit-interaction');
+  await tileClick(2, 3); await action('commit-interaction');
+  assert.equal((await readState()).light, 3);
+  const deadEnd = await readState();
+  await reload(); await action('continue'); assert.deepEqual(await readState(), deadEnd);
+  await tileClick(4, 3);
+  assert.ok(await evaluate('document.querySelector("[data-action=commit-interaction]").disabled'));
+
+  // Repeated movement keys, forms, dialogs and remembered inspection never spend resources.
+  fixture = baseFixture(); await inject(fixture);
+  await key('ArrowUp'); assert.equal((await readState()).steps, 1);
+  assert.equal(await evaluate('scrollY'), 0);
+  await key('ArrowUp', true); assert.equal((await readState()).steps, 1);
+  await evaluate('const input=document.createElement("input"); input.id="smoke-input"; document.body.append(input); input.focus();');
+  await key('ArrowDown'); assert.equal((await readState()).steps, 1);
+  await evaluate('document.getElementById("smoke-input").remove()');
+  await action('help'); await key('ArrowDown'); assert.equal((await readState()).steps, 1);
+  assert.ok(await evaluate('/ritual power/i.test(document.querySelector("dialog").innerText)'));
+  await key('Escape'); assert.equal(await evaluate('document.activeElement.dataset.action'), 'help');
   await action('legend'); await action('close-dialog');
-  await action('journal');
-  assert.equal(await evaluate('document.querySelectorAll(".hh-journal-room").length'), 1);
-  await action('close-dialog');
+  await action('journal'); await action('close-dialog');
 
-  await action('match-mode'); await action('direction-north');
-  assert.equal((await readState()).turn, 1, 'selecting a target is free');
-  await action('commit-match');
-  assert.equal((await readState()).turn, 2);
-  assert.equal((await readState()).matches, initial.matches - 1);
-  assert.equal(await evaluate('document.querySelectorAll(".hh-clue").length'), 1);
-  await action('wait'); await action('wait');
-  assert.equal((await readState()).turn, 4);
-  assert.equal(await evaluate('document.querySelectorAll(".hh-clue").length'), 0);
-  const resumed = await readState();
-  await reload(); await action('continue');
-  assert.deepEqual(await readState(), resumed);
-  await action('wait');
-  assert.deepEqual(await readState(), act(resumed, { type: 'wait' }).state);
+  // Destination movement follows revealed routes, stops at discoveries, and never auto-uses objects.
+  fixture = baseFixture(); fixture.player = position(1, 3);
+  addCandle(fixture, 'new-candle', position(4, 2), 3);
+  fixture.rooms[0].discovered[2 * 7 + 4] = false;
+  await inject(fixture); await tileClick(5, 3);
+  await waitFor(`JSON.parse(localStorage.getItem(${JSON.stringify(SAVE_KEY)})).player.x >= 2`);
+  await sleep(600);
+  assert.equal((await readState()).player.x, 3, 'newly discovered candle interrupts a queued route');
+  assert.equal((await readState()).candles[0].used, false);
+  assert.equal((await readState()).light, 4);
+  fixture = baseFixture(); fixture.player = position(1, 3);
+  addHaunting(fixture, 'approach-target', position(5, 3), 3, { power: 1 });
+  await inject(fixture); await tileClick(5, 3); await action('approach');
+  await waitFor(`JSON.parse(localStorage.getItem(${JSON.stringify(SAVE_KEY)})).player.x === 4`);
+  assert.equal((await readState()).hauntings[0].banished, false);
+  assert.equal((await readState()).decisions, 0);
+  assert.equal((await readState()).light, 4);
+  await action('commit-interaction'); assert.equal((await readState()).light, 2);
+  await tileClick(5, 3);
+  await waitFor(`JSON.parse(localStorage.getItem(${JSON.stringify(SAVE_KEY)})).player.x === 5`);
+  assert.equal((await readState()).decisions, 1, 'clicking a cleared haunting walks without another decision');
 
-  await action('new'); assert.ok(await evaluate('!!document.querySelector("dialog")'));
-  await action('close-dialog'); assert.equal((await readState()).seed, initial.seed);
-  await action('restart'); await action('confirm-start');
-  assert.deepEqual(await readState(), initial);
-  await action('new'); await action('confirm-start');
-  assert.notEqual((await readState()).seed, initial.seed);
+  fixture = baseFixture({ width: 21 }); fixture.player = position(1, 3);
+  await inject(fixture); await tileClick(19, 3); await action('help');
+  const pausedSteps = (await readState()).steps; await sleep(350);
+  assert.equal((await readState()).steps, pausedSteps, 'dialogs cancel pending movement');
+  await action('close-dialog'); await tileClick(19, 3); await key('Escape');
+  const cancelledSteps = (await readState()).steps; await sleep(350);
+  assert.equal((await readState()).steps, cancelledSteps, 'Escape cancels the route');
+  await tileClick(19, 3); await tileClick(1, 4); await sleep(650);
+  assert.deepEqual((await readState()).player, position(1, 4), 'a new destination replaces the old route');
 
-  // Narrow viewport + an actual touchscreen tap (not a synthetic click).
-  await inject(initial);
+  // Same-seed restart versus a different new adventure.
+  const generated = createGame('browser-new-and-restart'); await inject(generated);
+  await key('ArrowUp'); await action('restart'); await action('close-dialog');
+  assert.equal((await readState()).seed, generated.seed);
+  await action('restart'); await action('confirm-start'); assert.deepEqual(await readState(), generated);
+  await action('new'); await action('confirm-start'); assert.notEqual((await readState()).seed, generated.seed);
+
+  // Tablet/phone layouts and a real touchscreen tap.
+  await inject(orderingFixture());
+  await command('Emulation.setDeviceMetricsOverride', { width: 768, height: 1024, deviceScaleFactor: 1, mobile: true });
+  await tileClick(2, 3);
+  assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'), true, '768px viewport overflow');
+  assert.ok(await evaluate('document.querySelector(".hh-ritual-preview").scrollWidth <= document.querySelector(".hh-ritual-preview").clientWidth'), 'tablet preview fits its panel');
+  await screenshot('tablet-decision-v2');
   for (const width of [390, 320]) {
     await command('Emulation.setDeviceMetricsOverride', { width, height: 844, deviceScaleFactor: 1, mobile: true });
+    await evaluate('scrollTo(0, 0)');
     assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'), true, `${width}px viewport overflow`);
-    await screenshot(`mobile-${width}`);
+    await screenshot(`mobile-${width}-v2`);
+    await tileClick(2, 3); await screenshot(`mobile-${width}-decision-v2`);
     await action('help');
     assert.equal(await evaluate('document.querySelector("dialog").getBoundingClientRect().right <= innerWidth'), true);
-    await screenshot(`mobile-${width}-rules`); await action('close-dialog');
+    await screenshot(`mobile-${width}-rules-v2`); await action('close-dialog');
   }
+  await inject(baseFixture());
   await command('Emulation.setTouchEmulationEnabled', { enabled: true });
-  const beforeTouch = await readState();
-  const selector = `[data-action=tile][data-x="${beforeTouch.player.x}"][data-y="${beforeTouch.player.y - 1}"]`;
+  const selector = '[data-action=tile][data-x="3"][data-y="4"]';
   await evaluate(`document.querySelector(${JSON.stringify(selector)}).scrollIntoView({block:'center'})`);
   const point = await evaluate(`(() => { const r = document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect(); return {x:r.x+r.width/2,y:r.y+r.height/2}; })()`);
   await command('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ ...point, radiusX: 1, radiusY: 1, force: 1, id: 0 }] });
   await command('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
-  await waitFor(`JSON.parse(localStorage.getItem(${JSON.stringify(SAVE_KEY)})).turn === 1`);
-  assert.equal((await readState()).player.y, beforeTouch.player.y - 1);
+  await waitFor(`JSON.parse(localStorage.getItem(${JSON.stringify(SAVE_KEY)})).player.y === 4`);
+  assert.equal((await readState()).light, 4);
 
-  // UI gates search/travel commits behind explicit target selection.
-  let fixture = createGame('browser-context');
-  const room = fixture.rooms.find(r => r.containers.some(c => c.item));
-  const container = room.containers.find(c => c.item);
-  fixture.player = { roomId: room.id, x: container.x, y: container.y + 1 };
-  fixture = act(fixture, { type: 'wait' }).state;
-  await inject(fixture);
-  const search = interactions(fixture).find(i => i.action.type === 'search');
-  await click(`[data-action=select-interaction][data-id="${search.id}"]`);
-  assert.equal((await readState()).turn, fixture.turn);
-  await action('commit-interaction');
-  assert.ok((await readState()).inventory.includes(container.item));
-
-  // Honest reading with an invisible adjacent spirit and a single-use charm.
-  fixture = createGame('browser-contact');
-  fixture.spirit = { ...fixture.player, y: fixture.player.y - 1 };
-  await inject(fixture);
-  assert.equal(await evaluate('document.querySelector(".hh-candle-reading h2").textContent'), 'Guttering');
-  assert.equal(await evaluate('[...document.querySelectorAll(".hh-tile")].some(t => /spirit present/i.test(t.getAttribute("aria-label")))'), false);
-  await key('ArrowUp'); assert.equal((await readState()).charm, false);
-  await key('ArrowUp'); assert.equal((await readState()).status, 'lost');
-  assert.ok(await evaluate('!!document.querySelector(".hh-ending")')); await screenshot('defeat');
-  await reload(); await action('continue'); assert.equal((await readState()).status, 'lost');
-
-  // A well-formed objective-complete fixture exercises the final leave control.
-  fixture = createGame('browser-win');
-  for (const r of fixture.rooms) for (const c of r.containers) if (c.item) { c.opened = true; fixture.inventory.push(c.item); }
-  fixture.objective.completed = true;
-  await inject(fixture);
-  await click('[data-action=select-interaction][data-id=leave]'); await action('commit-interaction');
-  assert.equal((await readState()).status, 'won'); await screenshot('victory');
-
-  // No automatic overwrite/regeneration on unreadable or incompatible saves.
+  // Version1 belongs to earlier rules and is never converted or overwritten.
+  const old = '{"version":1,"seed":"earlier-house"}';
+  await evaluate(`localStorage.removeItem(${JSON.stringify(SAVE_KEY)}); localStorage.setItem(${JSON.stringify(LEGACY_KEY)}, ${JSON.stringify(old)})`);
+  await reload();
+  assert.equal(await evaluate('!!document.querySelector("[data-action=continue]")'), false);
+  assert.ok(await evaluate('!!document.querySelector("[data-action=download-legacy]")'));
+  await action('new');
+  assert.equal(await evaluate(`localStorage.getItem(${JSON.stringify(LEGACY_KEY)})`), old);
+  await reload(); await action('continue'); await action('journal');
+  assert.ok(await evaluate('!!document.querySelector("[data-action=download-legacy]")'), 'earlier save download remains available after v2 reload');
+  await action('close-dialog');
   for (const raw of ['{broken save', JSON.stringify({ version: 999 })]) {
     await evaluate(`localStorage.setItem(${JSON.stringify(SAVE_KEY)}, ${JSON.stringify(raw)})`); await reload();
     assert.equal(await evaluate('!!document.querySelector("[data-action=continue]")'), false);
     assert.ok(await evaluate('!!document.querySelector("[data-action=download-save]")'));
-    assert.equal(await evaluate(`localStorage.getItem(${JSON.stringify(SAVE_KEY)})`), raw);
     await action('new'); await action('close-dialog');
     assert.equal(await evaluate(`localStorage.getItem(${JSON.stringify(SAVE_KEY)})`), raw);
   }
-  await action('new'); await action('confirm-start');
+  await inject(orderingFixture());
   await evaluate('Storage.prototype.setItem = function(){ throw new DOMException("Full", "QuotaExceededError") }');
-  await action('wait');
+  await tileClick(2, 3); await action('commit-interaction');
   assert.match(await evaluate('document.querySelector(".hh-save-status").textContent'), /Not saved/);
   assert.equal(await evaluate('localStorage.getItem("unrelated-game-fixture")'), 'untouched');
-  await screenshot('storage-failure');
-
-  // Standalone build entry also serves the same runtime without source/TS tooling.
+  assert.equal(await evaluate(`localStorage.getItem(${JSON.stringify(LEGACY_KEY)})`), old);
+  await screenshot('storage-failure-v2');
   await navigate('/haunted-build/haunted_house.html', '!!document.querySelector("[data-action=new]")');
   assert.equal(await evaluate('document.title'), 'Haunted House');
   assert.deepEqual(exceptions, [], 'no browser runtime exceptions');
-  assert.deepEqual(badResponses.filter(url => !url.endsWith('/favicon.ico')), [], 'no failed page/assets requests');
-  console.log('Browser smoke passed: static navigation, keyboard/touch, targeting, rules/journal, saves, restart/new, clue expiry, charm/defeat/victory, 320/390px layouts, storage errors.');
+  assert.deepEqual(badResponses.filter(url => !url.endsWith('/favicon.ico')), [], 'no failed assets');
+  console.log('Browser smoke passed: complete resource puzzle and escape, undo/resume, explicit costs/refills, dead-end saves, click routes/cancellation, keyboard/touch, phone layouts, old-save preservation, storage failures and static navigation.');
   console.log(`Screenshots: ${artifacts}`);
   try { await command('Browser.close'); } catch {}
 } finally {

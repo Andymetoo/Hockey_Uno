@@ -1,16 +1,23 @@
 import type { Direction, ItemId, ObjectiveKind } from './types.ts';
 
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 export const TUNING = {
-  lightRadius: 1,
-  spiritEveryTurns: 4,
-  startingMatches: 6,
-  minRooms: 9,
-  maxRooms: 13,
+  lightRadius: 2,
+  startingPower: 1,
+  startingLight: 4,
+  maxLight: 5,
+  minRooms: 8,
+  maxRooms: 12,
   minFloors: 2,
   maxFloors: 3,
-  roomSize: 9,
-  generationAttempts: 12,
+  minSpirits: 5,
+  maxSpirits: 8,
+  minCandles: 3,
+  maxCandles: 5,
+  generationAttempts: 8,
+  solverBudget: 30000,
+  undoLimit: 12,
+  routeStepMs: 95,
   maxLogEntries: 8,
 } as const;
 export const DIRECTIONS: Record<Direction, { x: number; y: number; label: string }> = {
@@ -30,5 +37,5 @@ export const ITEMS: Record<ItemId, { name: string; symbol: string; description: 
 export const OBJECTIVES: Record<ObjectiveKind, { title: string; description: string }> = {
   escape: { title: 'The last door', description: 'Find the front-door key and escape through the entrance.' },
   diary: { title: 'An unfinished story', description: 'Recover the missing diary and bring it back to the entrance.' },
-  keepsake: { title: 'What remains', description: 'Recover the silver locket, place it on the memorial, then leave through the entrance.' },
+  keepsake: { title: 'What remains', description: 'Recover the silver locket and release its owner at the memorial, then return to the entrance.' },
 };

@@ -1,224 +1,332 @@
 import { OBJECTIVES, SAVE_VERSION, TUNING } from './content.ts';
-import type { Connection, GameState, ItemId, ObjectiveKind, Position, Room } from './types.ts';
-import { adjacent, cardinalNeighbors, neighbors, positionKey, random, refreshExploration, samePosition, seedNumber, tileAt, walkable } from './world.ts';
+import { makePatternRoom, type PatternRoom } from './room-patterns.ts';
+import { solveHouse } from './solver.ts';
+import type { Candle, Connection, Direction, GameSnapshot, GameState, Haunting, ItemId, Lead, ObjectiveKind, Position, Reward } from './types.ts';
+import { adjacent, positionKey, random, refreshExploration, samePosition, seedNumber, tileAt, walkable } from './world.ts';
 
-interface PlannedRoom { name: string; floor: number; parent: number; gate?: Connection['gate']; item?: ItemId; role?: 'altar' | 'supplies' | 'treasure' | 'quiet' | 'empty'; }
-interface Plan { kind: ObjectiveKind; rooms: PlannedRoom[]; loops: [number, number][]; }
-const OPTIONAL_NAMES = ['Drawing room', 'Old nursery', 'Linen room', 'Rain gallery', 'Music room', 'Box room', 'Portrait hall', 'Guest room', 'Dusty study'];
-const PORTALS = [{ x: 4, y: 1 }, { x: 7, y: 4 }, { x: 4, y: 7 }, { x: 1, y: 4 }, { x: 6, y: 1 }, { x: 7, y: 6 }, { x: 2, y: 7 }, { x: 1, y: 2 }];
-const OBJECT_SPOTS = [{ x: 3, y: 3 }, { x: 5, y: 3 }, { x: 3, y: 5 }, { x: 5, y: 5 }];
+export interface GenerationOptions { attempts?: number; solverBudget?: number; forceFallback?: boolean }
+type Opening = 'strength' | 'route' | 'replenishment';
+const OPPOSITE: Record<Direction, Direction> = { north: 'south', east: 'west', south: 'north', west: 'east' };
+const DELTAS = [[0, -1], [1, 0], [0, 1], [-1, 0]] as const;
+const FALLBACK_SEED = 'haunted-house:resource-fallback:2';
+const pick = <T>(rng: { rng: number }, values: readonly T[]): T => values[Math.floor(random(rng) * values.length)];
+const integer = (rng: { rng: number }, min: number, max: number): number => min + Math.floor(random(rng) * (max - min + 1));
 
-function pick<T>(rng: { rng: number }, values: readonly T[]): T { return values[Math.floor(random(rng) * values.length)]; }
-function shuffle<T>(rng: { rng: number }, values: T[]): T[] {
-  for (let index = values.length - 1; index > 0; index--) {
-    const other = Math.floor(random(rng) * (index + 1));
-    [values[index], values[other]] = [values[other], values[index]];
-  }
-  return values;
-}
-
-/** Establish the dependency graph before selecting any geometry or object positions. */
-function requirements(rng: { rng: number }): Plan {
-  const kind = pick<ObjectiveKind>(rng, ['escape', 'diary', 'keepsake']);
-  const count = TUNING.minRooms + Math.floor(random(rng) * (TUNING.maxRooms - TUNING.minRooms + 1));
-  const floors = TUNING.minFloors + Math.floor(random(rng) * (TUNING.maxFloors - TUNING.minFloors + 1));
-  const branching = random(rng) < 0.5;
-  const rooms: PlannedRoom[] = [
-    { name: 'Entrance hall', floor: 0, parent: -1 },
-    { name: pick(rng, ['Cloakroom', 'Morning room', 'Butler’s pantry']), floor: 0, parent: 0, item: 'moth-key' },
-    { name: 'Workshop', floor: 1, parent: random(rng) < 0.5 ? 0 : 1, gate: 'moth-key', item: 'crowbar' },
-    { name: 'Writing room', floor: branching ? 0 : 1, parent: branching ? 0 : 2, gate: branching ? undefined : 'crowbar', item: 'thorn-key' },
-    { name: 'Upper landing', floor: floors - 1, parent: branching ? 2 : 3, gate: branching ? 'crowbar' : undefined, role: 'quiet' },
-    { name: kind === 'diary' ? 'Sealed archive' : kind === 'keepsake' ? 'Lost bedroom' : 'Housekeeper’s room', floor: floors - 1, parent: 4, gate: 'thorn-key', item: kind === 'escape' ? 'exit-key' : kind },
-    { name: kind === 'keepsake' ? 'Memorial room' : 'Winter parlour', floor: 0, parent: 0, role: kind === 'keepsake' ? 'altar' : 'quiet' },
-  ];
-  const names = shuffle(rng, [...OPTIONAL_NAMES]);
-  for (let index = rooms.length; index < count; index++) {
-    const possibleParents = Array.from({ length: index }, (_, roomIndex) => roomIndex).filter(roomIndex => roomIndex !== 7);
-    const parent = pick(rng, possibleParents);
-    const floor = Math.max(0, Math.min(floors - 1, rooms[parent].floor + pick(rng, [-1, 0, 0, 1])));
-    const roles: PlannedRoom['role'][] = ['empty', 'supplies', 'treasure', 'quiet'];
-    rooms.push({ name: names[index - 7], parent, floor, role: roles[(index - 7) % roles.length] });
-  }
-  // A guaranteed early loop offers a route choice without bypassing a prerequisite.
-  const loops: [number, number][] = [[1, 6]];
-  const region = (index: number): string => {
-    const gates: string[] = [];
-    while (index > 0) { if (rooms[index].gate) gates.push(rooms[index].gate!); index = rooms[index].parent; }
-    return gates.sort().join('|');
-  };
-  const candidates: [number, number][] = [];
-  for (let first = 0; first < rooms.length; first++) for (let second = first + 1; second < rooms.length; second++) {
-    if (rooms[second].parent !== first && !(first === 1 && second === 6) && Math.abs(rooms[first].floor - rooms[second].floor) <= 1 && region(first) === region(second)) candidates.push([first, second]);
-  }
-  // Extra loops are optional; the first optional room remains a genuine dead end.
-  for (const pair of shuffle(rng, candidates)) {
-    if (loops.length >= 2 + Math.floor(count / 6)) break;
-    if (pair.includes(7) || random(rng) < 0.5) continue;
-    const degree = (index: number) => rooms.filter(room => room.parent === index).length + (index ? 1 : 0) + loops.filter(loop => loop.includes(index)).length;
-    if (degree(pair[0]) < 6 && degree(pair[1]) < 6) loops.push(pair);
-  }
-  return { kind, rooms, loops };
-}
-
-function build(seed: string, generationSeed: string): GameState {
+/** Choose bounded puzzle ingredients first; place their concrete geometry second. */
+function build(seed: string, generationSeed: string, fallback = false): GameState {
   const rng = { rng: seedNumber(generationSeed) };
-  const plan = requirements(rng);
-  const size = TUNING.roomSize;
-  const rooms: Room[] = plan.rooms.map((planned, index) => {
-    const room: Room = {
-      id: `room-${index}`, name: planned.name, floor: planned.floor, width: size, height: size,
-      tiles: Array.from({ length: size * size }, (_, tileIndex) => ({ kind: tileIndex % size === 0 || tileIndex % size === size - 1 || tileIndex < size || tileIndex >= size * (size - 1) ? 'wall' : 'floor' })),
-      containers: [], discovered: Array(size * size).fill(false), visited: false,
-    };
-    const spots = shuffle(rng, OBJECT_SPOTS.map(spot => ({ ...spot })));
-    const setObject = (kind: 'furniture' | 'container' | 'altar', label: string, containerId?: string): { x: number; y: number } => {
-      const spot = spots.pop()!;
-      room.tiles[spot.y * size + spot.x] = { kind, label, ...(containerId ? { containerId } : {}) };
-      return spot;
-    };
-    if (planned.item || planned.role === 'supplies' || planned.role === 'treasure') {
-      const id = `container-${index}`;
-      const label = planned.item ? pick(rng, ['Carved chest', 'Writing desk', 'Small cabinet']) : planned.role === 'supplies' ? 'Match tin' : 'Velvet-lined box';
-      const spot = setObject('container', label, id);
-      room.containers.push({ id, label, ...spot, opened: false, ...(planned.item ? { item: planned.item } : planned.role === 'supplies' ? { matches: 3 } : { treasure: 1 + Math.floor(random(rng) * 3) }) });
-    } else if (planned.role === 'altar') setObject('altar', 'Memorial');
-    else if (planned.role === 'quiet' && random(rng) < 0.65) {
-      const id = `container-${index}`;
-      const spot = setObject('container', 'Empty drawers', id);
-      room.containers.push({ id, label: 'Empty drawers', ...spot, opened: false, note: 'Only dust. Not every room has something to give.' });
-    }
-    if (planned.role !== 'empty') {
-      const furniture = Math.floor(random(rng) * 3);
-      for (let count = 0; count < furniture; count++) setObject('furniture', pick(rng, ['Tall wardrobe', 'Covered chair', 'Broken table']));
-    }
-    return room;
-  });
-  const freePortals = rooms.map((_, index) => shuffle(rng, PORTALS.filter(portal => index !== 0 || portal.x !== 4 || portal.y !== 7).map(portal => ({ ...portal }))));
-  const connections: Connection[] = [];
-  const connect = (first: number, second: number, gate?: Connection['gate']): void => {
-    const pointA = freePortals[first].pop();
-    const pointB = freePortals[second].pop();
-    if (!pointA || !pointB) throw new Error('Room connection budget exceeded.');
-    const kind = rooms[first].floor === rooms[second].floor ? 'door' : 'stairs';
-    const connection: Connection = { id: `passage-${connections.length}`, a: { roomId: rooms[first].id, ...pointA }, b: { roomId: rooms[second].id, ...pointB }, kind, ...(gate ? { gate } : {}), opened: !gate };
-    connections.push(connection);
-    for (const position of [connection.a, connection.b]) {
-      const room = rooms.find(candidate => candidate.id === position.roomId)!;
-      room.tiles[position.y * size + position.x] = { kind, connectionId: connection.id, label: kind === 'door' ? 'Doorway' : 'Staircase' };
-    }
+  const kind = fallback ? 'escape' : pick<ObjectiveKind>(rng, ['escape', 'diary', 'keepsake']);
+  const ritualCost = kind === 'keepsake' ? 1 : 0;
+  const opening = fallback ? 'strength' : pick<Opening>(rng, ['strength', 'route', 'replenishment']);
+  const count = fallback ? 8 : integer(rng, TUNING.minRooms, TUNING.maxRooms);
+  const floors = fallback ? 2 : integer(rng, TUNING.minFloors, TUNING.maxFloors);
+  const objectiveRoomName = kind === 'escape' ? 'Housekeeper’s archive' : kind === 'diary' ? 'Sealed archive' : 'Lost bedroom';
+  const layouts: PatternRoom[] = [];
+  const addRoom = (pattern: string, name: string, floor: number, mapX: number, mapY: number): number => {
+    layouts.push(makePatternRoom(pattern, `room-${layouts.length}`, name, floor, mapX, mapY));
+    return layouts.length - 1;
   };
-  plan.rooms.forEach((room, index) => { if (index) connect(room.parent, index, room.gate); });
-  plan.loops.forEach(([first, second]) => connect(first, second));
-  const entrance: Position = { roomId: rooms[0].id, x: 4, y: 7 };
-  rooms[0].tiles[entrance.y * size + entrance.x] = { kind: 'exit', label: 'Front door' };
-  const altarRoom = rooms.find(room => room.tiles.some(tile => tile.kind === 'altar'));
-  const altarIndex = altarRoom?.tiles.findIndex(tile => tile.kind === 'altar');
+  addRoom(opening === 'strength' ? 'foyer-wide' : opening === 'route' ? 'foyer-l' : 'foyer-alcove', 'Entrance hall', 0, 0, 0);
+  addRoom('workshop', 'Workshop', 0, 1, 0);
+  addRoom('study', 'Boarded study', 0, 2, 0);
+  addRoom(pick(rng, ['landing', 'long-hall']), 'Lower stair hall', 0, 2, -1);
+  addRoom('landing', 'Upper landing', 1, 2, -1);
+  addRoom('guard-gallery', 'Portrait gallery', 1, 3, -1);
+  addRoom(kind === 'keepsake' ? 'memorial' : 'archive', objectiveRoomName, floors - 1, floors === 3 ? 3 : 4, -1);
+  addRoom(pick(rng, ['closet', 'storage']), 'Linen closet', 0, -1, 0);
+  if (count > 8) addRoom('long-hall', 'Rain passage', 0, 1, -1);
+  if (count > 9) addRoom('nursery', 'Old nursery', 0, 0, -1);
+  if (count > 10) addRoom('treasure-alcove', 'Collector’s cabinet', 0, 3, 0);
+  if (count > 11) addRoom('divided-parlour', 'Divided drawing room', 1, 2, -2);
+
+  const rooms = layouts.map(layout => layout.room);
+  const connections: Connection[] = [];
+  const candles: Candle[] = [];
+  const hauntings: Haunting[] = [];
+  const usedPorts = new Set<string>();
+  const connect = (first: number, direction: Direction, second: number, gate?: Connection['gate']): Connection => {
+    const a = layouts[first].ports[direction];
+    const b = layouts[second].ports[OPPOSITE[direction]];
+    if (!a || !b || usedPorts.has(positionKey(a)) || usedPorts.has(positionKey(b))) throw new Error('Unavailable room doorway.');
+    usedPorts.add(positionKey(a)); usedPorts.add(positionKey(b));
+    const kind = rooms[first].floor === rooms[second].floor ? 'door' : 'stairs';
+    const connection: Connection = { id: `passage-${connections.length}`, a, b, kind, opened: !gate, ...(gate ? { gate } : {}) };
+    connections.push(connection);
+    for (const at of [a, b]) {
+      const room = rooms.find(candidate => candidate.id === at.roomId)!;
+      room.tiles[at.y * room.width + at.x] = { kind, connectionId: connection.id, label: kind === 'stairs' ? 'Staircase' : 'Doorway' };
+    }
+    return connection;
+  };
+  connect(0, 'east', 1);
+  const boardedStudy = connect(1, 'east', 2, 'crowbar');
+  const mothPassage = connect(2, 'north', 3, 'moth-key');
+  connect(3, 'north', 4);
+  connect(4, 'east', 5);
+  const finalPassage = connect(5, 'east', 6, 'thorn-key');
+  connect(0, 'west', 7);
+  if (count > 8) { connect(1, 'north', 8); connect(8, 'east', 3, 'moth-key'); }
+  if (count > 9) { connect(0, 'north', 9); connect(9, 'east', 8); }
+  if (count > 10) connect(2, 'east', 10);
+  if (count > 11) connect(4, 'north', 11);
+
+  const position = (room: number, anchor: string): Position => {
+    const found = layouts[room].anchors[anchor];
+    if (!found) throw new Error(`Missing ${anchor} in room ${room}`);
+    return found;
+  };
+  const container = (id: string, label: string, at: Position, reward: Reward, note?: string, leads?: Lead[]): void => {
+    const room = rooms.find(candidate => candidate.id === at.roomId)!;
+    if (tileAt(room, at.x, at.y)?.kind !== 'floor') throw new Error(`Occupied container placement: ${id}`);
+    room.tiles[at.y * room.width + at.x] = { kind: 'container', label, containerId: id };
+    room.containers.push({ id, label, x: at.x, y: at.y, opened: false, reward, ...(note ? { note } : {}), ...(leads ? { leads } : {}) });
+  };
+  const candle = (id: string, name: string, at: Position, restores: number): void => {
+    const room = rooms.find(candidate => candidate.id === at.roomId)!;
+    if (tileAt(room, at.x, at.y)?.kind !== 'floor') throw new Error(`Occupied candle placement: ${id}`);
+    room.tiles[at.y * room.width + at.x] = { kind: 'candle', label: name, candleId: id };
+    candles.push({ id, name, position: at, restores, used: false });
+  };
+  const spirit = (id: string, name: string, at: Position, resistance: number, reward: Reward, benefit: string, guards?: string[]): Haunting => {
+    const haunting: Haunting = { id, name, position: at, resistance, banished: false, reward, benefit, ...(guards ? { guards } : {}) };
+    hauntings.push(haunting); return haunting;
+  };
+  // Three light makes the guarded-candle variant tight enough that optional
+  // treasure can prevent a keepsake run from retaining its final ritual charge.
+  const mainCandleAmount = 3;
+  candle('candle-entrance', 'Hall candle', position(0, 'd'), mainCandleAmount);
+  candle('candle-study', 'Scholar’s candle', position(2, 'c'), 4);
+  candle('candle-landing', 'Landing candle', position(4, 'a'), 4);
+  spirit('haunt-instructor', 'The Whispering Tutor', position(0, 'a'), opening === 'strength' ? 3 : opening === 'route' ? 5 : 4,
+    { power: 1 }, 'Learn a stronger ritual: +1 permanent ritual power.');
+  spirit('haunt-caretaker', 'The Hollow Caretaker', position(0, 'b'), opening === 'strength' ? 5 : opening === 'route' ? 3 : 4,
+    { item: 'crowbar' }, `Receive the reusable crowbar. It opens the boards between ${rooms[1].name} and ${rooms[2].name}.`);
+  spirit('haunt-miser', 'The Pocket Miser', position(0, 'c'), 2, { treasure: 2 }, 'Recover two pieces of optional treasure.');
+  if (opening === 'replenishment') {
+    spirit('haunt-wick', 'The Wick Keeper', position(0, 'h'), 5, {}, `Open access to the Hall candle: restore ${mainCandleAmount} light once.`, ['candle-entrance']);
+  }
+  container('study-manual', 'Ritual manual', position(2, 'a'), { power: 1 },
+    `The improved ritual will help against the guardian of ${rooms[5].name}.`, [{ kind: 'haunting', id: 'haunt-portrait' }]);
+  spirit('haunt-librarian', 'The Folded Librarian', position(2, 'b'), 6, { item: 'moth-key' },
+    `Receive the Moth key. It opens the route to ${rooms[3].name}.`);
+  const objectiveItem: ItemId = kind === 'escape' ? 'exit-key' : kind;
+  const objectiveLabel = kind === 'escape' ? 'Front-door key' : kind === 'diary' ? 'Missing diary' : 'Silver locket';
+  spirit('haunt-portrait', 'The Faceless Portrait', position(5, 'g'), 7, { item: 'thorn-key' },
+    `Receive the Thorn key and open the passage to ${rooms[6].name}, where the ${objectiveLabel.toLowerCase()} waits.${ritualCost ? ` The memorial beyond requires ${ritualCost} light.` : ''}`, [finalPassage.id]);
+  container('objective-chest', kind === 'keepsake' ? 'Bedside keepsake box' : 'Housekeeper’s writing desk', position(6, 'a'), { item: objectiveItem });
+  container('entrance-note', 'Caretaker’s note', position(0, 'n'), {},
+    `A ritual manual remains in ${rooms[2].name}. The Hollow Caretaker holds the crowbar for its boarded passage.`,
+    [{ kind: 'container', id: 'study-manual' }, { kind: 'connection', id: boardedStudy.id }, { kind: 'haunting', id: 'haunt-caretaker' }]);
+  container('workshop-note', 'Marked workbench drawer', position(1, 'a'), {},
+    `The Moth lock leads from ${rooms[2].name} to ${rooms[3].name}. A candle waits in ${rooms[4].name}, above the stairs.`,
+    [{ kind: 'connection', id: mothPassage.id }, { kind: 'candle', id: 'candle-landing' }]);
+
+  let altar: Position | undefined;
+  if (kind === 'keepsake') {
+    altar = position(6, 'b');
+    rooms[6].tiles[altar.y * rooms[6].width + altar.x] = { kind: 'altar', label: 'Memorial' };
+    const resident = spirit('haunt-resident', 'The Waiting Resident', position(6, 'g'), 9, { treasure: 1 },
+      'Return the silver locket at the memorial to release its owner and reclaim a keepsake token.');
+    resident.resolution = 'keepsake';
+  }
+  if (count > 10) {
+    container('collector-box', 'Collector’s locked-away folio', position(10, 'a'), { power: 1, treasure: 2 });
+    spirit('haunt-collector', 'The Ink Collector', position(10, 'g'), 6, {},
+      'Open the alcove containing a ritual folio: +1 power and two pieces of treasure.', ['collector-box']);
+  }
+  const spiritTarget = fallback ? hauntings.length : integer(rng, Math.max(TUNING.minSpirits, hauntings.length), TUNING.maxSpirits);
+  const extraSpots = [position(1, 'b'), { roomId: rooms[2].id, x: 7, y: 4 }, { roomId: rooms[6].id, x: 8, y: 6 }];
+  for (let index = 0; hauntings.length < spiritTarget && index < extraSpots.length; index++) {
+    spirit(`haunt-optional-${index}`, ['The Ash Apprentice', 'The Paper Hoarder', 'The Velvet Guest'][index], extraSpots[index], index === 0 ? 6 : 4,
+      index === 0 ? { power: 1 } : { treasure: 3 }, index === 0 ? 'Learn an optional ritual improvement: +1 power.' : 'Recover three pieces of optional treasure.');
+  }
+  const candleTarget = fallback ? 3 : integer(rng, TUNING.minCandles, TUNING.maxCandles);
+  if (candleTarget > 3) candle('candle-workshop', 'Tallow stub', { roomId: rooms[1].id, x: 6, y: 1 }, 2);
+  if (candleTarget > 4) {
+    const at = count > 9 ? position(9, 'b') : position(5, 'a');
+    candle('candle-spare', count > 9 ? 'Nursery candle' : 'Gallery taper', at, 3);
+  }
+  const entrance = layouts[0].ports.south!;
+  rooms[0].tiles[entrance.y * rooms[0].width + entrance.x] = { kind: 'exit', label: 'Front door' };
   const state: GameState = {
-    version: SAVE_VERSION, seed, rng: rng.rng, rooms, connections,
-    player: { roomId: rooms[0].id, x: 4, y: 6 }, spirit: { roomId: rooms[rooms.length - 1].id, x: 4, y: 4 }, entrance,
-    turn: 0, spiritMoves: 0, inventory: [], matches: TUNING.startingMatches, charm: true, treasure: 0,
-    objective: { kind: plan.kind, ...OBJECTIVES[plan.kind], completed: false, ...(altarRoom && altarIndex !== undefined ? { altar: { roomId: altarRoom.id, x: altarIndex % size, y: Math.floor(altarIndex / size) } } : {}) },
-    evidence: [], log: ['The front door closes behind you.', 'Your candle is steady. Walk carefully; the house waits while you think.'], status: 'active',
+    version: SAVE_VERSION, seed, rng: rng.rng, rooms, connections, hauntings, candles,
+    clusters: [
+      { id: `opening-${opening}`, vantage: position(0, 'P'), members: [
+        { kind: 'haunting', id: 'haunt-instructor' }, { kind: 'haunting', id: 'haunt-caretaker' },
+        { kind: 'haunting', id: 'haunt-miser' }, { kind: 'candle', id: 'candle-entrance' },
+        ...(opening === 'replenishment' ? [{ kind: 'haunting' as const, id: 'haunt-wick' }] : []),
+      ] },
+      { id: 'study-choice', vantage: { roomId: rooms[2].id, x: 2, y: 3 }, members: [
+        { kind: 'container', id: 'study-manual' }, { kind: 'haunting', id: 'haunt-librarian' }, { kind: 'candle', id: 'candle-study' },
+      ] },
+      { id: 'upper-guardian', vantage: { roomId: rooms[4].id, x: 3, y: 3 }, members: [
+        { kind: 'haunting', id: 'haunt-portrait' }, { kind: 'candle', id: 'candle-landing' },
+      ] },
+    ],
+    player: { ...position(0, 'P') }, entrance, steps: 0, decisions: 0,
+    light: TUNING.startingLight, maxLight: TUNING.maxLight, ritualPower: TUNING.startingPower,
+    inventory: [], treasure: 0, objective: { kind, ...OBJECTIVES[kind],
+      description: `${OBJECTIVES[kind].description}${ritualCost ? ` The memorial ritual requires ${ritualCost} light.` : ''}`, completed: false, ritualCost,
+      ...(altar ? { altar, hauntingId: 'haunt-resident' } : {}) },
+    journal: [`The ${rooms[6].name} holds the ${objectiveLabel.toLowerCase()}.`, `The crowbar opens ${rooms[2].name}; its ritual manual strengthens future banishments.`],
+    log: ['The front door closes behind you.', 'Inspect the nearby hauntings and candle before spending your light.'], status: 'active', undo: [],
   };
   refreshExploration(state);
   return state;
 }
 
-/** Bounded retries plus the same authored, validated fallback for any failed seed. */
-export function createGame(seed: string): GameState {
-  for (let attempt = 0; attempt < TUNING.generationAttempts; attempt++) {
+/** Bounded retries. A fixed authored fallback is independently geometry-validated. */
+export function createGame(seed: string, options: GenerationOptions = {}): GameState {
+  const attempts = options.forceFallback ? 0 : Math.max(0, Math.min(TUNING.generationAttempts, Math.floor(options.attempts ?? TUNING.generationAttempts)));
+  for (let attempt = 0; attempt < attempts; attempt++) {
     try {
-      const state = build(seed, `${seed}:layout:${attempt}`);
-      if (validateHouse(state).length === 0) return state;
-    } catch { /* Retry only a bounded number of construction failures. */ }
+      const house = build(seed, `${seed}:resource:${attempt}`);
+      if (validateHouse(house, { solverBudget: options.solverBudget }).length === 0) return house;
+    } catch { /* Construction and validation have a strict retry limit. */ }
   }
-  const fallback = build(seed, 'haunted-house:known-valid:1');
+  const fallback = build(seed, FALLBACK_SEED, true);
   const errors = validateHouse(fallback);
   if (errors.length) throw new Error(`Haunted House fallback is invalid: ${errors.join('; ')}`);
   return fallback;
 }
 
-/** Tile-level acquisition simulation. Also accepts a progressed, structurally checked save. */
-export function validateHouse(state: GameState): string[] {
-  const errors: string[] = [];
-  const roomIds = new Set(state.rooms.map(room => room.id));
-  if (roomIds.size !== state.rooms.length) errors.push('Room identifiers must be unique.');
-  const connectionIds = new Set(state.connections.map(connection => connection.id));
-  if (connectionIds.size !== state.connections.length) errors.push('Passage identifiers must be unique.');
-  const endpoints = new Set<string>();
-  for (const connection of state.connections) {
-    if (connection.a.roomId === connection.b.roomId) errors.push(`${connection.id} must connect different rooms.`);
-    for (const endpoint of [connection.a, connection.b]) {
-      const room = state.rooms.find(candidate => candidate.id === endpoint.roomId);
-      const tile = room && tileAt(room, endpoint.x, endpoint.y);
-      if (!tile || tile.kind !== connection.kind || tile.connectionId !== connection.id) errors.push(`${connection.id} has an invalid endpoint.`);
-      if (endpoints.has(positionKey(endpoint))) errors.push('Passages share an endpoint.');
-      endpoints.add(positionKey(endpoint));
+interface FloodOptions { removeAllSpirits?: boolean; keepSpirit?: string; openAllGates?: boolean }
+
+/** Physical reachability used only by generation checks; it does not spend items. */
+function flood(house: GameSnapshot, start: Position, options: FloodOptions = {}): Map<string, Position> {
+  const byId = new Map(house.rooms.map(room => [room.id, room]));
+  const blockedSpirits = new Set(house.hauntings.filter(spirit =>
+    !spirit.banished && (!options.removeAllSpirits || spirit.id === options.keepSpirit)).map(spirit => positionKey(spirit.position)));
+  const blockedGates = new Set(house.connections.filter(connection => !connection.opened && !options.openAllGates)
+    .flatMap(connection => [positionKey(connection.a), positionKey(connection.b)]));
+  const portals = new Map(house.connections.flatMap(connection => [[positionKey(connection.a), connection.b], [positionKey(connection.b), connection.a]] as [string, Position][]));
+  const allowed = (at: Position): boolean => {
+    const room = byId.get(at.roomId);
+    return !!room && walkable(tileAt(room, at.x, at.y)) && !blockedSpirits.has(positionKey(at)) && !blockedGates.has(positionKey(at));
+  };
+  const result = new Map<string, Position>();
+  if (!allowed(start)) return result;
+  const queue = [start]; result.set(positionKey(start), start);
+  for (let head = 0; head < queue.length; head++) {
+    const current = queue[head];
+    const next = DELTAS.map(([x, y]) => ({ roomId: current.roomId, x: current.x + x, y: current.y + y }));
+    const peer = portals.get(positionKey(current));
+    if (peer) next.push(peer);
+    for (const candidate of next) if (allowed(candidate) && !result.has(positionKey(candidate))) {
+      result.set(positionKey(candidate), candidate); queue.push(candidate);
     }
-    const first = state.rooms.find(room => room.id === connection.a.roomId);
-    const second = state.rooms.find(room => room.id === connection.b.roomId);
-    if (first && second && (connection.kind === 'stairs' ? Math.abs(first.floor - second.floor) !== 1 : first.floor !== second.floor)) errors.push(`${connection.id} has inconsistent floors.`);
   }
-  for (const room of state.rooms) {
+  return result;
+}
+
+function leadPositions(house: GameSnapshot, lead: Lead): Position[] {
+  if (lead.kind === 'haunting') return house.hauntings.filter(spirit => spirit.id === lead.id).map(spirit => spirit.position);
+  if (lead.kind === 'candle') return house.candles.filter(candle => candle.id === lead.id).map(candle => candle.position);
+  if (lead.kind === 'container') return house.rooms.flatMap(room => room.containers.filter(container => container.id === lead.id).map(container => ({ roomId: room.id, x: container.x, y: container.y })));
+  if (lead.kind === 'connection') return house.connections.filter(connection => connection.id === lead.id).flatMap(connection => [connection.a, connection.b]);
+  return house.rooms.filter(room => room.id === lead.id).flatMap(room => room.tiles.flatMap((tile, index) => walkable(tile) ? [{ roomId: room.id, x: index % room.width, y: Math.floor(index / room.width) }] : []));
+}
+
+/** Every local decision cluster can be surveyed without committing any resource. */
+export function validateInformationFairness(house: GameSnapshot): string[] {
+  const errors: string[] = [];
+  for (const cluster of house.clusters) {
+    const safe = [...flood(house, cluster.vantage).values()];
+    if (!safe.length) { errors.push(`${cluster.id} has no safe vantage.`); continue; }
+    for (const member of cluster.members) {
+      const targets = leadPositions(house, member);
+      if (!targets.length || !targets.some(target => safe.some(at => at.roomId === target.roomId && Math.abs(at.x - target.x) + Math.abs(at.y - target.y) <= TUNING.lightRadius))) {
+        errors.push(`${cluster.id} hides ${member.id} until after a commitment.`);
+      }
+    }
+  }
+  return errors;
+}
+
+/** New-house validation. Progressed saves use structural validation instead. */
+export function validateHouse(house: GameSnapshot, options: { solverBudget?: number } = {}): string[] {
+  const errors: string[] = [];
+  const rooms = new Map(house.rooms.map(room => [room.id, room]));
+  const connectionIds = new Set(house.connections.map(connection => connection.id));
+  if (rooms.size !== house.rooms.length) errors.push('Room identifiers must be unique.');
+  if (connectionIds.size !== house.connections.length) errors.push('Connection identifiers must be unique.');
+  const endpointKeys = new Set<string>();
+  const onTerrain = (at: Position): boolean => { const room = rooms.get(at.roomId); return !!room && walkable(tileAt(room, at.x, at.y)); };
+  for (const connection of house.connections) {
+    const first = rooms.get(connection.a.roomId); const second = rooms.get(connection.b.roomId);
+    if (!first || !second || first.id === second.id) { errors.push(`${connection.id} connects invalid rooms.`); continue; }
+    if (connection.kind === 'stairs' ? Math.abs(first.floor - second.floor) !== 1 : first.floor !== second.floor) errors.push(`${connection.id} has inconsistent floors.`);
+    if (connection.kind === 'door') {
+      const dx = second.mapX - first.mapX; const dy = second.mapY - first.mapY;
+      if (Math.abs(dx) + Math.abs(dy) !== 1) errors.push(`${connection.id} does not connect neighbouring rooms.`);
+      if (dx > 0 && !(connection.a.x > first.width / 2 && connection.b.x < second.width / 2) || dx < 0 && !(connection.a.x < first.width / 2 && connection.b.x > second.width / 2) || dy > 0 && !(connection.a.y > first.height / 2 && connection.b.y < second.height / 2) || dy < 0 && !(connection.a.y < first.height / 2 && connection.b.y > second.height / 2)) errors.push(`${connection.id} has inconsistent doorway directions.`);
+    }
+    for (const endpoint of [connection.a, connection.b]) {
+      const room = rooms.get(endpoint.roomId); const tile = room && tileAt(room, endpoint.x, endpoint.y);
+      if (tile?.kind !== connection.kind || tile.connectionId !== connection.id) errors.push(`${connection.id} has an invalid endpoint.`);
+      if (endpointKeys.has(positionKey(endpoint))) errors.push('Two passages share an endpoint.');
+      endpointKeys.add(positionKey(endpoint));
+    }
+  }
+  for (const room of house.rooms) {
     if (room.tiles.length !== room.width * room.height || room.discovered.length !== room.tiles.length) errors.push(`${room.id} has inconsistent dimensions.`);
     room.tiles.forEach((tile, index) => {
-      const position = { roomId: room.id, x: index % room.width, y: Math.floor(index / room.width) };
-      if (walkable(tile) && cardinalNeighbors(state, position).length < 2) errors.push(`${room.id} has a tile that can trap the spirit.`);
-      if ((tile.kind === 'door' || tile.kind === 'stairs') && (!tile.connectionId || !connectionIds.has(tile.connectionId) || !endpoints.has(positionKey(position)))) errors.push(`${room.id} has an unpaired passage tile.`);
-      if (tile.kind === 'container' && !room.containers.some(container => container.id === tile.containerId && container.x === position.x && container.y === position.y)) errors.push(`${room.id} has a missing container.`);
+      const at = { roomId: room.id, x: index % room.width, y: Math.floor(index / room.width) };
+      if (['door', 'stairs'].includes(tile.kind) && (!tile.connectionId || !connectionIds.has(tile.connectionId) || !endpointKeys.has(positionKey(at)))) errors.push(`${room.id} contains an unpaired passage.`);
+      if (tile.kind === 'container' && !room.containers.some(container => container.id === tile.containerId && container.x === at.x && container.y === at.y)) errors.push(`${room.id} has an orphaned container tile.`);
+      if (tile.kind === 'candle' && !house.candles.some(candle => candle.id === tile.candleId && samePosition(candle.position, at))) errors.push(`${room.id} has an orphaned candle tile.`);
     });
     for (const container of room.containers) {
-      const tile = tileAt(room, container.x, container.y);
-      if (tile?.kind !== 'container' || tile.containerId !== container.id) errors.push(`${container.id} has no physical container tile.`);
+      if (tileAt(room, container.x, container.y)?.containerId !== container.id) errors.push(`${container.id} is missing its container tile.`);
+      for (const lead of container.leads ?? []) if (!leadPositions(house, lead).length) errors.push(`${container.id} has a clue pointing at missing content.`);
     }
   }
-  const validPosition = (position: Position) => {
-    const room = state.rooms.find(candidate => candidate.id === position.roomId);
-    return !!room && walkable(tileAt(room, position.x, position.y));
-  };
-  if (!validPosition(state.entrance) || !validPosition(state.player) || !validPosition(state.spirit)) errors.push('Entrance, player and spirit must stand on traversable tiles.');
-  const entranceRoom = state.rooms.find(room => room.id === state.entrance.roomId);
-  if (!entranceRoom || tileAt(entranceRoom, state.entrance.x, state.entrance.y)?.kind !== 'exit') errors.push('The entrance needs an exit tile.');
+  const spiritPositions = new Set<string>();
+  for (const spirit of house.hauntings) {
+    if (!onTerrain(spirit.position) || endpointKeys.has(positionKey(spirit.position))) errors.push(`${spirit.id} must occupy its own floor tile.`);
+    if (spiritPositions.has(positionKey(spirit.position))) errors.push('Hauntings cannot share a tile.');
+    spiritPositions.add(positionKey(spirit.position));
+  }
+  for (const candle of house.candles) {
+    const room = rooms.get(candle.position.roomId);
+    if (!room || tileAt(room, candle.position.x, candle.position.y)?.candleId !== candle.id || candle.restores <= 0) errors.push(`${candle.id} has an invalid placement or restoration.`);
+  }
+  const entranceRoom = rooms.get(house.entrance.roomId);
+  if (!onTerrain(house.player) || !entranceRoom || tileAt(entranceRoom, house.entrance.x, house.entrance.y)?.kind !== 'exit') errors.push('The player and entrance need valid floor positions.');
   if (errors.length) return errors;
 
-  const acquired = new Set<ItemId>(state.inventory);
-  let reachable = new Map<string, Position>();
-  for (let pass = 0; pass <= 6; pass++) {
-    const queue = [{ ...state.entrance }];
-    reachable = new Map([[positionKey(state.entrance), state.entrance]]);
-    for (let index = 0; index < queue.length; index++) for (const next of neighbors(state, queue[index], gate => acquired.has(gate))) {
-      if (!reachable.has(positionKey(next))) { reachable.set(positionKey(next), next); queue.push(next); }
-    }
-    let changed = false;
-    for (const room of state.rooms) for (const container of room.containers) {
-      if (!container.item || acquired.has(container.item) || container.opened) continue;
-      const position = { roomId: room.id, x: container.x, y: container.y };
-      if ([...reachable.values()].some(candidate => adjacent(candidate, position))) { acquired.add(container.item); changed = true; }
-    }
-    if (!changed) break;
-  }
-  for (const connection of state.connections) {
-    if (connection.gate && !acquired.has(connection.gate)) errors.push(`The ${connection.gate} prerequisite cannot be reached.`);
-    if (!reachable.has(positionKey(connection.a)) || !reachable.has(positionKey(connection.b))) errors.push(`${connection.id} has an unreachable endpoint.`);
-  }
-  for (const room of state.rooms) {
+  const allOpen = flood(house, house.entrance, { removeAllSpirits: true, openAllGates: true });
+  const canInteract = (at: Position, reachable: Map<string, Position>): boolean => [...reachable.values()].some(candidate => adjacent(candidate, at));
+  for (const room of house.rooms) {
     room.tiles.forEach((tile, index) => {
-      if (walkable(tile) && !reachable.has(positionKey({ roomId: room.id, x: index % room.width, y: Math.floor(index / room.width) }))) errors.push(`${room.id} has an unreachable floor tile.`);
+      if (walkable(tile) && !allOpen.has(positionKey({ roomId: room.id, x: index % room.width, y: Math.floor(index / room.width) }))) errors.push(`${room.id} has unreachable floor geometry.`);
     });
-    for (const container of room.containers) {
-      const position = { roomId: room.id, x: container.x, y: container.y };
-      if (![...reachable.values()].some(candidate => adjacent(candidate, position)) || (container.item && !acquired.has(container.item))) errors.push(`${container.id} cannot be searched from a reachable tile.`);
+    for (const container of room.containers) if (!canInteract({ roomId: room.id, x: container.x, y: container.y }, allOpen)) errors.push(`${container.id} has no interaction position.`);
+  }
+  for (const candle of house.candles) if (!canInteract(candle.position, allOpen)) errors.push(`${candle.id} has no interaction position.`);
+  for (const spirit of house.hauntings) {
+    if (!canInteract(spirit.position, allOpen)) errors.push(`${spirit.id} has no interaction position.`);
+    if (!spirit.guards?.length) continue;
+    const blocked = flood(house, house.entrance, { removeAllSpirits: true, keepSpirit: spirit.id, openAllGates: true });
+    for (const guard of spirit.guards) {
+      const connection = house.connections.find(candidate => candidate.id === guard);
+      const target = connection ? [connection.a, connection.b] : [
+        ...house.candles.filter(candle => candle.id === guard).map(candle => candle.position),
+        ...house.rooms.flatMap(room => room.containers.filter(container => container.id === guard).map(container => ({ roomId: room.id, x: container.x, y: container.y }))),
+      ];
+      if (!target.length) errors.push(`${spirit.id} guards missing content.`);
+      else if (connection ? target.some(at => blocked.has(positionKey(at))) : target.some(at => canInteract(at, blocked))) errors.push(`${spirit.id} can be bypassed on the way to ${guard}.`);
+      else if (connection ? !target.every(at => allOpen.has(positionKey(at))) : !target.some(at => canInteract(at, allOpen))) errors.push(`${guard} stays inaccessible after banishment.`);
     }
   }
-  const objectiveItem: ItemId = state.objective.kind === 'escape' ? 'exit-key' : state.objective.kind;
-  if (!acquired.has(objectiveItem)) errors.push('The objective item cannot be recovered.');
-  if (state.objective.kind === 'keepsake') {
-    const altar = state.objective.altar;
-    const room = altar && state.rooms.find(candidate => candidate.id === altar.roomId);
-    if (!altar || !room || tileAt(room, altar.x, altar.y)?.kind !== 'altar' || ![...reachable.values()].some(candidate => adjacent(candidate, altar))) errors.push('The memorial cannot be used from a reachable tile.');
+  if (house.objective.kind === 'keepsake') {
+    const altar = house.objective.altar; const room = altar && rooms.get(altar.roomId);
+    if (!altar || !room || tileAt(room, altar.x, altar.y)?.kind !== 'altar' || !canInteract(altar, allOpen) || !house.hauntings.some(spirit => spirit.id === house.objective.hauntingId && spirit.resolution === 'keepsake')) errors.push('The keepsake needs a reachable memorial and associated haunting.');
   }
-  if (!reachable.has(positionKey(state.player))) errors.push('The player has no return route.');
-  if (state.status === 'active' && samePosition(state.player, state.spirit)) errors.push('An active player cannot overlap the spirit.');
+  errors.push(...validateInformationFairness(house));
+  if (errors.length) return errors;
+  const solution = solveHouse(house, { budget: options.solverBudget });
+  if (solution.status === 'exhausted') errors.push(`Resource validation exhausted its ${solution.explored}-state search budget.`);
+  else if (solution.status !== 'solved') errors.push('The completed house has no resource solution with an escape route.');
   return errors;
 }

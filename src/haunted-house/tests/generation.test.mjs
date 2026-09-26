@@ -1,14 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createGame, validateHouse } from '../generation.ts';
+import { solveHouse } from '../solver.ts';
 import { TUNING } from '../content.ts';
-import { act, candle, interactions, objectiveReady } from '../game.ts';
+import { act, interactions } from '../game.ts';
 import { parseSave } from '../persistence.ts';
+import { refreshExploration } from '../world.ts';
+import { cheapestFirstFixture, clone, orderingFixture, pointKey, samePoint } from './fixtures.mjs';
 
-const cardinal = [[0, -1], [1, 0], [0, 1], [-1, 0]];
-const pointKey = p => `${p.roomId}:${p.x},${p.y}`;
-const samePoint = (a, b) => pointKey(a) === pointKey(b);
-const copy = value => structuredClone(value);
+const cardinal = [[0, -1, 'north'], [1, 0, 'east'], [0, 1, 'south'], [-1, 0, 'west']];
 
 function tileAt(state, p) {
   const room = state.rooms.find(candidate => candidate.id === p.roomId);
@@ -16,277 +16,248 @@ function tileAt(state, p) {
   return room.tiles[p.y * room.width + p.x];
 }
 
-const walkable = (state, p) => ['floor', 'door', 'stairs', 'exit'].includes(tileAt(state, p)?.kind);
+function safe(state, p) {
+  const tile = tileAt(state, p);
+  if (!tile || !['floor', 'door', 'stairs', 'exit'].includes(tile.kind)) return false;
+  if (state.hauntings.some(h => !h.banished && samePoint(h.position, p))) return false;
+  return !tile.connectionId || state.connections.some(c => c.id === tile.connectionId && c.opened);
+}
 
-// This solver works on individual tiles and actual container interaction positions.
-// A connected room graph alone cannot satisfy its reachability checks.
-function reachableTiles(state, inventory) {
-  const reached = new Map([[pointKey(state.entrance), state.entrance]]);
-  const queue = [state.entrance];
+/** Independent reachability follows real move semantics, including automatic portal crossing. */
+function pathsFrom(state, start = state.player) {
+  const queue = [start];
+  const paths = new Map([[pointKey(start), []]]);
   for (let index = 0; index < queue.length; index++) {
     const here = queue[index];
-    const neighbors = cardinal.map(([x, y]) => ({ roomId: here.roomId, x: here.x + x, y: here.y + y }));
-    for (const connection of state.connections) {
-      if (connection.gate && !connection.opened && !inventory.has(connection.gate)) continue;
-      if (samePoint(here, connection.a)) neighbors.push(connection.b);
-      if (samePoint(here, connection.b)) neighbors.push(connection.a);
+    const choices = cardinal.map(([dx, dy, direction]) => {
+      const neighbor = { roomId: here.roomId, x: here.x + dx, y: here.y + dy };
+      if (!safe(state, neighbor)) return undefined;
+      const connection = state.connections.find(c => c.id === tileAt(state, neighbor)?.connectionId);
+      const to = connection ? samePoint(connection.a, neighbor) ? connection.b : connection.a : neighbor;
+      return safe(state, to) ? { to, action: { type: 'move', direction } } : undefined;
+    });
+    for (const connection of state.connections.filter(c => c.opened)) {
+      if (samePoint(connection.a, here) && safe(state, connection.b)) choices.push({ to: connection.b, action: { type: 'travel', connectionId: connection.id } });
+      if (samePoint(connection.b, here) && safe(state, connection.a)) choices.push({ to: connection.a, action: { type: 'travel', connectionId: connection.id } });
     }
-    for (const next of neighbors) {
-      if (!walkable(state, next) || reached.has(pointKey(next))) continue;
-      reached.set(pointKey(next), next);
-      queue.push(next);
+    for (const choice of choices.filter(Boolean)) {
+      if (paths.has(pointKey(choice.to))) continue;
+      paths.set(pointKey(choice.to), [...paths.get(pointKey(here)), choice.action]);
+      queue.push(choice.to);
     }
   }
-  return reached;
+  return paths;
 }
 
-function canInteract(reached, position) {
-  return cardinal.some(([x, y]) => reached.has(pointKey({ roomId: position.roomId, x: position.x + x, y: position.y + y })));
+const canInteract = (paths, p) => cardinal.some(([dx, dy]) => paths.has(pointKey({ roomId: p.roomId, x: p.x + dx, y: p.y + dy })));
+
+function apply(state, action) {
+  const result = act(state, action);
+  assert.equal(result.committed, true, `${state.seed}: ${JSON.stringify(action)}: ${result.message}`);
+  return result.state;
 }
 
-function solve(state) {
-  const inventory = new Set(state.inventory);
-  let reached, priorSize;
-  const acquisition = [];
-  do {
-    priorSize = inventory.size;
-    reached = reachableTiles(state, inventory);
-    const found = [];
-    for (const room of state.rooms) {
-      for (const container of room.containers) {
-        if (!container.item || inventory.has(container.item)) continue;
-        if (canInteract(reached, { roomId: room.id, x: container.x, y: container.y })) found.push(container.item);
-      }
-    }
-    for (const item of found) inventory.add(item);
-    if (found.length) acquisition.push(found);
-  } while (inventory.size > priorSize);
-  return { inventory, reached, acquisition };
-}
-
-test('250 seeded houses are repeatable, varied, and solvable through tile-level prerequisites and return paths', () => {
-  const sizes = new Set(), floors = new Set(), objectives = new Set(), plans = new Set();
-  for (let number = 0; number < 250; number++) {
-    const seed = `generation-verification-${number}`;
+test('40 seeded houses are repeatable, within pacing budgets, and solved after final geometric placement', context => {
+  const sizes = new Set(), floors = new Set(), objectives = new Set(), patterns = new Set(), footprints = new Set(), openings = new Set();
+  let largestSearch = 0;
+  for (let number = 0; number < 40; number++) {
+    const seed = `resource-generation-${number}`;
     const state = createGame(seed);
-    assert.deepEqual(validateHouse(state), [], seed);
-    assert.deepEqual(createGame(seed), state, `restart must reproduce ${seed}`);
     assert.equal(state.seed, seed);
+    assert.deepEqual(createGame(seed), state, `same seed reproduces ${seed}`);
+    assert.deepEqual(validateHouse(state), [], seed);
+    const solved = solveHouse(state);
+    assert.equal(solved.status, 'solved', seed);
+    assert.ok(solved.solution.some(step => step.action.type === 'leave'));
+    largestSearch = Math.max(largestSearch, solved.explored);
     assert.equal(state.status, 'active');
-    assert.equal(state.turn, 0);
-    assert.equal(state.spiritMoves, 0);
-    assert.equal(state.charm, true);
-    assert.equal(state.matches, TUNING.startingMatches);
-    assert.ok(!samePoint(state.player, state.spirit));
-    assert.ok(state.spirit.roomId !== state.player.roomId || Math.abs(state.spirit.x - state.player.x) + Math.abs(state.spirit.y - state.player.y) > 1);
+    assert.equal(state.light, TUNING.startingLight);
+    assert.equal(state.ritualPower, TUNING.startingPower);
+    assert.equal(state.maxLight, TUNING.maxLight);
+    if (state.objective.kind === 'keepsake') {
+      const finalRitual = new RegExp(`${state.objective.ritualCost} light`);
+      assert.match(state.objective.description, finalRitual, 'the final ritual cost is known before any commitment');
+      assert.match(state.hauntings.find(h => h.id === 'haunt-portrait').benefit, finalRitual, 'the last guardian warns that light must remain for the memorial');
+    }
     assert.ok(state.rooms.length >= TUNING.minRooms && state.rooms.length <= TUNING.maxRooms);
+    assert.ok(state.hauntings.length >= TUNING.minSpirits && state.hauntings.length <= TUNING.maxSpirits);
+    assert.ok(state.candles.length >= TUNING.minCandles && state.candles.length <= TUNING.maxCandles);
     const floorCount = new Set(state.rooms.map(room => room.floor)).size;
     assert.ok(floorCount >= TUNING.minFloors && floorCount <= TUNING.maxFloors);
     sizes.add(state.rooms.length); floors.add(floorCount); objectives.add(state.objective.kind);
-    plans.add(JSON.stringify(state.connections.map(connection => [connection.a.roomId, connection.b.roomId, connection.gate])));
-
-    const solved = solve(state);
-    for (const connection of state.connections) {
-      assert.ok(solved.reached.has(pointKey(connection.a)), `${seed}: unreachable endpoint ${connection.id}.a`);
-      assert.ok(solved.reached.has(pointKey(connection.b)), `${seed}: unreachable endpoint ${connection.id}.b`);
-      if (connection.gate) assert.ok(solved.inventory.has(connection.gate), `${seed}: missing prerequisite ${connection.gate}`);
-      for (const endpoint of [connection.a, connection.b]) {
-        assert.equal(tileAt(state, endpoint)?.connectionId, connection.id);
-        assert.equal(tileAt(state, endpoint)?.kind, connection.kind);
-      }
-      const floorA = state.rooms.find(room => room.id === connection.a.roomId).floor;
-      const floorB = state.rooms.find(room => room.id === connection.b.roomId).floor;
-      if (connection.kind === 'stairs') assert.equal(Math.abs(floorA - floorB), 1);
-      else assert.equal(floorA, floorB);
-    }
-    const goalItem = state.objective.kind === 'escape' ? 'exit-key' : state.objective.kind;
-    assert.ok(solved.inventory.has(goalItem), `${seed}: objective item must be interactable`);
-    assert.ok(solved.reached.has(pointKey(state.entrance)), `${seed}: return to exit`);
-    if (state.objective.altar) assert.ok(canInteract(solved.reached, state.objective.altar) || solved.reached.has(pointKey(state.objective.altar)), `${seed}: memorial unreachable`);
-    assert.ok(solved.acquisition.length >= 2, `${seed}: progression must have actual dependencies`);
-    assert.ok(state.rooms.some(room => room.containers.length === 0), `${seed}: preserve empty rooms`);
-    assert.ok(state.connections.length >= state.rooms.length, `${seed}: at least one route loop`);
     for (const room of state.rooms) {
-      assert.ok([...solved.reached.values()].some(point => point.roomId === room.id), `${seed}: inaccessible room ${room.id}`);
-      for (const container of room.containers) assert.ok(canInteract(solved.reached, { roomId: room.id, x: container.x, y: container.y }), `${seed}: inaccessible container ${container.id}`);
+      patterns.add(room.pattern);
+      footprints.add(`${room.width}x${room.height}:${room.tiles.map(t => t.kind === 'wall' ? '#' : '.').join('')}`);
+      assert.equal(room.tiles.length, room.width * room.height);
+      assert.equal(room.discovered.length, room.tiles.length);
     }
-  }
-  assert.ok(sizes.size >= 3, 'room budgets must produce several house sizes');
-  assert.equal(floors.size, TUNING.maxFloors - TUNING.minFloors + 1);
-  assert.deepEqual([...objectives].sort(), ['diary', 'escape', 'keepsake']);
-  assert.ok(plans.size > 25, 'house routes must vary beyond item labels');
-});
-
-test('every generated walkable square permits a spirit to step away even with the player blocking one neighbor', () => {
-  for (let number = 0; number < 100; number++) {
-    const state = createGame(`fairness-${number}`);
-    for (const room of state.rooms) {
-      for (let y = 0; y < room.height; y++) {
-        for (let x = 0; x < room.width; x++) {
-          const here = { roomId: room.id, x, y };
-          if (!walkable(state, here)) continue;
-          const exits = cardinal.filter(([dx, dy]) => walkable(state, { roomId: room.id, x: x + dx, y: y + dy }));
-          assert.ok(exits.length >= 2, `${state.seed}: trapped spirit at ${pointKey(here)}`);
-        }
-      }
+    let opening = interactions(state).filter(entry => !entry.resolved && ['banish', 'search', 'refill'].includes(entry.action.type));
+    for (const path of pathsFrom(state).values()) {
+      if (opening.length || path.length > 3) continue;
+      const nearby = path.reduce((at, action) => apply(at, action), state);
+      opening = interactions(nearby).filter(entry => !entry.resolved && ['banish', 'search', 'refill'].includes(entry.action.type));
     }
-  }
-});
-
-test('validation rejects missing prerequisites, unreachable interactions, and malformed stairs', () => {
-  const base = createGame('validation-corruption');
-  const missingTool = copy(base);
-  for (const room of missingTool.rooms) {
-    for (const container of room.containers) if (container.item === 'crowbar') delete container.item;
-  }
-  assert.ok(validateHouse(missingTool).length > 0, 'essential tools cannot disappear');
-
-  const sealedGoal = copy(base);
-  const goalItem = sealedGoal.objective.kind === 'escape' ? 'exit-key' : sealedGoal.objective.kind;
-  const goalRoom = sealedGoal.rooms.find(room => room.containers.some(container => container.item === goalItem));
-  const container = goalRoom.containers.find(candidate => candidate.item === goalItem);
-  for (const [dx, dy] of cardinal) goalRoom.tiles[(container.y + dy) * goalRoom.width + container.x + dx] = { kind: 'wall' };
-  assert.ok(validateHouse(sealedGoal).length > 0, 'a graph-reachable room with a sealed objective must fail');
-
-  const brokenStairs = copy(base);
-  const stairs = brokenStairs.connections.find(connection => connection.kind === 'stairs');
-  assert.ok(stairs);
-  const destinationRoom = brokenStairs.rooms.find(room => room.id === stairs.b.roomId);
-  destinationRoom.tiles[stairs.b.y * destinationRoom.width + stairs.b.x] = { kind: 'floor' };
-  assert.ok(validateHouse(brokenStairs).length > 0, 'stairs must point to corresponding endpoint tiles');
-
-  const selfLocked = copy(base);
-  const originalKey = selfLocked.rooms.flatMap(room => room.containers).find(found => found.item === 'moth-key');
-  const lockedRoomId = selfLocked.connections.find(connection => connection.gate === 'moth-key').b.roomId;
-  const lockedRoom = selfLocked.rooms.find(room => room.id === lockedRoomId);
-  const lockedContainer = lockedRoom.containers[0];
-  assert.ok(lockedContainer, 'fixture must provide a container behind its first gate');
-  originalKey.item = lockedContainer.item;
-  lockedContainer.item = 'moth-key';
-  assert.ok(validateHouse(selfLocked).length > 0, 'a key behind its own gate must fail');
-});
-
-test('the bounded-generation fallback is valid, reproducible, and preserves the requested seed', () => {
-  const originalAttempts = TUNING.generationAttempts;
-  try {
-    TUNING.generationAttempts = 0;
-    const state = createGame('force-authored-fallback');
-    assert.equal(state.seed, 'force-authored-fallback');
-    assert.deepEqual(validateHouse(state), []);
-    assert.deepEqual(createGame(state.seed), state);
-    const solved = solve(state);
-    assert.ok(solved.inventory.has(state.objective.kind === 'escape' ? 'exit-key' : state.objective.kind));
-  } finally {
-    TUNING.generationAttempts = originalAttempts;
-  }
-});
-
-function nextObjectiveRoute(state) {
-  const tasks = [];
-  if (objectiveReady(state)) {
-    tasks.push({ at: state.entrance, action: { type: 'leave' } });
-  } else if (state.objective.kind === 'keepsake' && state.inventory.includes('keepsake')) {
-    tasks.push({ at: state.objective.altar, action: { type: 'settle' } });
-  } else {
-    for (const room of state.rooms) {
-      for (const container of room.containers) {
-        if (!container.opened && container.item && !state.inventory.includes(container.item)) {
-          tasks.push({ at: { roomId: room.id, x: container.x, y: container.y }, action: { type: 'search', containerId: container.id } });
-        }
-      }
-    }
+    assert.ok(opening.length > 0, `${seed}: the opening offers a useful visible interaction within three free steps`);
+    openings.add(opening.map(entry => `${entry.name}:${entry.detail}`).join('|'));
     for (const connection of state.connections) {
-      if (!connection.opened && connection.gate && state.inventory.includes(connection.gate)) {
-        for (const at of [connection.a, connection.b]) tasks.push({ at, action: { type: 'unlock', connectionId: connection.id } });
-      }
+      assert.equal(tileAt(state, connection.a)?.connectionId, connection.id);
+      assert.equal(tileAt(state, connection.b)?.connectionId, connection.id);
+      const first = state.rooms.find(room => room.id === connection.a.roomId);
+      const second = state.rooms.find(room => room.id === connection.b.roomId);
+      assert.notEqual(first.id, second.id);
+      assert.equal(first.floor === second.floor, connection.kind === 'door');
     }
   }
+  assert.ok(sizes.size >= 3, 'adventure room counts vary');
+  assert.equal(floors.size, 2, 'both two-floor and three-floor adventures occur');
+  assert.equal(objectives.size, 3);
+  assert.ok(patterns.size >= 5, 'closets, halls, chambers, and shaped rooms use authored footprints');
+  assert.ok(footprints.size >= 8, 'room geometry varies beyond names and furniture');
+  assert.ok(openings.size >= 3, 'houses do not share one mandatory tutorial opening');
+  context.diagnostic(`${sizes.size} room counts; ${patterns.size} named patterns; ${footprints.size} footprints; maximum ${largestSearch} solver states`);
+});
 
-  const queue = [state.player];
-  const previous = new Map([[pointKey(state.player), undefined]]);
-  const directions = ['north', 'east', 'south', 'west'];
-  for (let index = 0; index < queue.length; index++) {
-    const here = queue[index];
-    const task = tasks.find(candidate => candidate.at.roomId === here.roomId && Math.abs(candidate.at.x - here.x) + Math.abs(candidate.at.y - here.y) <= 1);
-    if (task) {
-      const actions = [task.action];
-      let current = pointKey(here);
-      while (previous.get(current)) {
-        const step = previous.get(current);
-        actions.push(step.action);
-        current = step.from;
-      }
-      return actions.reverse();
-    }
-    const options = cardinal.map(([dx, dy], direction) => ({
-      at: { roomId: here.roomId, x: here.x + dx, y: here.y + dy },
-      action: { type: 'move', direction: directions[direction] },
-    }));
-    for (const connection of state.connections) {
-      if (!connection.opened) continue;
-      if (samePoint(here, connection.a)) options.push({ at: connection.b, action: { type: 'travel', connectionId: connection.id } });
-      if (samePoint(here, connection.b)) options.push({ at: connection.a, action: { type: 'travel', connectionId: connection.id } });
-    }
-    for (const option of options) {
-      const key = pointKey(option.at);
-      if (!walkable(state, option.at) || previous.has(key)) continue;
-      previous.set(key, { from: pointKey(here), action: option.action });
-      queue.push(option.at);
-    }
-  }
-  return undefined;
-}
-
-test('12 complete adventures win using public safety readings, with exact save/load after every action', context => {
-  const runs = { escape: [], diary: [], keepsake: [] };
-  let safetyWaits = 0;
-  for (let candidate = 0; Object.values(runs).some(group => group.length < 4); candidate++) {
-    assert.ok(candidate < 100, 'expected four examples of every objective');
-    let state = createGame(`full-adventure-${candidate}`);
-    if (runs[state.objective.kind].length >= 4) continue;
-    const initialMatches = state.matches;
-    let actions = 0;
-    const perform = action => {
-      assert.ok(++actions <= 2500, `${state.seed}: route did not complete within the turn budget`);
-      if (action.type === 'wait') safetyWaits++;
-      const result = act(state, action);
-      assert.equal(result.committed, true, `${state.seed}: ${JSON.stringify(action)}: ${result.message}`);
-      assert.notEqual(result.state.status, 'lost', `${state.seed}: dependable readings must prevent contact`);
-      assert.equal(result.state.charm, true, `${state.seed}: no hidden hazard should need a charm`);
-      assert.equal(result.state.matches, initialMatches, `${state.seed}: required routes need no finite information supply`);
-      const loaded = parseSave(JSON.stringify(result.state));
-      assert.equal(loaded.kind, 'loaded', `${state.seed}: save invalid after ${JSON.stringify(action)}: ${loaded.message ?? ''}`);
-      assert.deepEqual(loaded.state, result.state);
-      state = loaded.state;
-    };
-    while (state.status === 'active') {
-      const route = nextObjectiveRoute(state);
-      assert.ok(route?.length, `${state.seed}: no reachable next objective interaction`);
-      for (const action of route) {
-        if (action.type === 'move') {
-          let waits = 0;
-          while (candle(state)) {
-            assert.ok(waits++ < TUNING.spiritEveryTurns, `${state.seed}: guttering candle never clears`);
-            perform({ type: 'wait' });
-          }
-        }
-        if (action.type === 'travel') {
-          let waits = 0;
-          const threshold = () => interactions(state).find(interaction => interaction.action.type === 'travel' && interaction.action.connectionId === action.connectionId);
-          assert.ok(threshold(), `${state.seed}: missing threshold reading at a passage`);
-          while (!threshold().available) {
-            assert.ok(waits++ < TUNING.spiritEveryTurns, `${state.seed}: occupied threshold never clears`);
-            perform({ type: 'wait' });
-          }
-        }
-        perform(action);
-      }
+test('12 complete generated adventures replay solver witnesses through actual walking and public actions', context => {
+  const completed = { escape: 0, diary: 0, keepsake: 0 };
+  let steps = 0, decisions = 0, optionalSurvivors = 0;
+  for (let candidate = 0; Object.values(completed).some(count => count < 4); candidate++) {
+    assert.ok(candidate < 100, 'every objective must be generated');
+    let state = createGame(`resource-complete-${candidate}`);
+    const kind = state.objective.kind;
+    if (completed[kind] >= 4) continue;
+    const solved = solveHouse(state);
+    assert.equal(solved.status, 'solved');
+    for (const step of solved.solution) {
+      const path = pathsFrom(state).get(pointKey(step.position));
+      assert.ok(path, `${state.seed}: solver action position must be reachable under real movement: ${JSON.stringify(step)}`);
+      for (const action of path) { state = apply(state, action); steps++; }
+      refreshExploration(state);
+      state = apply(state, step.action);
+      const resumed = parseSave(JSON.stringify(state));
+      assert.equal(resumed.kind, 'loaded', `${state.seed}: generated state and undo history load after ${step.action.type}: ${resumed.message ?? ''}`);
+      assert.deepEqual(resumed.state, state, 'save continuation preserves every generated object, reward, discovery, and snapshot');
+      state = resumed.state;
+      decisions++;
+      assert.ok(state.light >= 0 && state.light <= state.maxLight);
     }
     assert.equal(state.status, 'won');
     assert.equal(state.objective.completed, true);
-    runs[state.objective.kind].push(state.turn);
+    assert.equal(state.player.roomId, state.entrance.roomId);
+    assert.ok(samePoint(state.player, state.entrance) || Math.abs(state.player.x - state.entrance.x) + Math.abs(state.player.y - state.entrance.y) === 1);
+    optionalSurvivors += state.hauntings.filter(h => !h.banished).length;
+    completed[kind]++;
   }
-  assert.ok(safetyWaits > 0, 'the full adventures must exercise an actual hidden-hazard delay');
-  context.diagnostic(Object.entries(runs).map(([kind, turns]) => `${kind}: ${turns.join(', ')} turns`).join('; '));
-  context.diagnostic(`${safetyWaits} safety waits based on public candle or threshold readings`);
+  assert.ok(optionalSurvivors > 0, 'solutions do not require clearing every haunting');
+  context.diagnostic(`12 wins: ${steps} free walking actions and ${decisions} decisions; ${optionalSurvivors} optional hauntings left`);
+});
+
+test('a generated replenishment adventure makes the cheapest opening spirit a poor decision, recoverable with undo', () => {
+  let state = createGame('scan-65');
+  assert.equal(solveHouse(state).status, 'solved');
+  const miser = state.hauntings.find(haunting => haunting.id === 'haunt-miser');
+  assert.ok(miser);
+  const paths = pathsFrom(state);
+  const approach = cardinal.map(([dx, dy]) => paths.get(pointKey({ roomId: miser.position.roomId, x: miser.position.x + dx, y: miser.position.y + dy }))).find(Boolean);
+  assert.ok(approach, 'the tempting treasure spirit is accessible without another decision');
+  for (const action of approach) state = apply(state, action);
+  assert.equal(Math.max(1, miser.resistance - state.ritualPower), 1);
+  state = apply(state, { type: 'banish', hauntingId: miser.id });
+  assert.equal(solveHouse(state).status, 'unsolvable', 'spending the opening light on treasure prevents completion');
+  const saved = parseSave(JSON.stringify(state));
+  assert.equal(saved.kind, 'loaded', 'a poor resource decision remains a valid save');
+  state = apply(saved.state, { type: 'undo' });
+  assert.equal(solveHouse(state).status, 'solved', 'undo recovers the original opportunity without rerolling');
+});
+
+test('solver distinguishes exact-order solvability, a legitimate resource dead end, and an exhausted budget', () => {
+  for (const state of [orderingFixture(), cheapestFirstFixture()]) {
+    const before = clone(state);
+    assert.equal(solveHouse(state).status, 'solved');
+    assert.deepEqual(state, before, 'validation never consumes or discovers anything');
+    const exhausted = solveHouse(state, { budget: 0 });
+    assert.equal(exhausted.status, 'exhausted');
+    assert.equal(exhausted.explored, 0);
+    assert.deepEqual(exhausted.solution, []);
+    const limited = solveHouse(state, { budget: 1 });
+    assert.equal(limited.status, 'exhausted');
+    assert.ok(limited.explored <= 1);
+  }
+  let wrongOrder = orderingFixture();
+  wrongOrder = apply(wrongOrder, { type: 'refill', candleId: 'three-light-candle' });
+  wrongOrder = apply(wrongOrder, { type: 'banish', hauntingId: 'lesser' });
+  assert.equal(solveHouse(wrongOrder).status, 'unsolvable');
+  let cheapest = cheapestFirstFixture();
+  cheapest = apply(cheapest, { type: 'banish', hauntingId: 'treasure' });
+  assert.equal(solveHouse(cheapest).status, 'unsolvable');
+  cheapest = apply(cheapest, { type: 'undo' });
+  assert.equal(solveHouse(cheapest).status, 'solved');
+});
+
+test('bounded generation has a reproducible, independently validated fallback even when search attempts exhaust', () => {
+  const seed = 'forced-resource-fallback';
+  const forced = createGame(seed, { forceFallback: true });
+  assert.equal(forced.seed, seed);
+  assert.deepEqual(validateHouse(forced), []);
+  assert.deepEqual(createGame(seed, { forceFallback: true }), forced);
+  assert.deepEqual(createGame(seed, { attempts: 0 }), forced);
+  const exhausted = createGame(seed, { attempts: 1, solverBudget: 0 });
+  assert.deepEqual(exhausted, forced);
+  assert.equal(solveHouse(forced).status, 'solved');
+});
+
+test('final validation rejects broken physical connections, inaccessible rewards, and exhausted resource supplies', () => {
+  const initial = createGame('resource-mutant-checks');
+  const brokenStairs = clone(initial);
+  const stairs = brokenStairs.connections.find(c => c.kind === 'stairs');
+  const room = brokenStairs.rooms.find(r => r.id === stairs.b.roomId);
+  room.tiles[stairs.b.y * room.width + stairs.b.x] = { kind: 'floor' };
+  assert.ok(validateHouse(brokenStairs).length > 0);
+
+  const starved = clone(initial);
+  starved.light = 0;
+  starved.candles.forEach(c => { c.used = true; });
+  assert.notEqual(solveHouse(starved).status, 'solved');
+  assert.ok(validateHouse(starved).length > 0);
+
+  const sealed = clone(initial);
+  const objectiveItem = sealed.objective.kind === 'escape' ? 'exit-key' : sealed.objective.kind;
+  const targetHaunting = sealed.hauntings.find(h => h.reward.item === objectiveItem);
+  const targetContainer = sealed.rooms.flatMap(r => r.containers.map(c => ({ ...c, roomId: r.id }))).find(c => c.reward.item === objectiveItem);
+  const target = targetHaunting?.position ?? { roomId: targetContainer.roomId, x: targetContainer.x, y: targetContainer.y };
+  const targetRoom = sealed.rooms.find(r => r.id === target.roomId);
+  for (const [dx, dy] of cardinal) {
+    const x = target.x + dx, y = target.y + dy;
+    if (x >= 0 && y >= 0 && x < targetRoom.width && y < targetRoom.height) targetRoom.tiles[y * targetRoom.width + x] = { kind: 'wall' };
+  }
+  assert.ok(validateHouse(sealed).length > 0, 'a connected room graph cannot rescue a physically sealed reward');
+});
+
+test('declared spirit guards physically deny interaction or passage access until banished', () => {
+  let checked = 0;
+  for (let number = 0; number < 8; number++) {
+    const house = createGame(`guard-geometry-${number}`);
+    for (const guard of house.hauntings.filter(h => h.guards?.length)) {
+      const state = clone(house);
+      state.connections.forEach(c => { c.opened = true; });
+      state.hauntings.forEach(h => { h.banished = h.id !== guard.id; });
+      const before = pathsFrom(state, state.entrance);
+      state.hauntings.find(h => h.id === guard.id).banished = true;
+      const after = pathsFrom(state, state.entrance);
+      for (const id of guard.guards) {
+        const candle = state.candles.find(c => c.id === id);
+        const container = state.rooms.flatMap(r => r.containers.map(c => ({ ...c, roomId: r.id }))).find(c => c.id === id);
+        const connection = state.connections.find(c => c.id === id);
+        const target = candle?.position ?? (container && { roomId: container.roomId, x: container.x, y: container.y });
+        if (target) {
+          assert.equal(canInteract(before, target), false, `${guard.name} must block ${id}`);
+          assert.equal(canInteract(after, target), true, `${id} must become accessible`);
+        } else {
+          assert.ok(connection, `guard references an actual object or connection: ${id}`);
+          assert.ok([connection.a, connection.b].some(p => !before.has(pointKey(p)) && after.has(pointKey(p))), `${guard.name} must physically open ${id}`);
+        }
+        checked++;
+      }
+    }
+  }
+  assert.ok(checked >= 8, 'generated puzzles exercise physical guard placement');
 });

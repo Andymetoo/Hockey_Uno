@@ -1,12 +1,11 @@
 # Haunted House maintenance notes
 
-Haunted House is an isolated, turn-based exploration game. Its entry page is
-`/haunted_house.html`; the root minigames index links to it. Its code, CSS, build
-output, and storage belong only to this game. Existing games are not dependencies.
+Haunted House is a deterministic puzzle adventure at `/haunted_house.html`, linked
+from the existing minigames home page. Its source, styles, build, and storage are
+isolated from Hockey Cards, Ouija, and Bomber Command. No game clock runs while
+the player thinks, explores, or closes the page.
 
-## Run and check
-
-From the repository root:
+## Run and verify
 
 ```sh
 npm run dev:haunted
@@ -17,108 +16,182 @@ npm run preview:haunted
 node src/haunted-house/tests/browser-check.mjs
 ```
 
-On PowerShell installations that disable scripts, use `npm.cmd` instead of `npm`.
-The tests use Node's native TypeScript support and require a recent Node release.
-The browser check starts a local static server and a separate headless Chrome
-profile through the Chrome DevTools Protocol; no Playwright package is required.
-Set `CHROME_PATH` if Chrome is installed elsewhere. Screenshots go in the ignored
-`.haunted-checks/` directory. The regular test suite does not need a browser.
+Use `npm.cmd` on PowerShell installations that disable scripts. Tests use Node's
+native TypeScript support. The browser check uses Chrome DevTools Protocol and
+a separate headless profile; set `CHROME_PATH` if necessary. Generated screenshots
+belong in the ignored `.haunted-checks/` directory. No new runtime package is
+required.
 
-The root entry page references `haunted-build/haunted-house.js` and its stylesheet.
-**Run `build:haunted` before serving the repository as static files.** Generated
-`haunted-build/` files are ignored by Git. The dedicated Vite development config
-loads the TypeScript source directly; the build directory can also be previewed.
-Building does not publish or deploy anything.
+The static entry page loads `haunted-build/haunted-house.js` and its stylesheet.
+Run `build:haunted` before serving the repository as static files. Those generated
+files are ignored by Git. The dedicated Vite development configuration instead
+loads the TypeScript source. A build does not publish or deploy anything.
 
-## Modules
+## Resource and action contract
 
-- `types.ts` defines serializable state and action contracts.
-- `content.ts` holds item names, objective text, directions, and tuning values.
-- `world.ts` contains tile access, legal graph neighbors, discovery, and the PRNG.
-- `generation.ts` plans dependencies, constructs rooms, and validates adventures.
-- `game.ts` resolves deterministic actions and provides current feedback/actions.
-- `persistence.ts` validates, reads, and writes saves; it never repairs a save by
-  generating a different house.
-- `App.ts`, `main.ts`, and `styles.css` handle presentation and input. Reading a
-  menu, selecting a target, and opening the journal do not call a game action.
+`content.ts` centralizes initial light **4/5**, permanent ritual power **1**, fixed
+capacity **5**, discovery radius, generation budgets, route speed, and history
+limits. Banishment costs `max(1, resistance - ritualPower)`. Power is never spent.
+The displayed cost is charged once, simultaneously with removing the haunting
+and granting its defined reward. Requirements and adjacent interaction access
+are checked before any mutation. Rejected actions spend nothing.
 
-## Rules and information
+Hauntings remain on their floor tiles and block traversal until banished or
+resolved by the keepsake objective. They never move, chase, attack, or react to
+walking. Inspecting is free. Candles are solid, separately activated objects:
+each has a finite restoration amount and a persisted used flag. Preview the
+received amount and capacity waste before committing. Passing a candle does not
+activate it. Zero light does not affect visibility or end the run.
 
-An accepted step, search, unlock, crossing, match, wait, memorial interaction, or
-exit action costs one turn. Invalid actions return the original state unchanged.
-Actions resolve against the existing world first. Entering the spirit's tile
-resolves contact immediately: the first contact consumes the charm and returns
-the player to the previous tile; another contact ends the run before advancing
-its clock. A surviving player advances the turn, then the spirit takes a legal
-step after every fourth turn. Physical discovery and current readings refresh.
+The crowbar and shaped keys are reusable. Containers grant their authored rewards
+once; their contents are generated in advance. Escape requires the front-door
+key; the retrieval objective requires carrying the diary back. The keepsake
+objective requires the silver locket, an explicit one-light memorial action, and
+returning to the entrance. Its ritual cost appears in the objective from the
+start and in the gallery guardian's access preview. The memorial action removes its associated
+haunting and grants that haunting's reward. Clearing every spirit or collecting
+every treasure is unnecessary.
 
-The spirit uses cardinal floor movement and open, bidirectional connections. It
-never moves onto the player and never teleports. Outside the player's room it
-prefers shortest legal routes toward them; inside it chooses a seeded legal
-neighbor. Its uint32 Xorshift state is saved, so restoring a save preserves its
-subsequent decisions. There are no timers or automatic gameplay ticks.
+`game.ts` resolves immutable actions, resource previews, discovery, and undo.
+`world.ts` provides terrain, traversability, connections, remembered discovery,
+and the seed PRNG. Exploring does not advance the PRNG. `movement.ts` plans
+cardinal routes only through known traversable tiles in the current room; doors
+and stairs are terminal destinations, never hidden intermediate shortcuts.
+Stepping onto an open endpoint crosses to its peer. An occupied starting endpoint
+also supports explicit travel. A route stops when it reveals a new meaningful
+choice. Movement never searches, unlocks, refills, or banishes automatically.
+Dialogs, conflicting input, undo, restart, and a new house cancel pending routes.
 
-The candle gutters exactly when the spirit occupies one of the four adjacent
-tiles in the current room. A steady reading makes the next cardinal step safe
-because the player's move resolves before the spirit's. Matches check one
-walkable adjacent tile **after** their turn and any scheduled spirit step.
-Evidence is tagged with `spiritMoves` and expires at the next movement beat.
-Physical exploration memory does not expire and never certifies safety.
+## Content and room authoring
 
-Crossing a room boundary is a separate action from stepping onto its door/stair.
-A threshold ward reports whether the remote arrival tile is clear or disturbed;
-an occupied destination prevents travel without spending a turn. This explicit
-rule prevents an invisible gamble beyond the reach of the local candle.
+`room-patterns.ts` contains authored ASCII footprints. `#` is wall, `F` is solid
+furniture, `N/E/S/W` are available floor anchors for connections, `P` is the
+opening position, and lowercase letters are content anchors. Unused anchors
+remain ordinary floor. Each pattern has its own dimensions and actual walls:
+closets, storage rooms, narrow halls, an L-shaped study, a candle alcove, divided
+interiors, and larger rooms with routes around furniture. Furniture descriptions
+match room identities. A closet does not need two neighbors per floor tile.
 
-Every generated walkable tile has at least two within-room cardinal neighbors,
-even while every gate is closed. Blocking one neighbor with the player cannot
-trap the spirit. A guttering player can safely wait at most four turns: the
-spirit must move, a local step changes checkerboard parity, and a passage step
-leaves the room. Either way it leaves the four adjacent tiles. Likewise an
-occupied arrival endpoint must clear at its next step. This gives cautious play
-a guaranteed route without requiring consumable information tools or a charm.
+Keep row lengths equal. Preserve cardinal reachability and an adjacent floor
+position for every solid interaction. Put spirits on ordinary floor, never on
+arrival endpoints. Ports must be unique per room. Same-floor connections use
+opposing doorway directions and neighboring schematic coordinates; stairs join
+adjacent floors. An obstacle intended to guard something needs a real one-tile
+throat or equivalent barrier. Do not rely on its label to make it a guard.
 
-## Generation and extension
+`generation.ts` selects an objective and one of three opening resource patterns:
+an inexpensive power reward, early crowbar access, or a ward protecting a visible
+candle. Their resistances and candle arrangements vary action order. The main
+dependency joins a reusable crowbar, a boarded study and ritual manual, a shaped
+key, upper-floor replenishment, and a gallery guardian. Optional ingredients add
+a ritual folio, further power or treasure, spare candles, and connecting loops.
+The linen closet is genuinely quiet. Optional rooms are not all reward rooms.
 
-Generation chooses an objective and dependency graph before room geometry.
-The three templates require an exit key, a diary and return, or a locket placed
-at a memorial before leaving. Moth and thorn keys and a reusable crowbar form
-either a short chain or a branch. Optional rooms add supplies, treasure, quiet
-containers, connecting loops, and an actually empty dead end. Loops only join
-equal prerequisite regions, so they cannot bypass the intended dependencies.
+Current budgets are **8–12 rooms**, **2–3 floors**, **5–8 hauntings**, and **3–5
+candles**. These are pacing bounds, not an unrestricted architecture engine.
+The authored dependency backbone occupies eight rooms; further rooms create
+alternate approaches, optional rewards, and quiet space. Extending below eight
+or above twelve rooms requires adding compatible graph ingredients, not merely
+changing the numeric budget. The same applies when extending beyond three floors.
+The recipe intentionally stays small enough to inspect and balance.
 
-Room and floor budgets currently produce 9–13 rooms over 2–3 floors. Geometry
-uses a deliberately constrained **9×9 authored pattern** with sparse object
-positions and multiple routes around them. Portal and object coordinates are
-defined for that pattern: changing `roomSize` also requires updating those
-coordinates and retaining the neighbor invariant. Room/floor count, lighting,
-supplies, and movement rhythm are centralized in `TUNING`.
+Use typed `Reward` fields (`power`, `item`, `treasure`), `Lead` references, and
+`PuzzleCluster` members. Notes interpolate actual room names and object IDs.
+Spirit benefits describe their actual reward or access. Add new item text in
+`content.ts`, identifiers in `types.ts`, and behavior in `game.ts`. A mechanic
+that affects future reachability or affordability also needs solver and
+structural-validation support.
 
-The validator checks actual tiles, bidirectional endpoints, floor transitions,
-reachable interaction positions, and a repeated inventory-acquisition search.
-It requires every prerequisite, objective, return route, and floor tile to be
-reachable; it also validates progressed saves using their retained inventory.
-Generation has bounded attempts followed by a separately tested fixed fallback.
-Restarting uses the same original seed and reproduces the complete initial state.
+## Generation, physical validation, and the solver
 
-Add item text in `content.ts`, identifiers in `types.ts`, and requirements in
-`generation.ts`. New obstacle or objective behavior also belongs in `game.ts`.
-Extend validation and the independent tile solver whenever adding a mechanic
-that can affect solvability; do not rely on a connected room graph alone.
+`createGame(seed, options?)` retries at most `TUNING.generationAttempts`. Each
+finished house is validated before being returned. Tests can pass `attempts`,
+`solverBudget`, or `forceFallback`. Failed construction, unsolvable geometry,
+and exhausted search all cause bounded retries. A fixed authored eight-room
+fallback is independently validated using the normal solver budget. The original
+public seed remains in the save. Replaying normal generation for that seed
+reproduces its normal initial state; forced fallback options are for tests.
 
-## Saves and verification
+`validateHouse` is a **new-house solvability check**, never a save-load gate. It
+checks dimensions, paired endpoints, direction and floor consistency, physical
+containers/candles, references, all-open tile reachability, and interaction
+positions. For each `haunting.guards` ID, it removes every other spirit and opens
+all gates, then proves the target still cannot be reached or interacted with.
+Removing the named guard must make it reachable. This rejects casual bypasses.
 
-Storage key `haunted-house.save.v1` contains version 1's full `GameState`: seed,
-PRNG, rooms/tiles/containers, gates, positions, turn phase, discovery, supplies,
-inventory, clues, objective, log, and outcome. A committed action triggers an
-autosave. The adapter verifies writes and reports storage failures. Unreadable
-or incompatible saves remain untouched until the player explicitly confirms a
-replacement; raw unreadable data can be downloaded. No other game's key is used.
-Change the version/schema together when persistence becomes incompatible.
+`solver.ts` floods the current safe component and enumerates meaningful reachable
+banishments, refills, pickups, unlocks, memorial actions, and escape. It uses
+bounded bit masks for removed spirits, used candles, claimed containers, and
+opened gates, plus inventory, permanent power, light, objective state, and the
+reachable component. Dominance only discards a state when all those relevant
+facts match and an equal or higher light state already exists. Score-only
+containers and narration can be omitted because they cannot enable completion.
+An unclaimed treasure spirit is still considered because its tile may block a
+route. Pure walking is collapsed, not counted as a resource action.
 
-Tests cover diverse seeds, independent tile-level progression, legal spirit
-steps, action order, clue timing, protections/endings, cautious complete runs,
-exact serialized continuation, storage failures, and entry-page integration.
-Browser checks cover input, overlays, reloads, navigation, and narrow layouts.
-Human playtesting is still needed to establish the intended 10–15 minute pace,
-reward balance, and whether the spirit's initial room is too quiet in some seeds.
+The solver returns `solved`, `unsolvable`, or `exhausted`, an explored-state
+count, and a witness of actions with physically reachable interaction positions.
+Only actual objective completion and return to the entrance count as solved.
+The search budget defaults to 30,000 accepted states. A zero budget or oversized
+mask collection returns `exhausted`; it does not claim impossibility. Current
+authored budgets stay well below the 30-entity-per-mask limit.
+
+The solver knows hidden content. Its proof establishes resource feasibility,
+**not player understanding**. `validateInformationFairness` separately verifies
+that each local cluster can be freely surveyed from its stage's safe vantage,
+with all its costs, rewards, and candles discoverable before a commitment.
+Clusters use the same Manhattan discovery radius as play; later gated clusters
+have their own vantages. Authored clues describe required capabilities beyond
+those gates. These checks and the explicit ordering fixtures constrain hidden
+information traps, but do not establish that a new player will notice, remember,
+or correctly interpret the available information. Human playtesting is required.
+
+## Undo and persistence
+
+Each successful consequential action stores its complete pre-decision snapshot.
+Walking and inspection do not add history entries. The bounded stack currently
+holds **12 decisions**. Undo restores resources, inventory, claimed rewards,
+containers, gates, spirits, used candles, objectives, player position, journal,
+exploration, and deterministic state. Exploration accumulated after that snapshot
+is also rolled back. There is no nested undo history inside a snapshot, and no
+loot is rerolled. Undo itself is autosaved.
+
+New saves use **`haunted-house.save.v2`**, schema version **2**. The complete world,
+seed, PRNG, exploration, current state, and bounded undo history are serialized.
+Continue restores that data exactly. Restart This House regenerates the normal
+initial state for the same seed; New House requests a new seed. Committed walking
+and decisions autosave. Writes are read back to verify persistence and report
+failures truthfully.
+
+`validation.ts` checks structure, types, bounds, references, and history safely.
+It deliberately does **not** run the solver. A player can spend light badly and
+still have a legitimate save, including a state that requires undo to escape.
+No visible affordable action means only a local lack of options; it does not
+prove a global dead end.
+
+The adapter reads only the two Haunted House keys. **`haunted-house.save.v1` is
+preserved**, never converted, cleared, or overwritten. If only that earlier save
+exists, the UI explains the changed rules and offers a new house and a raw data
+download. That archive remains downloadable from the journal after saving and
+reloading a v2 adventure. No second gameplay engine is included. Unreadable v2 data is retained
+until explicitly replaced; its raw data can also be downloaded. Never touch
+another game's keys.
+
+## Verification and balance questions
+
+Tests cover exact costs and atomic rewards, insufficient resources, zero light,
+manual capped refills, the specified 4/5-light ordering puzzle, a cheapest-first
+trap, physical access and guards, distinct footprints/floors, bounded generation,
+solver budget exhaustion and fallback, local information fairness, complete
+walked adventures, exact persistence, valid resource-dead-end saves, undo,
+legacy preservation, and click-route isolation. Browser checks cover keyboard,
+touch, panels, reload, controls, and narrow layouts.
+
+Human playtests should establish whether adventures last roughly 10–15 minutes;
+whether the opening choices, ritual upgrades, and candle waste are understood;
+whether spare candles make optional treasure too cheap or scarce candles too
+punishing; whether the three openings and objective families feel different;
+whether quiet rooms and return journeys feel proportionate; and whether the
+undo/exploration rollback is clear. The current backbone is intentionally
+authored and recognizable. Further pattern variety should follow those findings
+without weakening physical or resource validation.
