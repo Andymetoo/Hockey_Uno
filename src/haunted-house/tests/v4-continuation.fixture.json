@@ -1,0 +1,502 @@
+{
+  "version": 4,
+  "ruleset": "power-flare",
+  "seed": "fixture",
+  "variant": 0,
+  "rooms": [
+    {
+      "id": "hall",
+      "name": "hall",
+      "floor": 0,
+      "width": 7,
+      "height": 7,
+      "tiles": [
+        {
+          "kind": "wall"
+        },
+        {
+          "kind": "wall"
+        },
+        {
+          "kind": "wall"
+        },
+        {
+          "kind": "wall"
+        },
+        {
+          "kind": "wall"
+        },
+        {
+          "kind": "wall"
+        },
+        {
+          "kind": "wall"
+        },
+        {
+          "kind": "wall"
+        },
+        {
+          "kind": "exit"
+        },
+        {
+          "kind": "floor"
+        },
+        {
+          "kind": "floor"
+        },
+        {
+          "kind": "floor"
+        },
+        {
+          "kind": "floor"
+        },
+        {
+          "kind": "wall"
+        },
+        {
+          "kind": "wall"
+        },
+        {
+          "kind": "floor"
+        },
+        {
+          "kind": "floor"
+        },
+        {
+          "kind": "floor"
+        },
+        {
+          "kind": "floor"
+        },
+        {
+          "kind": "floor"
+        },
+        {
+          "kind": "wall"
+        },
+        {
+          "kind": "wall"
+        },
+        {
+          "kind": "floor"
+        },
+        {
+          "kind": "floor"
+        },
+        {
+          "kind": "floor"
+        },
+        {
+          "kind": "floor"
+        },
+        {
+          "kind": "floor"
+        },
+        {
+          "kind": "wall"
+        },
+        {
+          "kind": "wall"
+        },
+        {
+          "kind": "floor"
+        },
+        {
+          "kind": "floor"
+        },
+        {
+          "kind": "floor"
+        },
+        {
+          "kind": "floor"
+        },
+        {
+          "kind": "floor"
+        },
+        {
+          "kind": "wall"
+        },
+        {
+          "kind": "wall"
+        },
+        {
+          "kind": "floor"
+        },
+        {
+          "kind": "floor"
+        },
+        {
+          "kind": "floor"
+        },
+        {
+          "kind": "floor"
+        },
+        {
+          "kind": "floor"
+        },
+        {
+          "kind": "wall"
+        },
+        {
+          "kind": "wall"
+        },
+        {
+          "kind": "wall"
+        },
+        {
+          "kind": "wall"
+        },
+        {
+          "kind": "wall"
+        },
+        {
+          "kind": "wall"
+        },
+        {
+          "kind": "wall"
+        },
+        {
+          "kind": "wall"
+        }
+      ],
+      "discovered": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "visited": true
+    }
+  ],
+  "hauntings": [
+    {
+      "id": "h0",
+      "name": "Brittle Shade",
+      "kind": "shade",
+      "position": {
+        "roomId": "hall",
+        "x": 4,
+        "y": 3
+      },
+      "tier": 1,
+      "hp": 11,
+      "maxHp": 17,
+      "attack": 7,
+      "regen": 2,
+      "xp": 1,
+      "boss": false,
+      "trait": "brittle"
+    }
+  ],
+  "supplies": [
+    {
+      "id": "s0",
+      "name": "Ritual primer",
+      "kind": "power",
+      "position": {
+        "roomId": "hall",
+        "x": 1,
+        "y": 2
+      },
+      "used": false,
+      "amount": 1
+    },
+    {
+      "id": "s1",
+      "name": "Heartwood charm",
+      "kind": "vitality",
+      "position": {
+        "roomId": "hall",
+        "x": 2,
+        "y": 2
+      },
+      "used": false,
+      "amount": 4
+    },
+    {
+      "id": "s2",
+      "name": "Alchemist's case",
+      "kind": "oil",
+      "position": {
+        "roomId": "hall",
+        "x": 3,
+        "y": 2
+      },
+      "used": false,
+      "amount": 3
+    }
+  ],
+  "connections": [],
+  "player": {
+    "roomId": "hall",
+    "x": 3,
+    "y": 3
+  },
+  "entrance": {
+    "roomId": "hall",
+    "x": 1,
+    "y": 1
+  },
+  "resources": {
+    "health": 15,
+    "maxHealth": 22,
+    "light": 5,
+    "maxLight": 10,
+    "power": 6,
+    "level": 1,
+    "xp": 0,
+    "tonics": 1,
+    "oils": 1,
+    "ward": true,
+    "empowered": false,
+    "treasure": 0
+  },
+  "turns": 2,
+  "inventory": [],
+  "objective": {
+    "kind": "escape",
+    "title": "Escape",
+    "description": "Find the key and leave.",
+    "completed": false
+  },
+  "journal": [],
+  "log": [
+    "Ward prepared: halve the next strike’s incoming damage, rounded up. Wounded spirits recover this turn. Other wounded spirits recovered 2 health in total.",
+    "Brittle Shade: dealt 8, received 7."
+  ],
+  "status": "active",
+  "undo": [
+    {
+      "player": {
+        "roomId": "hall",
+        "x": 3,
+        "y": 3
+      },
+      "resources": {
+        "health": 22,
+        "maxHealth": 22,
+        "light": 8,
+        "maxLight": 10,
+        "power": 6,
+        "level": 1,
+        "xp": 0,
+        "tonics": 1,
+        "oils": 1,
+        "ward": false,
+        "empowered": false,
+        "treasure": 0
+      },
+      "turns": 0,
+      "discovered": [
+        [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      ],
+      "visited": [
+        true
+      ],
+      "hp": [
+        17
+      ],
+      "used": [
+        false,
+        false,
+        false
+      ],
+      "opened": [],
+      "inventory": [],
+      "completed": false,
+      "status": "active",
+      "journal": [],
+      "log": []
+    },
+    {
+      "player": {
+        "roomId": "hall",
+        "x": 3,
+        "y": 3
+      },
+      "resources": {
+        "health": 15,
+        "maxHealth": 22,
+        "light": 8,
+        "maxLight": 10,
+        "power": 6,
+        "level": 1,
+        "xp": 0,
+        "tonics": 1,
+        "oils": 1,
+        "ward": false,
+        "empowered": false,
+        "treasure": 0
+      },
+      "turns": 1,
+      "discovered": [
+        [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      ],
+      "visited": [
+        true
+      ],
+      "hp": [
+        9
+      ],
+      "used": [
+        false,
+        false,
+        false
+      ],
+      "opened": [],
+      "inventory": [],
+      "completed": false,
+      "status": "active",
+      "journal": [],
+      "log": [
+        "Brittle Shade: dealt 8, received 7."
+      ]
+    }
+  ],
+  "runId": "frozen-v4-before-relics"
+}

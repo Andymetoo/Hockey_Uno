@@ -42,7 +42,7 @@ test('witness measurements use real actions and measure surviving level-up refun
 test('expanded ingredients retain baseline food/light budgets, include all rewards and traits, and permit quiet branches', () => {
  const rewards = new Set(), traits = new Set(); let quiet = 0, noFood = 0, laterRewards = 0;
  for (let i = 0; i < 40; i++) {
-  const seed = `ingredients-${i}`, old = generateCandidate(seed, 0, { ingredients: 'baseline' }), s = generateCandidate(seed);
+  const seed = `ingredients-${i}`, old = generateCandidate(seed, 0, { ingredients: 'baseline' }), s = generateCandidate(seed, 0, { ingredients: 'expanded' });
   for (const kind of ['food', 'candle']) assert.equal(s.supplies.filter(x => x.kind === kind).length, old.supplies.filter(x => x.kind === kind).length, `${seed} ${kind}`);
   const reward = s.supplies.find(x => ['Ritual primer', 'Heartwood charm', "Alchemist's case"].includes(x.name));
   assert.ok(reward); rewards.add(reward.kind);

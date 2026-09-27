@@ -1,11 +1,17 @@
 import { ITEMS, SAVE_VERSION, SPIRITS } from './content.ts';
-import type { GameState, Position, Resources, UndoFrame } from './types.ts';
+import type { GameState, Position, Resources, RelicEffect, UndoFrame } from './types.ts';
 import { known, positionKey, samePosition, tileAt } from './world.ts';
 const integer = (n: unknown, min = 0, max = 100000) => Number.isInteger(n) && (n as number) >= min && (n as number) <= max;
 const string = (s: unknown, max = 1000): s is string => typeof s === 'string' && s.length <= max;
 const strings = (a: unknown, max: number) => Array.isArray(a) && a.length <= max && a.every(x => string(x));
 const bool = (v: unknown) => typeof v === 'boolean';
 const ids = (a: { id: string }[]) => a.every(x => string(x.id, 80) && x.id.length > 0) && new Set(a.map(x => x.id)).size === a.length;
+function validEffect(e: RelicEffect | undefined): boolean {
+ if (!e || typeof e !== 'object') return false;
+ if (e.kind === 'guard') return integer(e.amount, 1, 10);
+ if (e.kind === 'recovery') return integer(e.health, 0, 100) && integer(e.light, 0, 100) && e.health + e.light > 0;
+ return e.kind === 'damage' && ['strike', 'flare'].includes(e.mode) && integer(e.amount, 1, 20) && Array.isArray(e.targets) && e.targets.length > 0 && e.targets.length <= 4 && new Set(e.targets).size === e.targets.length && e.targets.every(k => Object.hasOwn(SPIRITS, k));
+}
 export function validResources(r: Resources): boolean {
  return !!r && ['health', 'maxHealth', 'light', 'maxLight', 'power', 'level', 'xp', 'tonics', 'oils', 'treasure'].every(k => integer(r[k as keyof Resources])) && r.maxHealth > 0 && r.maxLight > 0 && r.power > 0 && r.level > 0 && r.health <= r.maxHealth && r.light <= r.maxLight && r.xp < r.level + 2 && bool(r.ward) && bool(r.empowered);
 }
@@ -17,7 +23,7 @@ export function isGameState(value: unknown): value is GameState {
   if (s.version !== SAVE_VERSION || s.ruleset !== 'power-flare' || (s.runId !== undefined && (!string(s.runId, 200) || !s.runId)) || !string(s.seed, 100) || !s.seed.trim() || !integer(s.variant, 0, 100) || !integer(s.turns, 0, 20000) || !validResources(s.resources)) return false;
   if (!Array.isArray(s.rooms) || !s.rooms.length || s.rooms.length > 20 || !ids(s.rooms)) return false;
   for (const r of s.rooms) {
-   if (!string(r.name, 100) || !integer(r.floor, 0, 10) || !integer(r.width, 3, 25) || !integer(r.height, 3, 25) || !bool(r.visited) || !Array.isArray(r.tiles) || r.tiles.length !== r.width * r.height || !Array.isArray(r.discovered) || r.discovered.length !== r.tiles.length || !r.discovered.every(bool)) return false;
+   if ([r.identity, r.accent, r.flavor].some(v => v !== undefined && !string(v, 1000)) || !string(r.name, 100) || !integer(r.floor, 0, 10) || !integer(r.width, 3, 25) || !integer(r.height, 3, 25) || !bool(r.visited) || !Array.isArray(r.tiles) || r.tiles.length !== r.width * r.height || !Array.isArray(r.discovered) || r.discovered.length !== r.tiles.length || !r.discovered.every(bool)) return false;
    if (!r.tiles.every(t => t && ['wall', 'floor', 'door', 'stairs', 'exit', 'altar'].includes(t.kind) && (t.connectionId === undefined || string(t.connectionId, 80)))) return false;
   }
   const position = (p: Position) => !!p && string(p.roomId, 80) && integer(p.x, 0, 24) && integer(p.y, 0, 24) && s.rooms.some(r => r.id === p.roomId && !!tileAt(r, p.x, p.y) && tileAt(r, p.x, p.y)!.kind !== 'wall');
@@ -31,18 +37,18 @@ export function isGameState(value: unknown): value is GameState {
    const p = positionKey(h.position); if (occupied.has(p)) return false; occupied.add(p);
   }
   for (const x of s.supplies) {
-   if (!string(x.name, 100) || !['food', 'candle', 'tonic', 'oil', 'power', 'vitality', 'cache', 'treasure', 'note'].includes(x.kind) || !position(x.position) || !bool(x.used) || !integer(x.amount, 1) || (x.item !== undefined && !item(x.item)) || (x.text !== undefined && !string(x.text))) return false;
+   if ((x.definitionId !== undefined && !string(x.definitionId, 100)) || (x.noteType !== undefined && !['rules', 'clue', 'flavor', 'objective'].includes(x.noteType)) || (x.kind === 'relic' ? !validEffect(x.effect) : x.effect !== undefined) || !string(x.name, 100) || !['food', 'candle', 'tonic', 'oil', 'power', 'vitality', 'cache', 'treasure', 'note', 'relic'].includes(x.kind) || !position(x.position) || !bool(x.used) || !integer(x.amount, 1) || (x.item !== undefined && !item(x.item)) || (x.text !== undefined && !string(x.text))) return false;
    const p = positionKey(x.position); if (occupied.has(p)) return false; occupied.add(p);
   }
   for (const c of s.connections) {
-   if (!position(c.a) || !position(c.b) || c.a.roomId === c.b.roomId || !['door', 'stairs'].includes(c.kind) || !bool(c.opened) || (c.gate !== undefined && !item(c.gate))) return false;
+   if ([c.name, c.description].some(v => v !== undefined && !string(v, 1000)) || !position(c.a) || !position(c.b) || c.a.roomId === c.b.roomId || !['door', 'stairs'].includes(c.kind) || !bool(c.opened) || (c.gate !== undefined && !item(c.gate))) return false;
    for (const p of [c.a, c.b]) { const r = s.rooms.find(r => r.id === p.roomId)!; const t = tileAt(r, p.x, p.y)!; if (t.kind !== c.kind || t.connectionId !== c.id || occupied.has(positionKey(p))) return false; occupied.add(positionKey(p)); }
   }
   for (const r of s.rooms) for (let i = 0; i < r.tiles.length; i++) {
    const t = r.tiles[i]; if ((t.kind === 'door' || t.kind === 'stairs') !== !!t.connectionId) return false;
    if (t.connectionId && !s.connections.some(c => c.id === t.connectionId && [c.a, c.b].some(p => p.roomId === r.id && p.x === i % r.width && p.y === Math.floor(i / r.width)))) return false;
   }
-  if (!s.objective || !['escape', 'diary', 'keepsake'].includes(s.objective.kind) || !string(s.objective.title, 100) || !string(s.objective.description) || !bool(s.objective.completed) || (s.objective.kind === 'keepsake' && (!s.objective.altar || !position(s.objective.altar)))) return false;
+  if (!s.objective || (s.objective.structure !== undefined && !string(s.objective.structure, 100)) || !['escape', 'diary', 'keepsake'].includes(s.objective.kind) || !string(s.objective.title, 100) || !string(s.objective.description) || !bool(s.objective.completed) || (s.objective.kind === 'keepsake' && (!s.objective.altar || !position(s.objective.altar)))) return false;
   if (!strings(s.journal, 250) || !strings(s.log, 20) || !['active', 'won', 'dead'].includes(s.status) || (s.resources.health === 0) !== (s.status === 'dead')) return false;
   if (s.hauntings.some(h => h.hp > 0 && samePosition(h.position, s.player)) || s.supplies.some(x => !x.used && samePosition(x.position, s.player))) return false;
   if (!Array.isArray(s.undo) || s.undo.length !== s.turns || s.undo.length > 20000) return false;

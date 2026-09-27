@@ -1,4 +1,5 @@
-import { act, previewAttack, objectiveReady } from './game.ts';
+import { isRecoverySupply } from './item-definitions.ts';
+import { act, previewAttack, exitReadiness } from './game.ts';
 import { TUNING } from './content.ts';
 import { choiceValue } from './diagnostics.ts';
 import type { Action, GameState, Haunting, Position } from './types.ts';
@@ -25,12 +26,13 @@ function expand(node: Node): Node {
   const s = node.state;
   let action = explorationAction(s);
   if (!action) {
-   const x = s.supplies.find(x => !x.used && known(s, x.position) && !['food', 'candle'].includes(x.kind));
+   const x = s.supplies.find(x => !x.used && known(s, x.position) && !isRecoverySupply(x));
    if (x) action = { type: 'use', supplyId: x.id };
   }
   if (!action) { const c = s.connections.find(c => !c.opened && (!c.gate || s.inventory.includes(c.gate)) && (known(s, c.a) || known(s, c.b))); if (c) action = { type: 'unlock', connectionId: c.id }; }
   if (!action && s.objective.kind === 'keepsake' && !s.objective.completed && s.inventory.includes('keepsake') && s.objective.altar && known(s, s.objective.altar)) action = { type: 'settle' };
-  if (!action && objectiveReady(s)) action = samePosition(s.player, s.entrance) ? { type: 'leave' } : { type: 'move', to: s.entrance };
+  const exit = exitReadiness(s);
+  if (!action && exit.prerequisitesMet) action = exit.canLeave ? { type: 'leave' } : { type: 'move', to: s.entrance };
   if (!action || s.status !== 'active') return node;
   const next = apply(node, action); if (!next) return node; node = next;
  }
@@ -73,7 +75,7 @@ export function solve(initial: GameState, budget: number = TUNING.solverBudget, 
    const k = key(node.state); if (seen.has(k)) continue; seen.add(k); visited++;
    if (visited > budget) break;
    for (const h of node.state.hauntings) if (h.hp > 0 && known(node.state, h.position)) next.push(...fights(node, h).map(expand));
-   for (const x of node.state.supplies) if (!x.used && known(node.state, x.position) && ['food', 'candle'].includes(x.kind)) { const n = apply(node, { type: 'use', supplyId: x.id }); if (n) next.push(expand(n)); }
+   for (const x of node.state.supplies) if (!x.used && known(node.state, x.position) && isRecoverySupply(x)) { const n = apply(node, { type: 'use', supplyId: x.id }); if (n) next.push(expand(n)); }
    if (node.state.resources.tonics && node.state.resources.health < node.state.resources.maxHealth) { const n = apply(node, { type: 'tonic' }); if (n) next.push(n); }
   }
   const won = next.find(n => n.state.status === 'won'); if (won) return { solved: true, actions: won.actions, visited, reason: 'won' };

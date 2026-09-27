@@ -1,5 +1,6 @@
 import type { Direction, ItemId, ObjectiveKind, Resources, SpiritKind, SpiritTrait } from './types.ts';
 export const SAVE_VERSION = 4;
+// Additive relic snapshots preserve the absence-of-effects semantics of existing v4 saves.
 /** Shared by previews, execution, the witness solver, diagnostics and displayed rules. */
 export const TUNING = { generationAttempts: 6, solverBudget: 450, solverWidth: 16, maxLogEntries: 6, flareCost: 4, flareBonus: 0, classicFlareBonus: 4, wardCost: 3, wardDivisor: 2, oilBonus: 4, armourReduction: 2, brittleBonus: 2, smoulderingBonus: 2, levelHealth: 3, levelPower: 2, foodFraction: .6, tonicFraction: .5, candleLight: 8 } as const;
 export const initialResources = (): Resources => ({ health: 22, maxHealth: 22, light: 8, maxLight: 10, power: 6, level: 1, xp: 0, tonics: 1, oils: 1, ward: false, empowered: false, treasure: 0 });
@@ -25,6 +26,7 @@ export const SPIRIT_TRAITS: Record<SpiritTrait, { name: string; description: str
  smouldering: { name: 'Smouldering', description: `Takes ${TUNING.smoulderingBonus} extra damage from Flares.` },
 };
 export const RULES = [
+ 'Optional finds can add narrow Strike or Flare bonuses, reduce incoming Strike damage after Ward rounding, or restore both health and light. Each find states its exact saved effect. Collecting one takes a turn and allows other wounded spirits to regenerate.',
  'Click any discovered empty tile to move there in one turn, regardless of distance or intervening obstacles. There is no pathfinding. Room tabs only change your view.',
  'Each arrival reveals its surrounding 3×3 square, including diagonals, even around corners. Discovery is permanent. Occupied tiles cannot be stood on until cleared; this can keep tiles beyond them hidden.',
  'Inspecting, selecting a spell, reading, and cancelling cost no turns. Movement, passage travel, unlocking, attacks, supplies and pocket abilities each cost one turn. Nothing happens while you think.',

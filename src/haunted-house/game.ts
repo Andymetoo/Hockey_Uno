@@ -1,4 +1,5 @@
 import { ITEMS, TUNING, xpNeeded } from './content.ts';
+import { activeRelics, describeRelicEffect, relicRecoveryPreview } from './item-definitions.ts';
 import type { Action, ActionResult, CombatPreview, GameSnapshot, GameState, Haunting, Supply, UndoFrame } from './types.ts';
 import { known, refreshExploration, samePosition, traversable } from './world.ts';
 export function capture(s: GameSnapshot): UndoFrame {
@@ -22,6 +23,10 @@ function awardExperience(r: GameSnapshot['resources'], xp: number): number {
  }
  return r.level - before;
 }
+/** Restore the saved first turn, preserving this exact house and its content snapshots. */
+export function restartState(s: GameState): GameState {
+ const fresh = cloneGame(s); if (fresh.undo.length) restore(fresh, fresh.undo[0]); fresh.undo = []; return fresh;
+}
 export function previewAttack(s: GameSnapshot, h: Haunting, mode: 'strike' | 'flare'): CombatPreview {
  const r = s.resources, lightCost = mode === 'flare' ? TUNING.flareCost : 0;
  const powerDamage = r.power, oilDamage = r.empowered ? TUNING.oilBonus : 0;
@@ -29,15 +34,19 @@ export function previewAttack(s: GameSnapshot, h: Haunting, mode: 'strike' | 'fl
  const flareBonus = mode === 'flare' ? s.ruleset === 'classic' ? TUNING.classicFlareBonus : TUNING.flareBonus : 0;
  const armourReduction = mode === 'strike' && h.kind === 'armour' ? TUNING.armourReduction : 0;
  const traitDamage = mode === 'strike' && h.trait === 'brittle' ? TUNING.brittleBonus : mode === 'flare' && h.trait === 'smouldering' ? TUNING.smoulderingBonus : 0;
- const damage = Math.max(1, powerDamage + oilDamage + flareBonus + traitDamage - armourReduction);
+ const relics = activeRelics(s);
+ const itemDamage = relics.reduce((n, x) => n + (x.effect?.kind === 'damage' && x.effect.mode === mode && x.effect.targets.includes(h.kind) ? x.effect.amount : 0), 0);
+ const damage = Math.max(1, powerDamage + oilDamage + flareBonus + traitDamage + itemDamage - armourReduction);
  const unwardedIncoming = mode === 'flare' ? 0 : h.attack;
- const incoming = mode === 'strike' && r.ward ? Math.ceil(unwardedIncoming / TUNING.wardDivisor) : unwardedIncoming;
+ const wardedIncoming = mode === 'strike' && r.ward ? Math.ceil(unwardedIncoming / TUNING.wardDivisor) : unwardedIncoming;
+ const incomingReduction = mode === 'strike' ? Math.min(wardedIncoming, relics.reduce((n, x) => n + (x.effect?.kind === 'guard' ? x.effect.amount : 0), 0)) : 0;
+ const incoming = wardedIncoming - incomingReduction;
  const healthAfter = Math.max(0, r.health - incoming), lightAfter = r.light - lightCost;
  const kills = damage >= h.hp, lethal = r.health <= incoming, affordable = r.light >= lightCost;
  const projected = { ...r, health: healthAfter, light: lightAfter };
  const levelsGained = kills && !lethal && affordable ? awardExperience(projected, h.xp) : 0;
  return { damage, incoming, healthAfter, enemyAfter: Math.max(0, h.hp - damage), lightCost, lightAfter, lethal, kills, affordable,
-  powerDamage, oilDamage, flareBonus, armourReduction, traitDamage, unwardedIncoming, levelsGained,
+  powerDamage, oilDamage, flareBonus, armourReduction, traitDamage, unwardedIncoming, itemDamage, incomingReduction, levelsGained,
   finalHealth: projected.health, finalLight: projected.light, finalMaxHealth: projected.maxHealth, finalPower: projected.power };
 }
 export function supplyPreview(s: GameSnapshot, supply: Supply): { received: number; wasted: number; total: number } {
@@ -45,7 +54,24 @@ export function supplyPreview(s: GameSnapshot, supply: Supply): { received: numb
  const current = supply.kind === 'food' ? r.health : r.light; const cap = supply.kind === 'food' ? r.maxHealth : r.maxLight;
  const received = Math.min(cap - current, amount); return { received, wasted: amount - received, total: current + received };
 }
-export function objectiveReady(s: GameSnapshot): boolean { return s.objective.kind === 'keepsake' ? s.objective.completed : s.inventory.includes(s.objective.kind === 'diary' ? 'diary' : 'exit-key'); }
+export interface ExitReadiness {
+ prerequisitesMet: boolean; atExit: boolean; canLeave: boolean;
+ actionLabel: string; missingRequirement: string | null;
+}
+/** The objective and entrance are the only finish requirements. Optional content never blocks leaving. */
+export function exitReadiness(s: GameSnapshot): ExitReadiness {
+ const prerequisitesMet = s.objective.kind === 'keepsake' ? s.objective.completed : s.inventory.includes(s.objective.kind === 'diary' ? 'diary' : 'exit-key');
+ const atExit = samePosition(s.player, s.entrance);
+ const active = s.status === 'active';
+ const missingRequirement = !active ? 'This run has ended. Undo, restart this house, or start a new one.'
+  : !prerequisitesMet ? s.objective.kind === 'escape' ? 'Recover the front-door key from the keeper.'
+   : s.objective.kind === 'diary' ? 'Recover the missing diary from the keeper.'
+   : s.inventory.includes('keepsake') ? 'Place the silver locket at the memorial.' : 'Recover the silver locket and place it at the memorial.'
+  : !atExit ? 'Return to the entrance first.' : null;
+ return { prerequisitesMet, atExit, canLeave: active && prerequisitesMet && atExit,
+  actionLabel: s.objective.kind === 'diary' ? 'Leave with diary' : s.objective.kind === 'escape' ? 'Leave with key' : 'Leave the quieted house', missingRequirement };
+}
+export function objectiveReady(s: GameSnapshot): boolean { return exitReadiness(s).prerequisitesMet; }
 /** One authority for interactive play, generation witnesses and save replay. */
 export function act(original: GameState, action: Action, record = true): ActionResult {
  const reject = (message: string, lethal = false): ActionResult => ({ state: original, committed: false, message, lethal });
@@ -89,7 +115,13 @@ export function act(original: GameState, action: Action, record = true): ActionR
   const x = s.supplies.find(x => x.id === action.supplyId);
   if (!x || x.used || !known(s, x.position)) return reject('Choose a discovered unused supply.');
   x.used = true; s.player = { ...x.position };
-  if (x.kind === 'food' || x.kind === 'candle') {
+  if (x.kind === 'relic' && x.effect) {
+   message = `${x.name}: ${describeRelicEffect(x.effect)}`;
+   if (x.effect.kind === 'recovery') {
+    const p = relicRecoveryPreview(original, x); r.health = p.health.total; r.light = p.light.total;
+    message = `${x.name}: restored ${p.health.received} health and ${p.light.received} light; wasted ${p.health.wasted} health and ${p.light.wasted} light. Tile cleared.`;
+   }
+  } else if (x.kind === 'food' || x.kind === 'candle') {
    const p = supplyPreview(original, x); if (x.kind === 'food') r.health = p.total; else r.light = p.total;
    message = `${x.name}: restored ${p.received} ${x.kind === 'food' ? 'health' : 'light'}; ${p.wasted} wasted. Tile cleared.`;
   } else {
@@ -115,8 +147,8 @@ export function act(original: GameState, action: Action, record = true): ActionR
   if (s.objective.kind !== 'keepsake' || s.objective.completed || !s.objective.altar || !known(s, s.objective.altar) || !s.inventory.includes('keepsake')) return reject('Bring the silver locket to the discovered memorial.');
   s.objective.completed = true; message = 'The locket rests at the memorial. Return to the entrance.';
  } else if (action.type === 'leave') {
-  if (!samePosition(s.player, s.entrance)) return reject('Return to the entrance first.');
-  if (!objectiveReady(s)) return reject(s.objective.description);
+  const readiness = exitReadiness(s);
+  if (!readiness.canLeave) return reject(readiness.missingRequirement!);
   s.status = 'won'; message = 'You step out into the morning. The house falls silent.';
  }
  s.turns++;

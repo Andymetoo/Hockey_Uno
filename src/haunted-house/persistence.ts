@@ -60,7 +60,7 @@ function validCompletion(value: unknown): value is CompletionRecord {
  if (!text(r.runId, 200) || !r.runId || !text(r.seed, 100) || !r.seed || !n(r.variant) || !p || !p.objective || p.objective.completed !== true || !text(p.objective.title, 100) || !n(p.turns) || !text(p.explanation)) return false;
  for (const pair of [p.hauntings && [p.hauntings.defeated, p.hauntings.total], p.exploration && [p.exploration.discovered, p.exploration.total], p.treasure && [p.treasure.collected, p.treasure.total]]) if (!pair || !pair.every(n) || pair[0] > pair[1]) return false;
  const f = p.supplies?.floor, pocket = p.supplies?.pocket;
- if (!f || !pocket || ![f.food, f.candle, f.tonic, f.oil, f.total, pocket.tonic, pocket.oil, pocket.total, p.supplies.total].every(n) || f.total !== f.food + f.candle + f.tonic + f.oil || pocket.total !== pocket.tonic + pocket.oil || p.supplies.total !== f.total + pocket.total) return false;
+ if (!f || !pocket || ![f.food, f.candle, f.tonic, f.oil, f.recovery ?? 0, f.total, pocket.tonic, pocket.oil, pocket.total, p.supplies.total].every(n) || f.total !== f.food + f.candle + f.tonic + f.oil + (f.recovery ?? 0) || pocket.total !== pocket.tonic + pocket.oil || p.supplies.total !== f.total + pocket.total) return false;
  return Array.isArray(p.commendations) && p.commendations.length <= 10 && p.commendations.every(c => c && text(c.title, 100) && text(c.description));
 }
 

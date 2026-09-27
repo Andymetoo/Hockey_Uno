@@ -4,15 +4,17 @@ export type ObjectiveKind = 'escape' | 'diary' | 'keepsake';
 export type TileKind = 'wall' | 'floor' | 'door' | 'stairs' | 'exit' | 'altar';
 export interface Position { roomId: string; x: number; y: number }
 export interface Tile { kind: TileKind; connectionId?: string }
-export interface Room { id: string; name: string; floor: number; width: number; height: number; tiles: Tile[]; discovered: boolean[]; visited: boolean }
-export interface Connection { id: string; a: Position; b: Position; kind: 'door' | 'stairs'; gate?: ItemId; opened: boolean }
+export interface Room { identity?: string; accent?: string; flavor?: string; id: string; name: string; floor: number; width: number; height: number; tiles: Tile[]; discovered: boolean[]; visited: boolean }
+export interface Connection { name?: string; description?: string; id: string; a: Position; b: Position; kind: 'door' | 'stairs'; gate?: ItemId; opened: boolean }
 export type SpiritKind = 'shade' | 'wisp' | 'armour' | 'revenant';
 export type SpiritTrait = 'brittle' | 'smouldering';
 export type CombatRuleset = 'classic' | 'power-flare';
 export interface Haunting { id: string; name: string; kind: SpiritKind; trait?: SpiritTrait; position: Position; tier: number; hp: number; maxHp: number; attack: number; regen: number; xp: number; reward?: ItemId; boss: boolean }
-export type SupplyKind = 'food' | 'candle' | 'tonic' | 'oil' | 'power' | 'vitality' | 'cache' | 'treasure' | 'note';
-export interface Supply { id: string; name: string; kind: SupplyKind; position: Position; used: boolean; amount: number; item?: ItemId; text?: string }
-export interface Objective { kind: ObjectiveKind; title: string; description: string; completed: boolean; altar?: Position }
+export type RelicEffect = { kind: 'damage'; mode: 'strike' | 'flare'; targets: SpiritKind[]; amount: number } | { kind: 'guard'; amount: number } | { kind: 'recovery'; health: number; light: number };
+export type SupplyKind = 'food' | 'candle' | 'tonic' | 'oil' | 'power' | 'vitality' | 'cache' | 'treasure' | 'note' | 'relic';
+/** New relics store their full effect, never a lookup into a changing content table. */
+export interface Supply { definitionId?: string; noteType?: 'rules' | 'clue' | 'flavor' | 'objective'; id: string; name: string; kind: SupplyKind; position: Position; used: boolean; amount: number; item?: ItemId; text?: string; effect?: RelicEffect }
+export interface Objective { structure?: string; kind: ObjectiveKind; title: string; description: string; completed: boolean; altar?: Position }
 export interface Resources { health: number; maxHealth: number; light: number; maxLight: number; power: number; level: number; xp: number; tonics: number; oils: number; ward: boolean; empowered: boolean; treasure: number }
 /** Only mutable data is retained in undo. Geometry is stored once per save. */
 export interface UndoFrame { player: Position; resources: Resources; turns: number; discovered: boolean[][]; visited: boolean[]; hp: number[]; used: boolean[]; opened: boolean[]; inventory: ItemId[]; completed: boolean; status: 'active' | 'won' | 'dead'; journal: string[]; log: string[] }
@@ -29,6 +31,6 @@ export interface ActionResult { state: GameState; committed: boolean; message: s
 export interface CombatPreview {
  damage: number; incoming: number; healthAfter: number; enemyAfter: number; lightCost: number; lightAfter: number;
  lethal: boolean; kills: boolean; affordable: boolean;
- powerDamage: number; oilDamage: number; flareBonus: number; armourReduction: number; traitDamage: number; unwardedIncoming: number;
+ powerDamage: number; oilDamage: number; flareBonus: number; armourReduction: number; traitDamage: number; unwardedIncoming: number; itemDamage: number; incomingReduction: number;
  levelsGained: number; finalHealth: number; finalLight: number; finalMaxHealth: number; finalPower: number;
 }

@@ -1,0 +1,5091 @@
+{
+  "source": "37f627ca13abb0306a7a81bf04b794099ff98336",
+  "actions": [
+    {
+      "type": "use",
+      "supplyId": "s0"
+    },
+    {
+      "type": "use",
+      "supplyId": "s1"
+    },
+    {
+      "type": "use",
+      "supplyId": "s2"
+    },
+    {
+      "type": "oil"
+    },
+    {
+      "type": "attack",
+      "hauntingId": "h0",
+      "mode": "strike"
+    },
+    {
+      "type": "attack",
+      "hauntingId": "h0",
+      "mode": "flare"
+    }
+  ],
+  "frames": [
+    {
+      "version": 4,
+      "ruleset": "power-flare",
+      "seed": "fixture",
+      "variant": 0,
+      "rooms": [
+        {
+          "id": "hall",
+          "name": "hall",
+          "floor": 0,
+          "width": 7,
+          "height": 7,
+          "tiles": [
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "exit"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            }
+          ],
+          "discovered": [
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "visited": true
+        }
+      ],
+      "hauntings": [
+        {
+          "id": "h0",
+          "name": "Brittle Shade",
+          "kind": "shade",
+          "position": {
+            "roomId": "hall",
+            "x": 4,
+            "y": 3
+          },
+          "tier": 1,
+          "hp": 13,
+          "maxHp": 17,
+          "attack": 7,
+          "regen": 2,
+          "xp": 1,
+          "boss": false,
+          "trait": "brittle"
+        }
+      ],
+      "supplies": [
+        {
+          "id": "s0",
+          "name": "Ritual primer",
+          "kind": "power",
+          "position": {
+            "roomId": "hall",
+            "x": 1,
+            "y": 2
+          },
+          "used": true,
+          "amount": 1
+        },
+        {
+          "id": "s1",
+          "name": "Heartwood charm",
+          "kind": "vitality",
+          "position": {
+            "roomId": "hall",
+            "x": 2,
+            "y": 2
+          },
+          "used": false,
+          "amount": 4
+        },
+        {
+          "id": "s2",
+          "name": "Alchemist's case",
+          "kind": "oil",
+          "position": {
+            "roomId": "hall",
+            "x": 3,
+            "y": 2
+          },
+          "used": false,
+          "amount": 3
+        }
+      ],
+      "connections": [],
+      "player": {
+        "roomId": "hall",
+        "x": 1,
+        "y": 2
+      },
+      "entrance": {
+        "roomId": "hall",
+        "x": 1,
+        "y": 1
+      },
+      "resources": {
+        "health": 15,
+        "maxHealth": 22,
+        "light": 5,
+        "maxLight": 10,
+        "power": 7,
+        "level": 1,
+        "xp": 0,
+        "tonics": 1,
+        "oils": 1,
+        "ward": true,
+        "empowered": false,
+        "treasure": 0
+      },
+      "turns": 3,
+      "inventory": [],
+      "objective": {
+        "kind": "escape",
+        "title": "Escape",
+        "description": "Find the key and leave.",
+        "completed": false
+      },
+      "journal": [],
+      "log": [
+        "Ritual primer: +1 permanent power. Other wounded spirits recovered 2 health in total.",
+        "Ward prepared: halve the next strike’s incoming damage, rounded up. Wounded spirits recover this turn. Other wounded spirits recovered 2 health in total.",
+        "Brittle Shade: dealt 8, received 7."
+      ],
+      "status": "active",
+      "undo": [
+        {
+          "player": {
+            "roomId": "hall",
+            "x": 3,
+            "y": 3
+          },
+          "resources": {
+            "health": 22,
+            "maxHealth": 22,
+            "light": 8,
+            "maxLight": 10,
+            "power": 6,
+            "level": 1,
+            "xp": 0,
+            "tonics": 1,
+            "oils": 1,
+            "ward": false,
+            "empowered": false,
+            "treasure": 0
+          },
+          "turns": 0,
+          "discovered": [
+            [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ]
+          ],
+          "visited": [
+            true
+          ],
+          "hp": [
+            17
+          ],
+          "used": [
+            false,
+            false,
+            false
+          ],
+          "opened": [],
+          "inventory": [],
+          "completed": false,
+          "status": "active",
+          "journal": [],
+          "log": []
+        },
+        {
+          "player": {
+            "roomId": "hall",
+            "x": 3,
+            "y": 3
+          },
+          "resources": {
+            "health": 15,
+            "maxHealth": 22,
+            "light": 8,
+            "maxLight": 10,
+            "power": 6,
+            "level": 1,
+            "xp": 0,
+            "tonics": 1,
+            "oils": 1,
+            "ward": false,
+            "empowered": false,
+            "treasure": 0
+          },
+          "turns": 1,
+          "discovered": [
+            [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ]
+          ],
+          "visited": [
+            true
+          ],
+          "hp": [
+            9
+          ],
+          "used": [
+            false,
+            false,
+            false
+          ],
+          "opened": [],
+          "inventory": [],
+          "completed": false,
+          "status": "active",
+          "journal": [],
+          "log": [
+            "Brittle Shade: dealt 8, received 7."
+          ]
+        },
+        {
+          "player": {
+            "roomId": "hall",
+            "x": 3,
+            "y": 3
+          },
+          "resources": {
+            "health": 15,
+            "maxHealth": 22,
+            "light": 5,
+            "maxLight": 10,
+            "power": 6,
+            "level": 1,
+            "xp": 0,
+            "tonics": 1,
+            "oils": 1,
+            "ward": true,
+            "empowered": false,
+            "treasure": 0
+          },
+          "turns": 2,
+          "discovered": [
+            [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ]
+          ],
+          "visited": [
+            true
+          ],
+          "hp": [
+            11
+          ],
+          "used": [
+            false,
+            false,
+            false
+          ],
+          "opened": [],
+          "inventory": [],
+          "completed": false,
+          "status": "active",
+          "journal": [],
+          "log": [
+            "Ward prepared: halve the next strike’s incoming damage, rounded up. Wounded spirits recover this turn. Other wounded spirits recovered 2 health in total.",
+            "Brittle Shade: dealt 8, received 7."
+          ]
+        }
+      ],
+      "runId": "frozen-v4-before-relics"
+    },
+    {
+      "version": 4,
+      "ruleset": "power-flare",
+      "seed": "fixture",
+      "variant": 0,
+      "rooms": [
+        {
+          "id": "hall",
+          "name": "hall",
+          "floor": 0,
+          "width": 7,
+          "height": 7,
+          "tiles": [
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "exit"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            }
+          ],
+          "discovered": [
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "visited": true
+        }
+      ],
+      "hauntings": [
+        {
+          "id": "h0",
+          "name": "Brittle Shade",
+          "kind": "shade",
+          "position": {
+            "roomId": "hall",
+            "x": 4,
+            "y": 3
+          },
+          "tier": 1,
+          "hp": 15,
+          "maxHp": 17,
+          "attack": 7,
+          "regen": 2,
+          "xp": 1,
+          "boss": false,
+          "trait": "brittle"
+        }
+      ],
+      "supplies": [
+        {
+          "id": "s0",
+          "name": "Ritual primer",
+          "kind": "power",
+          "position": {
+            "roomId": "hall",
+            "x": 1,
+            "y": 2
+          },
+          "used": true,
+          "amount": 1
+        },
+        {
+          "id": "s1",
+          "name": "Heartwood charm",
+          "kind": "vitality",
+          "position": {
+            "roomId": "hall",
+            "x": 2,
+            "y": 2
+          },
+          "used": true,
+          "amount": 4
+        },
+        {
+          "id": "s2",
+          "name": "Alchemist's case",
+          "kind": "oil",
+          "position": {
+            "roomId": "hall",
+            "x": 3,
+            "y": 2
+          },
+          "used": false,
+          "amount": 3
+        }
+      ],
+      "connections": [],
+      "player": {
+        "roomId": "hall",
+        "x": 2,
+        "y": 2
+      },
+      "entrance": {
+        "roomId": "hall",
+        "x": 1,
+        "y": 1
+      },
+      "resources": {
+        "health": 19,
+        "maxHealth": 26,
+        "light": 5,
+        "maxLight": 10,
+        "power": 7,
+        "level": 1,
+        "xp": 0,
+        "tonics": 1,
+        "oils": 1,
+        "ward": true,
+        "empowered": false,
+        "treasure": 0
+      },
+      "turns": 4,
+      "inventory": [],
+      "objective": {
+        "kind": "escape",
+        "title": "Escape",
+        "description": "Find the key and leave.",
+        "completed": false
+      },
+      "journal": [],
+      "log": [
+        "Heartwood charm: +4 maximum and current health. Other wounded spirits recovered 2 health in total.",
+        "Ritual primer: +1 permanent power. Other wounded spirits recovered 2 health in total.",
+        "Ward prepared: halve the next strike’s incoming damage, rounded up. Wounded spirits recover this turn. Other wounded spirits recovered 2 health in total.",
+        "Brittle Shade: dealt 8, received 7."
+      ],
+      "status": "active",
+      "undo": [
+        {
+          "player": {
+            "roomId": "hall",
+            "x": 3,
+            "y": 3
+          },
+          "resources": {
+            "health": 22,
+            "maxHealth": 22,
+            "light": 8,
+            "maxLight": 10,
+            "power": 6,
+            "level": 1,
+            "xp": 0,
+            "tonics": 1,
+            "oils": 1,
+            "ward": false,
+            "empowered": false,
+            "treasure": 0
+          },
+          "turns": 0,
+          "discovered": [
+            [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ]
+          ],
+          "visited": [
+            true
+          ],
+          "hp": [
+            17
+          ],
+          "used": [
+            false,
+            false,
+            false
+          ],
+          "opened": [],
+          "inventory": [],
+          "completed": false,
+          "status": "active",
+          "journal": [],
+          "log": []
+        },
+        {
+          "player": {
+            "roomId": "hall",
+            "x": 3,
+            "y": 3
+          },
+          "resources": {
+            "health": 15,
+            "maxHealth": 22,
+            "light": 8,
+            "maxLight": 10,
+            "power": 6,
+            "level": 1,
+            "xp": 0,
+            "tonics": 1,
+            "oils": 1,
+            "ward": false,
+            "empowered": false,
+            "treasure": 0
+          },
+          "turns": 1,
+          "discovered": [
+            [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ]
+          ],
+          "visited": [
+            true
+          ],
+          "hp": [
+            9
+          ],
+          "used": [
+            false,
+            false,
+            false
+          ],
+          "opened": [],
+          "inventory": [],
+          "completed": false,
+          "status": "active",
+          "journal": [],
+          "log": [
+            "Brittle Shade: dealt 8, received 7."
+          ]
+        },
+        {
+          "player": {
+            "roomId": "hall",
+            "x": 3,
+            "y": 3
+          },
+          "resources": {
+            "health": 15,
+            "maxHealth": 22,
+            "light": 5,
+            "maxLight": 10,
+            "power": 6,
+            "level": 1,
+            "xp": 0,
+            "tonics": 1,
+            "oils": 1,
+            "ward": true,
+            "empowered": false,
+            "treasure": 0
+          },
+          "turns": 2,
+          "discovered": [
+            [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ]
+          ],
+          "visited": [
+            true
+          ],
+          "hp": [
+            11
+          ],
+          "used": [
+            false,
+            false,
+            false
+          ],
+          "opened": [],
+          "inventory": [],
+          "completed": false,
+          "status": "active",
+          "journal": [],
+          "log": [
+            "Ward prepared: halve the next strike’s incoming damage, rounded up. Wounded spirits recover this turn. Other wounded spirits recovered 2 health in total.",
+            "Brittle Shade: dealt 8, received 7."
+          ]
+        },
+        {
+          "player": {
+            "roomId": "hall",
+            "x": 1,
+            "y": 2
+          },
+          "resources": {
+            "health": 15,
+            "maxHealth": 22,
+            "light": 5,
+            "maxLight": 10,
+            "power": 7,
+            "level": 1,
+            "xp": 0,
+            "tonics": 1,
+            "oils": 1,
+            "ward": true,
+            "empowered": false,
+            "treasure": 0
+          },
+          "turns": 3,
+          "discovered": [
+            [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ]
+          ],
+          "visited": [
+            true
+          ],
+          "hp": [
+            13
+          ],
+          "used": [
+            true,
+            false,
+            false
+          ],
+          "opened": [],
+          "inventory": [],
+          "completed": false,
+          "status": "active",
+          "journal": [],
+          "log": [
+            "Ritual primer: +1 permanent power. Other wounded spirits recovered 2 health in total.",
+            "Ward prepared: halve the next strike’s incoming damage, rounded up. Wounded spirits recover this turn. Other wounded spirits recovered 2 health in total.",
+            "Brittle Shade: dealt 8, received 7."
+          ]
+        }
+      ],
+      "runId": "frozen-v4-before-relics"
+    },
+    {
+      "version": 4,
+      "ruleset": "power-flare",
+      "seed": "fixture",
+      "variant": 0,
+      "rooms": [
+        {
+          "id": "hall",
+          "name": "hall",
+          "floor": 0,
+          "width": 7,
+          "height": 7,
+          "tiles": [
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "exit"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            }
+          ],
+          "discovered": [
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "visited": true
+        }
+      ],
+      "hauntings": [
+        {
+          "id": "h0",
+          "name": "Brittle Shade",
+          "kind": "shade",
+          "position": {
+            "roomId": "hall",
+            "x": 4,
+            "y": 3
+          },
+          "tier": 1,
+          "hp": 17,
+          "maxHp": 17,
+          "attack": 7,
+          "regen": 2,
+          "xp": 1,
+          "boss": false,
+          "trait": "brittle"
+        }
+      ],
+      "supplies": [
+        {
+          "id": "s0",
+          "name": "Ritual primer",
+          "kind": "power",
+          "position": {
+            "roomId": "hall",
+            "x": 1,
+            "y": 2
+          },
+          "used": true,
+          "amount": 1
+        },
+        {
+          "id": "s1",
+          "name": "Heartwood charm",
+          "kind": "vitality",
+          "position": {
+            "roomId": "hall",
+            "x": 2,
+            "y": 2
+          },
+          "used": true,
+          "amount": 4
+        },
+        {
+          "id": "s2",
+          "name": "Alchemist's case",
+          "kind": "oil",
+          "position": {
+            "roomId": "hall",
+            "x": 3,
+            "y": 2
+          },
+          "used": true,
+          "amount": 3
+        }
+      ],
+      "connections": [],
+      "player": {
+        "roomId": "hall",
+        "x": 3,
+        "y": 2
+      },
+      "entrance": {
+        "roomId": "hall",
+        "x": 1,
+        "y": 1
+      },
+      "resources": {
+        "health": 19,
+        "maxHealth": 26,
+        "light": 5,
+        "maxLight": 10,
+        "power": 7,
+        "level": 1,
+        "xp": 0,
+        "tonics": 1,
+        "oils": 4,
+        "ward": true,
+        "empowered": false,
+        "treasure": 0
+      },
+      "turns": 5,
+      "inventory": [],
+      "objective": {
+        "kind": "escape",
+        "title": "Escape",
+        "description": "Find the key and leave.",
+        "completed": false
+      },
+      "journal": [],
+      "log": [
+        "Alchemist's case: 3 collected. Other wounded spirits recovered 2 health in total.",
+        "Heartwood charm: +4 maximum and current health. Other wounded spirits recovered 2 health in total.",
+        "Ritual primer: +1 permanent power. Other wounded spirits recovered 2 health in total.",
+        "Ward prepared: halve the next strike’s incoming damage, rounded up. Wounded spirits recover this turn. Other wounded spirits recovered 2 health in total.",
+        "Brittle Shade: dealt 8, received 7."
+      ],
+      "status": "active",
+      "undo": [
+        {
+          "player": {
+            "roomId": "hall",
+            "x": 3,
+            "y": 3
+          },
+          "resources": {
+            "health": 22,
+            "maxHealth": 22,
+            "light": 8,
+            "maxLight": 10,
+            "power": 6,
+            "level": 1,
+            "xp": 0,
+            "tonics": 1,
+            "oils": 1,
+            "ward": false,
+            "empowered": false,
+            "treasure": 0
+          },
+          "turns": 0,
+          "discovered": [
+            [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ]
+          ],
+          "visited": [
+            true
+          ],
+          "hp": [
+            17
+          ],
+          "used": [
+            false,
+            false,
+            false
+          ],
+          "opened": [],
+          "inventory": [],
+          "completed": false,
+          "status": "active",
+          "journal": [],
+          "log": []
+        },
+        {
+          "player": {
+            "roomId": "hall",
+            "x": 3,
+            "y": 3
+          },
+          "resources": {
+            "health": 15,
+            "maxHealth": 22,
+            "light": 8,
+            "maxLight": 10,
+            "power": 6,
+            "level": 1,
+            "xp": 0,
+            "tonics": 1,
+            "oils": 1,
+            "ward": false,
+            "empowered": false,
+            "treasure": 0
+          },
+          "turns": 1,
+          "discovered": [
+            [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ]
+          ],
+          "visited": [
+            true
+          ],
+          "hp": [
+            9
+          ],
+          "used": [
+            false,
+            false,
+            false
+          ],
+          "opened": [],
+          "inventory": [],
+          "completed": false,
+          "status": "active",
+          "journal": [],
+          "log": [
+            "Brittle Shade: dealt 8, received 7."
+          ]
+        },
+        {
+          "player": {
+            "roomId": "hall",
+            "x": 3,
+            "y": 3
+          },
+          "resources": {
+            "health": 15,
+            "maxHealth": 22,
+            "light": 5,
+            "maxLight": 10,
+            "power": 6,
+            "level": 1,
+            "xp": 0,
+            "tonics": 1,
+            "oils": 1,
+            "ward": true,
+            "empowered": false,
+            "treasure": 0
+          },
+          "turns": 2,
+          "discovered": [
+            [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ]
+          ],
+          "visited": [
+            true
+          ],
+          "hp": [
+            11
+          ],
+          "used": [
+            false,
+            false,
+            false
+          ],
+          "opened": [],
+          "inventory": [],
+          "completed": false,
+          "status": "active",
+          "journal": [],
+          "log": [
+            "Ward prepared: halve the next strike’s incoming damage, rounded up. Wounded spirits recover this turn. Other wounded spirits recovered 2 health in total.",
+            "Brittle Shade: dealt 8, received 7."
+          ]
+        },
+        {
+          "player": {
+            "roomId": "hall",
+            "x": 1,
+            "y": 2
+          },
+          "resources": {
+            "health": 15,
+            "maxHealth": 22,
+            "light": 5,
+            "maxLight": 10,
+            "power": 7,
+            "level": 1,
+            "xp": 0,
+            "tonics": 1,
+            "oils": 1,
+            "ward": true,
+            "empowered": false,
+            "treasure": 0
+          },
+          "turns": 3,
+          "discovered": [
+            [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ]
+          ],
+          "visited": [
+            true
+          ],
+          "hp": [
+            13
+          ],
+          "used": [
+            true,
+            false,
+            false
+          ],
+          "opened": [],
+          "inventory": [],
+          "completed": false,
+          "status": "active",
+          "journal": [],
+          "log": [
+            "Ritual primer: +1 permanent power. Other wounded spirits recovered 2 health in total.",
+            "Ward prepared: halve the next strike’s incoming damage, rounded up. Wounded spirits recover this turn. Other wounded spirits recovered 2 health in total.",
+            "Brittle Shade: dealt 8, received 7."
+          ]
+        },
+        {
+          "player": {
+            "roomId": "hall",
+            "x": 2,
+            "y": 2
+          },
+          "resources": {
+            "health": 19,
+            "maxHealth": 26,
+            "light": 5,
+            "maxLight": 10,
+            "power": 7,
+            "level": 1,
+            "xp": 0,
+            "tonics": 1,
+            "oils": 1,
+            "ward": true,
+            "empowered": false,
+            "treasure": 0
+          },
+          "turns": 4,
+          "discovered": [
+            [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ]
+          ],
+          "visited": [
+            true
+          ],
+          "hp": [
+            15
+          ],
+          "used": [
+            true,
+            true,
+            false
+          ],
+          "opened": [],
+          "inventory": [],
+          "completed": false,
+          "status": "active",
+          "journal": [],
+          "log": [
+            "Heartwood charm: +4 maximum and current health. Other wounded spirits recovered 2 health in total.",
+            "Ritual primer: +1 permanent power. Other wounded spirits recovered 2 health in total.",
+            "Ward prepared: halve the next strike’s incoming damage, rounded up. Wounded spirits recover this turn. Other wounded spirits recovered 2 health in total.",
+            "Brittle Shade: dealt 8, received 7."
+          ]
+        }
+      ],
+      "runId": "frozen-v4-before-relics"
+    },
+    {
+      "version": 4,
+      "ruleset": "power-flare",
+      "seed": "fixture",
+      "variant": 0,
+      "rooms": [
+        {
+          "id": "hall",
+          "name": "hall",
+          "floor": 0,
+          "width": 7,
+          "height": 7,
+          "tiles": [
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "exit"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            }
+          ],
+          "discovered": [
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "visited": true
+        }
+      ],
+      "hauntings": [
+        {
+          "id": "h0",
+          "name": "Brittle Shade",
+          "kind": "shade",
+          "position": {
+            "roomId": "hall",
+            "x": 4,
+            "y": 3
+          },
+          "tier": 1,
+          "hp": 17,
+          "maxHp": 17,
+          "attack": 7,
+          "regen": 2,
+          "xp": 1,
+          "boss": false,
+          "trait": "brittle"
+        }
+      ],
+      "supplies": [
+        {
+          "id": "s0",
+          "name": "Ritual primer",
+          "kind": "power",
+          "position": {
+            "roomId": "hall",
+            "x": 1,
+            "y": 2
+          },
+          "used": true,
+          "amount": 1
+        },
+        {
+          "id": "s1",
+          "name": "Heartwood charm",
+          "kind": "vitality",
+          "position": {
+            "roomId": "hall",
+            "x": 2,
+            "y": 2
+          },
+          "used": true,
+          "amount": 4
+        },
+        {
+          "id": "s2",
+          "name": "Alchemist's case",
+          "kind": "oil",
+          "position": {
+            "roomId": "hall",
+            "x": 3,
+            "y": 2
+          },
+          "used": true,
+          "amount": 3
+        }
+      ],
+      "connections": [],
+      "player": {
+        "roomId": "hall",
+        "x": 3,
+        "y": 2
+      },
+      "entrance": {
+        "roomId": "hall",
+        "x": 1,
+        "y": 1
+      },
+      "resources": {
+        "health": 19,
+        "maxHealth": 26,
+        "light": 5,
+        "maxLight": 10,
+        "power": 7,
+        "level": 1,
+        "xp": 0,
+        "tonics": 1,
+        "oils": 3,
+        "ward": true,
+        "empowered": true,
+        "treasure": 0
+      },
+      "turns": 6,
+      "inventory": [],
+      "objective": {
+        "kind": "escape",
+        "title": "Escape",
+        "description": "Find the key and leave.",
+        "completed": false
+      },
+      "journal": [],
+      "log": [
+        "Oil prepared: +4 damage on your next strike or flare. Wounded spirits recover this turn.",
+        "Alchemist's case: 3 collected. Other wounded spirits recovered 2 health in total.",
+        "Heartwood charm: +4 maximum and current health. Other wounded spirits recovered 2 health in total.",
+        "Ritual primer: +1 permanent power. Other wounded spirits recovered 2 health in total.",
+        "Ward prepared: halve the next strike’s incoming damage, rounded up. Wounded spirits recover this turn. Other wounded spirits recovered 2 health in total.",
+        "Brittle Shade: dealt 8, received 7."
+      ],
+      "status": "active",
+      "undo": [
+        {
+          "player": {
+            "roomId": "hall",
+            "x": 3,
+            "y": 3
+          },
+          "resources": {
+            "health": 22,
+            "maxHealth": 22,
+            "light": 8,
+            "maxLight": 10,
+            "power": 6,
+            "level": 1,
+            "xp": 0,
+            "tonics": 1,
+            "oils": 1,
+            "ward": false,
+            "empowered": false,
+            "treasure": 0
+          },
+          "turns": 0,
+          "discovered": [
+            [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ]
+          ],
+          "visited": [
+            true
+          ],
+          "hp": [
+            17
+          ],
+          "used": [
+            false,
+            false,
+            false
+          ],
+          "opened": [],
+          "inventory": [],
+          "completed": false,
+          "status": "active",
+          "journal": [],
+          "log": []
+        },
+        {
+          "player": {
+            "roomId": "hall",
+            "x": 3,
+            "y": 3
+          },
+          "resources": {
+            "health": 15,
+            "maxHealth": 22,
+            "light": 8,
+            "maxLight": 10,
+            "power": 6,
+            "level": 1,
+            "xp": 0,
+            "tonics": 1,
+            "oils": 1,
+            "ward": false,
+            "empowered": false,
+            "treasure": 0
+          },
+          "turns": 1,
+          "discovered": [
+            [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ]
+          ],
+          "visited": [
+            true
+          ],
+          "hp": [
+            9
+          ],
+          "used": [
+            false,
+            false,
+            false
+          ],
+          "opened": [],
+          "inventory": [],
+          "completed": false,
+          "status": "active",
+          "journal": [],
+          "log": [
+            "Brittle Shade: dealt 8, received 7."
+          ]
+        },
+        {
+          "player": {
+            "roomId": "hall",
+            "x": 3,
+            "y": 3
+          },
+          "resources": {
+            "health": 15,
+            "maxHealth": 22,
+            "light": 5,
+            "maxLight": 10,
+            "power": 6,
+            "level": 1,
+            "xp": 0,
+            "tonics": 1,
+            "oils": 1,
+            "ward": true,
+            "empowered": false,
+            "treasure": 0
+          },
+          "turns": 2,
+          "discovered": [
+            [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ]
+          ],
+          "visited": [
+            true
+          ],
+          "hp": [
+            11
+          ],
+          "used": [
+            false,
+            false,
+            false
+          ],
+          "opened": [],
+          "inventory": [],
+          "completed": false,
+          "status": "active",
+          "journal": [],
+          "log": [
+            "Ward prepared: halve the next strike’s incoming damage, rounded up. Wounded spirits recover this turn. Other wounded spirits recovered 2 health in total.",
+            "Brittle Shade: dealt 8, received 7."
+          ]
+        },
+        {
+          "player": {
+            "roomId": "hall",
+            "x": 1,
+            "y": 2
+          },
+          "resources": {
+            "health": 15,
+            "maxHealth": 22,
+            "light": 5,
+            "maxLight": 10,
+            "power": 7,
+            "level": 1,
+            "xp": 0,
+            "tonics": 1,
+            "oils": 1,
+            "ward": true,
+            "empowered": false,
+            "treasure": 0
+          },
+          "turns": 3,
+          "discovered": [
+            [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ]
+          ],
+          "visited": [
+            true
+          ],
+          "hp": [
+            13
+          ],
+          "used": [
+            true,
+            false,
+            false
+          ],
+          "opened": [],
+          "inventory": [],
+          "completed": false,
+          "status": "active",
+          "journal": [],
+          "log": [
+            "Ritual primer: +1 permanent power. Other wounded spirits recovered 2 health in total.",
+            "Ward prepared: halve the next strike’s incoming damage, rounded up. Wounded spirits recover this turn. Other wounded spirits recovered 2 health in total.",
+            "Brittle Shade: dealt 8, received 7."
+          ]
+        },
+        {
+          "player": {
+            "roomId": "hall",
+            "x": 2,
+            "y": 2
+          },
+          "resources": {
+            "health": 19,
+            "maxHealth": 26,
+            "light": 5,
+            "maxLight": 10,
+            "power": 7,
+            "level": 1,
+            "xp": 0,
+            "tonics": 1,
+            "oils": 1,
+            "ward": true,
+            "empowered": false,
+            "treasure": 0
+          },
+          "turns": 4,
+          "discovered": [
+            [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ]
+          ],
+          "visited": [
+            true
+          ],
+          "hp": [
+            15
+          ],
+          "used": [
+            true,
+            true,
+            false
+          ],
+          "opened": [],
+          "inventory": [],
+          "completed": false,
+          "status": "active",
+          "journal": [],
+          "log": [
+            "Heartwood charm: +4 maximum and current health. Other wounded spirits recovered 2 health in total.",
+            "Ritual primer: +1 permanent power. Other wounded spirits recovered 2 health in total.",
+            "Ward prepared: halve the next strike’s incoming damage, rounded up. Wounded spirits recover this turn. Other wounded spirits recovered 2 health in total.",
+            "Brittle Shade: dealt 8, received 7."
+          ]
+        },
+        {
+          "player": {
+            "roomId": "hall",
+            "x": 3,
+            "y": 2
+          },
+          "resources": {
+            "health": 19,
+            "maxHealth": 26,
+            "light": 5,
+            "maxLight": 10,
+            "power": 7,
+            "level": 1,
+            "xp": 0,
+            "tonics": 1,
+            "oils": 4,
+            "ward": true,
+            "empowered": false,
+            "treasure": 0
+          },
+          "turns": 5,
+          "discovered": [
+            [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ]
+          ],
+          "visited": [
+            true
+          ],
+          "hp": [
+            17
+          ],
+          "used": [
+            true,
+            true,
+            true
+          ],
+          "opened": [],
+          "inventory": [],
+          "completed": false,
+          "status": "active",
+          "journal": [],
+          "log": [
+            "Alchemist's case: 3 collected. Other wounded spirits recovered 2 health in total.",
+            "Heartwood charm: +4 maximum and current health. Other wounded spirits recovered 2 health in total.",
+            "Ritual primer: +1 permanent power. Other wounded spirits recovered 2 health in total.",
+            "Ward prepared: halve the next strike’s incoming damage, rounded up. Wounded spirits recover this turn. Other wounded spirits recovered 2 health in total.",
+            "Brittle Shade: dealt 8, received 7."
+          ]
+        }
+      ],
+      "runId": "frozen-v4-before-relics"
+    },
+    {
+      "version": 4,
+      "ruleset": "power-flare",
+      "seed": "fixture",
+      "variant": 0,
+      "rooms": [
+        {
+          "id": "hall",
+          "name": "hall",
+          "floor": 0,
+          "width": 7,
+          "height": 7,
+          "tiles": [
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "exit"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            }
+          ],
+          "discovered": [
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "visited": true
+        }
+      ],
+      "hauntings": [
+        {
+          "id": "h0",
+          "name": "Brittle Shade",
+          "kind": "shade",
+          "position": {
+            "roomId": "hall",
+            "x": 4,
+            "y": 3
+          },
+          "tier": 1,
+          "hp": 4,
+          "maxHp": 17,
+          "attack": 7,
+          "regen": 2,
+          "xp": 1,
+          "boss": false,
+          "trait": "brittle"
+        }
+      ],
+      "supplies": [
+        {
+          "id": "s0",
+          "name": "Ritual primer",
+          "kind": "power",
+          "position": {
+            "roomId": "hall",
+            "x": 1,
+            "y": 2
+          },
+          "used": true,
+          "amount": 1
+        },
+        {
+          "id": "s1",
+          "name": "Heartwood charm",
+          "kind": "vitality",
+          "position": {
+            "roomId": "hall",
+            "x": 2,
+            "y": 2
+          },
+          "used": true,
+          "amount": 4
+        },
+        {
+          "id": "s2",
+          "name": "Alchemist's case",
+          "kind": "oil",
+          "position": {
+            "roomId": "hall",
+            "x": 3,
+            "y": 2
+          },
+          "used": true,
+          "amount": 3
+        }
+      ],
+      "connections": [],
+      "player": {
+        "roomId": "hall",
+        "x": 3,
+        "y": 2
+      },
+      "entrance": {
+        "roomId": "hall",
+        "x": 1,
+        "y": 1
+      },
+      "resources": {
+        "health": 15,
+        "maxHealth": 26,
+        "light": 5,
+        "maxLight": 10,
+        "power": 7,
+        "level": 1,
+        "xp": 0,
+        "tonics": 1,
+        "oils": 3,
+        "ward": false,
+        "empowered": false,
+        "treasure": 0
+      },
+      "turns": 7,
+      "inventory": [],
+      "objective": {
+        "kind": "escape",
+        "title": "Escape",
+        "description": "Find the key and leave.",
+        "completed": false
+      },
+      "journal": [],
+      "log": [
+        "Brittle Shade: dealt 13, received 4.",
+        "Oil prepared: +4 damage on your next strike or flare. Wounded spirits recover this turn.",
+        "Alchemist's case: 3 collected. Other wounded spirits recovered 2 health in total.",
+        "Heartwood charm: +4 maximum and current health. Other wounded spirits recovered 2 health in total.",
+        "Ritual primer: +1 permanent power. Other wounded spirits recovered 2 health in total.",
+        "Ward prepared: halve the next strike’s incoming damage, rounded up. Wounded spirits recover this turn. Other wounded spirits recovered 2 health in total."
+      ],
+      "status": "active",
+      "undo": [
+        {
+          "player": {
+            "roomId": "hall",
+            "x": 3,
+            "y": 3
+          },
+          "resources": {
+            "health": 22,
+            "maxHealth": 22,
+            "light": 8,
+            "maxLight": 10,
+            "power": 6,
+            "level": 1,
+            "xp": 0,
+            "tonics": 1,
+            "oils": 1,
+            "ward": false,
+            "empowered": false,
+            "treasure": 0
+          },
+          "turns": 0,
+          "discovered": [
+            [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ]
+          ],
+          "visited": [
+            true
+          ],
+          "hp": [
+            17
+          ],
+          "used": [
+            false,
+            false,
+            false
+          ],
+          "opened": [],
+          "inventory": [],
+          "completed": false,
+          "status": "active",
+          "journal": [],
+          "log": []
+        },
+        {
+          "player": {
+            "roomId": "hall",
+            "x": 3,
+            "y": 3
+          },
+          "resources": {
+            "health": 15,
+            "maxHealth": 22,
+            "light": 8,
+            "maxLight": 10,
+            "power": 6,
+            "level": 1,
+            "xp": 0,
+            "tonics": 1,
+            "oils": 1,
+            "ward": false,
+            "empowered": false,
+            "treasure": 0
+          },
+          "turns": 1,
+          "discovered": [
+            [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ]
+          ],
+          "visited": [
+            true
+          ],
+          "hp": [
+            9
+          ],
+          "used": [
+            false,
+            false,
+            false
+          ],
+          "opened": [],
+          "inventory": [],
+          "completed": false,
+          "status": "active",
+          "journal": [],
+          "log": [
+            "Brittle Shade: dealt 8, received 7."
+          ]
+        },
+        {
+          "player": {
+            "roomId": "hall",
+            "x": 3,
+            "y": 3
+          },
+          "resources": {
+            "health": 15,
+            "maxHealth": 22,
+            "light": 5,
+            "maxLight": 10,
+            "power": 6,
+            "level": 1,
+            "xp": 0,
+            "tonics": 1,
+            "oils": 1,
+            "ward": true,
+            "empowered": false,
+            "treasure": 0
+          },
+          "turns": 2,
+          "discovered": [
+            [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ]
+          ],
+          "visited": [
+            true
+          ],
+          "hp": [
+            11
+          ],
+          "used": [
+            false,
+            false,
+            false
+          ],
+          "opened": [],
+          "inventory": [],
+          "completed": false,
+          "status": "active",
+          "journal": [],
+          "log": [
+            "Ward prepared: halve the next strike’s incoming damage, rounded up. Wounded spirits recover this turn. Other wounded spirits recovered 2 health in total.",
+            "Brittle Shade: dealt 8, received 7."
+          ]
+        },
+        {
+          "player": {
+            "roomId": "hall",
+            "x": 1,
+            "y": 2
+          },
+          "resources": {
+            "health": 15,
+            "maxHealth": 22,
+            "light": 5,
+            "maxLight": 10,
+            "power": 7,
+            "level": 1,
+            "xp": 0,
+            "tonics": 1,
+            "oils": 1,
+            "ward": true,
+            "empowered": false,
+            "treasure": 0
+          },
+          "turns": 3,
+          "discovered": [
+            [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ]
+          ],
+          "visited": [
+            true
+          ],
+          "hp": [
+            13
+          ],
+          "used": [
+            true,
+            false,
+            false
+          ],
+          "opened": [],
+          "inventory": [],
+          "completed": false,
+          "status": "active",
+          "journal": [],
+          "log": [
+            "Ritual primer: +1 permanent power. Other wounded spirits recovered 2 health in total.",
+            "Ward prepared: halve the next strike’s incoming damage, rounded up. Wounded spirits recover this turn. Other wounded spirits recovered 2 health in total.",
+            "Brittle Shade: dealt 8, received 7."
+          ]
+        },
+        {
+          "player": {
+            "roomId": "hall",
+            "x": 2,
+            "y": 2
+          },
+          "resources": {
+            "health": 19,
+            "maxHealth": 26,
+            "light": 5,
+            "maxLight": 10,
+            "power": 7,
+            "level": 1,
+            "xp": 0,
+            "tonics": 1,
+            "oils": 1,
+            "ward": true,
+            "empowered": false,
+            "treasure": 0
+          },
+          "turns": 4,
+          "discovered": [
+            [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ]
+          ],
+          "visited": [
+            true
+          ],
+          "hp": [
+            15
+          ],
+          "used": [
+            true,
+            true,
+            false
+          ],
+          "opened": [],
+          "inventory": [],
+          "completed": false,
+          "status": "active",
+          "journal": [],
+          "log": [
+            "Heartwood charm: +4 maximum and current health. Other wounded spirits recovered 2 health in total.",
+            "Ritual primer: +1 permanent power. Other wounded spirits recovered 2 health in total.",
+            "Ward prepared: halve the next strike’s incoming damage, rounded up. Wounded spirits recover this turn. Other wounded spirits recovered 2 health in total.",
+            "Brittle Shade: dealt 8, received 7."
+          ]
+        },
+        {
+          "player": {
+            "roomId": "hall",
+            "x": 3,
+            "y": 2
+          },
+          "resources": {
+            "health": 19,
+            "maxHealth": 26,
+            "light": 5,
+            "maxLight": 10,
+            "power": 7,
+            "level": 1,
+            "xp": 0,
+            "tonics": 1,
+            "oils": 4,
+            "ward": true,
+            "empowered": false,
+            "treasure": 0
+          },
+          "turns": 5,
+          "discovered": [
+            [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ]
+          ],
+          "visited": [
+            true
+          ],
+          "hp": [
+            17
+          ],
+          "used": [
+            true,
+            true,
+            true
+          ],
+          "opened": [],
+          "inventory": [],
+          "completed": false,
+          "status": "active",
+          "journal": [],
+          "log": [
+            "Alchemist's case: 3 collected. Other wounded spirits recovered 2 health in total.",
+            "Heartwood charm: +4 maximum and current health. Other wounded spirits recovered 2 health in total.",
+            "Ritual primer: +1 permanent power. Other wounded spirits recovered 2 health in total.",
+            "Ward prepared: halve the next strike’s incoming damage, rounded up. Wounded spirits recover this turn. Other wounded spirits recovered 2 health in total.",
+            "Brittle Shade: dealt 8, received 7."
+          ]
+        },
+        {
+          "player": {
+            "roomId": "hall",
+            "x": 3,
+            "y": 2
+          },
+          "resources": {
+            "health": 19,
+            "maxHealth": 26,
+            "light": 5,
+            "maxLight": 10,
+            "power": 7,
+            "level": 1,
+            "xp": 0,
+            "tonics": 1,
+            "oils": 3,
+            "ward": true,
+            "empowered": true,
+            "treasure": 0
+          },
+          "turns": 6,
+          "discovered": [
+            [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ]
+          ],
+          "visited": [
+            true
+          ],
+          "hp": [
+            17
+          ],
+          "used": [
+            true,
+            true,
+            true
+          ],
+          "opened": [],
+          "inventory": [],
+          "completed": false,
+          "status": "active",
+          "journal": [],
+          "log": [
+            "Oil prepared: +4 damage on your next strike or flare. Wounded spirits recover this turn.",
+            "Alchemist's case: 3 collected. Other wounded spirits recovered 2 health in total.",
+            "Heartwood charm: +4 maximum and current health. Other wounded spirits recovered 2 health in total.",
+            "Ritual primer: +1 permanent power. Other wounded spirits recovered 2 health in total.",
+            "Ward prepared: halve the next strike’s incoming damage, rounded up. Wounded spirits recover this turn. Other wounded spirits recovered 2 health in total.",
+            "Brittle Shade: dealt 8, received 7."
+          ]
+        }
+      ],
+      "runId": "frozen-v4-before-relics"
+    },
+    {
+      "version": 4,
+      "ruleset": "power-flare",
+      "seed": "fixture",
+      "variant": 0,
+      "rooms": [
+        {
+          "id": "hall",
+          "name": "hall",
+          "floor": 0,
+          "width": 7,
+          "height": 7,
+          "tiles": [
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "exit"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "floor"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            },
+            {
+              "kind": "wall"
+            }
+          ],
+          "discovered": [
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "visited": true
+        }
+      ],
+      "hauntings": [
+        {
+          "id": "h0",
+          "name": "Brittle Shade",
+          "kind": "shade",
+          "position": {
+            "roomId": "hall",
+            "x": 4,
+            "y": 3
+          },
+          "tier": 1,
+          "hp": 0,
+          "maxHp": 17,
+          "attack": 7,
+          "regen": 2,
+          "xp": 1,
+          "boss": false,
+          "trait": "brittle"
+        }
+      ],
+      "supplies": [
+        {
+          "id": "s0",
+          "name": "Ritual primer",
+          "kind": "power",
+          "position": {
+            "roomId": "hall",
+            "x": 1,
+            "y": 2
+          },
+          "used": true,
+          "amount": 1
+        },
+        {
+          "id": "s1",
+          "name": "Heartwood charm",
+          "kind": "vitality",
+          "position": {
+            "roomId": "hall",
+            "x": 2,
+            "y": 2
+          },
+          "used": true,
+          "amount": 4
+        },
+        {
+          "id": "s2",
+          "name": "Alchemist's case",
+          "kind": "oil",
+          "position": {
+            "roomId": "hall",
+            "x": 3,
+            "y": 2
+          },
+          "used": true,
+          "amount": 3
+        }
+      ],
+      "connections": [],
+      "player": {
+        "roomId": "hall",
+        "x": 4,
+        "y": 3
+      },
+      "entrance": {
+        "roomId": "hall",
+        "x": 1,
+        "y": 1
+      },
+      "resources": {
+        "health": 15,
+        "maxHealth": 26,
+        "light": 1,
+        "maxLight": 10,
+        "power": 7,
+        "level": 1,
+        "xp": 1,
+        "tonics": 1,
+        "oils": 3,
+        "ward": false,
+        "empowered": false,
+        "treasure": 0
+      },
+      "turns": 8,
+      "inventory": [],
+      "objective": {
+        "kind": "escape",
+        "title": "Escape",
+        "description": "Find the key and leave.",
+        "completed": false
+      },
+      "journal": [],
+      "log": [
+        "Brittle Shade: dealt 7, received 0. Banished. +1 experience.",
+        "Brittle Shade: dealt 13, received 4.",
+        "Oil prepared: +4 damage on your next strike or flare. Wounded spirits recover this turn.",
+        "Alchemist's case: 3 collected. Other wounded spirits recovered 2 health in total.",
+        "Heartwood charm: +4 maximum and current health. Other wounded spirits recovered 2 health in total.",
+        "Ritual primer: +1 permanent power. Other wounded spirits recovered 2 health in total."
+      ],
+      "status": "active",
+      "undo": [
+        {
+          "player": {
+            "roomId": "hall",
+            "x": 3,
+            "y": 3
+          },
+          "resources": {
+            "health": 22,
+            "maxHealth": 22,
+            "light": 8,
+            "maxLight": 10,
+            "power": 6,
+            "level": 1,
+            "xp": 0,
+            "tonics": 1,
+            "oils": 1,
+            "ward": false,
+            "empowered": false,
+            "treasure": 0
+          },
+          "turns": 0,
+          "discovered": [
+            [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ]
+          ],
+          "visited": [
+            true
+          ],
+          "hp": [
+            17
+          ],
+          "used": [
+            false,
+            false,
+            false
+          ],
+          "opened": [],
+          "inventory": [],
+          "completed": false,
+          "status": "active",
+          "journal": [],
+          "log": []
+        },
+        {
+          "player": {
+            "roomId": "hall",
+            "x": 3,
+            "y": 3
+          },
+          "resources": {
+            "health": 15,
+            "maxHealth": 22,
+            "light": 8,
+            "maxLight": 10,
+            "power": 6,
+            "level": 1,
+            "xp": 0,
+            "tonics": 1,
+            "oils": 1,
+            "ward": false,
+            "empowered": false,
+            "treasure": 0
+          },
+          "turns": 1,
+          "discovered": [
+            [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ]
+          ],
+          "visited": [
+            true
+          ],
+          "hp": [
+            9
+          ],
+          "used": [
+            false,
+            false,
+            false
+          ],
+          "opened": [],
+          "inventory": [],
+          "completed": false,
+          "status": "active",
+          "journal": [],
+          "log": [
+            "Brittle Shade: dealt 8, received 7."
+          ]
+        },
+        {
+          "player": {
+            "roomId": "hall",
+            "x": 3,
+            "y": 3
+          },
+          "resources": {
+            "health": 15,
+            "maxHealth": 22,
+            "light": 5,
+            "maxLight": 10,
+            "power": 6,
+            "level": 1,
+            "xp": 0,
+            "tonics": 1,
+            "oils": 1,
+            "ward": true,
+            "empowered": false,
+            "treasure": 0
+          },
+          "turns": 2,
+          "discovered": [
+            [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ]
+          ],
+          "visited": [
+            true
+          ],
+          "hp": [
+            11
+          ],
+          "used": [
+            false,
+            false,
+            false
+          ],
+          "opened": [],
+          "inventory": [],
+          "completed": false,
+          "status": "active",
+          "journal": [],
+          "log": [
+            "Ward prepared: halve the next strike’s incoming damage, rounded up. Wounded spirits recover this turn. Other wounded spirits recovered 2 health in total.",
+            "Brittle Shade: dealt 8, received 7."
+          ]
+        },
+        {
+          "player": {
+            "roomId": "hall",
+            "x": 1,
+            "y": 2
+          },
+          "resources": {
+            "health": 15,
+            "maxHealth": 22,
+            "light": 5,
+            "maxLight": 10,
+            "power": 7,
+            "level": 1,
+            "xp": 0,
+            "tonics": 1,
+            "oils": 1,
+            "ward": true,
+            "empowered": false,
+            "treasure": 0
+          },
+          "turns": 3,
+          "discovered": [
+            [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ]
+          ],
+          "visited": [
+            true
+          ],
+          "hp": [
+            13
+          ],
+          "used": [
+            true,
+            false,
+            false
+          ],
+          "opened": [],
+          "inventory": [],
+          "completed": false,
+          "status": "active",
+          "journal": [],
+          "log": [
+            "Ritual primer: +1 permanent power. Other wounded spirits recovered 2 health in total.",
+            "Ward prepared: halve the next strike’s incoming damage, rounded up. Wounded spirits recover this turn. Other wounded spirits recovered 2 health in total.",
+            "Brittle Shade: dealt 8, received 7."
+          ]
+        },
+        {
+          "player": {
+            "roomId": "hall",
+            "x": 2,
+            "y": 2
+          },
+          "resources": {
+            "health": 19,
+            "maxHealth": 26,
+            "light": 5,
+            "maxLight": 10,
+            "power": 7,
+            "level": 1,
+            "xp": 0,
+            "tonics": 1,
+            "oils": 1,
+            "ward": true,
+            "empowered": false,
+            "treasure": 0
+          },
+          "turns": 4,
+          "discovered": [
+            [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ]
+          ],
+          "visited": [
+            true
+          ],
+          "hp": [
+            15
+          ],
+          "used": [
+            true,
+            true,
+            false
+          ],
+          "opened": [],
+          "inventory": [],
+          "completed": false,
+          "status": "active",
+          "journal": [],
+          "log": [
+            "Heartwood charm: +4 maximum and current health. Other wounded spirits recovered 2 health in total.",
+            "Ritual primer: +1 permanent power. Other wounded spirits recovered 2 health in total.",
+            "Ward prepared: halve the next strike’s incoming damage, rounded up. Wounded spirits recover this turn. Other wounded spirits recovered 2 health in total.",
+            "Brittle Shade: dealt 8, received 7."
+          ]
+        },
+        {
+          "player": {
+            "roomId": "hall",
+            "x": 3,
+            "y": 2
+          },
+          "resources": {
+            "health": 19,
+            "maxHealth": 26,
+            "light": 5,
+            "maxLight": 10,
+            "power": 7,
+            "level": 1,
+            "xp": 0,
+            "tonics": 1,
+            "oils": 4,
+            "ward": true,
+            "empowered": false,
+            "treasure": 0
+          },
+          "turns": 5,
+          "discovered": [
+            [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ]
+          ],
+          "visited": [
+            true
+          ],
+          "hp": [
+            17
+          ],
+          "used": [
+            true,
+            true,
+            true
+          ],
+          "opened": [],
+          "inventory": [],
+          "completed": false,
+          "status": "active",
+          "journal": [],
+          "log": [
+            "Alchemist's case: 3 collected. Other wounded spirits recovered 2 health in total.",
+            "Heartwood charm: +4 maximum and current health. Other wounded spirits recovered 2 health in total.",
+            "Ritual primer: +1 permanent power. Other wounded spirits recovered 2 health in total.",
+            "Ward prepared: halve the next strike’s incoming damage, rounded up. Wounded spirits recover this turn. Other wounded spirits recovered 2 health in total.",
+            "Brittle Shade: dealt 8, received 7."
+          ]
+        },
+        {
+          "player": {
+            "roomId": "hall",
+            "x": 3,
+            "y": 2
+          },
+          "resources": {
+            "health": 19,
+            "maxHealth": 26,
+            "light": 5,
+            "maxLight": 10,
+            "power": 7,
+            "level": 1,
+            "xp": 0,
+            "tonics": 1,
+            "oils": 3,
+            "ward": true,
+            "empowered": true,
+            "treasure": 0
+          },
+          "turns": 6,
+          "discovered": [
+            [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ]
+          ],
+          "visited": [
+            true
+          ],
+          "hp": [
+            17
+          ],
+          "used": [
+            true,
+            true,
+            true
+          ],
+          "opened": [],
+          "inventory": [],
+          "completed": false,
+          "status": "active",
+          "journal": [],
+          "log": [
+            "Oil prepared: +4 damage on your next strike or flare. Wounded spirits recover this turn.",
+            "Alchemist's case: 3 collected. Other wounded spirits recovered 2 health in total.",
+            "Heartwood charm: +4 maximum and current health. Other wounded spirits recovered 2 health in total.",
+            "Ritual primer: +1 permanent power. Other wounded spirits recovered 2 health in total.",
+            "Ward prepared: halve the next strike’s incoming damage, rounded up. Wounded spirits recover this turn. Other wounded spirits recovered 2 health in total.",
+            "Brittle Shade: dealt 8, received 7."
+          ]
+        },
+        {
+          "player": {
+            "roomId": "hall",
+            "x": 3,
+            "y": 2
+          },
+          "resources": {
+            "health": 15,
+            "maxHealth": 26,
+            "light": 5,
+            "maxLight": 10,
+            "power": 7,
+            "level": 1,
+            "xp": 0,
+            "tonics": 1,
+            "oils": 3,
+            "ward": false,
+            "empowered": false,
+            "treasure": 0
+          },
+          "turns": 7,
+          "discovered": [
+            [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ]
+          ],
+          "visited": [
+            true
+          ],
+          "hp": [
+            4
+          ],
+          "used": [
+            true,
+            true,
+            true
+          ],
+          "opened": [],
+          "inventory": [],
+          "completed": false,
+          "status": "active",
+          "journal": [],
+          "log": [
+            "Brittle Shade: dealt 13, received 4.",
+            "Oil prepared: +4 damage on your next strike or flare. Wounded spirits recover this turn.",
+            "Alchemist's case: 3 collected. Other wounded spirits recovered 2 health in total.",
+            "Heartwood charm: +4 maximum and current health. Other wounded spirits recovered 2 health in total.",
+            "Ritual primer: +1 permanent power. Other wounded spirits recovered 2 health in total.",
+            "Ward prepared: halve the next strike’s incoming damage, rounded up. Wounded spirits recover this turn. Other wounded spirits recovered 2 health in total."
+          ]
+        }
+      ],
+      "runId": "frozen-v4-before-relics"
+    }
+  ]
+}

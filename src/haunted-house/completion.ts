@@ -1,7 +1,7 @@
 import type { GameSnapshot, GameState, Position } from './types.ts';
 import { positionKey, refreshExploration, seedNumber, tileAt, traversable } from './world.ts';
 
-export interface SupplyCounts { food: number; candle: number; tonic: number; oil: number; total: number }
+export interface SupplyCounts { food: number; candle: number; tonic: number; oil: number; recovery?: number; total: number }
 export interface CompletionReport {
  objective: { title: string; completed: boolean };
  hauntings: { defeated: number; total: number };
@@ -65,8 +65,9 @@ export function completionReport(state: GameSnapshot): CompletionReport {
  for (const s of state.supplies) if (!s.used) {
   if (s.kind === 'food' || s.kind === 'candle') floor[s.kind]++;
   else if (s.kind === 'tonic' || s.kind === 'oil') floor[s.kind] += s.amount;
+  else if (s.kind === 'relic' && s.effect?.kind === 'recovery') floor.recovery = (floor.recovery ?? 0) + 1;
  }
- floor.total = floor.food + floor.candle + floor.tonic + floor.oil;
+ floor.total = floor.food + floor.candle + floor.tonic + floor.oil + (floor.recovery ?? 0);
  const pocket = { tonic: state.resources.tonics, oil: state.resources.oils, total: state.resources.tonics + state.resources.oils };
  const report: CompletionReport = {
   objective: { title: state.objective.title, completed: state.status === 'won' },
