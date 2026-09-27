@@ -1,8 +1,10 @@
 import { act, previewAttack, objectiveReady } from './game.ts';
 import { TUNING } from './content.ts';
+import { choiceValue } from './diagnostics.ts';
 import type { Action, GameState, Haunting, Position } from './types.ts';
 import { known, revealGain, samePosition, traversable } from './world.ts';
 export interface SolveResult { solved: boolean; actions: Action[]; visited: number; reason: 'won' | 'budget' | 'exhausted' }
+export type SolvePreference = 'balanced' | 'health' | 'light';
 interface Node { state: GameState; actions: Action[] }
 function apply(node: Node, action: Action): Node | undefined { const result = act(node.state, action, false); return result.committed && result.state.status !== 'dead' ? { state: result.state, actions: [...node.actions, action] } : undefined; }
 /** Uses revealed contents only. Unknown tiles are never inspected to select a destination. */
@@ -38,7 +40,7 @@ function expand(node: Node): Node {
 function fights(node: Node, enemy: Haunting): Node[] {
  const result: Node[] = [];
  const preparations: Action[][] = [[], [{ type: 'ward' }], [{ type: 'oil' }], [{ type: 'oil' }, { type: 'ward' }]];
- for (const prep of preparations) for (const spellsFirst of [false, true]) {
+ for (const prep of preparations) for (const tactic of ['strike', 'flare-first', 'flare-finish'] as const) {
   let trial: Node | undefined = node;
   for (const a of prep) { if (!trial) break; trial = apply(trial, a); }
   if (!trial) continue;
@@ -46,7 +48,7 @@ function fights(node: Node, enemy: Haunting): Node[] {
    const h = trial.state.hauntings.find(x => x.id === enemy.id)!;
    if (!h.hp) { result.push(trial); break; }
    const melee = previewAttack(trial.state, h, 'strike'), flare = previewAttack(trial.state, h, 'flare');
-   const useFlare = flare.affordable && (spellsFirst || melee.lethal);
+   const useFlare = flare.affordable && (tactic === 'flare-first' || (tactic === 'flare-finish' && flare.kills) || melee.lethal);
    if (melee.lethal && !useFlare) break;
    trial = apply(trial, { type: 'attack', hauntingId: h.id, mode: useFlare ? 'flare' : 'strike' });
   }
@@ -57,12 +59,12 @@ function fights(node: Node, enemy: Haunting): Node[] {
 function key(s: GameState): string {
  return JSON.stringify([s.resources, s.hauntings.map(h => h.hp), s.supplies.map(x => +x.used), s.connections.map(c => +c.opened), s.rooms.map(r => r.discovered.map(v => v ? '1' : '0').join('')), s.inventory, s.objective.completed, s.status]);
 }
-function score(s: GameState): number {
+function score(s: GameState, preference: SolvePreference): number {
  const r = s.resources;
- return s.hauntings.filter(h => h.hp === 0).length * 100 + r.level * 35 + r.xp * 8 + r.health * 1.3 + r.light * 3 + r.tonics * 12 + r.oils * 8 + (r.ward ? 7 : 0) + (r.empowered ? 8 : 0) + s.inventory.length * 55 + s.rooms.filter(r => r.visited).length * 15 + s.supplies.filter(x => !x.used && x.kind === 'food').length * 18 + s.supplies.filter(x => !x.used && x.kind === 'candle').length * 12;
+ return s.hauntings.filter(h => h.hp === 0).length * 100 + r.level * 35 + r.xp * 8 + r.health * (preference === 'health' ? 2.6 : 1.3) + r.light * (preference === 'light' ? 6 : 3) + r.tonics * 12 + r.oils * 8 + (r.ward ? 7 : 0) + (r.empowered ? 8 : 0) + s.inventory.length * 55 + s.rooms.filter(r => r.visited).length * 15 + s.supplies.filter(x => !x.used && x.kind === 'food').length * 18 + s.supplies.filter(x => !x.used && x.kind === 'candle').length * 12 + choiceValue(s) * 2;
 }
 /** Bounded witness search. Failure means unverified, never a proof of impossibility. */
-export function solve(initial: GameState, budget: number = TUNING.solverBudget): SolveResult {
+export function solve(initial: GameState, budget: number = TUNING.solverBudget, preference: SolvePreference = 'balanced'): SolveResult {
  let frontier = [expand({ state: { ...initial, undo: [] }, actions: [] })]; const seen = new Set<string>(); let visited = 0;
  while (frontier.length && visited < budget) {
   const next: Node[] = [];
@@ -75,7 +77,7 @@ export function solve(initial: GameState, budget: number = TUNING.solverBudget):
    if (node.state.resources.tonics && node.state.resources.health < node.state.resources.maxHealth) { const n = apply(node, { type: 'tonic' }); if (n) next.push(n); }
   }
   const won = next.find(n => n.state.status === 'won'); if (won) return { solved: true, actions: won.actions, visited, reason: 'won' };
-  frontier = [...new Map(next.filter(n => !seen.has(key(n.state))).map(n => [key(n.state), n])).values()].sort((a, b) => score(b.state) - score(a.state)).slice(0, TUNING.solverWidth);
+  frontier = [...new Map(next.filter(n => !seen.has(key(n.state))).map(n => [key(n.state), n])).values()].map(n => ({ node: n, score: score(n.state, preference) })).sort((a, b) => b.score - a.score).slice(0, TUNING.solverWidth).map(n => n.node);
  }
  return { solved: false, actions: [], visited, reason: frontier.length ? 'budget' : 'exhausted' };
 }

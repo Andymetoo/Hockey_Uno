@@ -14,7 +14,7 @@ export function isGameState(value: unknown): value is GameState {
  try {
   if (!value || typeof value !== 'object') return false;
   const s = value as GameState;
-  if (s.version !== SAVE_VERSION || !string(s.seed, 100) || !s.seed.trim() || !integer(s.variant, 0, 100) || !integer(s.turns, 0, 20000) || !validResources(s.resources)) return false;
+  if (s.version !== SAVE_VERSION || s.ruleset !== 'power-flare' || (s.runId !== undefined && (!string(s.runId, 200) || !s.runId)) || !string(s.seed, 100) || !s.seed.trim() || !integer(s.variant, 0, 100) || !integer(s.turns, 0, 20000) || !validResources(s.resources)) return false;
   if (!Array.isArray(s.rooms) || !s.rooms.length || s.rooms.length > 20 || !ids(s.rooms)) return false;
   for (const r of s.rooms) {
    if (!string(r.name, 100) || !integer(r.floor, 0, 10) || !integer(r.width, 3, 25) || !integer(r.height, 3, 25) || !bool(r.visited) || !Array.isArray(r.tiles) || r.tiles.length !== r.width * r.height || !Array.isArray(r.discovered) || r.discovered.length !== r.tiles.length || !r.discovered.every(bool)) return false;
@@ -27,11 +27,11 @@ export function isGameState(value: unknown): value is GameState {
   if (!Array.isArray(s.inventory) || s.inventory.length > 6 || !s.inventory.every(item) || new Set(s.inventory).size !== s.inventory.length) return false;
   const occupied = new Set<string>();
   for (const h of s.hauntings) {
-   if (!string(h.name, 100) || !Object.hasOwn(SPIRITS, h.kind) || !position(h.position) || !integer(h.hp) || !integer(h.maxHp, 1) || h.hp > h.maxHp || !integer(h.attack) || !integer(h.regen) || !integer(h.xp, 1) || !integer(h.tier, 1) || !bool(h.boss) || (h.reward !== undefined && !item(h.reward))) return false;
+   if (!string(h.name, 100) || !Object.hasOwn(SPIRITS, h.kind) || (h.trait !== undefined && !['brittle', 'smouldering'].includes(h.trait)) || !position(h.position) || !integer(h.hp) || !integer(h.maxHp, 1) || h.hp > h.maxHp || !integer(h.attack) || !integer(h.regen) || !integer(h.xp, 1) || !integer(h.tier, 1) || !bool(h.boss) || (h.reward !== undefined && !item(h.reward))) return false;
    const p = positionKey(h.position); if (occupied.has(p)) return false; occupied.add(p);
   }
   for (const x of s.supplies) {
-   if (!string(x.name, 100) || !['food', 'candle', 'tonic', 'oil', 'power', 'cache', 'treasure', 'note'].includes(x.kind) || !position(x.position) || !bool(x.used) || !integer(x.amount, 1) || (x.item !== undefined && !item(x.item)) || (x.text !== undefined && !string(x.text))) return false;
+   if (!string(x.name, 100) || !['food', 'candle', 'tonic', 'oil', 'power', 'vitality', 'cache', 'treasure', 'note'].includes(x.kind) || !position(x.position) || !bool(x.used) || !integer(x.amount, 1) || (x.item !== undefined && !item(x.item)) || (x.text !== undefined && !string(x.text))) return false;
    const p = positionKey(x.position); if (occupied.has(p)) return false; occupied.add(p);
   }
   for (const c of s.connections) {

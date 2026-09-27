@@ -14,14 +14,34 @@ export function cloneGame(s: GameState): GameState {
  // Geometry and coordinates are immutable after generation. Copy only mutable state.
  return { ...s, player: { ...s.player }, resources: { ...s.resources }, rooms: s.rooms.map(r => ({ ...r, discovered: [...r.discovered] })), hauntings: s.hauntings.map(h => ({ ...h })), supplies: s.supplies.map(x => ({ ...x })), connections: s.connections.map(c => ({ ...c })), objective: { ...s.objective }, inventory: [...s.inventory], journal: [...s.journal], log: [...s.log], undo: [...s.undo] };
 }
+function awardExperience(r: GameSnapshot['resources'], xp: number): number {
+ const before = r.level; r.xp += xp;
+ while (r.xp >= xpNeeded(r.level)) {
+  r.xp -= xpNeeded(r.level); r.level++; r.maxHealth += TUNING.levelHealth; r.power += TUNING.levelPower;
+  r.health = r.maxHealth; r.light = r.maxLight;
+ }
+ return r.level - before;
+}
 export function previewAttack(s: GameSnapshot, h: Haunting, mode: 'strike' | 'flare'): CombatPreview {
- const r = s.resources; const lightCost = mode === 'flare' ? TUNING.flareCost : 0;
- const damage = Math.max(1, r.power + (r.empowered ? TUNING.oilBonus : 0) + (mode === 'flare' ? 4 : h.kind === 'armour' ? -2 : 0));
- const incoming = mode === 'flare' ? 0 : r.ward ? Math.ceil(h.attack / 2) : h.attack;
- return { damage, incoming, healthAfter: Math.max(0, r.health - incoming), enemyAfter: Math.max(0, h.hp - damage), lightCost, lethal: r.health <= incoming, kills: damage >= h.hp, affordable: r.light >= lightCost };
+ const r = s.resources, lightCost = mode === 'flare' ? TUNING.flareCost : 0;
+ const powerDamage = r.power, oilDamage = r.empowered ? TUNING.oilBonus : 0;
+ // Classic is an explicit benchmark ruleset. Version-3 saves are archived, never implicitly upgraded.
+ const flareBonus = mode === 'flare' ? s.ruleset === 'classic' ? TUNING.classicFlareBonus : TUNING.flareBonus : 0;
+ const armourReduction = mode === 'strike' && h.kind === 'armour' ? TUNING.armourReduction : 0;
+ const traitDamage = mode === 'strike' && h.trait === 'brittle' ? TUNING.brittleBonus : mode === 'flare' && h.trait === 'smouldering' ? TUNING.smoulderingBonus : 0;
+ const damage = Math.max(1, powerDamage + oilDamage + flareBonus + traitDamage - armourReduction);
+ const unwardedIncoming = mode === 'flare' ? 0 : h.attack;
+ const incoming = mode === 'strike' && r.ward ? Math.ceil(unwardedIncoming / TUNING.wardDivisor) : unwardedIncoming;
+ const healthAfter = Math.max(0, r.health - incoming), lightAfter = r.light - lightCost;
+ const kills = damage >= h.hp, lethal = r.health <= incoming, affordable = r.light >= lightCost;
+ const projected = { ...r, health: healthAfter, light: lightAfter };
+ const levelsGained = kills && !lethal && affordable ? awardExperience(projected, h.xp) : 0;
+ return { damage, incoming, healthAfter, enemyAfter: Math.max(0, h.hp - damage), lightCost, lightAfter, lethal, kills, affordable,
+  powerDamage, oilDamage, flareBonus, armourReduction, traitDamage, unwardedIncoming, levelsGained,
+  finalHealth: projected.health, finalLight: projected.light, finalMaxHealth: projected.maxHealth, finalPower: projected.power };
 }
 export function supplyPreview(s: GameSnapshot, supply: Supply): { received: number; wasted: number; total: number } {
- const r = s.resources; const amount = supply.kind === 'food' ? Math.ceil(r.maxHealth * .6) : supply.amount;
+ const r = s.resources; const amount = supply.kind === 'food' ? Math.ceil(r.maxHealth * TUNING.foodFraction) : supply.amount;
  const current = supply.kind === 'food' ? r.health : r.light; const cap = supply.kind === 'food' ? r.maxHealth : r.maxLight;
  const received = Math.min(cap - current, amount); return { received, wasted: amount - received, total: current + received };
 }
@@ -60,9 +80,10 @@ export function act(original: GameState, action: Action, record = true): ActionR
   attacked = h.id; message = `${h.name}: dealt ${p.damage}, received ${p.incoming}.`;
   if (!r.health) { s.status = 'dead'; message += ' You died before experience or healing could help.'; }
   else if (!h.hp) {
-   s.player = { ...h.position }; r.xp += h.xp; message += ` Banished. +${h.xp} experience.`;
+   s.player = { ...h.position }; message += ` Banished. +${h.xp} experience.`;
    if (h.reward && !s.inventory.includes(h.reward)) { s.inventory.push(h.reward); message += ` Found ${ITEMS[h.reward].name}.`; }
-   while (r.xp >= xpNeeded(r.level)) { r.xp -= xpNeeded(r.level); r.level++; r.maxHealth += 3; r.power += 2; r.health = r.maxHealth; r.light = r.maxLight; message += ` Level ${r.level}: +2 power, +3 maximum health; health and light restored.`; }
+   const levels = awardExperience(r, h.xp);
+   if (levels) message += ` Level ${r.level}: +${TUNING.levelPower * levels} power, +${TUNING.levelHealth * levels} maximum health; health and light restored.`;
   }
  } else if (action.type === 'use') {
   const x = s.supplies.find(x => x.id === action.supplyId);
@@ -75,19 +96,20 @@ export function act(original: GameState, action: Action, record = true): ActionR
    if (x.kind === 'tonic') r.tonics += x.amount;
    if (x.kind === 'oil') r.oils += x.amount;
    if (x.kind === 'power') r.power += x.amount;
+   if (x.kind === 'vitality') { r.maxHealth += x.amount; r.health += x.amount; }
    if (x.kind === 'treasure') r.treasure += x.amount;
    if (x.item && !s.inventory.includes(x.item)) s.inventory.push(x.item);
    if (x.text) s.journal.push(x.text);
-   message = `${x.name}: ${x.item ? ITEMS[x.item].name + ' collected.' : x.kind === 'power' ? '+' + x.amount + ' permanent power.' : x.kind === 'note' ? x.text : 'collected.'}`;
+   message = `${x.name}: ${x.item ? ITEMS[x.item].name + ' collected.' : x.kind === 'power' ? '+' + x.amount + ' permanent power.' : x.kind === 'vitality' ? '+' + x.amount + ' maximum and current health.' : x.kind === 'note' ? 'Informational note only; no stat or quest reward. ' + (x.text ?? '') + ' Tile cleared.' : x.amount + ' collected.'}`;
   }
  } else if (action.type === 'tonic') {
   if (!r.tonics) return reject('No tonic in your pockets.'); if (r.health === r.maxHealth) return reject('Already at full health.');
-  const heal = Math.min(r.maxHealth - r.health, Math.ceil(r.maxHealth / 2)); r.tonics--; r.health += heal; message = `Tonic restored ${heal} health. Wounded spirits recover this turn.`;
+  const heal = Math.min(r.maxHealth - r.health, Math.ceil(r.maxHealth * TUNING.tonicFraction)); r.tonics--; r.health += heal; message = `Tonic restored ${heal} health. Wounded spirits recover this turn.`;
  } else if (action.type === 'oil') {
   if (!r.oils || r.empowered) return reject('You need an oil bottle and no oil already prepared.');
-  r.oils--; r.empowered = true; message = 'Oil prepared: +4 damage on your next strike or flare. Wounded spirits recover this turn.';
+  r.oils--; r.empowered = true; message = `Oil prepared: +${TUNING.oilBonus} damage on your next strike or flare. Wounded spirits recover this turn.`;
  } else if (action.type === 'ward') {
-  if (r.ward || r.light < TUNING.wardCost) return reject('Ward needs 3 light and no existing ward.');
+  if (r.ward || r.light < TUNING.wardCost) return reject(`Ward needs ${TUNING.wardCost} light and no existing ward.`);
   r.light -= TUNING.wardCost; r.ward = true; message = 'Ward prepared: halve the next strike’s incoming damage, rounded up. Wounded spirits recover this turn.';
  } else if (action.type === 'settle') {
   if (s.objective.kind !== 'keepsake' || s.objective.completed || !s.objective.altar || !known(s, s.objective.altar) || !s.inventory.includes('keepsake')) return reject('Bring the silver locket to the discovered memorial.');

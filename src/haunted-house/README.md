@@ -1,10 +1,10 @@
-# Haunted House
+﻿# Haunted House maintenance notes
 
-A procedural, turn-based resource puzzle at `haunted_house.html`. This game has
-its own source, build, storage and tests. Hockey Cards, Ouija, Bomber Command and
-the existing root navigation are unchanged by the combat/discovery pass.
+Haunted House is a deterministic resource puzzle at `haunted_house.html`, with its
+own source, build, storage, and tests. Keep changes isolated from Hockey Cards,
+Ouija, and Bomber Command. The existing home entry and page remain in place.
 
-## Run and verify
+## Build, verify, and serve
 
 ```sh
 npm install
@@ -15,135 +15,282 @@ npm run build:haunted
 npm run preview:haunted
 ```
 
-Use `npm.cmd` in PowerShell if its script policy blocks `npm`. Tests require a
-Node version with native TypeScript stripping (Node 22.18+ or 24+). There are no
-new runtime packages. For optional real Chromium checks:
+Use `npm.cmd` in PowerShell if script policy blocks `npm`. Tests need native
+TypeScript stripping (Node 22.18+ or 24+). No new runtime dependency is required.
+The real Chromium check uses a local HTTP server and a separate headless profile:
 
 ```sh
 node src/haunted-house/tests/browser-check.mjs
 ```
 
-Set `CHROME_PATH` to the Chrome/Chromium executable if it is not at the default
-Windows location. That script uses a separate headless profile in the ignored
-`.haunted-checks/` directory and covers a complete winning sequence through UI
-controls, generation, desktop/tablet/mobile, lethal confirmations, keyboard,
-touch, saves and undo. It is an authored check, not evidence it ran: browser
-verification was blocked in the implementation environment. Run it locally.
+Set `CHROME_PATH` if Chrome is not at the default Windows installation path.
+Artifacts go in ignored `.haunted-checks/`. Device sizes and touch are emulated;
+this does not replace testing on a physical phone.
 
-Build before ordinary static hosting. `haunted_house.html` loads
-`haunted-build/haunted-house.js` and `.css`; generated output is ignored by Git.
-Generation runs in an **inline worker** so the root page and standalone build
-both work without worker-relative URL errors. The dedicated Vite dev command
-loads source instead. Neither build nor this branch deploys the website.
+Reproduce the balance comparison in order (raw JSON goes in the ignored check
+directory). The fixed-progression arithmetic probe supplements legal witnesses:
+
+```sh
+node src/haunted-house/tests/balance-batch.mjs --phase baseline --output .haunted-checks/baseline.json
+node src/haunted-house/tests/balance-batch.mjs --phase expanded --output .haunted-checks/expanded.json
+node src/haunted-house/tests/balance-batch.mjs --arithmetic --output .haunted-checks/arithmetic.json
+```
+
+**Build Haunted House before any optional Hosting deployment.** The root page
+loads `haunted-build/haunted-house.js` and `.css`, which are ignored build outputs.
+Deploying Hosting without rebuilding can serve an old Haunted House bundle even
+when TypeScript source has changed. The generic `npm run build` builds Ouija and
+is not a replacement for this command:
+
+```sh
+npm run build:haunted
+# Optional, only when deployment is separately intended:
+firebase deploy --only hosting
+```
+
+This iteration does not deploy Firebase. Generation uses an inline worker so the
+root static entry and standalone Haunted House build both resolve it correctly.
 
 ## Settled gameplay contract
 
-- A move selects **any discovered empty destination**, across remembered rooms
-  and floors, and costs exactly **one turn**. No pathfinding, travel distance,
-  intervening collision, or implicit per-tile turns. Invalid/no-op moves cost
-  nothing. Arrow keys browse cells; Enter activates; WASD moves one tile; Z undoes.
-- Arriving reveals the **3×3 square** centered on the player, diagonals included.
-  Walls do not occlude this square. No recursive flood reveal; discovery persists.
-- Spirits and supplies occupy tiles. Their indirect barrier is denying a viewing
-  position that would reveal tiles beyond. An alternate diagonal view can reveal
-  a tile past an obstacle, and that destination becomes legal immediately.
-- Any discovered spirit/supply can be acted on without an approach move. Clearing
-  it places the player there and reveals its neighborhood. Food is consumed on
-  its tile, never silently put into a backpack. Passage travel costs one turn;
-  unlocking costs one turn; viewing a room tab costs none. Open passage inspection
-  offers either travel or standing on its near endpoint.
-- No time passes while inspecting, thinking, cancelling a prompt or closing the
-  page. Every committed gameplay action advances one turn throughout the house.
-- Strikes exchange damage simultaneously, including killing blows. At zero health,
-  the player dies before XP or level-up recovery. The engine rejects lethal
-  strikes unless explicitly confirmed; the UI shows the exact exchange first.
-- Starting values: 22 health, 6 power, 8/10 light, level 1, one tonic and one oil.
-  Flare: 4 light, power + 4 damage, ignores armour, no retaliation. Ward: 3 light
-  and one preparation turn, halves next strike's incoming damage rounded up.
-  Oil: one bottle and one preparation turn, +4 damage on the next attack.
-- A living wounded spirit regenerates its listed amount at the end of every turn
-  **except a turn attacking that spirit**. All floors follow the same rule.
-  Defeated spirits never respawn. Walking does not heal the player.
-- Food restores ceil(maxHealth × 0.6); candles restore 8 light. Both cap, preview
-  waste, and can be deliberately wasted to clear their tile. Tonics heal
-  ceil(maxHealth / 2) on a separate turn. Tonics/oil can be pocketed.
-- Each spirit grants its displayed XP. Level + 2 XP earns the next level, +3 max
-  health, +2 power, and full health/light; excess XP carries. Survive the hit first.
-- Keys/crowbar are reusable. Objective families: recover exit key and leave;
-  retrieve diary and leave; retrieve locket, place at memorial, and leave.
-  The memorial costs one turn, no resources. Clearing every spirit is unnecessary.
-- Death is explicit. A living run may still be resource-exhausted after mistakes;
-  there is no speculative 'unwinnable' popup based on an incomplete solver.
-  Every committed turn, including exploration, is undoable back to the beginning.
+- Any discovered, empty, eligible destination can be selected in one turn,
+  regardless of distance, walls, occupants between positions, rooms, or floors.
+  There is no physical pathfinding. Invalid and no-op moves spend nothing.
+- Occupying a tile reveals the surrounding 3×3 square, diagonals included, with
+  no wall occlusion or recursive reveal. Discovery persists. Occupants can block
+  a useful viewing position; an already discovered destination beyond them is
+  nevertheless legal.
+- Inspecting, selecting an attack mode, changing viewed rooms, reading panels,
+  and cancelling a confirmation are free. Explicitly reading/clearing a note on
+  the board is a committed action. Movement, attack, preparation, supplies,
+  unlocking, passage travel, memorial, and exit each consume one turn.
+- Discovered enemies and supplies can be acted on remotely. A surviving kill or
+  supply use places the player on its cleared tile and reveals its neighborhood.
+- An open doorway/stair offers two different actions: stand on the near endpoint
+  to reveal locally, or travel through. Each costs one turn. A closed endpoint
+  cannot be occupied or travelled through before unlocking. Tools are reusable.
+- Strikes exchange damage simultaneously, including killing blows. A lethal
+  exchange needs explicit confirmation and kills before XP or recovery resolves.
+- A wounded living spirit regenerates its listed amount after every committed
+  turn except an attack against that spirit, throughout all rooms. Food causes
+  the same other-action regeneration as movement; it does not directly heal
+  enemies. Defeated spirits never return. No passive player recovery exists.
+- Rooms retain state; there are multiple rooms and floors, reusable keys/crowbar,
+  and the escape-key, diary, and locket/memorial objective families.
+- Full-run undo, restart, autosave, JSON export/import and seeded generation remain.
+  No roaming enemies, random hits, surprise damage, or live stat scaling is used.
 
-`content.ts` describes player rules and core values. `game.ts` is the shared
-transition and preview authority. `world.ts` handles destination eligibility and
-revelation. `movement.ts` deliberately returns at most one relocation command.
-Do not restore the earlier moving-mine, light-cost banishment, or pathfinding rules.
+## Combat and tuning
 
-## Procedural generation and the guarantee
+`content.ts` holds `TUNING`, initial resources, XP requirements, and displayed rule
+text. `game.ts` owns the preview and transition math; the solver and diagnostics
+use those functions. Preview exposes contributions, the immediate exchange,
+level-ups, and final recovered resources. The same XP helper is used by previews
+and execution. Do not add a second combat implementation to the UI or solver.
 
-`room-patterns.ts` carves a growing maze, broadens some junctions into small
-chambers and adds occasional loops. It uses no authored level/room layouts.
-`generation.ts` constructs 6–8 rooms over two floors, a randomized room tree,
-reusable tool gates, 1–3 enemies per room (three in the entrance), and a keeper.
-The count is an adjustable budget, not a required hand-authored progression.
-Tool chests appear earlier in the tree's construction order than their own
-locked edge; the final resource/discovery check is still authoritative.
+| Rule | Current value |
+| --- | --- |
+| Start | 22 HP, 6 power, 8/10 light, level 1, 1 tonic, 1 oil |
+| Strike | power + prepared Oil + trait bonus − armour, minimum 1; retaliation simultaneous |
+| Flare | 4 light; current power + prepared Oil + trait bonus; ignores armour, zero retaliation |
+| Hollow armour | subtract 2 from Strike damage |
+| Ward | 3 light and one preparation turn; halve next Strike's incoming damage, rounded up |
+| Oil | one bottle and one preparation turn; +4 on next Strike or Flare |
+| Food | ceil(60% of maximum HP), capped; consumed on its tile |
+| Candle | 8 light, capped |
+| Tonic | ceil(50% of maximum HP), capped; pocket use takes one turn |
+| Level-up | level + 2 XP; +3 max HP, +2 power, full HP/light; carry excess XP |
 
-Four spirit roles supply different arithmetic: ordinary shades, fragile hard-
-hitting wisps, armour with 2 strike reduction, and durable regenerating revenants.
-Enemies, supplies, shapes, connections, gates and objective family vary by seed.
-The seed plus accepted variant reproduce the generated starting state.
+Ward persists through Flares. Oil is consumed by the next attack. Both are visible
+in the resource strip until consumed. Preparations also give wounded enemies
+one regeneration turn. Food/candles can be deliberately wasted to clear a tile.
 
-`solver.ts` searches for a **winning witness**, then `createGame` replays it through
-`act()` before accepting a house. Exploration expansion chooses only discovered
-empty destinations and uses actual 3×3 revelation. It does not grant hidden tiles,
-ignore regeneration, or use ordinary physical flood-fill to declare a gate valid.
-Preparations, strikes, spells, supplies, keys, passage travel, memorial and exit
-are represented as actual actions. The user is not forced to follow the witness.
+The isolated balance change is **Flare's base damage from power + 4 to power**.
+Cost, armour bypass, retaliation avoidance, Oil, Ward, maximum light, food,
+candles, and level recovery were retained. `classic` is an explicit internal
+benchmark ruleset; it is not a promise to resume old saves under the new content.
+See `BALANCE.md` and the reproducible balance script for paired seed evidence,
+rejections, route metrics, and limitations. Solver use counts are not player
+preference or a proof of fun. Occasional refill chains are intended.
 
-Search is bounded (450 expanded states, beam width 16); it explores complete-fight
-plans with different spell/preparation choices, plus recovery and food-waste
-branches. It is deliberately incomplete: 'budget' or 'exhausted' means **not
-verified by this search**, not mathematically impossible. Some legitimate
-mid-fight recovery plans may therefore be rejected. The generator retries up to
-six procedural variants; if none has a verified witness, it reports that instead
-of silently serving an unverified house or changing the requested seed. Generation
-is cancellable and runs off the UI thread. No per-frame/real-time solver runs.
+## Ingredients and generation
 
-This establishes existence of a legal winning sequence under the engine rules.
-It does **not** prove that fog-hidden choices are always inferable, that every
-reasonable decision wins, that there are multiple solutions, or that balance is
-fun. Human testing should check the intended explore → calculate → finish fight
-→ recover rhythm, occasional rather than constant wasted-food choices, room
-variety, and the 10–15 minute target. Avoid designing around repeated partial
-fights or making every meal conceal a mandatory reward.
+The small reward pool replaces the guaranteed Ritual primer:
 
-## Persistence and undo
+- Ritual primer: +1 power for this run.
+- Heartwood charm: +4 maximum and current HP; missing HP stays the same.
+- Alchemist's case: three pocket oils for chosen hit-count thresholds.
 
-Current slot: `haunted-house.save.v3`. V1 and v2 slots are never overwritten and
-are separately downloadable from the start menu. Old rules cannot be faithfully
-converted to combat resources, so they remain archives. The current run supports
-JSON export/import with a replace confirmation, exact resume, same-seed restart,
-and autosave after every committed turn and undo. Storage failure remains visible;
-export can preserve an in-memory run even when browser storage fills.
+Ordinary shades, wisps, armour and revenants remain. Some non-boss spirits gain
+one visible trait: **Brittle** takes +2 Strike damage; **Smouldering** takes +2
+Flare damage. Neither adds hidden retaliation or resistance. All generated stats
+and traits are stored at the start and remain stable during a run.
 
-The save stores geometry once; undo frames contain only mutable resources,
-enemy HP, used/opened flags, inventory, discovery, position, notes and log. No
-12-decision truncation. Structural validation checks current and historical data,
-references, bounds and resource ranges; it accepts legitimate dead/stranded runs
-without running a solver. A failed parse leaves stored bytes untouched until the
-player explicitly starts or imports a replacement.
+Supplies use a house-wide budget and varied placement, with early recovery and
+optional branches. Quiet spaces are permitted. The three objective families
+remain, with varied keeper and memorial placement. Keys/tools are placed before
+their own gate in the construction order, and actual discovery/action validation
+remains authoritative.
 
-## Validation from this implementation
+The house has 6–8 rooms over two floors. Recovery totals match the baseline, with
+one food and candle in the entrance and at most four recovery tiles per room;
+half of later placements prefer earlier room indices. An eligible optional leaf
+has a 40% chance to be quiet. A reward is chosen uniformly from the three types
+and placed in a nonquiet room. A 28% trait nomination rate is further filtered
+by whether its bonus changes a hit count at representative tier power. The keeper
+varies among the deepest two depth bands; a memorial may occupy any other room.
+Journal hints identify required tools, keeper and memorial locations.
 
-- 30 automated tests, including actual static builds and the dedicated dev entry.
-- Six generated houses replayed through every real action, with JSON save/reload
-  after every turn, followed by complete undo back to the starting state.
-- Thirty raw seeds checked for geometry, connection and objective variety.
-- Repository typecheck, Haunted House typecheck and production build.
-- Browser execution unavailable: local preview was blocked and a local Chromium
-  download failed. The browser-check script has been updated but not run here.
+`room-patterns.ts` carves mazes, broadens junctions and adds occasional loops. It
+uses no library of authored levels. `generation.ts` produces candidates;
+`diagnostics.ts` measures Strike/Flare hit counts and costs, Ward survival/savings,
+Oil hit thresholds and refill opportunities at representative states. These
+measurements guide trait selection and the bounded solver's ranking without
+requiring any ability quota or a unique solution.
 
-Visual/touch confirmation and human balance/pacing checks remain necessary.
+`solver.ts` searches complete-fight plans with alternative preparations, attack
+orders, recovery and supply-waste branches. It expands exploration by choosing
+only discovered eligible destinations and applying the actual 3×3 reveal. Every
+accepted candidate has a winning witness replayed through `act()`. The worker
+keeps generation off the UI thread and can be cancelled. Search has finite
+budgets (450 expanded states, beam width 16, six candidate attempts); exhausted
+search produces an explicit failure,
+never an unverified fallback, altered live enemies, or secretly added supplies.
+
+This proves existence of one legal winning sequence. It does **not** prove that
+hidden information is inferable, that every reasonable choice wins, that all
+optional cleanup is affordable, or that the puzzle has multiple solutions.
+The search is incomplete; rejection means unverified, not mathematically
+impossible. Human understanding, pacing and encounter choice still need playtests.
+
+## Interaction layout
+
+The desktop workspace places the board beside a stable selected-target panel,
+with essential stats and prepared buffs above. Damage math and commitment share
+one panel. Secondary rules, known enemies, journal/supplies, activity and completed
+runs use accessible dialogs. Phone/tablet layouts use normal-flow compact
+controls and permit scrolling without covering the board with a fixed sheet.
+
+Selection, attacks, supplies and room travel preserve viewport position; focus
+restores to the matching control or a predictable board/inspection fallback.
+Selected targets have a visible outline/marker, and eligible floor has a distinct
+shape treatment. Keyboard: arrows browse cells, Enter activates, WASD requests
+single-tile moves, Z undoes. Touch uses the same explicit inspect/commit controls.
+Faded annotation is labelled informational: no stats, XP or quest reward. Clearing
+it still costs a turn and reveals its tile's neighborhood.
+
+## Saves and completed runs
+
+The current slot is `haunted-house.save.v4`, with the explicit `power-flare`
+ruleset. V1, v2 and v3 slots remain untouched and separately downloadable. Old
+imports explain that a new adventure is required; they are never silently
+converted. Exact v3 continuation is not claimed.
+Future incompatible tuning/content changes must use another explicit save/rules
+version or a verified compatibility path, not reinterpret existing v4 runs.
+
+Geometry/content is stored once, while undo frames store mutable resources,
+enemy HP, used/opened flags, inventory, discovery, position, objective status,
+notes and log. Prepared buffs, new traits/rewards and full history survive JSON
+roundtrips. Validation accepts dead or resource-exhausted runs without solving
+them. Storage failures stay visible; export preserves an in-memory run. Failed
+parsing leaves the original bytes alone.
+
+Every fresh interactive adventure/restart gets a stable run ID; load/import/undo
+retain it. `haunted-house.completions.v1` stores one report per attempt. Loading or
+re-entering an ending updates the same record instead of adding another award.
+Undo does not erase the historical completion. Ending again after exploration
+updates that attempt's report. There are no permanent stat gains or unlocks.
+
+## Completion definitions
+
+The report shows objective completion, defeated/total hauntings, discovered/total
+playable tiles, treasure collected, preserved floor and pocket supplies, and turns.
+
+The exploration denominator is the non-wall tiles that can be revealed from the
+entrance under the game's 3×3 discovery and passage rules, with removable occupants
+cleared and gates open. It excludes inaccessible geometry and decorative walls.
+A memorial can count when seen without being occupied. This is a geometric target,
+not a guarantee that every resource-spending route can still achieve full discovery.
+No requirement exists to stand on every tile.
+
+Conservation counts unused food and candles as uses, loose tonic/oil quantities,
+and pocket tonic/oil bottles. Pocketing a bottle transfers it rather than counting
+it twice. Prepared Oil is already spent. Treasure, notes, keys and permanent finds
+are not consumables. Unseen unused floor supplies still count.
+
+Commendations are independent, with no combined perfect grade:
+
+- Into the morning: complete the objective and leave alive (the main achievement).
+- Curious explorer: discover at least 80% of playable tiles.
+- Peacebringer: defeat at least 75% of hauntings.
+- Treasure finder: bring out any treasure.
+- Well provisioned: preserve at least three consumable uses across floor/pockets.
+
+Spending supplies to finish exploration is a valid competing achievement. Raw turns
+are displayed but never used as a universal ranking across house sizes. Thresholds
+intentionally avoid requiring tedious full cleanup.
+
+## Verification performed for this iteration
+
+The original 30-test suite passed before the changes. The expanded suite now has
+49 passing tests covering combat/preview agreement, lethal and level-up ordering,
+buff consumption, traits/rewards, cross-room regeneration, free-distance movement,
+landing/travel, prerequisite placement, scoring, save archives, exact roundtrips,
+full undo, duplicate completion records and actual static/development entries.
+Six generated adventures replay every witness action with JSON reload after each
+turn, then undo all the way to the initial state. Additional batches inspect 40
+ingredient/prerequisite seeds and 30 geometry seeds.
+
+Repository typecheck, Haunted House typecheck, production build, and whitespace
+checks passed. The final `haunted-build/` assets were rebuilt locally; no Hosting
+deployment was run. Only Haunted House source/docs/tests were changed; the existing
+entry page and home button remain intact.
+
+Real headless Chromium checks passed at 1366×768, 1280×720, 1024×600, 768×1024,
+390×700, 320×568 and 667×375. From scroll position zero, ordinary desktop sizes
+show the full board, essential stats, damage preview, attack and Oil/Ward controls
+together. Phone layouts allow normal scrolling and use no fixed action overlay.
+The checks cover no horizontal page overflow, tiles at least 32px, stable viewport
+after selection/mode/attacks/preparation/kill/collection/travel, keyboard focus,
+touch attacks, local stair discovery, remembered-room inspection, disclosure
+open/close sizing, and duplicate-free completion after load/undo/re-ending. A full
+139-turn winning witness was replayed through UI controls with save comparison
+after every turn. No browser exceptions or failed asset requests occurred.
+
+Screenshots were visually reviewed for desktop, tablet, phone and the completion
+report. Local artifacts: `.haunted-checks/inspection-{width}x{height}-v4.png`,
+`action-{width}x{height}-v4.png` for phone/short landscape views, and
+`completion-report-v4.png`. These are emulated Chromium viewports, not physical
+device testing. Very short screens and expanded explanations still need scrolling.
+
+The controlled balance batch accepted 16/16 seeds for each of old rules,
+power-only Flare, and expanded ingredients. Rejected candidates were 4, 6 and 5;
+none silently fell back. At-most-two-Flare leveling kills changed 8 → 3 → 5;
+average turns changed 144.56 → 154.50 → 156.69. The baseline did not reproduce the
+reported consecutive two-Wisp chain, so this is evidence of reduced opportunities,
+not proof that every chain has disappeared. Recovery supplies remained plentiful.
+See [the full report](BALANCE.md) for per-seed rejection outcomes, actual route
+measurements, alternative encounter orders and fixed-progression arithmetic.
+
+The main remaining balance risk is longer routes/more fights. Hidden-information
+fairness and Easy-mode feel cannot be established by an omniscient witness. Physical
+phone safe areas, browser chrome, zoom, and human pacing still warrant playtesting.
+
+## Human playtest questions
+
+1. At desktop and short phone sizes, inspect, switch attack modes, prepare Oil or
+   Ward, attack, and use food. Check the board remains easy to return to without
+   automatic jumping; try keyboard and touch as well as mouse.
+2. Inspect stairs, stand on the landing to reveal locally, then travel. Confirm
+   the difference is obvious and neither action happens during inspection.
+3. Before a killing Strike, calculate retaliation and a possible level-up. Check
+   the preview, lethal confirmation, prepared-buff consumption and recovery.
+4. Play several seeds without the witness. Does power-only Flare still offer
+   useful safe finishes and armour bypass? Are Ward and Oil worth considering?
+   Do choices remain forgiving enough for Easy, including non-primer starts?
+5. Try the health and oil rewards and both traits. Do they change choices without
+   becoming another rulebook to memorise? Watch for hidden mandatory bottlenecks.
+6. Finish an objective, then undo the exit and spend leftover supplies exploring.
+   Leave again, reload, and inspect the report and single updated completion.
+7. Check perceived length and pacing: the target remains a short pocket puzzle,
+   with occasional recovery chains rather than repeated effortless encounter loops.

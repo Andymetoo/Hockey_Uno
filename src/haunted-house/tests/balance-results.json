@@ -1,0 +1,3877 @@
+{
+  "seeds": [
+    "hh-balance-00",
+    "hh-balance-01",
+    "hh-balance-02",
+    "hh-balance-03",
+    "hh-balance-04",
+    "hh-balance-05",
+    "hh-balance-06",
+    "hh-balance-07",
+    "hh-balance-08",
+    "hh-balance-09",
+    "hh-balance-10",
+    "hh-balance-11",
+    "hh-balance-12",
+    "hh-balance-13",
+    "hh-balance-14",
+    "hh-balance-15"
+  ],
+  "budget": 450,
+  "width": 16,
+  "attempts": 6,
+  "cases": [
+    {
+      "name": "baseline-classic",
+      "ingredients": "baseline",
+      "ruleset": "classic",
+      "summary": {
+        "seeds": 16,
+        "accepted": 16,
+        "failures": 0,
+        "rawVariantZeroWins": 14,
+        "candidates": 20,
+        "rejectedCandidates": 4,
+        "budgetRejections": 0,
+        "exhaustedRejections": 4,
+        "generationErrors": 0,
+        "maxAttemptMs": 5193,
+        "strikes": 277,
+        "flares": 137,
+        "wards": 33,
+        "oils": 10,
+        "turns": 2313,
+        "kills": 156,
+        "levelUps": 71,
+        "lightRefunded": 594,
+        "pureFlareKills": 23,
+        "twoFlareRefillKills": 8,
+        "consecutiveTwoFlareRefills": 0,
+        "healthRefunded": 1757,
+        "consecutiveRefillKills": 20,
+        "unusedFood": 135,
+        "unusedCandles": 67,
+        "pocketTonics": 31,
+        "pocketOils": 22,
+        "inspectableEncounterSamples": 1076,
+        "meanStrikeHits": 3.112,
+        "meanStrikeHealthCost": 21.198,
+        "meanFlareHits": 2.212,
+        "meanFlareLightCost": 8.848,
+        "wardSurvivalThresholds": 25,
+        "wardSavesAtLeastThree": 460,
+        "oilChangesStrikeCount": 412,
+        "oilChangesFlareCount": 293,
+        "affordableTwoFlareRefills": 49,
+        "alternativeRuns": 8,
+        "alternativeWins": 8,
+        "alternativeDifferentOrders": 8
+      },
+      "runs": [
+        {
+          "seed": "hh-balance-00",
+          "attempts": [
+            {
+              "variant": 0,
+              "solved": true,
+              "replayed": true,
+              "reason": "won",
+              "visited": 209,
+              "ms": 1171
+            }
+          ],
+          "accepted": {
+            "variant": 0,
+            "metrics": {
+              "turns": 121,
+              "strikes": 15,
+              "flares": 10,
+              "wards": 2,
+              "oils": 1,
+              "kills": 12,
+              "levelUps": 4,
+              "lightRefunded": 33,
+              "healthRefunded": 91,
+              "refillKills": 4,
+              "pureFlareKills": 5,
+              "twoFlareRefillKills": 1,
+              "consecutiveTwoFlareRefills": 0,
+              "consecutiveRefillKills": 0,
+              "unusedFood": 10,
+              "unusedCandles": 4,
+              "pocketTonics": 1,
+              "pocketOils": 1,
+              "finalHealth": 34,
+              "finalLight": 10,
+              "encounterOrder": [
+                "h0",
+                "h4",
+                "h2",
+                "h6",
+                "h14",
+                "h10",
+                "h9",
+                "h3",
+                "h1",
+                "h5",
+                "h8",
+                "keeper"
+              ]
+            },
+            "alternatives": [
+              {
+                "preference": "health",
+                "solved": true,
+                "reason": "won",
+                "metrics": {
+                  "turns": 121,
+                  "strikes": 19,
+                  "flares": 8,
+                  "wards": 2,
+                  "oils": 0,
+                  "kills": 12,
+                  "levelUps": 4,
+                  "lightRefunded": 33,
+                  "healthRefunded": 107,
+                  "refillKills": 4,
+                  "pureFlareKills": 4,
+                  "twoFlareRefillKills": 0,
+                  "consecutiveTwoFlareRefills": 0,
+                  "consecutiveRefillKills": 0,
+                  "unusedFood": 9,
+                  "unusedCandles": 5,
+                  "pocketTonics": 1,
+                  "pocketOils": 2,
+                  "finalHealth": 34,
+                  "finalLight": 10,
+                  "encounterOrder": [
+                    "h0",
+                    "h5",
+                    "h10",
+                    "h6",
+                    "h14",
+                    "h4",
+                    "h9",
+                    "h3",
+                    "h2",
+                    "h1",
+                    "h8",
+                    "keeper"
+                  ]
+                }
+              },
+              {
+                "preference": "light",
+                "solved": true,
+                "reason": "won",
+                "metrics": {
+                  "turns": 121,
+                  "strikes": 19,
+                  "flares": 7,
+                  "wards": 2,
+                  "oils": 1,
+                  "kills": 12,
+                  "levelUps": 4,
+                  "lightRefunded": 32,
+                  "healthRefunded": 97,
+                  "refillKills": 4,
+                  "pureFlareKills": 3,
+                  "twoFlareRefillKills": 0,
+                  "consecutiveTwoFlareRefills": 0,
+                  "consecutiveRefillKills": 0,
+                  "unusedFood": 9,
+                  "unusedCandles": 5,
+                  "pocketTonics": 1,
+                  "pocketOils": 1,
+                  "finalHealth": 34,
+                  "finalLight": 10,
+                  "encounterOrder": [
+                    "h0",
+                    "h4",
+                    "h1",
+                    "h6",
+                    "h9",
+                    "h10",
+                    "h3",
+                    "h14",
+                    "h5",
+                    "h2",
+                    "h8",
+                    "keeper"
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        {
+          "seed": "hh-balance-01",
+          "attempts": [
+            {
+              "variant": 0,
+              "solved": true,
+              "replayed": true,
+              "reason": "won",
+              "visited": 65,
+              "ms": 1578
+            }
+          ],
+          "accepted": {
+            "variant": 0,
+            "metrics": {
+              "turns": 144,
+              "strikes": 9,
+              "flares": 8,
+              "wards": 0,
+              "oils": 1,
+              "kills": 5,
+              "levelUps": 4,
+              "lightRefunded": 34,
+              "healthRefunded": 90,
+              "refillKills": 4,
+              "pureFlareKills": 0,
+              "twoFlareRefillKills": 0,
+              "consecutiveTwoFlareRefills": 0,
+              "consecutiveRefillKills": 2,
+              "unusedFood": 11,
+              "unusedCandles": 5,
+              "pocketTonics": 2,
+              "pocketOils": 1,
+              "finalHealth": 34,
+              "finalLight": 10,
+              "encounterOrder": [
+                "h8",
+                "h16",
+                "h12",
+                "h17",
+                "keeper"
+              ]
+            },
+            "alternatives": [
+              {
+                "preference": "health",
+                "solved": true,
+                "reason": "won",
+                "metrics": {
+                  "turns": 144,
+                  "strikes": 9,
+                  "flares": 8,
+                  "wards": 0,
+                  "oils": 1,
+                  "kills": 6,
+                  "levelUps": 4,
+                  "lightRefunded": 34,
+                  "healthRefunded": 92,
+                  "refillKills": 4,
+                  "pureFlareKills": 1,
+                  "twoFlareRefillKills": 0,
+                  "consecutiveTwoFlareRefills": 0,
+                  "consecutiveRefillKills": 1,
+                  "unusedFood": 11,
+                  "unusedCandles": 5,
+                  "pocketTonics": 2,
+                  "pocketOils": 1,
+                  "finalHealth": 34,
+                  "finalLight": 10,
+                  "encounterOrder": [
+                    "h16",
+                    "h3",
+                    "h17",
+                    "h0",
+                    "h8",
+                    "keeper"
+                  ]
+                }
+              },
+              {
+                "preference": "light",
+                "solved": true,
+                "reason": "won",
+                "metrics": {
+                  "turns": 146,
+                  "strikes": 11,
+                  "flares": 7,
+                  "wards": 1,
+                  "oils": 1,
+                  "kills": 6,
+                  "levelUps": 4,
+                  "lightRefunded": 33,
+                  "healthRefunded": 100,
+                  "refillKills": 4,
+                  "pureFlareKills": 0,
+                  "twoFlareRefillKills": 0,
+                  "consecutiveTwoFlareRefills": 0,
+                  "consecutiveRefillKills": 1,
+                  "unusedFood": 11,
+                  "unusedCandles": 5,
+                  "pocketTonics": 2,
+                  "pocketOils": 1,
+                  "finalHealth": 34,
+                  "finalLight": 10,
+                  "encounterOrder": [
+                    "h16",
+                    "h3",
+                    "h17",
+                    "h12",
+                    "h8",
+                    "keeper"
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        {
+          "seed": "hh-balance-02",
+          "attempts": [
+            {
+              "variant": 0,
+              "solved": true,
+              "replayed": true,
+              "reason": "won",
+              "visited": 91,
+              "ms": 953
+            }
+          ],
+          "accepted": {
+            "variant": 0,
+            "metrics": {
+              "turns": 126,
+              "strikes": 12,
+              "flares": 8,
+              "wards": 0,
+              "oils": 1,
+              "kills": 7,
+              "levelUps": 4,
+              "lightRefunded": 34,
+              "healthRefunded": 96,
+              "refillKills": 4,
+              "pureFlareKills": 0,
+              "twoFlareRefillKills": 0,
+              "consecutiveTwoFlareRefills": 0,
+              "consecutiveRefillKills": 1,
+              "unusedFood": 9,
+              "unusedCandles": 5,
+              "pocketTonics": 2,
+              "pocketOils": 1,
+              "finalHealth": 34,
+              "finalLight": 10,
+              "encounterOrder": [
+                "h1",
+                "h7",
+                "h2",
+                "h8",
+                "h3",
+                "h11",
+                "keeper"
+              ]
+            },
+            "alternatives": [
+              {
+                "preference": "health",
+                "solved": true,
+                "reason": "won",
+                "metrics": {
+                  "turns": 125,
+                  "strikes": 11,
+                  "flares": 8,
+                  "wards": 0,
+                  "oils": 1,
+                  "kills": 6,
+                  "levelUps": 4,
+                  "lightRefunded": 34,
+                  "healthRefunded": 100,
+                  "refillKills": 4,
+                  "pureFlareKills": 1,
+                  "twoFlareRefillKills": 0,
+                  "consecutiveTwoFlareRefills": 0,
+                  "consecutiveRefillKills": 2,
+                  "unusedFood": 9,
+                  "unusedCandles": 5,
+                  "pocketTonics": 2,
+                  "pocketOils": 1,
+                  "finalHealth": 34,
+                  "finalLight": 10,
+                  "encounterOrder": [
+                    "h1",
+                    "h7",
+                    "h11",
+                    "h6",
+                    "h8",
+                    "keeper"
+                  ]
+                }
+              },
+              {
+                "preference": "light",
+                "solved": true,
+                "reason": "won",
+                "metrics": {
+                  "turns": 126,
+                  "strikes": 12,
+                  "flares": 8,
+                  "wards": 0,
+                  "oils": 1,
+                  "kills": 7,
+                  "levelUps": 4,
+                  "lightRefunded": 34,
+                  "healthRefunded": 98,
+                  "refillKills": 4,
+                  "pureFlareKills": 0,
+                  "twoFlareRefillKills": 0,
+                  "consecutiveTwoFlareRefills": 0,
+                  "consecutiveRefillKills": 2,
+                  "unusedFood": 9,
+                  "unusedCandles": 5,
+                  "pocketTonics": 2,
+                  "pocketOils": 1,
+                  "finalHealth": 34,
+                  "finalLight": 10,
+                  "encounterOrder": [
+                    "h1",
+                    "h7",
+                    "h11",
+                    "h2",
+                    "h3",
+                    "h8",
+                    "keeper"
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        {
+          "seed": "hh-balance-03",
+          "attempts": [
+            {
+              "variant": 0,
+              "solved": true,
+              "replayed": true,
+              "reason": "won",
+              "visited": 209,
+              "ms": 543
+            }
+          ],
+          "accepted": {
+            "variant": 0,
+            "metrics": {
+              "turns": 126,
+              "strikes": 21,
+              "flares": 10,
+              "wards": 3,
+              "oils": 0,
+              "kills": 12,
+              "levelUps": 4,
+              "lightRefunded": 35,
+              "healthRefunded": 96,
+              "refillKills": 4,
+              "pureFlareKills": 0,
+              "twoFlareRefillKills": 0,
+              "consecutiveTwoFlareRefills": 0,
+              "consecutiveRefillKills": 0,
+              "unusedFood": 6,
+              "unusedCandles": 3,
+              "pocketTonics": 2,
+              "pocketOils": 2,
+              "finalHealth": 10,
+              "finalLight": 2,
+              "encounterOrder": [
+                "h2",
+                "h0",
+                "h3",
+                "h1",
+                "h9",
+                "h11",
+                "h10",
+                "h4",
+                "h7",
+                "h6",
+                "h8",
+                "keeper"
+              ]
+            },
+            "alternatives": [
+              {
+                "preference": "health",
+                "solved": true,
+                "reason": "won",
+                "metrics": {
+                  "turns": 124,
+                  "strikes": 20,
+                  "flares": 11,
+                  "wards": 1,
+                  "oils": 0,
+                  "kills": 12,
+                  "levelUps": 4,
+                  "lightRefunded": 33,
+                  "healthRefunded": 92,
+                  "refillKills": 4,
+                  "pureFlareKills": 0,
+                  "twoFlareRefillKills": 0,
+                  "consecutiveTwoFlareRefills": 0,
+                  "consecutiveRefillKills": 0,
+                  "unusedFood": 6,
+                  "unusedCandles": 3,
+                  "pocketTonics": 2,
+                  "pocketOils": 2,
+                  "finalHealth": 10,
+                  "finalLight": 2,
+                  "encounterOrder": [
+                    "h2",
+                    "h0",
+                    "h3",
+                    "h11",
+                    "h4",
+                    "h1",
+                    "h10",
+                    "h9",
+                    "h7",
+                    "h8",
+                    "h6",
+                    "keeper"
+                  ]
+                }
+              },
+              {
+                "preference": "light",
+                "solved": true,
+                "reason": "won",
+                "metrics": {
+                  "turns": 127,
+                  "strikes": 22,
+                  "flares": 9,
+                  "wards": 4,
+                  "oils": 0,
+                  "kills": 12,
+                  "levelUps": 4,
+                  "lightRefunded": 34,
+                  "healthRefunded": 99,
+                  "refillKills": 4,
+                  "pureFlareKills": 0,
+                  "twoFlareRefillKills": 0,
+                  "consecutiveTwoFlareRefills": 0,
+                  "consecutiveRefillKills": 0,
+                  "unusedFood": 6,
+                  "unusedCandles": 3,
+                  "pocketTonics": 2,
+                  "pocketOils": 2,
+                  "finalHealth": 10,
+                  "finalLight": 2,
+                  "encounterOrder": [
+                    "h2",
+                    "h0",
+                    "h3",
+                    "h1",
+                    "h9",
+                    "h11",
+                    "h10",
+                    "h4",
+                    "h8",
+                    "h7",
+                    "h6",
+                    "keeper"
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        {
+          "seed": "hh-balance-04",
+          "attempts": [
+            {
+              "variant": 0,
+              "solved": true,
+              "replayed": true,
+              "reason": "won",
+              "visited": 193,
+              "ms": 1175
+            }
+          ],
+          "accepted": {
+            "variant": 0,
+            "metrics": {
+              "turns": 144,
+              "strikes": 22,
+              "flares": 7,
+              "wards": 4,
+              "oils": 2,
+              "kills": 11,
+              "levelUps": 5,
+              "lightRefunded": 40,
+              "healthRefunded": 130,
+              "refillKills": 5,
+              "pureFlareKills": 2,
+              "twoFlareRefillKills": 1,
+              "consecutiveTwoFlareRefills": 0,
+              "consecutiveRefillKills": 1,
+              "unusedFood": 8,
+              "unusedCandles": 4,
+              "pocketTonics": 2,
+              "pocketOils": 0,
+              "finalHealth": 37,
+              "finalLight": 10,
+              "encounterOrder": [
+                "h2",
+                "h6",
+                "h5",
+                "h7",
+                "h4",
+                "h8",
+                "h1",
+                "h0",
+                "h3",
+                "h11",
+                "keeper"
+              ]
+            },
+            "alternatives": []
+          }
+        },
+        {
+          "seed": "hh-balance-05",
+          "attempts": [
+            {
+              "variant": 0,
+              "solved": true,
+              "replayed": true,
+              "reason": "won",
+              "visited": 161,
+              "ms": 3767
+            }
+          ],
+          "accepted": {
+            "variant": 0,
+            "metrics": {
+              "turns": 149,
+              "strikes": 16,
+              "flares": 11,
+              "wards": 1,
+              "oils": 0,
+              "kills": 10,
+              "levelUps": 5,
+              "lightRefunded": 41,
+              "healthRefunded": 121,
+              "refillKills": 5,
+              "pureFlareKills": 2,
+              "twoFlareRefillKills": 0,
+              "consecutiveTwoFlareRefills": 0,
+              "consecutiveRefillKills": 1,
+              "unusedFood": 8,
+              "unusedCandles": 4,
+              "pocketTonics": 2,
+              "pocketOils": 2,
+              "finalHealth": 11,
+              "finalLight": 2,
+              "encounterOrder": [
+                "h15",
+                "h17",
+                "h11",
+                "h16",
+                "h13",
+                "h14",
+                "h10",
+                "h12",
+                "h8",
+                "keeper"
+              ]
+            },
+            "alternatives": []
+          }
+        },
+        {
+          "seed": "hh-balance-06",
+          "attempts": [
+            {
+              "variant": 0,
+              "solved": true,
+              "replayed": true,
+              "reason": "won",
+              "visited": 109,
+              "ms": 2513
+            }
+          ],
+          "accepted": {
+            "variant": 0,
+            "metrics": {
+              "turns": 149,
+              "strikes": 17,
+              "flares": 8,
+              "wards": 3,
+              "oils": 0,
+              "kills": 8,
+              "levelUps": 4,
+              "lightRefunded": 35,
+              "healthRefunded": 96,
+              "refillKills": 4,
+              "pureFlareKills": 1,
+              "twoFlareRefillKills": 1,
+              "consecutiveTwoFlareRefills": 0,
+              "consecutiveRefillKills": 1,
+              "unusedFood": 10,
+              "unusedCandles": 4,
+              "pocketTonics": 2,
+              "pocketOils": 2,
+              "finalHealth": 10,
+              "finalLight": 2,
+              "encounterOrder": [
+                "h0",
+                "h9",
+                "h5",
+                "h19",
+                "h17",
+                "h14",
+                "h3",
+                "keeper"
+              ]
+            },
+            "alternatives": []
+          }
+        },
+        {
+          "seed": "hh-balance-07",
+          "attempts": [
+            {
+              "variant": 0,
+              "solved": true,
+              "replayed": true,
+              "reason": "won",
+              "visited": 145,
+              "ms": 1215
+            }
+          ],
+          "accepted": {
+            "variant": 0,
+            "metrics": {
+              "turns": 143,
+              "strikes": 20,
+              "flares": 8,
+              "wards": 2,
+              "oils": 0,
+              "kills": 9,
+              "levelUps": 4,
+              "lightRefunded": 32,
+              "healthRefunded": 97,
+              "refillKills": 4,
+              "pureFlareKills": 2,
+              "twoFlareRefillKills": 0,
+              "consecutiveTwoFlareRefills": 0,
+              "consecutiveRefillKills": 1,
+              "unusedFood": 7,
+              "unusedCandles": 3,
+              "pocketTonics": 2,
+              "pocketOils": 2,
+              "finalHealth": 1,
+              "finalLight": 2,
+              "encounterOrder": [
+                "h3",
+                "h7",
+                "h1",
+                "h12",
+                "h11",
+                "h9",
+                "h8",
+                "h4",
+                "keeper"
+              ]
+            },
+            "alternatives": []
+          }
+        },
+        {
+          "seed": "hh-balance-08",
+          "attempts": [
+            {
+              "variant": 0,
+              "solved": true,
+              "replayed": true,
+              "reason": "won",
+              "visited": 81,
+              "ms": 1100
+            }
+          ],
+          "accepted": {
+            "variant": 0,
+            "metrics": {
+              "turns": 159,
+              "strikes": 12,
+              "flares": 8,
+              "wards": 0,
+              "oils": 1,
+              "kills": 5,
+              "levelUps": 4,
+              "lightRefunded": 34,
+              "healthRefunded": 102,
+              "refillKills": 4,
+              "pureFlareKills": 0,
+              "twoFlareRefillKills": 0,
+              "consecutiveTwoFlareRefills": 0,
+              "consecutiveRefillKills": 3,
+              "unusedFood": 7,
+              "unusedCandles": 4,
+              "pocketTonics": 2,
+              "pocketOils": 1,
+              "finalHealth": 34,
+              "finalLight": 10,
+              "encounterOrder": [
+                "h2",
+                "h7",
+                "h8",
+                "h12",
+                "keeper"
+              ]
+            },
+            "alternatives": []
+          }
+        },
+        {
+          "seed": "hh-balance-09",
+          "attempts": [
+            {
+              "variant": 0,
+              "solved": false,
+              "replayed": false,
+              "reason": "exhausted",
+              "visited": 77,
+              "ms": 34
+            },
+            {
+              "variant": 1,
+              "solved": true,
+              "replayed": true,
+              "reason": "won",
+              "visited": 139,
+              "ms": 1059
+            }
+          ],
+          "accepted": {
+            "variant": 1,
+            "metrics": {
+              "turns": 157,
+              "strikes": 16,
+              "flares": 6,
+              "wards": 2,
+              "oils": 1,
+              "kills": 9,
+              "levelUps": 4,
+              "lightRefunded": 32,
+              "healthRefunded": 91,
+              "refillKills": 4,
+              "pureFlareKills": 2,
+              "twoFlareRefillKills": 1,
+              "consecutiveTwoFlareRefills": 0,
+              "consecutiveRefillKills": 1,
+              "unusedFood": 9,
+              "unusedCandles": 4,
+              "pocketTonics": 2,
+              "pocketOils": 1,
+              "finalHealth": 34,
+              "finalLight": 10,
+              "encounterOrder": [
+                "h1",
+                "h10",
+                "h7",
+                "h5",
+                "h6",
+                "h9",
+                "h12",
+                "h2",
+                "keeper"
+              ]
+            },
+            "alternatives": []
+          }
+        },
+        {
+          "seed": "hh-balance-10",
+          "attempts": [
+            {
+              "variant": 0,
+              "solved": false,
+              "replayed": false,
+              "reason": "exhausted",
+              "visited": 94,
+              "ms": 32
+            },
+            {
+              "variant": 1,
+              "solved": false,
+              "replayed": false,
+              "reason": "exhausted",
+              "visited": 358,
+              "ms": 986
+            },
+            {
+              "variant": 2,
+              "solved": false,
+              "replayed": false,
+              "reason": "exhausted",
+              "visited": 78,
+              "ms": 26
+            },
+            {
+              "variant": 3,
+              "solved": true,
+              "replayed": true,
+              "reason": "won",
+              "visited": 113,
+              "ms": 2055
+            }
+          ],
+          "accepted": {
+            "variant": 3,
+            "metrics": {
+              "turns": 147,
+              "strikes": 12,
+              "flares": 8,
+              "wards": 2,
+              "oils": 1,
+              "kills": 8,
+              "levelUps": 4,
+              "lightRefunded": 32,
+              "healthRefunded": 81,
+              "refillKills": 4,
+              "pureFlareKills": 2,
+              "twoFlareRefillKills": 1,
+              "consecutiveTwoFlareRefills": 0,
+              "consecutiveRefillKills": 1,
+              "unusedFood": 8,
+              "unusedCandles": 5,
+              "pocketTonics": 2,
+              "pocketOils": 1,
+              "finalHealth": 8,
+              "finalLight": 2,
+              "encounterOrder": [
+                "h4",
+                "h13",
+                "h14",
+                "h8",
+                "h5",
+                "h10",
+                "h9",
+                "keeper"
+              ]
+            },
+            "alternatives": []
+          }
+        },
+        {
+          "seed": "hh-balance-11",
+          "attempts": [
+            {
+              "variant": 0,
+              "solved": true,
+              "replayed": true,
+              "reason": "won",
+              "visited": 113,
+              "ms": 1357
+            }
+          ],
+          "accepted": {
+            "variant": 0,
+            "metrics": {
+              "turns": 139,
+              "strikes": 15,
+              "flares": 9,
+              "wards": 1,
+              "oils": 1,
+              "kills": 8,
+              "levelUps": 5,
+              "lightRefunded": 41,
+              "healthRefunded": 131,
+              "refillKills": 5,
+              "pureFlareKills": 2,
+              "twoFlareRefillKills": 2,
+              "consecutiveTwoFlareRefills": 0,
+              "consecutiveRefillKills": 3,
+              "unusedFood": 11,
+              "unusedCandles": 6,
+              "pocketTonics": 2,
+              "pocketOils": 1,
+              "finalHealth": 37,
+              "finalLight": 10,
+              "encounterOrder": [
+                "h0",
+                "h1",
+                "h3",
+                "h5",
+                "h8",
+                "h12",
+                "h10",
+                "keeper"
+              ]
+            },
+            "alternatives": []
+          }
+        },
+        {
+          "seed": "hh-balance-12",
+          "attempts": [
+            {
+              "variant": 0,
+              "solved": true,
+              "replayed": true,
+              "reason": "won",
+              "visited": 252,
+              "ms": 737
+            }
+          ],
+          "accepted": {
+            "variant": 0,
+            "metrics": {
+              "turns": 148,
+              "strikes": 28,
+              "flares": 8,
+              "wards": 4,
+              "oils": 0,
+              "kills": 15,
+              "levelUps": 5,
+              "lightRefunded": 46,
+              "healthRefunded": 137,
+              "refillKills": 5,
+              "pureFlareKills": 1,
+              "twoFlareRefillKills": 1,
+              "consecutiveTwoFlareRefills": 0,
+              "consecutiveRefillKills": 0,
+              "unusedFood": 6,
+              "unusedCandles": 3,
+              "pocketTonics": 2,
+              "pocketOils": 2,
+              "finalHealth": 37,
+              "finalLight": 10,
+              "encounterOrder": [
+                "h1",
+                "h4",
+                "h0",
+                "h5",
+                "h6",
+                "h2",
+                "h3",
+                "h7",
+                "h13",
+                "h10",
+                "h9",
+                "h11",
+                "h12",
+                "h8",
+                "keeper"
+              ]
+            },
+            "alternatives": []
+          }
+        },
+        {
+          "seed": "hh-balance-13",
+          "attempts": [
+            {
+              "variant": 0,
+              "solved": true,
+              "replayed": true,
+              "reason": "won",
+              "visited": 305,
+              "ms": 5193
+            }
+          ],
+          "accepted": {
+            "variant": 0,
+            "metrics": {
+              "turns": 186,
+              "strikes": 29,
+              "flares": 11,
+              "wards": 5,
+              "oils": 0,
+              "kills": 19,
+              "levelUps": 6,
+              "lightRefunded": 49,
+              "healthRefunded": 162,
+              "refillKills": 6,
+              "pureFlareKills": 3,
+              "twoFlareRefillKills": 0,
+              "consecutiveTwoFlareRefills": 0,
+              "consecutiveRefillKills": 1,
+              "unusedFood": 9,
+              "unusedCandles": 4,
+              "pocketTonics": 2,
+              "pocketOils": 2,
+              "finalHealth": 4,
+              "finalLight": 6,
+              "encounterOrder": [
+                "h7",
+                "h14",
+                "h11",
+                "h3",
+                "h4",
+                "h8",
+                "h13",
+                "h10",
+                "h15",
+                "h0",
+                "h12",
+                "h2",
+                "h6",
+                "h1",
+                "h9",
+                "h5",
+                "h16",
+                "h17",
+                "keeper"
+              ]
+            },
+            "alternatives": []
+          }
+        },
+        {
+          "seed": "hh-balance-14",
+          "attempts": [
+            {
+              "variant": 0,
+              "solved": true,
+              "replayed": true,
+              "reason": "won",
+              "visited": 209,
+              "ms": 1505
+            }
+          ],
+          "accepted": {
+            "variant": 0,
+            "metrics": {
+              "turns": 142,
+              "strikes": 23,
+              "flares": 9,
+              "wards": 4,
+              "oils": 0,
+              "kills": 12,
+              "levelUps": 5,
+              "lightRefunded": 42,
+              "healthRefunded": 142,
+              "refillKills": 5,
+              "pureFlareKills": 1,
+              "twoFlareRefillKills": 0,
+              "consecutiveTwoFlareRefills": 0,
+              "consecutiveRefillKills": 2,
+              "unusedFood": 8,
+              "unusedCandles": 5,
+              "pocketTonics": 2,
+              "pocketOils": 2,
+              "finalHealth": 37,
+              "finalLight": 10,
+              "encounterOrder": [
+                "h1",
+                "h8",
+                "h12",
+                "h9",
+                "h5",
+                "h3",
+                "h4",
+                "h2",
+                "h0",
+                "h7",
+                "h6",
+                "keeper"
+              ]
+            },
+            "alternatives": []
+          }
+        },
+        {
+          "seed": "hh-balance-15",
+          "attempts": [
+            {
+              "variant": 0,
+              "solved": true,
+              "replayed": true,
+              "reason": "won",
+              "visited": 81,
+              "ms": 1214
+            }
+          ],
+          "accepted": {
+            "variant": 0,
+            "metrics": {
+              "turns": 133,
+              "strikes": 10,
+              "flares": 8,
+              "wards": 0,
+              "oils": 1,
+              "kills": 6,
+              "levelUps": 4,
+              "lightRefunded": 34,
+              "healthRefunded": 94,
+              "refillKills": 4,
+              "pureFlareKills": 0,
+              "twoFlareRefillKills": 0,
+              "consecutiveTwoFlareRefills": 0,
+              "consecutiveRefillKills": 2,
+              "unusedFood": 8,
+              "unusedCandles": 4,
+              "pocketTonics": 2,
+              "pocketOils": 1,
+              "finalHealth": 34,
+              "finalLight": 10,
+              "encounterOrder": [
+                "h4",
+                "h11",
+                "h3",
+                "h0",
+                "h6",
+                "keeper"
+              ]
+            },
+            "alternatives": []
+          }
+        }
+      ]
+    },
+    {
+      "name": "baseline-power-flare",
+      "ingredients": "baseline",
+      "ruleset": "power-flare",
+      "summary": {
+        "seeds": 16,
+        "accepted": 16,
+        "failures": 0,
+        "rawVariantZeroWins": 12,
+        "candidates": 22,
+        "rejectedCandidates": 6,
+        "budgetRejections": 0,
+        "exhaustedRejections": 6,
+        "generationErrors": 0,
+        "maxAttemptMs": 6539,
+        "strikes": 363,
+        "flares": 158,
+        "wards": 34,
+        "oils": 16,
+        "turns": 2472,
+        "kills": 193,
+        "levelUps": 80,
+        "lightRefunded": 656,
+        "pureFlareKills": 9,
+        "twoFlareRefillKills": 3,
+        "consecutiveTwoFlareRefills": 0,
+        "healthRefunded": 2228,
+        "consecutiveRefillKills": 15,
+        "unusedFood": 133,
+        "unusedCandles": 67,
+        "pocketTonics": 31,
+        "pocketOils": 16,
+        "inspectableEncounterSamples": 1358,
+        "meanStrikeHits": 3.17,
+        "meanStrikeHealthCost": 22.807,
+        "meanFlareHits": 2.98,
+        "meanFlareLightCost": 11.92,
+        "wardSurvivalThresholds": 37,
+        "wardSavesAtLeastThree": 634,
+        "oilChangesStrikeCount": 527,
+        "oilChangesFlareCount": 505,
+        "affordableTwoFlareRefills": 12,
+        "alternativeRuns": 8,
+        "alternativeWins": 8,
+        "alternativeDifferentOrders": 5
+      },
+      "runs": [
+        {
+          "seed": "hh-balance-00",
+          "attempts": [
+            {
+              "variant": 0,
+              "solved": true,
+              "replayed": true,
+              "reason": "won",
+              "visited": 225,
+              "ms": 1605
+            }
+          ],
+          "accepted": {
+            "variant": 0,
+            "metrics": {
+              "turns": 138,
+              "strikes": 24,
+              "flares": 8,
+              "wards": 2,
+              "oils": 2,
+              "kills": 13,
+              "levelUps": 5,
+              "lightRefunded": 40,
+              "healthRefunded": 143,
+              "refillKills": 5,
+              "pureFlareKills": 0,
+              "twoFlareRefillKills": 0,
+              "consecutiveTwoFlareRefills": 0,
+              "consecutiveRefillKills": 1,
+              "unusedFood": 9,
+              "unusedCandles": 5,
+              "pocketTonics": 2,
+              "pocketOils": 0,
+              "finalHealth": 37,
+              "finalLight": 10,
+              "encounterOrder": [
+                "h0",
+                "h3",
+                "h6",
+                "h9",
+                "h10",
+                "h5",
+                "h14",
+                "h2",
+                "h1",
+                "h4",
+                "h8",
+                "h12",
+                "keeper"
+              ]
+            },
+            "alternatives": [
+              {
+                "preference": "health",
+                "solved": true,
+                "reason": "won",
+                "metrics": {
+                  "turns": 124,
+                  "strikes": 20,
+                  "flares": 8,
+                  "wards": 2,
+                  "oils": 2,
+                  "kills": 12,
+                  "levelUps": 4,
+                  "lightRefunded": 33,
+                  "healthRefunded": 111,
+                  "refillKills": 4,
+                  "pureFlareKills": 1,
+                  "twoFlareRefillKills": 0,
+                  "consecutiveTwoFlareRefills": 0,
+                  "consecutiveRefillKills": 0,
+                  "unusedFood": 9,
+                  "unusedCandles": 5,
+                  "pocketTonics": 1,
+                  "pocketOils": 0,
+                  "finalHealth": 34,
+                  "finalLight": 10,
+                  "encounterOrder": [
+                    "h0",
+                    "h5",
+                    "h4",
+                    "h9",
+                    "h6",
+                    "h10",
+                    "h14",
+                    "h3",
+                    "h2",
+                    "h1",
+                    "h8",
+                    "keeper"
+                  ]
+                }
+              },
+              {
+                "preference": "light",
+                "solved": true,
+                "reason": "won",
+                "metrics": {
+                  "turns": 137,
+                  "strikes": 23,
+                  "flares": 9,
+                  "wards": 1,
+                  "oils": 2,
+                  "kills": 13,
+                  "levelUps": 5,
+                  "lightRefunded": 41,
+                  "healthRefunded": 140,
+                  "refillKills": 5,
+                  "pureFlareKills": 1,
+                  "twoFlareRefillKills": 0,
+                  "consecutiveTwoFlareRefills": 0,
+                  "consecutiveRefillKills": 1,
+                  "unusedFood": 9,
+                  "unusedCandles": 5,
+                  "pocketTonics": 2,
+                  "pocketOils": 0,
+                  "finalHealth": 37,
+                  "finalLight": 10,
+                  "encounterOrder": [
+                    "h0",
+                    "h3",
+                    "h9",
+                    "h6",
+                    "h10",
+                    "h5",
+                    "h14",
+                    "h2",
+                    "h1",
+                    "h4",
+                    "h8",
+                    "h12",
+                    "keeper"
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        {
+          "seed": "hh-balance-01",
+          "attempts": [
+            {
+              "variant": 0,
+              "solved": true,
+              "replayed": true,
+              "reason": "won",
+              "visited": 145,
+              "ms": 3675
+            }
+          ],
+          "accepted": {
+            "variant": 0,
+            "metrics": {
+              "turns": 162,
+              "strikes": 19,
+              "flares": 9,
+              "wards": 1,
+              "oils": 1,
+              "kills": 10,
+              "levelUps": 4,
+              "lightRefunded": 33,
+              "healthRefunded": 106,
+              "refillKills": 4,
+              "pureFlareKills": 0,
+              "twoFlareRefillKills": 0,
+              "consecutiveTwoFlareRefills": 0,
+              "consecutiveRefillKills": 1,
+              "unusedFood": 11,
+              "unusedCandles": 5,
+              "pocketTonics": 2,
+              "pocketOils": 1,
+              "finalHealth": 1,
+              "finalLight": 2,
+              "encounterOrder": [
+                "h0",
+                "h7",
+                "h16",
+                "h3",
+                "h12",
+                "h8",
+                "h11",
+                "h9",
+                "h17",
+                "keeper"
+              ]
+            },
+            "alternatives": [
+              {
+                "preference": "health",
+                "solved": true,
+                "reason": "won",
+                "metrics": {
+                  "turns": 161,
+                  "strikes": 17,
+                  "flares": 9,
+                  "wards": 1,
+                  "oils": 2,
+                  "kills": 10,
+                  "levelUps": 4,
+                  "lightRefunded": 33,
+                  "healthRefunded": 104,
+                  "refillKills": 4,
+                  "pureFlareKills": 2,
+                  "twoFlareRefillKills": 0,
+                  "consecutiveTwoFlareRefills": 0,
+                  "consecutiveRefillKills": 1,
+                  "unusedFood": 11,
+                  "unusedCandles": 5,
+                  "pocketTonics": 2,
+                  "pocketOils": 0,
+                  "finalHealth": 1,
+                  "finalLight": 2,
+                  "encounterOrder": [
+                    "h1",
+                    "h12",
+                    "h16",
+                    "h3",
+                    "h9",
+                    "h8",
+                    "h0",
+                    "h7",
+                    "h17",
+                    "keeper"
+                  ]
+                }
+              },
+              {
+                "preference": "light",
+                "solved": true,
+                "reason": "won",
+                "metrics": {
+                  "turns": 162,
+                  "strikes": 19,
+                  "flares": 9,
+                  "wards": 1,
+                  "oils": 1,
+                  "kills": 10,
+                  "levelUps": 4,
+                  "lightRefunded": 33,
+                  "healthRefunded": 106,
+                  "refillKills": 4,
+                  "pureFlareKills": 0,
+                  "twoFlareRefillKills": 0,
+                  "consecutiveTwoFlareRefills": 0,
+                  "consecutiveRefillKills": 1,
+                  "unusedFood": 11,
+                  "unusedCandles": 5,
+                  "pocketTonics": 2,
+                  "pocketOils": 1,
+                  "finalHealth": 1,
+                  "finalLight": 2,
+                  "encounterOrder": [
+                    "h0",
+                    "h7",
+                    "h16",
+                    "h3",
+                    "h12",
+                    "h8",
+                    "h11",
+                    "h9",
+                    "h17",
+                    "keeper"
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        {
+          "seed": "hh-balance-02",
+          "attempts": [
+            {
+              "variant": 0,
+              "solved": true,
+              "replayed": true,
+              "reason": "won",
+              "visited": 139,
+              "ms": 1383
+            }
+          ],
+          "accepted": {
+            "variant": 0,
+            "metrics": {
+              "turns": 134,
+              "strikes": 17,
+              "flares": 9,
+              "wards": 1,
+              "oils": 2,
+              "kills": 10,
+              "levelUps": 4,
+              "lightRefunded": 33,
+              "healthRefunded": 112,
+              "refillKills": 4,
+              "pureFlareKills": 0,
+              "twoFlareRefillKills": 0,
+              "consecutiveTwoFlareRefills": 0,
+              "consecutiveRefillKills": 0,
+              "unusedFood": 9,
+              "unusedCandles": 5,
+              "pocketTonics": 2,
+              "pocketOils": 0,
+              "finalHealth": 10,
+              "finalLight": 2,
+              "encounterOrder": [
+                "h1",
+                "h9",
+                "h3",
+                "h8",
+                "h2",
+                "h11",
+                "h10",
+                "h7",
+                "h6",
+                "keeper"
+              ]
+            },
+            "alternatives": [
+              {
+                "preference": "health",
+                "solved": true,
+                "reason": "won",
+                "metrics": {
+                  "turns": 134,
+                  "strikes": 17,
+                  "flares": 9,
+                  "wards": 1,
+                  "oils": 2,
+                  "kills": 10,
+                  "levelUps": 4,
+                  "lightRefunded": 33,
+                  "healthRefunded": 105,
+                  "refillKills": 4,
+                  "pureFlareKills": 2,
+                  "twoFlareRefillKills": 1,
+                  "consecutiveTwoFlareRefills": 0,
+                  "consecutiveRefillKills": 1,
+                  "unusedFood": 9,
+                  "unusedCandles": 5,
+                  "pocketTonics": 2,
+                  "pocketOils": 0,
+                  "finalHealth": 10,
+                  "finalLight": 2,
+                  "encounterOrder": [
+                    "h1",
+                    "h3",
+                    "h9",
+                    "h8",
+                    "h2",
+                    "h10",
+                    "h6",
+                    "h7",
+                    "h11",
+                    "keeper"
+                  ]
+                }
+              },
+              {
+                "preference": "light",
+                "solved": true,
+                "reason": "won",
+                "metrics": {
+                  "turns": 133,
+                  "strikes": 16,
+                  "flares": 10,
+                  "wards": 0,
+                  "oils": 2,
+                  "kills": 10,
+                  "levelUps": 4,
+                  "lightRefunded": 34,
+                  "healthRefunded": 110,
+                  "refillKills": 4,
+                  "pureFlareKills": 1,
+                  "twoFlareRefillKills": 1,
+                  "consecutiveTwoFlareRefills": 0,
+                  "consecutiveRefillKills": 0,
+                  "unusedFood": 9,
+                  "unusedCandles": 5,
+                  "pocketTonics": 2,
+                  "pocketOils": 0,
+                  "finalHealth": 10,
+                  "finalLight": 2,
+                  "encounterOrder": [
+                    "h1",
+                    "h9",
+                    "h3",
+                    "h8",
+                    "h2",
+                    "h11",
+                    "h6",
+                    "h7",
+                    "h10",
+                    "keeper"
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        {
+          "seed": "hh-balance-03",
+          "attempts": [
+            {
+              "variant": 0,
+              "solved": true,
+              "replayed": true,
+              "reason": "won",
+              "visited": 257,
+              "ms": 615
+            }
+          ],
+          "accepted": {
+            "variant": 0,
+            "metrics": {
+              "turns": 136,
+              "strikes": 26,
+              "flares": 11,
+              "wards": 4,
+              "oils": 1,
+              "kills": 13,
+              "levelUps": 5,
+              "lightRefunded": 43,
+              "healthRefunded": 124,
+              "refillKills": 5,
+              "pureFlareKills": 1,
+              "twoFlareRefillKills": 0,
+              "consecutiveTwoFlareRefills": 0,
+              "consecutiveRefillKills": 0,
+              "unusedFood": 5,
+              "unusedCandles": 2,
+              "pocketTonics": 2,
+              "pocketOils": 1,
+              "finalHealth": 37,
+              "finalLight": 10,
+              "encounterOrder": [
+                "h2",
+                "h0",
+                "h1",
+                "h3",
+                "h11",
+                "h4",
+                "h10",
+                "h8",
+                "h7",
+                "h6",
+                "h9",
+                "h5",
+                "keeper"
+              ]
+            },
+            "alternatives": [
+              {
+                "preference": "health",
+                "solved": true,
+                "reason": "won",
+                "metrics": {
+                  "turns": 138,
+                  "strikes": 27,
+                  "flares": 10,
+                  "wards": 6,
+                  "oils": 1,
+                  "kills": 13,
+                  "levelUps": 5,
+                  "lightRefunded": 45,
+                  "healthRefunded": 121,
+                  "refillKills": 5,
+                  "pureFlareKills": 1,
+                  "twoFlareRefillKills": 0,
+                  "consecutiveTwoFlareRefills": 0,
+                  "consecutiveRefillKills": 0,
+                  "unusedFood": 5,
+                  "unusedCandles": 2,
+                  "pocketTonics": 2,
+                  "pocketOils": 1,
+                  "finalHealth": 37,
+                  "finalLight": 10,
+                  "encounterOrder": [
+                    "h2",
+                    "h0",
+                    "h1",
+                    "h3",
+                    "h11",
+                    "h4",
+                    "h10",
+                    "h8",
+                    "h7",
+                    "h6",
+                    "h9",
+                    "h5",
+                    "keeper"
+                  ]
+                }
+              },
+              {
+                "preference": "light",
+                "solved": true,
+                "reason": "won",
+                "metrics": {
+                  "turns": 135,
+                  "strikes": 26,
+                  "flares": 11,
+                  "wards": 3,
+                  "oils": 1,
+                  "kills": 13,
+                  "levelUps": 5,
+                  "lightRefunded": 40,
+                  "healthRefunded": 125,
+                  "refillKills": 5,
+                  "pureFlareKills": 1,
+                  "twoFlareRefillKills": 0,
+                  "consecutiveTwoFlareRefills": 0,
+                  "consecutiveRefillKills": 0,
+                  "unusedFood": 5,
+                  "unusedCandles": 2,
+                  "pocketTonics": 2,
+                  "pocketOils": 1,
+                  "finalHealth": 37,
+                  "finalLight": 10,
+                  "encounterOrder": [
+                    "h2",
+                    "h0",
+                    "h1",
+                    "h3",
+                    "h11",
+                    "h4",
+                    "h10",
+                    "h8",
+                    "h7",
+                    "h6",
+                    "h9",
+                    "h5",
+                    "keeper"
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        {
+          "seed": "hh-balance-04",
+          "attempts": [
+            {
+              "variant": 0,
+              "solved": true,
+              "replayed": true,
+              "reason": "won",
+              "visited": 209,
+              "ms": 1557
+            }
+          ],
+          "accepted": {
+            "variant": 0,
+            "metrics": {
+              "turns": 154,
+              "strikes": 25,
+              "flares": 9,
+              "wards": 5,
+              "oils": 1,
+              "kills": 12,
+              "levelUps": 5,
+              "lightRefunded": 41,
+              "healthRefunded": 137,
+              "refillKills": 5,
+              "pureFlareKills": 1,
+              "twoFlareRefillKills": 0,
+              "consecutiveTwoFlareRefills": 0,
+              "consecutiveRefillKills": 1,
+              "unusedFood": 8,
+              "unusedCandles": 4,
+              "pocketTonics": 2,
+              "pocketOils": 1,
+              "finalHealth": 4,
+              "finalLight": 6,
+              "encounterOrder": [
+                "h2",
+                "h6",
+                "h5",
+                "h4",
+                "h1",
+                "h7",
+                "h0",
+                "h3",
+                "h8",
+                "h12",
+                "h11",
+                "keeper"
+              ]
+            },
+            "alternatives": []
+          }
+        },
+        {
+          "seed": "hh-balance-05",
+          "attempts": [
+            {
+              "variant": 0,
+              "solved": true,
+              "replayed": true,
+              "reason": "won",
+              "visited": 257,
+              "ms": 6539
+            }
+          ],
+          "accepted": {
+            "variant": 0,
+            "metrics": {
+              "turns": 176,
+              "strikes": 30,
+              "flares": 11,
+              "wards": 2,
+              "oils": 1,
+              "kills": 16,
+              "levelUps": 6,
+              "lightRefunded": 48,
+              "healthRefunded": 170,
+              "refillKills": 6,
+              "pureFlareKills": 0,
+              "twoFlareRefillKills": 0,
+              "consecutiveTwoFlareRefills": 0,
+              "consecutiveRefillKills": 2,
+              "unusedFood": 8,
+              "unusedCandles": 4,
+              "pocketTonics": 2,
+              "pocketOils": 1,
+              "finalHealth": 1,
+              "finalLight": 6,
+              "encounterOrder": [
+                "h2",
+                "h15",
+                "h16",
+                "h14",
+                "h1",
+                "h11",
+                "h10",
+                "h8",
+                "h0",
+                "h17",
+                "h13",
+                "h6",
+                "h7",
+                "h3",
+                "h4",
+                "keeper"
+              ]
+            },
+            "alternatives": []
+          }
+        },
+        {
+          "seed": "hh-balance-06",
+          "attempts": [
+            {
+              "variant": 0,
+              "solved": true,
+              "replayed": true,
+              "reason": "won",
+              "visited": 205,
+              "ms": 5000
+            }
+          ],
+          "accepted": {
+            "variant": 0,
+            "metrics": {
+              "turns": 162,
+              "strikes": 25,
+              "flares": 10,
+              "wards": 1,
+              "oils": 1,
+              "kills": 13,
+              "levelUps": 5,
+              "lightRefunded": 41,
+              "healthRefunded": 143,
+              "refillKills": 5,
+              "pureFlareKills": 2,
+              "twoFlareRefillKills": 0,
+              "consecutiveTwoFlareRefills": 0,
+              "consecutiveRefillKills": 1,
+              "unusedFood": 10,
+              "unusedCandles": 4,
+              "pocketTonics": 1,
+              "pocketOils": 1,
+              "finalHealth": 1,
+              "finalLight": 6,
+              "encounterOrder": [
+                "h0",
+                "h5",
+                "h12",
+                "h14",
+                "h10",
+                "h17",
+                "h16",
+                "h19",
+                "h9",
+                "h6",
+                "h7",
+                "h3",
+                "keeper"
+              ]
+            },
+            "alternatives": []
+          }
+        },
+        {
+          "seed": "hh-balance-07",
+          "attempts": [
+            {
+              "variant": 0,
+              "solved": true,
+              "replayed": true,
+              "reason": "won",
+              "visited": 161,
+              "ms": 1382
+            }
+          ],
+          "accepted": {
+            "variant": 0,
+            "metrics": {
+              "turns": 145,
+              "strikes": 21,
+              "flares": 9,
+              "wards": 1,
+              "oils": 0,
+              "kills": 10,
+              "levelUps": 4,
+              "lightRefunded": 33,
+              "healthRefunded": 105,
+              "refillKills": 4,
+              "pureFlareKills": 0,
+              "twoFlareRefillKills": 0,
+              "consecutiveTwoFlareRefills": 0,
+              "consecutiveRefillKills": 0,
+              "unusedFood": 7,
+              "unusedCandles": 3,
+              "pocketTonics": 2,
+              "pocketOils": 2,
+              "finalHealth": 1,
+              "finalLight": 2,
+              "encounterOrder": [
+                "h7",
+                "h3",
+                "h0",
+                "h11",
+                "h6",
+                "h12",
+                "h10",
+                "h9",
+                "h4",
+                "keeper"
+              ]
+            },
+            "alternatives": []
+          }
+        },
+        {
+          "seed": "hh-balance-08",
+          "attempts": [
+            {
+              "variant": 0,
+              "solved": true,
+              "replayed": true,
+              "reason": "won",
+              "visited": 97,
+              "ms": 1178
+            }
+          ],
+          "accepted": {
+            "variant": 0,
+            "metrics": {
+              "turns": 165,
+              "strikes": 15,
+              "flares": 9,
+              "wards": 1,
+              "oils": 2,
+              "kills": 6,
+              "levelUps": 4,
+              "lightRefunded": 33,
+              "healthRefunded": 104,
+              "refillKills": 4,
+              "pureFlareKills": 0,
+              "twoFlareRefillKills": 0,
+              "consecutiveTwoFlareRefills": 0,
+              "consecutiveRefillKills": 3,
+              "unusedFood": 7,
+              "unusedCandles": 4,
+              "pocketTonics": 2,
+              "pocketOils": 0,
+              "finalHealth": 10,
+              "finalLight": 2,
+              "encounterOrder": [
+                "h2",
+                "h7",
+                "h11",
+                "h8",
+                "h12",
+                "keeper"
+              ]
+            },
+            "alternatives": []
+          }
+        },
+        {
+          "seed": "hh-balance-09",
+          "attempts": [
+            {
+              "variant": 0,
+              "solved": false,
+              "replayed": false,
+              "reason": "exhausted",
+              "visited": 81,
+              "ms": 56
+            },
+            {
+              "variant": 1,
+              "solved": true,
+              "replayed": true,
+              "reason": "won",
+              "visited": 140,
+              "ms": 1287
+            }
+          ],
+          "accepted": {
+            "variant": 1,
+            "metrics": {
+              "turns": 161,
+              "strikes": 18,
+              "flares": 6,
+              "wards": 4,
+              "oils": 1,
+              "kills": 9,
+              "levelUps": 4,
+              "lightRefunded": 38,
+              "healthRefunded": 97,
+              "refillKills": 4,
+              "pureFlareKills": 1,
+              "twoFlareRefillKills": 1,
+              "consecutiveTwoFlareRefills": 0,
+              "consecutiveRefillKills": 1,
+              "unusedFood": 9,
+              "unusedCandles": 4,
+              "pocketTonics": 2,
+              "pocketOils": 1,
+              "finalHealth": 34,
+              "finalLight": 10,
+              "encounterOrder": [
+                "h1",
+                "h10",
+                "h9",
+                "h7",
+                "h5",
+                "h6",
+                "h12",
+                "h2",
+                "keeper"
+              ]
+            },
+            "alternatives": []
+          }
+        },
+        {
+          "seed": "hh-balance-10",
+          "attempts": [
+            {
+              "variant": 0,
+              "solved": false,
+              "replayed": false,
+              "reason": "exhausted",
+              "visited": 95,
+              "ms": 30
+            },
+            {
+              "variant": 1,
+              "solved": false,
+              "replayed": false,
+              "reason": "exhausted",
+              "visited": 374,
+              "ms": 914
+            },
+            {
+              "variant": 2,
+              "solved": false,
+              "replayed": false,
+              "reason": "exhausted",
+              "visited": 79,
+              "ms": 32
+            },
+            {
+              "variant": 3,
+              "solved": true,
+              "replayed": true,
+              "reason": "won",
+              "visited": 193,
+              "ms": 2457
+            }
+          ],
+          "accepted": {
+            "variant": 3,
+            "metrics": {
+              "turns": 158,
+              "strikes": 21,
+              "flares": 10,
+              "wards": 2,
+              "oils": 1,
+              "kills": 13,
+              "levelUps": 5,
+              "lightRefunded": 40,
+              "healthRefunded": 138,
+              "refillKills": 5,
+              "pureFlareKills": 0,
+              "twoFlareRefillKills": 0,
+              "consecutiveTwoFlareRefills": 0,
+              "consecutiveRefillKills": 1,
+              "unusedFood": 8,
+              "unusedCandles": 5,
+              "pocketTonics": 2,
+              "pocketOils": 1,
+              "finalHealth": 11,
+              "finalLight": 2,
+              "encounterOrder": [
+                "h4",
+                "h5",
+                "h14",
+                "h13",
+                "h8",
+                "h2",
+                "h10",
+                "h15",
+                "h11",
+                "h1",
+                "h12",
+                "h9",
+                "keeper"
+              ]
+            },
+            "alternatives": []
+          }
+        },
+        {
+          "seed": "hh-balance-11",
+          "attempts": [
+            {
+              "variant": 0,
+              "solved": true,
+              "replayed": true,
+              "reason": "won",
+              "visited": 129,
+              "ms": 893
+            }
+          ],
+          "accepted": {
+            "variant": 0,
+            "metrics": {
+              "turns": 143,
+              "strikes": 18,
+              "flares": 9,
+              "wards": 2,
+              "oils": 1,
+              "kills": 9,
+              "levelUps": 5,
+              "lightRefunded": 44,
+              "healthRefunded": 149,
+              "refillKills": 5,
+              "pureFlareKills": 1,
+              "twoFlareRefillKills": 1,
+              "consecutiveTwoFlareRefills": 0,
+              "consecutiveRefillKills": 2,
+              "unusedFood": 11,
+              "unusedCandles": 6,
+              "pocketTonics": 2,
+              "pocketOils": 1,
+              "finalHealth": 37,
+              "finalLight": 10,
+              "encounterOrder": [
+                "h0",
+                "h1",
+                "h3",
+                "h8",
+                "h5",
+                "h11",
+                "h6",
+                "h10",
+                "keeper"
+              ]
+            },
+            "alternatives": []
+          }
+        },
+        {
+          "seed": "hh-balance-12",
+          "attempts": [
+            {
+              "variant": 0,
+              "solved": false,
+              "replayed": false,
+              "reason": "exhausted",
+              "visited": 401,
+              "ms": 874
+            },
+            {
+              "variant": 1,
+              "solved": true,
+              "replayed": true,
+              "reason": "won",
+              "visited": 257,
+              "ms": 1312
+            }
+          ],
+          "accepted": {
+            "variant": 1,
+            "metrics": {
+              "turns": 164,
+              "strikes": 28,
+              "flares": 12,
+              "wards": 2,
+              "oils": 1,
+              "kills": 15,
+              "levelUps": 6,
+              "lightRefunded": 48,
+              "healthRefunded": 174,
+              "refillKills": 6,
+              "pureFlareKills": 0,
+              "twoFlareRefillKills": 0,
+              "consecutiveTwoFlareRefills": 0,
+              "consecutiveRefillKills": 0,
+              "unusedFood": 7,
+              "unusedCandles": 4,
+              "pocketTonics": 2,
+              "pocketOils": 1,
+              "finalHealth": 40,
+              "finalLight": 10,
+              "encounterOrder": [
+                "h11",
+                "h2",
+                "h12",
+                "h8",
+                "h0",
+                "h10",
+                "h7",
+                "h1",
+                "h3",
+                "h9",
+                "h6",
+                "h4",
+                "h14",
+                "h5",
+                "keeper"
+              ]
+            },
+            "alternatives": []
+          }
+        },
+        {
+          "seed": "hh-balance-13",
+          "attempts": [
+            {
+              "variant": 0,
+              "solved": true,
+              "replayed": true,
+              "reason": "won",
+              "visited": 305,
+              "ms": 4069
+            }
+          ],
+          "accepted": {
+            "variant": 0,
+            "metrics": {
+              "turns": 185,
+              "strikes": 31,
+              "flares": 12,
+              "wards": 3,
+              "oils": 0,
+              "kills": 19,
+              "levelUps": 6,
+              "lightRefunded": 47,
+              "healthRefunded": 176,
+              "refillKills": 6,
+              "pureFlareKills": 2,
+              "twoFlareRefillKills": 1,
+              "consecutiveTwoFlareRefills": 0,
+              "consecutiveRefillKills": 0,
+              "unusedFood": 9,
+              "unusedCandles": 4,
+              "pocketTonics": 2,
+              "pocketOils": 2,
+              "finalHealth": 4,
+              "finalLight": 6,
+              "encounterOrder": [
+                "h7",
+                "h3",
+                "h0",
+                "h11",
+                "h13",
+                "h15",
+                "h10",
+                "h6",
+                "h8",
+                "h9",
+                "h4",
+                "h2",
+                "h14",
+                "h12",
+                "h5",
+                "h1",
+                "h16",
+                "h17",
+                "keeper"
+              ]
+            },
+            "alternatives": []
+          }
+        },
+        {
+          "seed": "hh-balance-14",
+          "attempts": [
+            {
+              "variant": 0,
+              "solved": true,
+              "replayed": true,
+              "reason": "won",
+              "visited": 193,
+              "ms": 1419
+            }
+          ],
+          "accepted": {
+            "variant": 0,
+            "metrics": {
+              "turns": 140,
+              "strikes": 22,
+              "flares": 11,
+              "wards": 1,
+              "oils": 0,
+              "kills": 11,
+              "levelUps": 5,
+              "lightRefunded": 41,
+              "healthRefunded": 145,
+              "refillKills": 5,
+              "pureFlareKills": 0,
+              "twoFlareRefillKills": 0,
+              "consecutiveTwoFlareRefills": 0,
+              "consecutiveRefillKills": 1,
+              "unusedFood": 8,
+              "unusedCandles": 5,
+              "pocketTonics": 2,
+              "pocketOils": 2,
+              "finalHealth": 37,
+              "finalLight": 10,
+              "encounterOrder": [
+                "h0",
+                "h8",
+                "h4",
+                "h9",
+                "h2",
+                "h1",
+                "h5",
+                "h12",
+                "h10",
+                "h7",
+                "keeper"
+              ]
+            },
+            "alternatives": []
+          }
+        },
+        {
+          "seed": "hh-balance-15",
+          "attempts": [
+            {
+              "variant": 0,
+              "solved": false,
+              "replayed": false,
+              "reason": "exhausted",
+              "visited": 390,
+              "ms": 1366
+            },
+            {
+              "variant": 1,
+              "solved": true,
+              "replayed": true,
+              "reason": "won",
+              "visited": 241,
+              "ms": 1677
+            }
+          ],
+          "accepted": {
+            "variant": 1,
+            "metrics": {
+              "turns": 149,
+              "strikes": 23,
+              "flares": 13,
+              "wards": 2,
+              "oils": 1,
+              "kills": 14,
+              "levelUps": 7,
+              "lightRefunded": 53,
+              "healthRefunded": 205,
+              "refillKills": 7,
+              "pureFlareKills": 1,
+              "twoFlareRefillKills": 0,
+              "consecutiveTwoFlareRefills": 0,
+              "consecutiveRefillKills": 1,
+              "unusedFood": 7,
+              "unusedCandles": 3,
+              "pocketTonics": 2,
+              "pocketOils": 1,
+              "finalHealth": 43,
+              "finalLight": 10,
+              "encounterOrder": [
+                "h6",
+                "h9",
+                "h0",
+                "h7",
+                "h3",
+                "h10",
+                "h1",
+                "h11",
+                "h4",
+                "h8",
+                "h12",
+                "h2",
+                "h5",
+                "keeper"
+              ]
+            },
+            "alternatives": []
+          }
+        }
+      ]
+    },
+    {
+      "name": "expanded-power-flare",
+      "ingredients": "expanded",
+      "ruleset": "power-flare",
+      "summary": {
+        "seeds": 16,
+        "accepted": 16,
+        "failures": 0,
+        "rawVariantZeroWins": 11,
+        "candidates": 21,
+        "rejectedCandidates": 5,
+        "budgetRejections": 1,
+        "exhaustedRejections": 4,
+        "generationErrors": 0,
+        "maxAttemptMs": 5655,
+        "strikes": 367,
+        "flares": 156,
+        "wards": 48,
+        "oils": 20,
+        "turns": 2507,
+        "kills": 190,
+        "levelUps": 79,
+        "lightRefunded": 653,
+        "pureFlareKills": 19,
+        "twoFlareRefillKills": 5,
+        "consecutiveTwoFlareRefills": 0,
+        "healthRefunded": 2227,
+        "consecutiveRefillKills": 14,
+        "unusedFood": 131,
+        "unusedCandles": 57,
+        "pocketTonics": 30,
+        "pocketOils": 30,
+        "inspectableEncounterSamples": 1052,
+        "meanStrikeHits": 3.294,
+        "meanStrikeHealthCost": 23.032,
+        "meanFlareHits": 3.121,
+        "meanFlareLightCost": 12.483,
+        "wardSurvivalThresholds": 33,
+        "wardSavesAtLeastThree": 476,
+        "oilChangesStrikeCount": 333,
+        "oilChangesFlareCount": 313,
+        "affordableTwoFlareRefills": 14,
+        "alternativeRuns": 8,
+        "alternativeWins": 8,
+        "alternativeDifferentOrders": 7
+      },
+      "runs": [
+        {
+          "seed": "hh-balance-00",
+          "attempts": [
+            {
+              "variant": 0,
+              "solved": true,
+              "replayed": true,
+              "reason": "won",
+              "visited": 257,
+              "ms": 1502
+            }
+          ],
+          "accepted": {
+            "variant": 0,
+            "metrics": {
+              "turns": 152,
+              "strikes": 26,
+              "flares": 9,
+              "wards": 5,
+              "oils": 2,
+              "kills": 14,
+              "levelUps": 5,
+              "lightRefunded": 46,
+              "healthRefunded": 145,
+              "refillKills": 5,
+              "pureFlareKills": 2,
+              "twoFlareRefillKills": 1,
+              "consecutiveTwoFlareRefills": 0,
+              "consecutiveRefillKills": 0,
+              "unusedFood": 8,
+              "unusedCandles": 5,
+              "pocketTonics": 2,
+              "pocketOils": 3,
+              "finalHealth": 37,
+              "finalLight": 10,
+              "encounterOrder": [
+                "h0",
+                "h5",
+                "h8",
+                "h9",
+                "h3",
+                "h4",
+                "h2",
+                "h1",
+                "h6",
+                "h7",
+                "h12",
+                "h13",
+                "h10",
+                "keeper"
+              ]
+            },
+            "alternatives": [
+              {
+                "preference": "health",
+                "solved": true,
+                "reason": "won",
+                "metrics": {
+                  "turns": 148,
+                  "strikes": 24,
+                  "flares": 11,
+                  "wards": 1,
+                  "oils": 2,
+                  "kills": 14,
+                  "levelUps": 5,
+                  "lightRefunded": 42,
+                  "healthRefunded": 145,
+                  "refillKills": 5,
+                  "pureFlareKills": 3,
+                  "twoFlareRefillKills": 1,
+                  "consecutiveTwoFlareRefills": 0,
+                  "consecutiveRefillKills": 0,
+                  "unusedFood": 8,
+                  "unusedCandles": 5,
+                  "pocketTonics": 2,
+                  "pocketOils": 3,
+                  "finalHealth": 37,
+                  "finalLight": 10,
+                  "encounterOrder": [
+                    "h0",
+                    "h5",
+                    "h8",
+                    "h9",
+                    "h3",
+                    "h2",
+                    "h4",
+                    "h1",
+                    "h6",
+                    "h7",
+                    "h12",
+                    "h13",
+                    "h10",
+                    "keeper"
+                  ]
+                }
+              },
+              {
+                "preference": "light",
+                "solved": true,
+                "reason": "won",
+                "metrics": {
+                  "turns": 150,
+                  "strikes": 25,
+                  "flares": 10,
+                  "wards": 3,
+                  "oils": 2,
+                  "kills": 14,
+                  "levelUps": 5,
+                  "lightRefunded": 44,
+                  "healthRefunded": 140,
+                  "refillKills": 5,
+                  "pureFlareKills": 3,
+                  "twoFlareRefillKills": 2,
+                  "consecutiveTwoFlareRefills": 0,
+                  "consecutiveRefillKills": 0,
+                  "unusedFood": 8,
+                  "unusedCandles": 5,
+                  "pocketTonics": 2,
+                  "pocketOils": 3,
+                  "finalHealth": 37,
+                  "finalLight": 10,
+                  "encounterOrder": [
+                    "h0",
+                    "h5",
+                    "h8",
+                    "h6",
+                    "h3",
+                    "h4",
+                    "h2",
+                    "h1",
+                    "h9",
+                    "h7",
+                    "h12",
+                    "h13",
+                    "h10",
+                    "keeper"
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        {
+          "seed": "hh-balance-01",
+          "attempts": [
+            {
+              "variant": 0,
+              "solved": false,
+              "replayed": false,
+              "reason": "budget",
+              "visited": 451,
+              "ms": 2426
+            },
+            {
+              "variant": 1,
+              "solved": true,
+              "replayed": true,
+              "reason": "won",
+              "visited": 145,
+              "ms": 1807
+            }
+          ],
+          "accepted": {
+            "variant": 1,
+            "metrics": {
+              "turns": 172,
+              "strikes": 17,
+              "flares": 8,
+              "wards": 3,
+              "oils": 2,
+              "kills": 9,
+              "levelUps": 5,
+              "lightRefunded": 40,
+              "healthRefunded": 135,
+              "refillKills": 5,
+              "pureFlareKills": 0,
+              "twoFlareRefillKills": 0,
+              "consecutiveTwoFlareRefills": 0,
+              "consecutiveRefillKills": 1,
+              "unusedFood": 9,
+              "unusedCandles": 4,
+              "pocketTonics": 2,
+              "pocketOils": 3,
+              "finalHealth": 37,
+              "finalLight": 10,
+              "encounterOrder": [
+                "h4",
+                "h2",
+                "h3",
+                "h6",
+                "h8",
+                "h9",
+                "h11",
+                "h10",
+                "keeper"
+              ]
+            },
+            "alternatives": [
+              {
+                "preference": "health",
+                "solved": true,
+                "reason": "won",
+                "metrics": {
+                  "turns": 170,
+                  "strikes": 15,
+                  "flares": 9,
+                  "wards": 1,
+                  "oils": 3,
+                  "kills": 8,
+                  "levelUps": 4,
+                  "lightRefunded": 33,
+                  "healthRefunded": 110,
+                  "refillKills": 4,
+                  "pureFlareKills": 0,
+                  "twoFlareRefillKills": 0,
+                  "consecutiveTwoFlareRefills": 0,
+                  "consecutiveRefillKills": 2,
+                  "unusedFood": 9,
+                  "unusedCandles": 4,
+                  "pocketTonics": 2,
+                  "pocketOils": 2,
+                  "finalHealth": 8,
+                  "finalLight": 2,
+                  "encounterOrder": [
+                    "h2",
+                    "h3",
+                    "h6",
+                    "h8",
+                    "h4",
+                    "h14",
+                    "h12",
+                    "keeper"
+                  ]
+                }
+              },
+              {
+                "preference": "light",
+                "solved": true,
+                "reason": "won",
+                "metrics": {
+                  "turns": 170,
+                  "strikes": 16,
+                  "flares": 9,
+                  "wards": 2,
+                  "oils": 2,
+                  "kills": 8,
+                  "levelUps": 5,
+                  "lightRefunded": 39,
+                  "healthRefunded": 142,
+                  "refillKills": 5,
+                  "pureFlareKills": 1,
+                  "twoFlareRefillKills": 1,
+                  "consecutiveTwoFlareRefills": 0,
+                  "consecutiveRefillKills": 2,
+                  "unusedFood": 9,
+                  "unusedCandles": 4,
+                  "pocketTonics": 2,
+                  "pocketOils": 3,
+                  "finalHealth": 37,
+                  "finalLight": 10,
+                  "encounterOrder": [
+                    "h3",
+                    "h6",
+                    "h8",
+                    "h11",
+                    "h14",
+                    "h12",
+                    "h2",
+                    "keeper"
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        {
+          "seed": "hh-balance-02",
+          "attempts": [
+            {
+              "variant": 0,
+              "solved": true,
+              "replayed": true,
+              "reason": "won",
+              "visited": 188,
+              "ms": 1384
+            }
+          ],
+          "accepted": {
+            "variant": 0,
+            "metrics": {
+              "turns": 149,
+              "strikes": 21,
+              "flares": 11,
+              "wards": 1,
+              "oils": 0,
+              "kills": 11,
+              "levelUps": 5,
+              "lightRefunded": 41,
+              "healthRefunded": 159,
+              "refillKills": 5,
+              "pureFlareKills": 0,
+              "twoFlareRefillKills": 0,
+              "consecutiveTwoFlareRefills": 0,
+              "consecutiveRefillKills": 1,
+              "unusedFood": 8,
+              "unusedCandles": 4,
+              "pocketTonics": 2,
+              "pocketOils": 2,
+              "finalHealth": 41,
+              "finalLight": 10,
+              "encounterOrder": [
+                "h1",
+                "h5",
+                "h6",
+                "h2",
+                "h10",
+                "h3",
+                "h11",
+                "h4",
+                "h8",
+                "h9",
+                "keeper"
+              ]
+            },
+            "alternatives": [
+              {
+                "preference": "health",
+                "solved": true,
+                "reason": "won",
+                "metrics": {
+                  "turns": 149,
+                  "strikes": 22,
+                  "flares": 10,
+                  "wards": 0,
+                  "oils": 1,
+                  "kills": 11,
+                  "levelUps": 5,
+                  "lightRefunded": 42,
+                  "healthRefunded": 146,
+                  "refillKills": 5,
+                  "pureFlareKills": 2,
+                  "twoFlareRefillKills": 0,
+                  "consecutiveTwoFlareRefills": 0,
+                  "consecutiveRefillKills": 1,
+                  "unusedFood": 7,
+                  "unusedCandles": 5,
+                  "pocketTonics": 2,
+                  "pocketOils": 1,
+                  "finalHealth": 41,
+                  "finalLight": 10,
+                  "encounterOrder": [
+                    "h1",
+                    "h5",
+                    "h6",
+                    "h10",
+                    "h3",
+                    "h11",
+                    "h4",
+                    "h2",
+                    "h8",
+                    "h9",
+                    "keeper"
+                  ]
+                }
+              },
+              {
+                "preference": "light",
+                "solved": true,
+                "reason": "won",
+                "metrics": {
+                  "turns": 148,
+                  "strikes": 21,
+                  "flares": 11,
+                  "wards": 0,
+                  "oils": 0,
+                  "kills": 11,
+                  "levelUps": 5,
+                  "lightRefunded": 42,
+                  "healthRefunded": 163,
+                  "refillKills": 5,
+                  "pureFlareKills": 1,
+                  "twoFlareRefillKills": 1,
+                  "consecutiveTwoFlareRefills": 0,
+                  "consecutiveRefillKills": 1,
+                  "unusedFood": 8,
+                  "unusedCandles": 4,
+                  "pocketTonics": 2,
+                  "pocketOils": 2,
+                  "finalHealth": 41,
+                  "finalLight": 10,
+                  "encounterOrder": [
+                    "h1",
+                    "h5",
+                    "h6",
+                    "h2",
+                    "h10",
+                    "h3",
+                    "h11",
+                    "h4",
+                    "h8",
+                    "h9",
+                    "keeper"
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        {
+          "seed": "hh-balance-03",
+          "attempts": [
+            {
+              "variant": 0,
+              "solved": true,
+              "replayed": true,
+              "reason": "won",
+              "visited": 209,
+              "ms": 860
+            }
+          ],
+          "accepted": {
+            "variant": 0,
+            "metrics": {
+              "turns": 119,
+              "strikes": 23,
+              "flares": 8,
+              "wards": 4,
+              "oils": 0,
+              "kills": 12,
+              "levelUps": 5,
+              "lightRefunded": 39,
+              "healthRefunded": 133,
+              "refillKills": 5,
+              "pureFlareKills": 2,
+              "twoFlareRefillKills": 0,
+              "consecutiveTwoFlareRefills": 0,
+              "consecutiveRefillKills": 1,
+              "unusedFood": 6,
+              "unusedCandles": 3,
+              "pocketTonics": 2,
+              "pocketOils": 2,
+              "finalHealth": 37,
+              "finalLight": 10,
+              "encounterOrder": [
+                "h2",
+                "h3",
+                "h5",
+                "h10",
+                "h11",
+                "h8",
+                "h4",
+                "h7",
+                "h9",
+                "h6",
+                "h0",
+                "keeper"
+              ]
+            },
+            "alternatives": [
+              {
+                "preference": "health",
+                "solved": true,
+                "reason": "won",
+                "metrics": {
+                  "turns": 120,
+                  "strikes": 22,
+                  "flares": 9,
+                  "wards": 3,
+                  "oils": 2,
+                  "kills": 12,
+                  "levelUps": 5,
+                  "lightRefunded": 40,
+                  "healthRefunded": 131,
+                  "refillKills": 5,
+                  "pureFlareKills": 4,
+                  "twoFlareRefillKills": 0,
+                  "consecutiveTwoFlareRefills": 0,
+                  "consecutiveRefillKills": 1,
+                  "unusedFood": 6,
+                  "unusedCandles": 3,
+                  "pocketTonics": 2,
+                  "pocketOils": 0,
+                  "finalHealth": 37,
+                  "finalLight": 10,
+                  "encounterOrder": [
+                    "h2",
+                    "h3",
+                    "h4",
+                    "h10",
+                    "h11",
+                    "h9",
+                    "h5",
+                    "h7",
+                    "h8",
+                    "h6",
+                    "h0",
+                    "keeper"
+                  ]
+                }
+              },
+              {
+                "preference": "light",
+                "solved": true,
+                "reason": "won",
+                "metrics": {
+                  "turns": 118,
+                  "strikes": 19,
+                  "flares": 13,
+                  "wards": 1,
+                  "oils": 0,
+                  "kills": 12,
+                  "levelUps": 5,
+                  "lightRefunded": 41,
+                  "healthRefunded": 112,
+                  "refillKills": 5,
+                  "pureFlareKills": 3,
+                  "twoFlareRefillKills": 1,
+                  "consecutiveTwoFlareRefills": 0,
+                  "consecutiveRefillKills": 1,
+                  "unusedFood": 6,
+                  "unusedCandles": 2,
+                  "pocketTonics": 2,
+                  "pocketOils": 2,
+                  "finalHealth": 37,
+                  "finalLight": 10,
+                  "encounterOrder": [
+                    "h3",
+                    "h0",
+                    "h8",
+                    "h7",
+                    "h11",
+                    "h4",
+                    "h10",
+                    "h6",
+                    "h2",
+                    "h9",
+                    "h5",
+                    "keeper"
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        {
+          "seed": "hh-balance-04",
+          "attempts": [
+            {
+              "variant": 0,
+              "solved": true,
+              "replayed": true,
+              "reason": "won",
+              "visited": 155,
+              "ms": 1005
+            }
+          ],
+          "accepted": {
+            "variant": 0,
+            "metrics": {
+              "turns": 141,
+              "strikes": 18,
+              "flares": 9,
+              "wards": 1,
+              "oils": 2,
+              "kills": 9,
+              "levelUps": 4,
+              "lightRefunded": 33,
+              "healthRefunded": 115,
+              "refillKills": 4,
+              "pureFlareKills": 1,
+              "twoFlareRefillKills": 0,
+              "consecutiveTwoFlareRefills": 0,
+              "consecutiveRefillKills": 1,
+              "unusedFood": 8,
+              "unusedCandles": 4,
+              "pocketTonics": 2,
+              "pocketOils": 0,
+              "finalHealth": 38,
+              "finalLight": 10,
+              "encounterOrder": [
+                "h0",
+                "h1",
+                "h5",
+                "h7",
+                "h6",
+                "h2",
+                "h8",
+                "h4",
+                "keeper"
+              ]
+            },
+            "alternatives": []
+          }
+        },
+        {
+          "seed": "hh-balance-05",
+          "attempts": [
+            {
+              "variant": 0,
+              "solved": true,
+              "replayed": true,
+              "reason": "won",
+              "visited": 348,
+              "ms": 2383
+            }
+          ],
+          "accepted": {
+            "variant": 0,
+            "metrics": {
+              "turns": 211,
+              "strikes": 37,
+              "flares": 12,
+              "wards": 5,
+              "oils": 2,
+              "kills": 19,
+              "levelUps": 7,
+              "lightRefunded": 55,
+              "healthRefunded": 221,
+              "refillKills": 7,
+              "pureFlareKills": 2,
+              "twoFlareRefillKills": 0,
+              "consecutiveTwoFlareRefills": 0,
+              "consecutiveRefillKills": 1,
+              "unusedFood": 8,
+              "unusedCandles": 2,
+              "pocketTonics": 1,
+              "pocketOils": 0,
+              "finalHealth": 43,
+              "finalLight": 10,
+              "encounterOrder": [
+                "h7",
+                "h13",
+                "h2",
+                "h15",
+                "h3",
+                "h1",
+                "h0",
+                "h16",
+                "h17",
+                "h11",
+                "h6",
+                "h5",
+                "h10",
+                "h12",
+                "h8",
+                "h14",
+                "h9",
+                "h4",
+                "keeper"
+              ]
+            },
+            "alternatives": []
+          }
+        },
+        {
+          "seed": "hh-balance-06",
+          "attempts": [
+            {
+              "variant": 0,
+              "solved": true,
+              "replayed": true,
+              "reason": "won",
+              "visited": 237,
+              "ms": 1058
+            }
+          ],
+          "accepted": {
+            "variant": 0,
+            "metrics": {
+              "turns": 180,
+              "strikes": 29,
+              "flares": 11,
+              "wards": 4,
+              "oils": 1,
+              "kills": 14,
+              "levelUps": 5,
+              "lightRefunded": 46,
+              "healthRefunded": 143,
+              "refillKills": 5,
+              "pureFlareKills": 2,
+              "twoFlareRefillKills": 0,
+              "consecutiveTwoFlareRefills": 0,
+              "consecutiveRefillKills": 0,
+              "unusedFood": 9,
+              "unusedCandles": 3,
+              "pocketTonics": 2,
+              "pocketOils": 1,
+              "finalHealth": 1,
+              "finalLight": 6,
+              "encounterOrder": [
+                "h0",
+                "h10",
+                "h6",
+                "h11",
+                "h8",
+                "h2",
+                "h9",
+                "h5",
+                "h3",
+                "h16",
+                "h15",
+                "h14",
+                "h4",
+                "keeper"
+              ]
+            },
+            "alternatives": []
+          }
+        },
+        {
+          "seed": "hh-balance-07",
+          "attempts": [
+            {
+              "variant": 0,
+              "solved": true,
+              "replayed": true,
+              "reason": "won",
+              "visited": 161,
+              "ms": 1235
+            }
+          ],
+          "accepted": {
+            "variant": 0,
+            "metrics": {
+              "turns": 145,
+              "strikes": 19,
+              "flares": 10,
+              "wards": 2,
+              "oils": 1,
+              "kills": 10,
+              "levelUps": 4,
+              "lightRefunded": 32,
+              "healthRefunded": 105,
+              "refillKills": 4,
+              "pureFlareKills": 2,
+              "twoFlareRefillKills": 1,
+              "consecutiveTwoFlareRefills": 0,
+              "consecutiveRefillKills": 1,
+              "unusedFood": 8,
+              "unusedCandles": 2,
+              "pocketTonics": 2,
+              "pocketOils": 1,
+              "finalHealth": 1,
+              "finalLight": 2,
+              "encounterOrder": [
+                "h7",
+                "h0",
+                "h3",
+                "h12",
+                "h6",
+                "h11",
+                "h10",
+                "h9",
+                "h4",
+                "keeper"
+              ]
+            },
+            "alternatives": []
+          }
+        },
+        {
+          "seed": "hh-balance-08",
+          "attempts": [
+            {
+              "variant": 0,
+              "solved": true,
+              "replayed": true,
+              "reason": "won",
+              "visited": 209,
+              "ms": 1338
+            }
+          ],
+          "accepted": {
+            "variant": 0,
+            "metrics": {
+              "turns": 184,
+              "strikes": 25,
+              "flares": 10,
+              "wards": 4,
+              "oils": 1,
+              "kills": 11,
+              "levelUps": 5,
+              "lightRefunded": 39,
+              "healthRefunded": 137,
+              "refillKills": 5,
+              "pureFlareKills": 2,
+              "twoFlareRefillKills": 0,
+              "consecutiveTwoFlareRefills": 0,
+              "consecutiveRefillKills": 2,
+              "unusedFood": 6,
+              "unusedCandles": 3,
+              "pocketTonics": 2,
+              "pocketOils": 4,
+              "finalHealth": 1,
+              "finalLight": 2,
+              "encounterOrder": [
+                "h2",
+                "h1",
+                "h5",
+                "h4",
+                "h0",
+                "h6",
+                "h3",
+                "h8",
+                "h13",
+                "h12",
+                "keeper"
+              ]
+            },
+            "alternatives": []
+          }
+        },
+        {
+          "seed": "hh-balance-09",
+          "attempts": [
+            {
+              "variant": 0,
+              "solved": false,
+              "replayed": false,
+              "reason": "exhausted",
+              "visited": 96,
+              "ms": 65
+            },
+            {
+              "variant": 1,
+              "solved": true,
+              "replayed": true,
+              "reason": "won",
+              "visited": 161,
+              "ms": 1799
+            }
+          ],
+          "accepted": {
+            "variant": 1,
+            "metrics": {
+              "turns": 172,
+              "strikes": 20,
+              "flares": 8,
+              "wards": 4,
+              "oils": 1,
+              "kills": 11,
+              "levelUps": 5,
+              "lightRefunded": 46,
+              "healthRefunded": 138,
+              "refillKills": 5,
+              "pureFlareKills": 1,
+              "twoFlareRefillKills": 1,
+              "consecutiveTwoFlareRefills": 0,
+              "consecutiveRefillKills": 1,
+              "unusedFood": 10,
+              "unusedCandles": 4,
+              "pocketTonics": 2,
+              "pocketOils": 4,
+              "finalHealth": 37,
+              "finalLight": 10,
+              "encounterOrder": [
+                "h1",
+                "h10",
+                "h2",
+                "h9",
+                "h7",
+                "h5",
+                "h6",
+                "h11",
+                "h13",
+                "h3",
+                "keeper"
+              ]
+            },
+            "alternatives": []
+          }
+        },
+        {
+          "seed": "hh-balance-10",
+          "attempts": [
+            {
+              "variant": 0,
+              "solved": false,
+              "replayed": false,
+              "reason": "exhausted",
+              "visited": 104,
+              "ms": 44
+            },
+            {
+              "variant": 1,
+              "solved": true,
+              "replayed": true,
+              "reason": "won",
+              "visited": 225,
+              "ms": 1287
+            }
+          ],
+          "accepted": {
+            "variant": 1,
+            "metrics": {
+              "turns": 105,
+              "strikes": 23,
+              "flares": 10,
+              "wards": 3,
+              "oils": 1,
+              "kills": 14,
+              "levelUps": 5,
+              "lightRefunded": 44,
+              "healthRefunded": 143,
+              "refillKills": 5,
+              "pureFlareKills": 1,
+              "twoFlareRefillKills": 0,
+              "consecutiveTwoFlareRefills": 0,
+              "consecutiveRefillKills": 0,
+              "unusedFood": 9,
+              "unusedCandles": 4,
+              "pocketTonics": 2,
+              "pocketOils": 1,
+              "finalHealth": 37,
+              "finalLight": 10,
+              "encounterOrder": [
+                "h2",
+                "h12",
+                "h0",
+                "h4",
+                "h5",
+                "h14",
+                "h1",
+                "h7",
+                "h13",
+                "h6",
+                "h15",
+                "h11",
+                "h3",
+                "keeper"
+              ]
+            },
+            "alternatives": []
+          }
+        },
+        {
+          "seed": "hh-balance-11",
+          "attempts": [
+            {
+              "variant": 0,
+              "solved": true,
+              "replayed": true,
+              "reason": "won",
+              "visited": 116,
+              "ms": 1317
+            }
+          ],
+          "accepted": {
+            "variant": 0,
+            "metrics": {
+              "turns": 151,
+              "strikes": 16,
+              "flares": 9,
+              "wards": 1,
+              "oils": 3,
+              "kills": 8,
+              "levelUps": 5,
+              "lightRefunded": 41,
+              "healthRefunded": 148,
+              "refillKills": 5,
+              "pureFlareKills": 1,
+              "twoFlareRefillKills": 1,
+              "consecutiveTwoFlareRefills": 0,
+              "consecutiveRefillKills": 3,
+              "unusedFood": 10,
+              "unusedCandles": 6,
+              "pocketTonics": 2,
+              "pocketOils": 2,
+              "finalHealth": 37,
+              "finalLight": 10,
+              "encounterOrder": [
+                "h0",
+                "h1",
+                "h3",
+                "h8",
+                "h5",
+                "h10",
+                "h12",
+                "keeper"
+              ]
+            },
+            "alternatives": []
+          }
+        },
+        {
+          "seed": "hh-balance-12",
+          "attempts": [
+            {
+              "variant": 0,
+              "solved": false,
+              "replayed": false,
+              "reason": "exhausted",
+              "visited": 385,
+              "ms": 2197
+            },
+            {
+              "variant": 1,
+              "solved": true,
+              "replayed": true,
+              "reason": "won",
+              "visited": 284,
+              "ms": 2416
+            }
+          ],
+          "accepted": {
+            "variant": 1,
+            "metrics": {
+              "turns": 170,
+              "strikes": 28,
+              "flares": 13,
+              "wards": 2,
+              "oils": 2,
+              "kills": 16,
+              "levelUps": 6,
+              "lightRefunded": 48,
+              "healthRefunded": 177,
+              "refillKills": 6,
+              "pureFlareKills": 2,
+              "twoFlareRefillKills": 1,
+              "consecutiveTwoFlareRefills": 0,
+              "consecutiveRefillKills": 0,
+              "unusedFood": 8,
+              "unusedCandles": 3,
+              "pocketTonics": 1,
+              "pocketOils": 0,
+              "finalHealth": 40,
+              "finalLight": 10,
+              "encounterOrder": [
+                "h2",
+                "h0",
+                "h3",
+                "h4",
+                "h11",
+                "h12",
+                "h10",
+                "h6",
+                "h13",
+                "h7",
+                "h1",
+                "h14",
+                "h5",
+                "h8",
+                "h9",
+                "keeper"
+              ]
+            },
+            "alternatives": []
+          }
+        },
+        {
+          "seed": "hh-balance-13",
+          "attempts": [
+            {
+              "variant": 0,
+              "solved": true,
+              "replayed": true,
+              "reason": "won",
+              "visited": 225,
+              "ms": 5655
+            }
+          ],
+          "accepted": {
+            "variant": 0,
+            "metrics": {
+              "turns": 174,
+              "strikes": 25,
+              "flares": 9,
+              "wards": 3,
+              "oils": 0,
+              "kills": 13,
+              "levelUps": 5,
+              "lightRefunded": 37,
+              "healthRefunded": 128,
+              "refillKills": 5,
+              "pureFlareKills": 0,
+              "twoFlareRefillKills": 0,
+              "consecutiveTwoFlareRefills": 0,
+              "consecutiveRefillKills": 0,
+              "unusedFood": 8,
+              "unusedCandles": 4,
+              "pocketTonics": 2,
+              "pocketOils": 2,
+              "finalHealth": 1,
+              "finalLight": 2,
+              "encounterOrder": [
+                "h2",
+                "h7",
+                "h3",
+                "h11",
+                "h13",
+                "h8",
+                "h6",
+                "h10",
+                "h4",
+                "h15",
+                "h0",
+                "h16",
+                "keeper"
+              ]
+            },
+            "alternatives": []
+          }
+        },
+        {
+          "seed": "hh-balance-14",
+          "attempts": [
+            {
+              "variant": 0,
+              "solved": true,
+              "replayed": true,
+              "reason": "won",
+              "visited": 209,
+              "ms": 1629
+            }
+          ],
+          "accepted": {
+            "variant": 0,
+            "metrics": {
+              "turns": 140,
+              "strikes": 24,
+              "flares": 9,
+              "wards": 4,
+              "oils": 0,
+              "kills": 11,
+              "levelUps": 4,
+              "lightRefunded": 34,
+              "healthRefunded": 100,
+              "refillKills": 4,
+              "pureFlareKills": 0,
+              "twoFlareRefillKills": 0,
+              "consecutiveTwoFlareRefills": 0,
+              "consecutiveRefillKills": 0,
+              "unusedFood": 8,
+              "unusedCandles": 4,
+              "pocketTonics": 2,
+              "pocketOils": 2,
+              "finalHealth": 1,
+              "finalLight": 2,
+              "encounterOrder": [
+                "h1",
+                "h8",
+                "h3",
+                "h9",
+                "h0",
+                "h4",
+                "h2",
+                "h7",
+                "h10",
+                "h6",
+                "keeper"
+              ]
+            },
+            "alternatives": []
+          }
+        },
+        {
+          "seed": "hh-balance-15",
+          "attempts": [
+            {
+              "variant": 0,
+              "solved": false,
+              "replayed": false,
+              "reason": "exhausted",
+              "visited": 374,
+              "ms": 1490
+            },
+            {
+              "variant": 1,
+              "solved": true,
+              "replayed": true,
+              "reason": "won",
+              "visited": 145,
+              "ms": 911
+            }
+          ],
+          "accepted": {
+            "variant": 1,
+            "metrics": {
+              "turns": 142,
+              "strikes": 16,
+              "flares": 10,
+              "wards": 2,
+              "oils": 2,
+              "kills": 8,
+              "levelUps": 4,
+              "lightRefunded": 32,
+              "healthRefunded": 100,
+              "refillKills": 4,
+              "pureFlareKills": 1,
+              "twoFlareRefillKills": 0,
+              "consecutiveTwoFlareRefills": 0,
+              "consecutiveRefillKills": 2,
+              "unusedFood": 8,
+              "unusedCandles": 2,
+              "pocketTonics": 2,
+              "pocketOils": 3,
+              "finalHealth": 1,
+              "finalLight": 2,
+              "encounterOrder": [
+                "h0",
+                "h1",
+                "h5",
+                "h9",
+                "h10",
+                "h3",
+                "h7",
+                "keeper"
+              ]
+            },
+            "alternatives": []
+          }
+        }
+      ]
+    }
+  ],
+  "arithmetic": [
+    {
+      "ruleset": "classic",
+      "level": 1,
+      "enemies": 259,
+      "meanFlareHits": 3.058,
+      "affordableFlareKills": 99,
+      "wardSurvivalThresholds": 38,
+      "oilStrikeThresholds": 194
+    },
+    {
+      "ruleset": "classic",
+      "level": 3,
+      "enemies": 259,
+      "meanFlareHits": 2.355,
+      "affordableFlareKills": 175,
+      "wardSurvivalThresholds": 6,
+      "oilStrikeThresholds": 110
+    },
+    {
+      "ruleset": "classic",
+      "level": 5,
+      "enemies": 259,
+      "meanFlareHits": 1.869,
+      "affordableFlareKills": 216,
+      "wardSurvivalThresholds": 1,
+      "oilStrikeThresholds": 86
+    },
+    {
+      "ruleset": "classic",
+      "level": 7,
+      "enemies": 259,
+      "meanFlareHits": 1.641,
+      "affordableFlareKills": 239,
+      "wardSurvivalThresholds": 5,
+      "oilStrikeThresholds": 55
+    },
+    {
+      "ruleset": "power-flare",
+      "level": 1,
+      "enemies": 259,
+      "meanFlareHits": 4.745,
+      "affordableFlareKills": 18,
+      "wardSurvivalThresholds": 38,
+      "oilStrikeThresholds": 194
+    },
+    {
+      "ruleset": "power-flare",
+      "level": 3,
+      "enemies": 259,
+      "meanFlareHits": 3.058,
+      "affordableFlareKills": 99,
+      "wardSurvivalThresholds": 6,
+      "oilStrikeThresholds": 110
+    },
+    {
+      "ruleset": "power-flare",
+      "level": 5,
+      "enemies": 259,
+      "meanFlareHits": 2.355,
+      "affordableFlareKills": 175,
+      "wardSurvivalThresholds": 1,
+      "oilStrikeThresholds": 86
+    },
+    {
+      "ruleset": "power-flare",
+      "level": 7,
+      "enemies": 259,
+      "meanFlareHits": 1.869,
+      "affordableFlareKills": 216,
+      "wardSurvivalThresholds": 5,
+      "oilStrikeThresholds": 55
+    }
+  ],
+  "matchedRawZero": {
+    "seeds": [
+      "hh-balance-00",
+      "hh-balance-01",
+      "hh-balance-02",
+      "hh-balance-03",
+      "hh-balance-04",
+      "hh-balance-05",
+      "hh-balance-06",
+      "hh-balance-07",
+      "hh-balance-08",
+      "hh-balance-11",
+      "hh-balance-13",
+      "hh-balance-14"
+    ],
+    "cases": [
+      {
+        "name": "baseline-classic",
+        "turns": 1728,
+        "kills": 118,
+        "strikes": 211,
+        "flares": 107,
+        "wards": 25,
+        "oils": 7,
+        "twoFlareRefillKills": 5,
+        "unusedFood": 104,
+        "unusedCandles": 51
+      },
+      {
+        "name": "baseline-power-flare",
+        "turns": 1840,
+        "kills": 142,
+        "strikes": 273,
+        "flares": 117,
+        "wards": 24,
+        "oils": 12,
+        "twoFlareRefillKills": 2,
+        "unusedFood": 102,
+        "unusedCandles": 51
+      }
+    ]
+  }
+}

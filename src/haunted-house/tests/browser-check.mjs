@@ -9,8 +9,8 @@ import { fileURLToPath } from 'node:url';
 import { createGame } from '../generation.ts';
 import { act } from '../game.ts';
 import { solve } from '../solver.ts';
-import { SAVE_KEY, LEGACY_KEYS } from '../persistence.ts';
-import { baseFixture, addHaunting, addSupply, position } from './fixtures.mjs';
+import { SAVE_KEY, LEGACY_KEYS, COMPLETIONS_KEY } from '../persistence.ts';
+import { baseFixture, addHaunting, addSupply, addConnection, position } from './fixtures.mjs';
 
 const root = fileURLToPath(new URL('../../../', import.meta.url));
 const artifacts = resolve(root, '.haunted-checks');
@@ -92,7 +92,7 @@ try {
     await reload(); await action('continue');
   }
   async function key(key, autoRepeat = false) {
-    const virtual = { ArrowUp: 38, ArrowDown: 40, ArrowLeft: 37, ArrowRight: 39, Escape: 27 }[key] ?? key.toUpperCase().charCodeAt(0);
+    const virtual = { ArrowUp: 38, ArrowDown: 40, ArrowLeft: 37, ArrowRight: 39, Escape: 27, Enter: 13, Tab: 9, ' ': 32 }[key] ?? key.toUpperCase().charCodeAt(0);
     await command('Input.dispatchKeyEvent', { type: 'keyDown', key, code: key.length === 1 ? `Key${key.toUpperCase()}` : key, windowsVirtualKeyCode: virtual, autoRepeat });
     await command('Input.dispatchKeyEvent', { type: 'keyUp', key, windowsVirtualKeyCode: virtual });
   }
@@ -155,20 +155,86 @@ try {
     expected = act(expected, a).state; assert.deepEqual(await readState(), JSON.parse(JSON.stringify(expected)), JSON.stringify(a));
   }
   assert.equal((await readState()).status, 'won');
-  for (const width of [768, 390, 320]) {
-    await command('Emulation.setDeviceMetricsOverride', { width, height: 844, deviceScaleFactor: 1, mobile: width < 700 });
+  assert.ok(await evaluate('document.querySelector("dialog").innerText.includes("Playable tiles discovered")'));
+  await screenshot('completion-report-v4');
+  const recordCount = await evaluate(`JSON.parse(localStorage.getItem(${JSON.stringify(COMPLETIONS_KEY)})).length`);
+  await action('close-dialog'); await action('undo'); await action('leave');
+  assert.equal(await evaluate(`JSON.parse(localStorage.getItem(${JSON.stringify(COMPLETIONS_KEY)})).length`), recordCount, 're-ending does not duplicate completion records');
+  await reload(); await action('continue');
+  assert.equal(await evaluate(`JSON.parse(localStorage.getItem(${JSON.stringify(COMPLETIONS_KEY)})).length`), recordCount, 'loading completion does not duplicate records');
+  // Each viewport exercises fixed-position inspection, keyboard focus and a
+  // shrinking target (kill/collection) while the document is scrolled.
+  for (const [width, height] of [[1366,768], [1280,720], [1024,600], [768,1024], [390,700], [320,568], [667,375]]) {
+    await command('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: width <= 720 });
     fixture = baseFixture({ width: 9, height: 9 }); addHaunting(fixture); addSupply(fixture); await inject(fixture);
+    await evaluate('window.scrollTo(0,0)');
     assert.ok(await evaluate('document.documentElement.scrollWidth <= innerWidth + 1'), `${width}px page does not overflow`);
-    assert.ok(await evaluate('document.querySelector(".hh-tile").getBoundingClientRect().width >= 28'), `${width}px tiles stay usable`);
-    await tileClick(4, 3); await screenshot(`inspection-${width}-v3`);
-    if (width < 700) {
+    assert.ok(await evaluate('document.querySelector(".hh-tile").getBoundingClientRect().width >= 31.9'), `${width}px tiles stay usable`);
+    const scrollStart = await evaluate('scrollY');
+    await tileClick(4, 3);
+    assert.equal(await evaluate('scrollY'), scrollStart, `${width}px inspection never scrolls the page`);
+    assert.equal(await evaluate('document.activeElement.dataset.focus'), 'tile-hall-4-3', 'inspection retains tile focus');
+    if (width >= 768 && height >= 720) {
+      assert.ok(await evaluate('document.querySelector(".hh-board").getBoundingClientRect().top >= document.querySelector(".hh-resource-strip").getBoundingClientRect().bottom'), `${width}px board is not hidden by sticky stats`);
+      assert.ok(await evaluate('document.querySelector(".hh-board").getBoundingClientRect().bottom <= innerHeight'), `${width}px desktop/tablet full board visible`);
+      assert.ok(await evaluate('document.querySelector("[data-action=attack]").getBoundingClientRect().bottom <= innerHeight'), `${width}px preview and attack visible with board`);
+      assert.ok(await evaluate('document.querySelector("[data-action=ward]").getBoundingClientRect().bottom <= innerHeight'), `${width}px preparation visible with board and attack`);
+    }
+    await screenshot(`inspection-${width}x${height}-v4`);
+    await action('combat-details');
+    assert.ok(await evaluate('document.querySelector("#hh-combat-math").innerText.includes("6 power = 6 damage")'));
+    await action('combat-details');
+    assert.equal((await readState()).turns,0,'reading combat math is free');
+    if (width >= 768 && height >= 720) assert.ok(await evaluate('document.querySelector("[data-action=ward]").getBoundingClientRect().bottom <= innerHeight'), 'closing explanation returns to compact controls');
+    await evaluate('window.scrollTo(0, Math.min(260, document.documentElement.scrollHeight-innerHeight))');
+    const actionScroll = await evaluate('scrollY');
+    await action('flare-mode');
+    assert.equal(await evaluate('scrollY'), actionScroll, 'switching attack preview preserves viewport');
+    await action('strike-mode'); await action('attack');
+    assert.equal(await evaluate('scrollY'), actionScroll, 'attacking preserves viewport');
+    assert.equal(await evaluate('document.activeElement.dataset.focus'), 'attack', 'surviving attack retains attack focus');
+    await action('oil');
+    assert.equal(await evaluate('scrollY'), actionScroll, 'preparing oil preserves viewport');
+    assert.equal(await evaluate('document.activeElement.dataset.focus'), 'inspection', 'disabled preparation falls back to inspection focus');
+    assert.ok(await evaluate('document.querySelector(".hh-prepared").innerText.includes("Oil +4 prepared")'));
+    await action('ward');
+    assert.ok(await evaluate('document.querySelector(".hh-prepared").innerText.includes("Ward prepared")'));
+    await action('attack');
+    assert.equal(await evaluate('scrollY'), actionScroll, 'buffed attack preserves viewport');
+    await action('attack');
+    assert.equal(await evaluate('scrollY'), actionScroll, 'killing and clearing inspection does not clamp viewport');
+    await tileClick(2, 3); await action('use');
+    assert.equal(await evaluate('scrollY'), actionScroll, 'consuming and clearing inspection preserves viewport');
+    if (width <= 720) {
+      fixture = baseFixture({width:9,height:9}); addHaunting(fixture); await inject(fixture); await tileClick(4,3);
       await command('Emulation.setTouchEmulationEnabled', { enabled: true });
       await evaluate('document.querySelector("[data-action=attack]").scrollIntoView({block:"center"})');
+      const touchScroll = await evaluate('scrollY');
       const p = await evaluate('(() => { const r = document.querySelector("[data-action=attack]").getBoundingClientRect(); return {x:r.x+r.width/2,y:r.y+r.height/2}; })()');
       await command('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [p] }); await command('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
-      assert.equal((await readState()).turns, 1); await command('Emulation.setTouchEmulationEnabled', { enabled: false });
+      assert.equal((await readState()).turns, 1);
+      assert.equal(await evaluate('scrollY'), touchScroll, 'touch attack does not move viewport');
+      await command('Emulation.setTouchEmulationEnabled', { enabled: false });
+      await screenshot(`action-${width}x${height}-v4`);
     }
   }
+  // A visible stair endpoint offers local discovery before cross-room travel.
+  fixture = baseFixture(); const stairs = addConnection(fixture, {kind:'stairs'});
+  fixture.rooms[0].discovered[4 * fixture.rooms[0].width + 4] = false;
+  await inject(fixture); await tileClick(5,5);
+  assert.ok(await evaluate('document.querySelector("[data-action=stand]").innerText.includes("Stand on this landing")'));
+  await action('stand'); assert.equal((await readState()).turns,1); assert.equal((await readState()).player.roomId,'hall');
+  assert.equal((await readState()).rooms[0].discovered[4 * fixture.rooms[0].width + 4],true);
+  assert.equal(await evaluate('document.querySelector("[data-action=stand]").disabled'),true);
+  const landingScroll = await evaluate('scrollY'); await action('travel');
+  assert.equal((await readState()).turns,2); assert.equal((await readState()).player.roomId,stairs.b.roomId);
+  assert.equal(await evaluate('scrollY'),landingScroll,'travelling preserves viewport');
+  // Inspect/attack a remembered enemy without moving: viewing that room remains stable.
+  fixture = baseFixture(); addConnection(fixture); fixture.rooms[1].discovered.fill(true);
+  addHaunting(fixture,{position:position(3,3,'study')}); await inject(fixture);
+  await click('[data-action=room][data-id=study]'); await tileClick(3,3); await action('attack');
+  assert.equal((await readState()).player.roomId,'hall');
+  assert.equal(await evaluate('document.querySelector(".hh-room-heading h2").textContent'),'study');
   assert.equal(await evaluate("localStorage.getItem('unrelated-game-fixture')"), 'untouched');
   assert.deepEqual(exceptions, []); assert.deepEqual(badResponses, []);
   console.log('Browser checks passed: generated worker, complete UI witness, desktop/tablet/mobile, keyboard, touch, saves, confirmation and undo.');

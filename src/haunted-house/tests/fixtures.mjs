@@ -5,7 +5,7 @@ export function makeRoom(id = 'hall', { width = 7, height = 7, known = true, sol
 }
 export function baseFixture(options = {}) {
  const room = makeRoom('hall', options);
- const s = { version: SAVE_VERSION, seed: 'fixture', variant: 0, rooms: [room], hauntings: [], supplies: [], connections: [], player: position(3, 3), entrance: position(1, 1), resources: initialResources(), turns: 0, inventory: [], objective: { kind: 'escape', title: 'Escape', description: 'Find the key and leave.', completed: false }, journal: [], log: [], status: 'active', undo: [] };
+ const s = { version: SAVE_VERSION, ruleset: 'power-flare', seed: 'fixture', variant: 0, rooms: [room], hauntings: [], supplies: [], connections: [], player: position(3, 3), entrance: position(1, 1), resources: initialResources(), turns: 0, inventory: [], objective: { kind: 'escape', title: 'Escape', description: 'Find the key and leave.', completed: false }, journal: [], log: [], status: 'active', undo: [] };
  markTile(s, s.entrance, { kind: 'exit' }); return s;
 }
 export function markTile(s, p, tile) { const r = s.rooms.find(r => r.id === p.roomId); r.tiles[p.y * r.width + p.x] = tile; }

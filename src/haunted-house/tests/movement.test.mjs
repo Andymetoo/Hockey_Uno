@@ -49,3 +49,16 @@ test('locked door does not reveal other endpoint; tool is reusable and unlock an
  s.inventory.push('moth-key'); const a = act(s, { type: 'unlock', connectionId: c.id }); assert.equal(a.state.turns, 1); assert.equal(known(a.state, c.b), false); assert.deepEqual(a.state.inventory, ['moth-key']);
  const b = act(a.state, { type: 'travel', connectionId: c.id, from: c.a }); assert.equal(b.state.turns, 2); assert.equal(known(b.state, c.b), true);
 });
+
+test('standing on stairs reveals the local landing in one turn without travelling', () => {
+ const s = baseFixture({ known: false }); const c = addConnection(s, { kind: 'stairs' });
+ s.rooms[0].discovered[c.a.y * 7 + c.a.x] = true;
+ const stood = act(s, { type: 'move', to: c.a });
+ assert.equal(stood.committed, true); assert.equal(stood.state.turns, 1); assert.equal(stood.state.player.roomId, 'hall');
+ assert.equal(known(stood.state, position(4, 4)), true); assert.equal(known(stood.state, c.b), false);
+ assert.equal(act(stood.state, { type: 'move', to: c.a }).committed, false);
+ const travelled = act(stood.state, { type: 'travel', connectionId: c.id, from: c.a });
+ assert.equal(travelled.state.turns, 2); assert.deepEqual(travelled.state.player, c.b);
+ c.opened = false; assert.equal(act(s, { type: 'move', to: c.a }).committed, false);
+ assert.equal(act(s, { type: 'travel', connectionId: c.id, from: c.a }).committed, false);
+});

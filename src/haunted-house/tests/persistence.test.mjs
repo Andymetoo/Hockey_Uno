@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { loadGame, saveGame, parseSave, SAVE_KEY, LEGACY_KEYS } from '../persistence.ts';
 import { act } from '../game.ts';
-import { baseFixture, addHaunting, position } from './fixtures.mjs';
+import { baseFixture, addHaunting, addSupply, position } from './fixtures.mjs';
 const memory = () => { const data = new Map(); return { getItem: k => data.get(k) ?? null, setItem: (k, v) => data.set(k, v) }; };
 test('save resumes exact resources, fog, wounded enemies and full undo', () => {
  let s = baseFixture(); const h = addHaunting(s); s = act(s, { type: 'attack', hauntingId: h.id, mode: 'strike' }).state;
@@ -14,9 +14,27 @@ test('dead and resource-exhausted saves remain loadable', () => {
  const s = baseFixture(); s.resources.health = 1; const h = addHaunting(s); const dead = act(s, { type: 'attack', hauntingId: h.id, mode: 'strike', acceptDeath: true }).state;
  assert.equal(parseSave(JSON.stringify(dead)).kind, 'loaded'); s.resources.light = 0; s.resources.tonics = 0; assert.equal(parseSave(JSON.stringify(s)).kind, 'loaded');
 });
-test('v1 and v2 archives survive new saves and remain separately downloadable', () => {
+test('v1, v2 and v3 archives survive v4 saves and remain separately downloadable', () => {
  const store = memory(); LEGACY_KEYS.forEach((k, i) => store.setItem(k, `archive-${i}`)); const s = baseFixture(); saveGame(s, store);
- const r = loadGame(store); assert.equal(r.kind, 'loaded'); assert.equal(r.archives.length, 2); LEGACY_KEYS.forEach((k, i) => assert.equal(store.getItem(k), `archive-${i}`));
+ const r = loadGame(store); assert.equal(r.kind, 'loaded'); assert.equal(r.archives.length, 3); LEGACY_KEYS.forEach((k, i) => assert.equal(store.getItem(k), `archive-${i}`));
+});
+test('earlier combat rules are archived honestly instead of silently reinterpreted', () => {
+ const prior = { ...baseFixture(), version: 3 }; delete prior.ruleset;
+ const raw = JSON.stringify(prior), store = memory(); store.setItem('haunted-house.save.v3', raw);
+ const loaded = loadGame(store); assert.equal(loaded.kind, 'empty'); assert.equal(loaded.archives[0].raw, raw);
+ const parsed = parseSave(raw); assert.equal(parsed.kind, 'error'); assert.match(parsed.message, /require a new adventure/); assert.equal(parsed.raw, raw);
+ saveGame(baseFixture(), store); assert.equal(store.getItem('haunted-house.save.v3'), raw);
+ const unsupported = { ...baseFixture(), ruleset: 'classic' }; assert.equal(parseSave(JSON.stringify(unsupported)).kind, 'error');
+});
+test('new ingredients and both prepared buffs roundtrip and undo exactly', () => {
+ let s = baseFixture(); s.runId = 'prepared-content';
+ addHaunting(s, { trait: 'smouldering', hp: 9, maxHp: 20 });
+ const charm = addSupply(s, 'vitality', { amount: 4 });
+ s = act(s, { type: 'use', supplyId: charm.id }).state;
+ s = act(s, { type: 'oil' }).state; s = act(s, { type: 'ward' }).state;
+ const parsed = parseSave(JSON.stringify(s)); assert.equal(parsed.kind, 'loaded'); assert.deepEqual(parsed.state, s);
+ assert.equal(parsed.state.resources.ward, true); assert.equal(parsed.state.resources.empowered, true);
+ assert.deepEqual(act(parsed.state, { type: 'undo' }).state, act(s, { type: 'undo' }).state);
 });
 test('bad saves are preserved and storage failures are reported', () => {
  const store = memory(); store.setItem(SAVE_KEY, '{bad'); const r = loadGame(store); assert.equal(r.kind, 'error'); assert.equal(r.raw, '{bad'); assert.equal(store.getItem(SAVE_KEY), '{bad');
@@ -25,7 +43,7 @@ test('bad saves are preserved and storage failures are reported', () => {
 });
 test('malformed current and historical state, invalid references, oversized files are rejected', () => {
  const s = baseFixture(); const valid = act(s, { type: 'move', to: position(1, 2) }).state;
- const changes = [x => x.resources.health = -1, x => x.player.x = 99, x => x.rooms[0].discovered.pop(), x => x.undo[0].hp.push(4), x => x.undo[0].resources.power = 'six', x => x.inventory.push('fake-key'), x => x.rooms[0].tiles[10] = { kind: 'door', connectionId: 'missing' }];
+ const changes = [x => x.resources.health = -1, x => x.player.x = 99, x => x.rooms[0].discovered.pop(), x => x.undo[0].hp.push(4), x => x.undo[0].resources.power = 'six', x => x.inventory.push('fake-key'), x => x.ruleset = 'future-rules', x => x.runId = '', x => x.rooms[0].tiles[10] = { kind: 'door', connectionId: 'missing' }];
  for (const change of changes) { const x = structuredClone(valid); change(x); assert.equal(parseSave(JSON.stringify(x)).kind, 'error'); }
  assert.equal(parseSave('x'.repeat(12000001)).kind, 'error');
 });
