@@ -1,0 +1,103 @@
+/** Experimental v3 rules. Values here are intentionally editable, not balance claims. */
+export const DEFAULT_CONFIG = Object.freeze({
+  startingOfficer: 3, startingEnlisted: 5,
+  missionEnemy: 15, missionResource: 20, combatHit: 20, combatMiss: 13,
+  bf109Cards: 10, bf110Cards: 6, fw190Cards: 5, me262Cards: 3, flakCards: 4,
+  maxFighters: 3, flakShots: 2, spawnFacing: 0, clearFighters: true, unavailableDraws: true,
+  fireCap: 4, repairCap: 3, engineerBonus: 1, eightWayWork: false,
+  extinguishLeavesDamage: true, crewBlocksFirstFire: true,
+  medicalDuration: 1, repairDuration: 1, fireDuration: 1,
+  repairCost: 1, fireCost: 1, medicalCost: 1, escortCost: 1, orderShotCost: 1,
+  conversionRate: 2, restartMax: 4,
+  startingAltitude: 5, controlOfficerMin: 3, controlEnlistedMin: 5,
+  structureSafe: 1, structureMid: 3, structureFatal: 6, structureMidMin: 3, structureHighMin: 5,
+  enginesSafe: 1, enginesMid: 2, enginesAuto: 4, enginesMidMin: 3, enginesHighMin: 5,
+  outboundLength: 6, returnLength: 4, bombingMin: 3, animationMs: 750,
+});
+
+const number = (key, label, group, min = 0, max = 40, step = 1) => ({ key, label, group, type: 'number', min, max, step });
+const boolean = (key, label, group) => ({ key, label, group, type: 'boolean' });
+export const CONFIG_FIELDS = [
+  number('startingOfficer', 'Starting Officer resources', 'Bags & resources'),
+  number('startingEnlisted', 'Starting Enlisted resources', 'Bags & resources'),
+  number('missionEnemy', 'Mission Enemy tokens', 'Bags & resources', 0, 100),
+  number('missionResource', 'Mission Resource tokens', 'Bags & resources', 0, 100),
+  number('combatHit', 'Combat Hit tokens', 'Bags & resources', 0, 100),
+  number('combatMiss', 'Combat Miss tokens', 'Bags & resources', 0, 100),
+  number('bf109Cards', 'BF-109 cards', 'Enemy deck'),
+  number('bf110Cards', 'BF-110 cards', 'Enemy deck'),
+  number('fw190Cards', 'FW-190 cards', 'Enemy deck'),
+  number('me262Cards', 'Me-262 cards', 'Enemy deck'),
+  number('flakCards', 'Flak cards (provisional)', 'Enemy deck'),
+  number('maxFighters', 'Active fighter cap', 'Enemy pressure', 1, 3),
+  number('flakShots', 'Shots per Flak event', 'Enemy pressure', 1, 8),
+  { key: 'spawnFacing', label: 'Fighter spawn facing', group: 'Enemy pressure', type: 'select', options: [{ value: 0, label: 'Toward B-17' }, { value: 90, label: '90° off-angle' }] },
+  boolean('clearFighters', 'Clear fighters at round end', 'Enemy pressure'),
+  boolean('unavailableDraws', 'Unavailable crew still make mission draws', 'Enemy pressure'),
+  number('fireCap', 'Fire Control square cap', 'Crisis work', 1, 12),
+  number('repairCap', 'Repair square cap', 'Crisis work', 1, 12),
+  number('engineerBonus', 'Engineer additional repair squares', 'Crisis work', 0, 6),
+  boolean('eightWayWork', 'Allow diagonal work connections', 'Crisis work'),
+  boolean('extinguishLeavesDamage', 'Extinguished fire leaves Damage', 'Crisis work'),
+  boolean('crewBlocksFirstFire', 'Healthy crew stop first fire spread', 'Crisis work'),
+  number('medicalDuration', 'Medical duration (round starts)', 'Crisis work', 0, 4),
+  number('repairDuration', 'Repair duration (round starts)', 'Crisis work', 0, 4),
+  number('fireDuration', 'Fire Control duration (round starts)', 'Crisis work', 0, 4),
+  number('repairCost', 'Repair resource cost', 'Action costs', 0, 5),
+  number('fireCost', 'Fire Control resource cost', 'Action costs', 0, 5),
+  number('medicalCost', 'Medical resource cost', 'Action costs', 0, 5),
+  number('escortCost', 'Escort Enlisted resource cost', 'Action costs', 0, 5),
+  number('orderShotCost', 'Ordered Basic Shot Officer cost', 'Action costs', 0, 5),
+  number('conversionRate', 'Copilot conversion input per 1 output', 'Action costs', 1, 5),
+  number('restartMax', 'Engine restart succeeds on d6 ≤', 'Altitude & engines', 1, 6),
+  number('startingAltitude', 'Starting altitude (0 = ground)', 'Altitude & engines', 1, 12),
+  number('controlOfficerMin', 'Officer control succeeds on d6 ≥', 'Altitude & engines', 1, 6),
+  number('controlEnlistedMin', 'Enlisted control succeeds on d6 ≥', 'Altitude & engines', 1, 6),
+  number('structureSafe', 'Structure: safe up to compromised sections', 'Altitude & engines', 0, 7),
+  number('structureMid', 'Structure: middle tier up to sections', 'Altitude & engines', 1, 7),
+  number('structureFatal', 'Structure: destruction at sections', 'Altitude & engines', 1, 8),
+  number('structureMidMin', 'Structure middle tier: d6 ≥', 'Altitude & engines', 1, 6),
+  number('structureHighMin', 'Structure high tier: d6 ≥', 'Altitude & engines', 1, 6),
+  number('enginesSafe', 'Engines: safe up to stopped engines', 'Altitude & engines', 0, 3),
+  number('enginesMid', 'Engines: middle tier up to stopped', 'Altitude & engines', 1, 3),
+  number('enginesAuto', 'Engines: automatic loss at stopped', 'Altitude & engines', 1, 4),
+  number('enginesMidMin', 'Engines middle tier: d6 ≥', 'Altitude & engines', 1, 6),
+  number('enginesHighMin', 'Engines high tier: d6 ≥', 'Altitude & engines', 1, 6),
+  number('outboundLength', 'Rounds to target', 'Mission & presentation', 1, 20),
+  number('returnLength', 'Rounds from target to HOME', 'Mission & presentation', 1, 20),
+  number('bombingMin', 'Provisional bombing success: d6 ≥', 'Mission & presentation', 1, 6),
+  number('animationMs', 'Event delay ms (0 = instant)', 'Mission & presentation', 0, 3000, 50),
+];
+
+/** Ignore unknown keys, coerce form input, and prevent impossible empty token systems. */
+export function normalizeConfig(overrides = {}) {
+  const config = { ...DEFAULT_CONFIG };
+  for (const field of CONFIG_FIELDS) {
+    const value = overrides[field.key];
+    if (value === undefined || value === null || value === '') continue;
+    if (field.type === 'boolean') config[field.key] = value === true || value === 'true';
+    else if (field.type === 'select') {
+      const option = field.options.find((item) => String(item.value) === String(value));
+      if (option) config[field.key] = option.value;
+    } else if (Number.isFinite(Number(value))) {
+      config[field.key] = Math.min(field.max, Math.max(field.min, Math.round(Number(value))));
+    }
+  }
+  if (config.missionEnemy + config.missionResource === 0) config.missionResource = 1;
+  if (config.combatHit + config.combatMiss === 0) config.combatMiss = 1;
+  if (config.bf109Cards + config.bf110Cards + config.fw190Cards + config.me262Cards + config.flakCards === 0) config.flakCards = 1;
+  config.structureMid = Math.max(config.structureSafe, config.structureMid);
+  config.structureFatal = Math.max(config.structureMid + 1, config.structureFatal);
+  config.enginesMid = Math.max(config.enginesSafe, config.enginesMid);
+  config.enginesAuto = Math.max(config.enginesMid + 1, config.enginesAuto);
+  return config;
+}
+
+export const ENEMY_DEFS = Object.freeze({
+  'BF-109': { name: 'BF-109', hp: 2, countKey: 'bf109Cards', abilities: [] },
+  'BF-110': { name: 'BF-110', hp: 2, countKey: 'bf110Cards', abilities: [] },
+  'FW-190': { name: 'FW-190', hp: 3, countKey: 'fw190Cards', abilities: [] },
+  'Me-262': { name: 'Me-262', hp: 4, countKey: 'me262Cards', abilities: [] },
+});
+
+export const RESOURCE_BY_RANK = Object.freeze({ Officer: 'Officer', Enlisted: 'Enlisted' });
