@@ -42,7 +42,7 @@ try {
     gunner.fighters = [fighter('before-enemies', { hp:3, maxHp:3 })];
     gunner.bags.combat = { tokens:['Hit'], discard:[] };
     await inject(gunner);
-    assert.equal(await evaluate("!!document.querySelector('[data-ui=opportunity]')"), false, 'no shot before the normal action');
+    assert.equal(await evaluate("document.querySelector('[data-ui=opportunity]').classList.contains('unavailable')"), true, 'persistent Opportunity is disabled before a legal shot exists');
     await choose('wait'); await click('#choice-form button[type="submit"]'); await flush();
     assert.equal((await getState()).phase, 'opportunity');
     assert.equal((await getState()).crew.find(c => c.id === 'engineer').activationCompleted, true);
@@ -65,7 +65,7 @@ try {
     const continued = await eventTypes();
     assert.equal(continued.filter(e => e === 'ENEMY_PHASE_STARTED').length, 1);
     assert.ok(continued.includes('ATTACK_DISRUPTED'));
-    assert.equal(await evaluate("!!document.querySelector('[data-ui=opportunity]')"), false, 'window closes before next activation');
+    assert.equal((await getState()).phase, 'select', 'Continue returns to crew selection after resolving the enemy phase');
     assert.ok(await evaluate('document.documentElement.scrollWidth <= innerWidth + 1'));
   }
   note('Desktop and 320/360/390 touch: shared Intercept preference and an explicit completed-action Opportunity window before one enemy phase');
@@ -73,15 +73,14 @@ try {
   const pilot = activated('pilot'); pilot.opportunity = 0;
   Object.assign(pilot.crew.find(c => c.id === 'engineer'), { used:true, activationCompleted:true });
   pilot.fighters = [fighter('pilot-order', { hp:3, maxHp:3 })]; pilot.bags.combat = { tokens:['Hit'], discard:[] };
-  await inject(pilot); await choose('directFire'); await click('#choice-form button[type="submit"]'); await flush();
-  assert.equal((await getState()).phase, 'opportunity'); assert.equal((await getState()).opportunity, 1);
-  assert.equal((await eventTypes()).includes('ENEMY_PHASE_STARTED'), false);
-  await touch('[data-ui="opportunity"]'); await touch('#crew-list [data-crew="engineer"]');
-  await touch('#enemies [data-fighter="pilot-order"]'); await click('[data-ui="confirm-target"]'); await flush();
-  assert.equal((await getState()).fighters[0].hp, 2); assert.equal((await getState()).phase, 'opportunity');
-  await touch('[data-command="continueEnemyPhase"]'); await flush();
+  await inject(pilot); await choose('directFire');
+  await touch('#crew-list [data-crew="engineer"]'); await touch('#enemies [data-fighter="pilot-order"]'); await flush();
+  assert.equal((await getState()).phase, 'select'); assert.equal((await getState()).opportunity, 0);
+  assert.equal((await getState()).fighters[0].hp, 2);
+  assert.equal((await eventTypes()).filter(e => e === 'GUNNER_SHOT_ROLL').length, 1);
   assert.equal((await eventTypes()).filter(e => e === 'ENEMY_PHASE_STARTED').length, 1);
-  note('Pilot Direct Fire immediately opens the pre-enemy window and its new Opportunity can be spent before the enemy phase');
+  assert.equal((await getState()).crew.find(c => c.id === 'engineer').used, true);
+  note('Pilot Direct Fire immediately fires an already tapped gunner without creating Opportunity or changing that gunner’s activation');
 
   const medical = activated('pilot');
   medical.crew.find(c => c.id === 'radio').health = 'injured';

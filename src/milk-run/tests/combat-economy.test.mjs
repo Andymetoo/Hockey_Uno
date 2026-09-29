@@ -70,19 +70,21 @@ test('Disruption cancels the next facing-in attack without a roll, still flies b
   assert.ok(types.indexOf('ATTACK_DISRUPTED') < types.indexOf('FIGHTER_MOVED'));
 });
 
-test('Disruption persists across ordinary rotation phases and cancels only a would-be attack', () => {
+test('Disruption clears after the facing-away rotation, then the following action attacks normally', () => {
   let state = action(shotState(['Hit']), 'basicFire', { targetId: 'f1' }).state;
   assert.equal(state.fighters[0].facing, 90);
+  state.fighters[0].disrupted = true;
+  state.fighters[0].facing = 90;
   assert.equal(state.fighters[0].disrupted, true);
   state.phase = 'action'; state.activeCrew = 'pilot';
   let result = action(state, 'wait');
   assert.equal(result.state.fighters[0].facing, 0);
-  assert.equal(result.state.fighters[0].disrupted, true);
-  assert.equal(result.events.some(event => event.type === 'ATTACK_DISRUPTED'), false);
+  assert.equal(result.state.fighters[0].disrupted, false);
+  assert.equal(result.events.some(event => event.type === 'DISRUPT_CLEARED'), true);
   state = result.state; state.phase = 'action'; state.activeCrew = 'pilot';
   result = action(state, 'wait');
-  assert.equal(result.state.fighters[0].disrupted, false);
-  assert.equal(result.events.filter(event => event.type === 'ATTACK_DISRUPTED').length, 1);
+  assert.equal(result.events.filter(event => event.type === 'ATTACK_DISRUPTED').length, 0);
+  assert.equal(result.events.filter(event => event.type === 'ENEMY_ATTACK').length, 1);
 });
 
 test('Disruption can be disabled and misses never disrupt', () => {
@@ -93,7 +95,7 @@ test('Disruption can be disabled and misses never disrupt', () => {
   }
 });
 
-test('a fresh Escort hit during a cancelled attack flyby can apply a new Disruption', () => {
+test('Escort hit during a cancelled attack flyby does not apply Disruption', () => {
   const state = activated('pilot', { disruptOnHit: true });
   state.fighters = [fighter('f1', { hp: 3, maxHp: 3, facing: 0, disrupted: true })];
   state.escorts = [{ id: 'escort', quadrant: 'Port', round: 1 }];
@@ -101,13 +103,13 @@ test('a fresh Escort hit during a cancelled attack flyby can apply a new Disrupt
   const result = action(state, 'wait');
   assert.equal(result.state.fighters[0].quadrant, 'Port');
   assert.equal(result.state.fighters[0].hp, 2);
-  assert.equal(result.state.fighters[0].disrupted, true);
+  assert.equal(result.state.fighters[0].disrupted, false);
   assert.equal(result.events.filter(event => event.type === 'ATTACK_DISRUPTED').length, 1);
-  assert.equal(result.events.filter(event => event.type === 'FIGHTER_DISRUPTED').length, 1);
+  assert.equal(result.events.filter(event => event.type === 'FIGHTER_DISRUPTED').length, 0);
   assert.equal(result.state.stats.enemyAttacks, 0);
 });
 
-test('Escort damage disrupts survivors, while Escort kills award one capped Opportunity', () => {
+test('Escort damage does not Disrupt survivors and Escort kills do not award Opportunity', () => {
   for (const hp of [1, 2]) {
     const state = fresh({ disruptOnHit: true, opportunityEnabled: true, opportunityOnKill: true });
     state.opportunity = 1;
@@ -116,12 +118,12 @@ test('Escort damage disrupts survivors, while Escort kills award one capped Oppo
     const { events, emit } = collect();
     postAttackPosition(state, 'f1', emit, { quadrant: 'Port', altitude: 'High' });
     if (hp === 2) {
-      assert.equal(state.fighters[0].disrupted, true);
+      assert.equal(Boolean(state.fighters[0].disrupted), false);
       assert.equal(state.opportunity, 1);
     } else {
       assert.equal(state.fighters.length, 0);
-      assert.equal(state.opportunity, 2);
-      assert.equal(events.filter(event => event.type === 'OPPORTUNITY_GAINED').length, 1);
+      assert.equal(state.opportunity, 1);
+      assert.equal(events.filter(event => event.type === 'OPPORTUNITY_GAINED').length, 0);
     }
   }
 });
@@ -193,19 +195,20 @@ test('Opportunity Shot rejects unavailable, unused, displaced, burning-station a
   assert.ok(opportunityGunners(opportunityState(['Hit'])).some(crew => crew.id === 'engineer'));
 });
 
-test('Pilot Direct Fire spends one Officer to gain Opportunity and never shoots; normal enemy phase still follows', () => {
+test('Pilot Direct Fire spends one Officer and immediately makes one basic gun shot', () => {
   const state = activated('pilot', { opportunityEnabled: true, directFireCost: 1 });
   state.opportunity = 1;
-  const result = action(state, 'directFire');
+  state.fighters = [fighter('f1', { hp: 3, maxHp: 3, facing: 90 })];
+  state.bags.combat = { tokens: ['Hit'], discard: [] };
+  const result = action(state, 'directFire', { gunnerId: 'engineer', targetId: 'f1' });
   assert.equal(result.state.resources.Officer, state.resources.Officer - 1);
-  assert.equal(result.state.opportunity, 2);
+  assert.equal(result.state.opportunity, 1);
   assert.deepEqual(result.state.bags.mission.discard, ['Resource']);
   assert.equal(result.events.filter(event => event.type === 'ENEMY_PHASE_STARTED').length, 1);
-  assert.equal(result.events.some(event => event.type === 'GUNNER_SHOT_ROLL'), false);
+  assert.equal(result.events.filter(event => event.type === 'GUNNER_SHOT_ROLL').length, 1);
+  assert.equal(result.state.fighters[0].hp, 2);
   assert.equal(result.state.stats.missionDraws, state.stats.missionDraws);
-  assert.equal(availableActions(state, 'pilot').some(item => item.id === 'orderShot'), false);
-  assert.throws(() => action(state, 'orderShot'), /not available/i);
-  for (const alter of [s => { s.opportunity = s.config.opportunityCap; }, s => { s.config.opportunityEnabled = false; }, s => { s.resources.Officer = 0; }]) {
+  for (const alter of [s => { s.fighters = []; }, s => { s.resources.Officer = 0; }]) {
     const invalid = structuredClone(state); alter(invalid);
     assert.equal(availableActions(invalid, 'pilot').find(item => item.id === 'directFire').enabled, false);
     assert.throws(() => action(invalid, 'directFire'));

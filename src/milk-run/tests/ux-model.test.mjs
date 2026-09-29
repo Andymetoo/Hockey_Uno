@@ -9,8 +9,8 @@ test('gun preview and crew selection helpers are pure before activation', () => 
   const state = dispatch(fresh(), { type: 'startRound' }).state;
   state.fighters = [fighter('legal'), fighter('wrong-altitude', { altitude: 'Low' }), fighter('wrong-quadrant', { quadrant: 'Aft' })];
   const before = structuredClone(state), navigator = state.crew.find(c => c.id === 'navigator');
-  assert.deepEqual(arcPreview(state, 'navigator').fighterIds, ['legal']);
-  assert.deepEqual(new Set(arcPreview(state, 'navigator').sectors), new Set(['Fore/High', 'Fore/Level']));
+  assert.deepEqual(arcPreview(state, 'navigator').fighterIds, ['legal', 'wrong-altitude']);
+  assert.deepEqual(new Set(arcPreview(state, 'navigator').sectors), new Set(['Fore/High', 'Fore/Level', 'Fore/Low']));
   assert.equal(crewStatus(state, navigator, true).id, 'selected');
   assert.equal(availableCount(state), 10);
   assert.deepEqual(state, before, 'preview consumes no action, token, resource, or RNG');

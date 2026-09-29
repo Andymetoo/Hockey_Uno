@@ -98,7 +98,7 @@ test('activation alone cannot qualify a gunner; finishing the normal action open
   assert.equal(member(s, 'engineer').used, true);
   assert.equal(member(s, 'engineer').activationCompleted, false);
   assert.equal(opportunityAvailability(s).enabled, false);
-  assert.throws(() => command(s, { type: 'opportunityShot', gunnerId: 'engineer', targetId: 'target' }), /after the crew action/i);
+  assert.throws(() => command(s, { type: 'opportunityShot', gunnerId: 'engineer', targetId: 'target' }));
   const result = dispatch(s, { type: 'action', action: 'basicFire', targetId: 'target' });
   assert.equal(result.state.phase, 'opportunity');
   assert.equal(member(result.state, 'engineer').activationCompleted, true);
@@ -119,20 +119,23 @@ test('activation alone cannot qualify a gunner; finishing the normal action open
   assert.throws(() => command(continued.state, { type: 'continueEnemyPhase' }), /only from/i);
 });
 
-test('Pilot-created Opportunity is spendable immediately, with repeated kill chains and explicit Continue', () => {
+test('Opportunity kills chain normally and explicit Continue resolves the enemy queue', () => {
   let s = command(fresh({ startingOpportunity: 0 }), { type: 'startRound' });
   s = command(s, { type: 'activate', crewId: 'engineer' });
   s = action(s, 'wait');
   s = command(s, { type: 'activate', crewId: 'pilot' });
   s.fighters = ['one', 'two', 'three'].map(id => fighter(id));
+  s.crew.find(c => c.id === 'engineer').used = true;
+  s.crew.find(c => c.id === 'engineer').activationCompleted = true;
+  s.opportunity = 1;
   s.bags.combat = { tokens: ['Burst'], discard: [] };
   const officer = s.resources.Officer, draws = s.stats.missionDraws, slot = s.slot;
-  const direct = dispatch(s, { type: 'action', action: 'directFire' });
+  const direct = dispatch(s, { type: 'action', action: 'wait' });
   s = direct.state;
-  assert.equal(s.resources.Officer, officer - 1);
+  assert.equal(s.resources.Officer, officer);
   assert.equal(s.phase, 'opportunity');
   assert.equal(s.opportunity, 1);
-  assert.equal(direct.events.some(e => e.type === 'ENEMY_PHASE_STARTED' || e.type === 'GUNNER_SHOT_ROLL'), false);
+  assert.equal(direct.events.some(e => e.type === 'ENEMY_PHASE_STARTED'), false);
   for (const targetId of ['one', 'two', 'three']) {
     s = command(s, { type: 'opportunityShot', gunnerId: 'engineer', targetId });
     assert.equal(s.opportunity, 1, 'kill returns the spent Opportunity and can chain');
@@ -163,8 +166,8 @@ test('Continue may decline all shots and eligibility resets next round', () => {
   assert.ok(s.crew.every(c => !c.activationCompleted));
 });
 
-test('Opportunity is unavailable outside its window and auto-skips when no legal shot exists', () => {
-  for (const phase of ['ready', 'select', 'action', 'roundEnd', 'bombing']) {
+test('Opportunity is unavailable outside open decision windows and auto-skips when no legal shot exists', () => {
+  for (const phase of ['ready', 'action', 'roundEnd', 'bombing']) {
     const s = activated('engineer');
     s.phase = phase; s.fighters = [fighter()]; member(s, 'engineer').activationCompleted = true;
     assert.equal(opportunityAvailability(s).enabled, false);

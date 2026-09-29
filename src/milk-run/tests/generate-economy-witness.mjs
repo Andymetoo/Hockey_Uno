@@ -75,7 +75,11 @@ function actionChoice(state, crewId) {
   const engine = stopped.find(engine => BOARD.filter(cell => cell.engine === engine.id).every(cell => state.cells[cell.id] === 'healthy'));
   if (engine) add('restartEngine', stopped.length >= 2 ? 120 : 55, { targetId: engine.id });
   add('escort', state.slot <= 3 ? 97 : state.slot <= 6 ? 55 : 10);
-  add('directFire', state.opportunity === 0 ? 70 : 40);
+  if (allowed.has('directFire')) {
+    const candidate = state.crew.flatMap(gunner => rankedTargets(state, gunner.id).map(target => ({ gunner, target })))
+      .find(pair => pair.gunner.id !== crewId);
+    if (candidate) add('directFire', state.opportunity === 0 ? 70 : 40, { gunnerId: candidate.gunner.id, targetId: candidate.target.id });
+  }
   const exchange = conversionOptions(state).find(option => option.to === 'Enlisted' && option.enabled);
   if (exchange) add('convert', state.resources.Enlisted < 3 ? 105 : state.resources.Enlisted < 6 ? 62 : 8, { to: 'Enlisted' });
   const threat = state.fighters.filter(fighter => fighter.facing < 180 && !fighter.disrupted).sort((a, b) => priority(b) - priority(a))[0];

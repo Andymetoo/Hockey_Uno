@@ -37,28 +37,24 @@ test('Copilot alone converts resources at 2:1 and preserves the physical token t
   assert.throws(() => action(ordinary, 'convert', { to: 'Enlisted' }), /available/i);
 });
 
-test('Pilot Direct Fire creates Opportunity before the enemy phase for a completed gunner', () => {
+test('Pilot Direct Fire immediately fires an untapped gunner without changing Opportunity or gunner state', () => {
   const state = activated('pilot');
-  state.crew.find(c=>c.id==='engineer').used = true;
-  state.crew.find(c=>c.id==='engineer').activationCompleted = true;
+  state.crew.find(c=>c.id==='engineer').used = false;
+  state.crew.find(c=>c.id==='engineer').activationCompleted = false;
   state.fighters = [fighter('f1', { hp: 4, maxHp: 4, facing: 180 })];
   state.bags.combat = { tokens: ['Hit','Hit','Hit'], discard: [] };
-  const result = action(state, 'directFire');
-  assert.equal(result.state.fighters[0].hp, 4, 'Direct Fire creates the currency rather than firing a gun');
-  assert.equal(result.state.opportunity, state.opportunity + 1);
+  const result = action(state, 'directFire', { gunnerId: 'engineer', targetId: 'f1' });
+  assert.equal(result.state.fighters[0].hp, 3, 'Direct Fire is one Basic pull');
+  assert.equal(result.state.opportunity, state.opportunity);
+  assert.equal(result.state.stats.opportunityGained, 0);
+  assert.equal(result.state.crew.find(c=>c.id==='engineer').used, false);
+  assert.equal(result.state.crew.find(c=>c.id==='engineer').activationCompleted, false);
   assert.equal(result.state.stats.missionDraws, state.stats.missionDraws);
   assert.equal(result.state.slot, state.slot);
-  assert.equal(result.state.phase, 'opportunity');
-  assert.equal(result.events.filter(e=>e.type==='ENEMY_PHASE_STARTED').length, 0);
-  assert.equal(result.events.filter(e=>e.type==='GUNNER_SHOT_ROLL').length, 0);
+  assert.equal(result.state.phase, 'select');
+  assert.equal(result.events.filter(e=>e.type==='ENEMY_PHASE_STARTED').length, 1, 'the Pilot activation gets its ordinary enemy phase');
+  assert.equal(result.events.filter(e=>e.type==='GUNNER_SHOT_ROLL').length, 1);
   assert.equal(result.state.resources.Officer, state.resources.Officer - 1);
-  const shot=dispatch(result.state,{type:'opportunityShot',gunnerId:'engineer',targetId:'f1'});
-  assert.equal(shot.state.fighters[0].hp,3);
-  assert.equal(shot.state.opportunity,result.state.opportunity-1);
-  assert.equal(shot.state.stats.missionDraws,result.state.stats.missionDraws);
-  assert.equal(shot.state.slot,result.state.slot);assert.equal(shot.state.phase,result.state.phase);
-  assert.equal(shot.events.filter(e=>e.type==='ENEMY_PHASE_STARTED').length,0);
-  assert.equal(shot.events.filter(e=>e.type==='GUNNER_SHOT_ROLL').length,1);
 });
 
 test('unavailable slots occur after active crew, waste resource draws, and still resolve enemy phases', () => {

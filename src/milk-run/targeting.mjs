@@ -1,12 +1,12 @@
-import { legalTargets, eligibleCrisisTargets, eligibleMedicalTargets, crisisTargetCap, connectedTargetSelection, legalWorkPositions, opportunityGunners, opportunityAvailability } from './rules.mjs';
+import { legalTargets, eligibleCrisisTargets, eligibleMedicalTargets, crisisTargetCap, connectedTargetSelection, legalWorkPositions, opportunityGunners, opportunityAvailability, directFireGunners } from './rules.mjs';
 
-export const DIRECT_ACTIONS = ['basicFire','advancedFire','opportunityShot','rotateFighter','repair','fireControl','medical'];
-export function beginTargeting(action, crewId) { return {action,crewId,cells:[],targetId:null,workCellId:null,gunnerId:null,stage:action==='opportunityShot'?'gunner':'target'}; }
-export function selectableGunners(s) {return opportunityGunners(s);}
+export const DIRECT_ACTIONS = ['basicFire','advancedFire','opportunityShot','directFire','rotateFighter','repair','fireControl','medical'];
+export function beginTargeting(action, crewId) { return {action,crewId,cells:[],targetId:null,workCellId:null,gunnerId:null,stage:['opportunityShot','directFire'].includes(action)?'gunner':'target'}; }
+export function selectableGunners(s,action='opportunityShot') {return action==='directFire'?directFireGunners(s):opportunityGunners(s);}
 export function targetOptions(s,t) {
   if(!t)return {fighters:[],cells:[],crew:[],work:[]};
-  const fighters=t.action==='rotateFighter'?s.fighters.filter(f=>f.facing<180):['basicFire','advancedFire','opportunityShot'].includes(t.action)?legalTargets(s,t.gunnerId??t.crewId):[];
-  const crew=t.stage==='gunner'?selectableGunners(s):t.action==='medical'?eligibleMedicalTargets(s,t.crewId):[];
+  const fighters=t.action==='rotateFighter'?s.fighters.filter(f=>f.facing<180):['basicFire','advancedFire','opportunityShot','directFire'].includes(t.action)?legalTargets(s,t.gunnerId??t.crewId):[];
+  const crew=t.stage==='gunner'?selectableGunners(s,t.action):t.action==='medical'?eligibleMedicalTargets(s,t.crewId):[];
   const cells=['repair','fireControl'].includes(t.action)?eligibleCrisisTargets(s,t.action).filter(c=>t.cells.includes(c.id)||t.cells.length<crisisTargetCap(s,t.crewId,t.action)&&(!t.cells.length||connectedTargetSelection(s,t.action,[...t.cells,c.id]))):[];
   const workTargets=t.action==='medical'?(s.crew.find(c=>c.id===t.targetId)?.position??[]):t.cells;
   return {fighters:fighters.map(f=>f.id),crew:crew.map(c=>c.id),cells:cells.map(c=>c.id),work:workTargets.length?legalWorkPositions(s,t.crewId,workTargets).map(c=>c.id):[]};
@@ -27,6 +27,7 @@ export function needsWorkPosition(t) {return ['repair','fireControl','medical'].
 export function canConfirm(s,t) {
   if(!t)return false;
   if(t.action==='opportunityShot'&&(!opportunityAvailability(s).enabled||!opportunityGunners(s).some(c=>c.id===t.gunnerId)))return false;
+  if(t.action==='directFire'&&!directFireGunners(s).some(c=>c.id===t.gunnerId))return false;
   const options=targetOptions(s,t);
   if(needsWorkPosition(t))return (t.action==='medical'?options.crew.includes(t.targetId):t.cells.length>0)&&t.stage==='work'&&options.work.includes(t.workCellId);
   return options.fighters.includes(t.targetId);

@@ -40,6 +40,7 @@ async function layout(label, mobile) {
     const rect = e => { const r=e.getBoundingClientRect(); return {x:r.x,y:r.y,width:r.width,height:r.height,right:r.right,bottom:r.bottom}; };
     return {width:innerWidth,scrollWidth:document.documentElement.scrollWidth,board:rect(document.querySelector('#board svg')),
       crew:[...document.querySelectorAll('#crew-list [data-crew]')].map(e=>({...rect(e),id:e.dataset.crew})),
+      opportunity:rect(document.querySelector('#opportunity-control')),
       dock:rect(document.querySelector('.action-dock')), quarters:document.querySelectorAll('#board [data-cell]').length,
       crewTokens:[...document.querySelectorAll('#board .crew-marker')].map(e=>({id:e.dataset.crewId,footprint:e.dataset.footprint})),
       primary:[...document.querySelectorAll('#primary-action button')].map(rect)};
@@ -50,6 +51,7 @@ async function layout(label, mobile) {
   for (const definition of CREW_DEFS) assert.equal(shown.crewTokens.find(c => c.id === definition.id)?.footprint, STATIONS[definition.station].cells.join(' '));
   assert.equal(shown.crew.length, 10);
   assert.ok(shown.crew.every(r => r.width >= 44 && r.height >= 44), `${label}: crew touch targets`);
+  assert.ok(shown.opportunity.width >= 44 && shown.opportunity.height >= 44, `${label}: permanent Opportunity control is visible and reachable`);
   if (mobile) {
     const rows = new Map();
     for (const r of shown.crew) { const y = Math.round(r.y); rows.set(y, (rows.get(y) || 0) + 1); }
@@ -77,10 +79,93 @@ try {
     await click('[data-ui="choose"]');
     const sheet = await evaluate(`(() => {const r=document.querySelector('dialog[open]').getBoundingClientRect();return {x:r.x,y:r.y,right:r.right,bottom:r.bottom,text:document.querySelector('dialog[open]').innerText};})()`);
     assert.ok(sheet.x >= -1 && sheet.y >= -1 && sheet.right <= width + 1 && sheet.bottom <= height + 1, `${width}: sheet fits`);
-    assert.match(sheet.text, /General Actions/i); assert.match(sheet.text, /Station Actions/i);
+    assert.match(sheet.text, /General Actions/i); assert.match(sheet.text, /Combat Actions/i);
     await screenshot(`action-sheet-${width}`); await closeSheet();
   }
   note('Desktop/tablet and 320/360/390/430 portrait layouts, two-row rack, sheets, board geometry and preview-only selection');
+
+  // Persistent Opportunity control and arc audit on the real board.
+  const noEnemies = dispatch(createGame({ missionEnemy:0, missionResource:100 }, 'opportunity-ui-no-fighters'), {type:'startRound'}).state;
+  await viewport(390,844); await inject(noEnemies);
+  await evaluate("document.querySelectorAll('dialog[open]').forEach(d=>d.close())");
+  assert.equal(await evaluate("document.querySelector('#opportunity-control').classList.contains('unavailable')"), true);
+  assert.match(await evaluate("document.querySelector('#opportunity-control').title"), /No active fighters/i);
+  const arcPreview = dispatch(createGame({ missionEnemy:0, missionResource:100 }, 'authoritative-preview'), {type:'startRound'}).state;
+  arcPreview.fighters=[fighter('preview-target',{quadrant:'Fore',altitude:'Low'}),fighter('radio-target',{quadrant:'Aft',altitude:'Level'})];
+  const noCompleted=structuredClone(arcPreview);noCompleted.fighters=[fighter('waiting-target',{quadrant:'Fore',altitude:'High'})];
+  await inject(noCompleted);assert.match(await evaluate("document.querySelector('#opportunity-control').title"),/No healthy gunner has completed/i);
+  const noArc=structuredClone(arcPreview);noArc.fighters=[fighter('outside-arc',{quadrant:'Aft',altitude:'High'})];
+  Object.assign(noArc.crew.find(c=>c.id==='navigator'),{used:true,activationCompleted:true});
+  await inject(noArc);assert.match(await evaluate("document.querySelector('#opportunity-control').title"),/No fighter is inside/i);
+  const noToken=structuredClone(arcPreview);noToken.fighters=[fighter('no-token-target',{quadrant:'Fore',altitude:'High'})];noToken.opportunity=0;
+  Object.assign(noToken.crew.find(c=>c.id==='engineer'),{used:true,activationCompleted:true});
+  await inject(noToken);assert.match(await evaluate("document.querySelector('#opportunity-control').title"),/No Opportunity tokens/i);
+  for(const gunner of ['navigator','bombardier']) {
+    await inject(arcPreview); await evaluate("document.querySelectorAll('dialog[open]').forEach(d=>d.close())"); await touch(`#crew-list [data-crew="${gunner}"]`); await closeSheet();
+    for(const altitude of ['High','Level','Low']) assert.equal(await evaluate(`document.querySelector('[data-sector="Fore/${altitude}"]').classList.contains('arc-legal')`),true,`${gunner} preview includes Fore ${altitude}`);
+  }
+  await inject(arcPreview); await evaluate("document.querySelectorAll('dialog[open]').forEach(d=>d.close())"); await touch('#crew-list [data-crew="radio"]'); await closeSheet();
+  assert.equal(await evaluate("document.querySelector('[data-sector=\"Aft/Level\"]').classList.contains('arc-legal')"),true,'Radio preview includes Aft Level');
+  note('Persistent Opportunity status and Nose Fore High/Level/Low plus Radio Aft Level previews');
+
+  // Banked Opportunity starts a target flow and stays banked until shot confirmation.
+  const banked=dispatch(createGame({missionEnemy:0,missionResource:100},'opportunity-ui-banked'),{type:'startRound'}).state;
+  banked.phase='select';banked.opportunity=1;banked.fighters=[fighter('banked-target',{facing:180})];
+  const gunner=banked.crew.find(c=>c.id==='engineer');gunner.used=true;gunner.activationCompleted=true;
+  await inject(banked);await evaluate("document.querySelectorAll('dialog[open]').forEach(d=>d.close())");assert.equal(await evaluate("document.querySelector('#opportunity-control').classList.contains('available')"),true);
+  await touch('#opportunity-control');assert.equal((await evaluate('window.milkRun.getInteraction()')).stage,'gunner');
+  assert.equal(await evaluate("document.querySelector('#crew-list [data-crew=engineer]').classList.contains('target-legal')"),true,'eligible completed gunner is highlighted');
+  await touch('#crew-list [data-crew="engineer"]');await touch('#enemies [data-fighter="banked-target"]');
+  assert.equal((await getState()).opportunity,1,'target selection spends no token');
+  await touch('[data-ui="cancel-target"]');assert.equal((await getState()).opportunity,1,'cancel before confirmation spends no token');
+  note('Enabled Opportunity starts its own gunner and fighter targeting flow; cancel leaves the token banked');
+
+  // Pilot uses an untapped gunner and its direct shot does not become Opportunity.
+  const pilot=dispatch(createGame({missionEnemy:0,missionResource:100,directFireCost:1},'pilot-direct-ui'),{type:'startRound'}).state;
+  pilot.phase='action';pilot.activeCrew='pilot';pilot.resources.Officer=1;pilot.fighters=[fighter('pilot-target',{hp:3,maxHp:3,facing:180})];pilot.opportunity=0;pilot.bags.combat={tokens:['Hit'],discard:[]};
+  await inject(pilot);await evaluate("document.querySelectorAll('dialog[open]').forEach(d=>d.close())");await speed('manual');await click('[data-ui="choose"]');
+  const directText=await evaluate("document.querySelector('[data-action=directFire]').innerText");
+  assert.match(directText,/order any healthy gunner.*immediate Basic Shot/i);assert.doesNotMatch(directText,/Opportunity/i);
+  await click('[data-action=directFire]');
+  assert.equal(await evaluate("document.querySelector('#crew-list [data-crew=engineer]').classList.contains('target-legal')"),true,'healthy operating gunner is highlighted for Pilot order');
+  await touch('#crew-list [data-crew="engineer"]');
+  assert.match(await evaluate("document.querySelector('#board-stage').innerText"),/Pilot Direct Fire/i);
+  assert.equal((await evaluate('window.milkRun.getInteraction()')).action,'directFire');
+  assert.equal(await evaluate("document.querySelector('#enemies [data-fighter=pilot-target]').classList.contains('target-legal')"),true,'legal target highlights after gunner selection');
+  await touch('#enemies [data-fighter="pilot-target"]');
+  assert.equal(await evaluate("document.querySelector('#opportunity-control').disabled"),true,'Opportunity cannot interrupt a resolving shot');
+  await flush();
+  assert.equal((await getState()).crew.find(c=>c.id==='engineer').used,false,'Pilot fire does not consume or tap gunner activation');
+  assert.equal((await getState()).opportunity,0,'Pilot Fire grants no Opportunity absent a kill');
+  assert.equal((await getState()).fighters[0].hp,2,'Pilot Direct Fire resolves a Basic Shot immediately');
+  note('Pilot Direct Fire has distinct copy, targets a tapped-state-independent gunner and fires immediately without tapping it');
+
+  const menu=activated('engineer');menu.fighters=[fighter('menu-target',{facing:180})];
+  await inject(menu);await evaluate("document.querySelectorAll('dialog[open]').forEach(d=>d.close())");await click('[data-ui="choose"]');
+  const menuActions=await evaluate("[...document.querySelectorAll('#action-content [data-action]')].map(e=>e.dataset.action)");
+  assert.ok(menuActions.indexOf('basicFire')<menuActions.indexOf('advancedFire'),'gunner Basic Fire precedes Advanced Fire');
+  assert.equal(menuActions.includes('medical'),false,'Medical hides when no untreated injuries exist');
+  assert.equal(menuActions.includes('repair'),false,'Repair hides when there is no damage');
+  assert.equal(menuActions.includes('fireControl'),false,'Fire Control hides when there are no fires');
+  await closeSheet();
+  note('Gunner action menu puts Basic/Advanced first and hides irrelevant crisis actions');
+
+  // Every fighter in a three aircraft formation has a separate touch center at phone widths.
+  const cluster=activated('engineer');cluster.fighters=[fighter('touch-1',{facing:180}),fighter('touch-2',{facing:180}),fighter('touch-3',{facing:180})];
+  for(const width of [320,360,390]) {
+    await viewport(width,800);await inject(cluster);await evaluate("document.querySelectorAll('dialog[open]').forEach(d=>d.close())");
+    const centers=await evaluate(`[...document.querySelectorAll('#board [data-fighter]')].map(e=>{const r=e.getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2,w:r.width,h:r.height,id:e.dataset.fighter}})`);
+    assert.equal(centers.length,3);assert.ok(centers.every(p=>p.w>=36&&p.h>=36),`${width}: three separate usable touch targets`);
+    for(const target of ['touch-1','touch-2','touch-3']) {
+      await inject(cluster);await evaluate("document.querySelectorAll('dialog[open]').forEach(d=>d.close())");await choose('basicFire');
+      assert.equal(await evaluate("[...document.querySelectorAll('#board [data-fighter]')].every(e=>e.classList.contains('target-legal'))"),true,`${width}: all clustered fighters are legal targets`);
+      await touch(`#board [data-fighter="${target}"]`);
+      assert.equal((await evaluate('window.milkRun.getInteraction()')).targetId,target,`${width}: direct touch selects ${target}`);
+      await click('[data-ui="cancel-target"]');
+    }
+    await screenshot(`three-fighter-touch-${width}`);
+  }
+  note('Three-fighter shared-sector formation has individually touchable targets at 320/360/390px');
 
   // Additional UI scenarios below deliberately use manual presentation: a test
   // never races animation timers, and every consequence can be inspected.

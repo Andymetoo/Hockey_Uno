@@ -69,6 +69,20 @@ test('dev preferences persist only explicit differences and restore a fresh norm
   assert.equal(isConfigModified({}), false);
 });
 
+test('combat dev controls persist independently and reset to canonical combat defaults', () => {
+  const storage = memoryStorage();
+  const values = { disruptOnHit: false, opportunityEnabled: false, startingOpportunity: 2, opportunityCap: 5,
+    opportunityOnKill: false, combatHit: 7, combatBurst: 0, combatMiss: 11 };
+  assert.equal(saveDevPreferences(values, storage), true);
+  assert.deepEqual(Object.fromEntries(Object.keys(values).map(key => [key, loadDevPreferences(storage)[key]])), values);
+  assert.equal(resetDevPreferences(storage), true);
+  const defaults = loadDevPreferences(storage);
+  assert.equal(defaults.disruptOnHit, true); assert.equal(defaults.opportunityEnabled, true);
+  assert.equal(defaults.startingOpportunity, 1); assert.equal(defaults.opportunityCap, 3);
+  assert.equal(defaults.opportunityOnKill, true);
+  assert.deepEqual([defaults.combatHit, defaults.combatBurst, defaults.combatMiss], [16, 4, 13]);
+});
+
 test('resetting preferences restores current defaults while preserving the active sortie and other games', () => {
   const storage = memoryStorage();
   storage.setItem(SAVE_KEY, 'active sortie stays byte-for-byte unchanged');

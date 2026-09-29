@@ -78,7 +78,7 @@ export function crewMarkerLayout(state) {
 export const sectorPoint=(q,a)=>{const i=ALTITUDES.indexOf(a);return q==='Fore'?[232+i*74,47]:q==='Aft'?[232+i*74,563]:q==='Port'?[47,234+i*74]:[567,234+i*74];};
 export function boardMarkup(s,{selectedCrew,interaction:t,visual={},current,previousFighters=new Map()}={}) {
   const options=targetOptions(s,t),preview=arcPreview(s,t?.gunnerId??t?.crewId??selectedCrew);
-  const aimed=t&&['basicFire','advancedFire','opportunityShot','rotateFighter'].includes(t.action)&&t.stage!=='gunner';
+  const aimed=t&&['basicFire','advancedFire','opportunityShot','directFire','rotateFighter'].includes(t.action)&&t.stage!=='gunner';
   const worked=new Set(s.jobs.flatMap(j=>j.cells??[]));
   const focus=visual.focusCell??(current?.type==='ENEMY_HIT_LOCATION'?null:current?.cellId);
   let svg=`<svg viewBox="0 0 620 620" aria-label="B-17 damage board, columns A to F, rows 1 to 6" role="group"><defs><pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse"><path d="M0 6L6 0" stroke="#653c21" stroke-width="1.3" opacity=".5"/></pattern></defs><rect width="620" height="620" fill="#e8e8d8" rx="12"/><text x="310" y="21" class="compass-label" text-anchor="middle">FORE</text><text x="310" y="611" class="compass-label" text-anchor="middle">AFT</text><text x="20" y="309" transform="rotate(-90 20 309)" class="compass-label" text-anchor="middle">PORT</text><text x="607" y="309" transform="rotate(90 607 309)" class="compass-label" text-anchor="middle">STARBOARD</text>`;
@@ -104,12 +104,12 @@ export function boardMarkup(s,{selectedCrew,interaction:t,visual={},current,prev
     svg+=`<g class="sector ${legal?'arc-legal':''}" data-sector="${q}/${a}"><circle cx="${x}" cy="${y}" r="25"/><text x="${x}" y="${y+4}" class="sector-alt" text-anchor="middle">${a==='High'?'HI':a==='Level'?'LV':'LO'}</text></g>`;
     if(fighters.length>1)svg+=`<text x="${x+27}" y="${y-22}" class="cluster-count">×${fighters.length}</text>`;
     fighters.forEach((f,i)=>{
-      const px=x+(i-(fighters.length-1)/2)*22,py=y+(i%2)*13-5,heading=fighterHeading(f);
+      const [dx,dy]=fighterFormationOffset(q,i,fighters.length),px=x+dx,py=y+dy,heading=fighterHeading(f);
       const legal=aimed?options.fighters.includes(f.id):preview.fighterIds.includes(f.id),dim=(aimed||preview.arc)&&!legal,selected=t?.targetId===f.id;
       const previous=previousFighters.get(f.id),moving=current?.type==='FIGHTER_MOVED'&&current.fighterId===f.id&&previous;
       const rotating=current?.type==='FIGHTER_ROTATED'&&current.fighterId===f.id&&previous&&previous.heading!==heading;
       const turn=previous?((heading-previous.heading+540)%360)-180:0;
-      svg+=`<g class="fighter-marker ${legal?'target-legal':''} ${dim?'target-dim':''} ${selected?'target-chosen':''} ${visual.activeFighterId===f.id?'resolving':''}" data-fighter="${f.id}" data-heading="${heading}" data-disrupted="${Boolean(f.disrupted)}" role="button" tabindex="0" aria-label="Fighter ${s.fighters.indexOf(f)+1}, ${esc(f.type)}, ${f.hp} HP, ${q} ${a}" transform="translate(${px} ${py})">${moving?`<animateTransform attributeName="transform" type="translate" from="${previous.x} ${previous.y}" to="${px} ${py}" dur=".65s" fill="freeze"/>`:''}<circle r="21" class="fighter-touch"/><g transform="rotate(${heading})">${rotating?`<animateTransform attributeName="transform" type="rotate" from="${previous.heading}" to="${previous.heading+turn}" dur=".55s" fill="freeze"/>`:''}<path class="fighter-shape" d="M0 -19L4 -7L17 3L17 7L4 3L3 13L8 17L8 20L0 17L-8 20L-8 17L-3 13L-4 3L-17 7L-17 3L-4 -7Z"/></g><circle class="fighter-id-disc" cx="13" cy="16" r="10"/><text x="13" y="20" class="fighter-number" text-anchor="middle">${s.fighters.indexOf(f)+1}</text>${f.disrupted?'<g class="disrupt-marker"><rect x="-26" y="-26" width="18" height="15" rx="3"/><text x="-17" y="-14" text-anchor="middle">D</text></g>':''}${current?.type==='ATTACK_DISRUPTED'&&current.fighterId===f.id?'<text class="attack-disrupted" x="0" y="-33" text-anchor="middle">DISRUPTED</text>':''}${visual.attackMissFighter===f.id?'<text x="0" y="-29" class="attack-miss" text-anchor="middle">MISS</text>':''}</g>`;
+      svg+=`<g class="fighter-marker ${legal?'target-legal':''} ${dim?'target-dim':''} ${selected?'target-chosen':''} ${visual.activeFighterId===f.id?'resolving':''}" data-fighter="${f.id}" data-heading="${heading}" data-disrupted="${Boolean(f.disrupted)}" role="button" tabindex="0" aria-label="Fighter ${s.fighters.indexOf(f)+1}, ${esc(f.type)}, ${f.hp} HP, ${q} ${a}" transform="translate(${px} ${py})">${moving?`<animateTransform attributeName="transform" type="translate" from="${previous.x} ${previous.y}" to="${px} ${py}" dur=".65s" fill="freeze"/>`:''}<circle r="44" class="fighter-touch"/><g transform="rotate(${heading})">${rotating?`<animateTransform attributeName="transform" type="rotate" from="${previous.heading}" to="${previous.heading+turn}" dur=".55s" fill="freeze"/>`:''}<path class="fighter-shape" d="M0 -19L4 -7L17 3L17 7L4 3L3 13L8 17L8 20L0 17L-8 20L-8 17L-3 13L-4 3L-17 7L-17 3L-4 -7Z"/></g><circle class="fighter-id-disc" cx="13" cy="16" r="10"/><text x="13" y="20" class="fighter-number" text-anchor="middle">${s.fighters.indexOf(f)+1}</text>${f.disrupted?'<g class="disrupt-marker"><rect x="-26" y="-26" width="18" height="15" rx="3"/><text x="-17" y="-14" text-anchor="middle">D</text></g>':''}${current?.type==='ATTACK_DISRUPTED'&&current.fighterId===f.id?'<text class="attack-disrupted" x="0" y="-33" text-anchor="middle">ATTACK DISRUPTED</text>':''}${visual.attackMissFighter===f.id?'<text x="0" y="-29" class="attack-miss" text-anchor="middle">MISS</text>':''}</g>`;
     });
   }
   for(const e of s.escorts) {
@@ -120,4 +120,14 @@ export function boardMarkup(s,{selectedCrew,interaction:t,visual={},current,prev
   if(focus){const c=BOARD.find(c=>c.id===focus);if(c)svg+=`<g class="hit-focus" data-focus-cell="${focus}" transform="translate(${bx+c.x*step+18} ${by+c.y*step+18})"><rect class="strike-ring" x="-16" y="-16" width="32" height="32"/><path class="focus-reticle ${current?.type==='ENEMY_LOCATION_FOCUS'?'contract':''}" d="M-25 -10v-15h15m20 0h15v15m0 20v15h-15m-20 0h-15v-15"/></g>`;}
   return svg+'</svg>';
 }
-export function fighterPositions(s) {return new Map(s.fighters.map(f=>{const [x,y]=sectorPoint(f.quadrant,f.altitude),group=s.fighters.filter(g=>g.quadrant===f.quadrant&&g.altitude===f.altitude),i=group.indexOf(f);return[f.id,{x:x+(i-(group.length-1)/2)*22,y:y+(i%2)*13-5,heading:fighterHeading(f)}];}));}
+function fighterFormationOffset(quadrant,index,count) {
+  if(count<2)return[0,0];
+  if(count===2)return['Fore','Aft'].includes(quadrant)?[(index===0?-52:52),0]:[0,index===0?-52:52];
+  if(['Fore','Aft'].includes(quadrant)) {
+    const inward=quadrant==='Fore'?1:-1;
+    return index===0?[-52,inward*8]:index===1?[52,inward*8]:[0,inward*100];
+  }
+  const inward=quadrant==='Port'?1:-1;
+  return index===0?[inward*8,-52]:index===1?[inward*8,52]:[inward*100,0];
+}
+export function fighterPositions(s) {return new Map(s.fighters.map(f=>{const [x,y]=sectorPoint(f.quadrant,f.altitude),group=s.fighters.filter(g=>g.quadrant===f.quadrant&&g.altitude===f.altitude),i=group.indexOf(f),[dx,dy]=fighterFormationOffset(f.quadrant,i,group.length);return[f.id,{x:x+dx,y:y+dy,heading:fighterHeading(f)}];}));}

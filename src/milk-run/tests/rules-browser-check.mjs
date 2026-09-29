@@ -88,6 +88,7 @@ try {
   assert.equal(await evaluate("window.milkRun.exportSession().log.some(e=>e.type==='ENEMY_PHASE_STARTED')"),false);
   await click('[data-command="continueEnemyPhase"]');
   await advanceTo('ATTACK_DISRUPTED');
+  assert.match(await evaluate("document.querySelector('#board').textContent"),/ATTACK DISRUPTED/i);
   assert.equal((await getView()).fighters[0].disrupted,false);
   assert.equal(await evaluate("window.milkRun.getQueue().some(e=>e.type==='ENEMY_ATTACK_ROLL')"),false);
   await advanceTo('FIGHTER_MOVED');await flush();
@@ -113,20 +114,42 @@ try {
   await screenshot('opportunity-chain');
   note('Three direct Opportunity kills chain legally while preserving activation, slot, mission draws, resources and enemy phases');
 
-  const pilot=activated('pilot');await inject(pilot);await choose('directFire');
-  await click('#choice-form button[type="submit"]');await flush();
-  assert.equal((await getState()).opportunity,pilot.opportunity+1);
+  const between=activated('pilot');between.phase='select';between.opportunity=1;
+  Object.assign(between.crew.find(c=>c.id==='engineer'),{used:true,activationCompleted:true});
+  between.fighters=[fighter('between-activations',{hp:3,maxHp:3})];between.bags.combat={tokens:['Hit'],discard:[]};
+  await inject(between);const beforeBetween=await getState();
+  await touch('[data-ui="opportunity"]');await touch('#crew-list [data-crew="engineer"]');
+  await touch('#enemies [data-fighter="between-activations"]');await click('[data-ui="confirm-target"]');await flush();
+  const afterBetween=await getState();
+  assert.equal(afterBetween.phase,'select');assert.equal(afterBetween.opportunity,0);assert.equal(afterBetween.fighters[0].hp,2);
+  assert.equal(afterBetween.slot,beforeBetween.slot);assert.equal(afterBetween.stats.missionDraws,beforeBetween.stats.missionDraws);
+  assert.equal(afterBetween.stats.enemyAttacks,beforeBetween.stats.enemyAttacks);
+  note('Banked Opportunity is usable between crew activations and consumes no slot, draw, or enemy phase');
+
+  const cancelled=activated('pilot');cancelled.phase='select';cancelled.opportunity=1;
+  Object.assign(cancelled.crew.find(c=>c.id==='engineer'),{used:true,activationCompleted:true});
+  cancelled.fighters=[fighter('cancel-shot')];cancelled.bags.combat={tokens:['Hit'],discard:[]};
+  await inject(cancelled);await touch('[data-ui="opportunity"]');await touch('#crew-list [data-crew="engineer"]');
+  await touch('#enemies [data-fighter="cancel-shot"]');await click('[data-ui="cancel-target"]');await flush();
+  assert.deepEqual(await getState(),cancelled,'canceling before confirmation preserves every resource and game state field');
+  note('Canceling a fully targeted Opportunity shot spends no token and leaves the fighter unchanged');
+
+  const pilot=activated('pilot');pilot.fighters=[fighter('pilot-direct',{hp:3,maxHp:3})];pilot.bags.combat={tokens:['Hit'],discard:[]};await inject(pilot);await choose('directFire');
+  await touch('#crew-list [data-crew="engineer"]');await touch('#enemies [data-fighter="pilot-direct"]');await flush();
+  assert.equal((await getState()).fighters[0].hp,2);
+  assert.equal((await getState()).opportunity,pilot.opportunity);
   assert.equal((await getState()).resources.Officer,pilot.resources.Officer-1);
-  assert.equal(await evaluate("window.milkRun.exportSession().log.some(e=>e.type==='GUNNER_SHOT_ROLL')"),false);
+  assert.equal(await evaluate("window.milkRun.exportSession().log.filter(e=>e.type==='GUNNER_SHOT_ROLL').length"),1);
   assert.equal(await evaluate("window.milkRun.exportSession().log.filter(e=>e.type==='ENEMY_PHASE_STARTED').length"),1);
   const unavailable=activated('pilot');unavailable.phase='opportunity';Object.assign(unavailable.crew.find(c=>c.id==='engineer'),{used:true,activationCompleted:true});unavailable.fighters=[fighter('cannot-shoot')];unavailable.opportunity=0;
   await inject(unavailable);await touch('[data-ui="opportunity"]');
   assert.match(await evaluate("document.querySelector('#info-content').textContent"),/opportunity/i);
   assert.deepEqual(await getState(),unavailable);await close();
-  const disabled=activated('pilot',{opportunityEnabled:false});await inject(disabled);await click('[data-ui="choose"]');
-  assert.equal(await evaluate("document.querySelector('[data-action=directFire]')?.disabled??true"),true);
-  assert.equal(await evaluate("!!document.querySelector('[data-ui=opportunity]')"),false);await close();
-  note('Pilot Direct Fire creates currency with its normal enemy phase; empty or disabled Opportunity remains clearly unavailable');
+  const disabled=activated('pilot',{opportunityEnabled:false});disabled.fighters=[fighter('direct-when-disabled')];await inject(disabled);await click('[data-ui="choose"]');
+  assert.equal(await evaluate("document.querySelector('[data-action=directFire]')?.disabled??true"),false);
+  assert.equal(await evaluate("!!document.querySelector('[data-ui=opportunity].unavailable')"),true);
+  assert.match(await evaluate("document.querySelector('[data-ui=opportunity]').title"),/disabled for this sortie/i);await close();
+  note('Pilot Direct Fire fires immediately without generating Opportunity; empty or disabled Opportunity remains clearly unavailable');
 
   for(const direction of ['Officer','Enlisted']) {
     const conversion=activated('copilot');conversion.resources={Officer:3,Enlisted:5};conversion.bags.mission={tokens:['Enemy','Resource'],discard:['Resource']};

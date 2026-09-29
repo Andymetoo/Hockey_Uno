@@ -89,10 +89,10 @@ test('spawned fighters store absolute headings and old autosaves normalize lazil
   assert.equal(Object.hasOwn(legacy.fighters[0], 'heading'), false, 'dispatch preserves its input');
 });
 
-test('all gun previews match the intended 12-sector arcs without consuming an activation', () => {
+test('all gun previews match the authoritative sectors without consuming an activation', () => {
   const expected = {
-    pilot: [], copilot: [], navigator: ['Fore/High', 'Fore/Level'], bombardier: ['Fore/High', 'Fore/Level'],
-    radio: ['Aft/High'], engineer: QUADRANTS.flatMap(q => [`${q}/High`, `${q}/Level`]),
+    pilot: [], copilot: [], navigator: ['Fore/High', 'Fore/Level', 'Fore/Low'], bombardier: ['Fore/High', 'Fore/Level', 'Fore/Low'],
+    radio: ['Aft/High', 'Aft/Level'], engineer: ['Fore','Starboard','Aft','Port'].flatMap(q => [`${q}/High`, `${q}/Level`]),
     ball: QUADRANTS.flatMap(q => [`${q}/Level`, `${q}/Low`]),
     leftWaist: ALTITUDES.map(a => `Port/${a}`), rightWaist: ALTITUDES.map(a => `Starboard/${a}`),
     tail: ALTITUDES.map(a => `Aft/${a}`),

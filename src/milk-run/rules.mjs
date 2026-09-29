@@ -50,6 +50,10 @@ export function legalTargets(state, crewId) {
   return state.fighters.filter(target => gunArcLegal(state, crewId, target.id));
 }
 
+export function directFireGunners(state) {
+  return state.crew.filter(crew => hasTag(crew, 'Gunner') && operatingArc(state, crew.id) && legalTargets(state, crew.id).length);
+}
+
 /** Both conversions conserve physical Resource tokens, including held tokens. */
 export function conversionOptions(state) {
   const ratio = state.config.conversionRate;
@@ -64,16 +68,23 @@ export function conversionOptions(state) {
   });
 }
 
+function completedOpportunityGunners(state) {
+  return state.crew.filter(crew => crew.used && crew.activationCompleted && operatingArc(state, crew.id));
+}
+
 export function opportunityGunners(state) {
-  return state.crew.filter(crew => crew.used && crew.activationCompleted && operatingArc(state, crew.id) && legalTargets(state, crew.id).length);
+  return completedOpportunityGunners(state).filter(crew => legalTargets(state, crew.id).length);
 }
 
 export function opportunityAvailability(state) {
+  const completed = completedOpportunityGunners(state);
   const gunners = opportunityGunners(state);
   const reason = !state.config.opportunityEnabled ? 'Opportunity is disabled for this sortie.'
-    : state.phase !== 'opportunity' ? 'Opportunity Shots are available after the crew action, before the enemy phase.'
-    : !(state.opportunity > 0) ? 'No Opportunity tokens available.'
-    : !gunners.length ? 'No healthy gunner with a completed activation has an operating gun and legal target.' : '';
+    : !['select','opportunity'].includes(state.phase) ? 'Opportunity Shots are available between crew activations or after an action before the enemy phase.'
+    : !state.fighters.length ? 'No active fighters to target.'
+    : !completed.length ? 'No healthy gunner has completed their normal activation at a usable gun station.'
+    : !gunners.length ? 'No fighter is inside any completed gunner’s operating arc.'
+    : !(state.opportunity > 0) ? 'No Opportunity tokens available.' : '';
   return { enabled: !reason, reason, gunners };
 }
 
@@ -121,7 +132,7 @@ export function availableActions(state, crewId = state.activeCrew) {
   }
   if (hasAbility(crew, 'directFire')) {
     const cost = state.config.directFireCost ?? 1;
-    const reason = !state.config.opportunityEnabled ? 'Opportunity is disabled for this sortie.' : (state.opportunity || 0) >= state.config.opportunityCap ? 'Opportunity pool is full.' : !affordable('Officer', cost) ? `Needs ${cost} Officer resource${cost === 1 ? '' : 's'}.` : '';
+    const reason = !directFireGunners(state).length ? 'No healthy crew member is operating a gun with a legal fighter target.' : !affordable('Officer', cost) ? `Needs ${cost} Officer resource${cost === 1 ? '' : 's'}.` : '';
     add('directFire', 'Direct Fire', !reason, reason, `${cost} Officer`);
   }
   if (hasAbility(crew, 'convert')) {
@@ -247,22 +258,22 @@ export function resolveAttack(state, emit, { source = 'Enemy', fighterId, roll, 
   damageSquare(state, location, result === 6 ? 2 : 1, emit);
 }
 
-function killFighter(state, target, emit, cause) {
+function killFighter(state, target, emit, cause, gunfire = false) {
   const index = state.fighters.findIndex(item => item.id === target.id);
   if (index < 0) return;
   state.fighters.splice(index, 1);
   bump(state, 'fightersKilled');
   record(emit, 'FIGHTER_DESTROYED', `${target.type} is destroyed by ${cause}. Remaining fighters move forward in queue order.`, { fighterId: target.id });
-  if (state.config.opportunityOnKill) gainOpportunity(state, 1, emit, `${target.type} destroyed`, { fighterId: target.id });
+  if (gunfire && state.config.opportunityOnKill) gainOpportunity(state, 1, emit, `${target.type} destroyed by B-17 gunfire`, { fighterId: target.id });
 }
 
-function damageFighter(state, target, amount, emit, cause) {
+function damageFighter(state, target, amount, emit, cause, gunfire = false) {
   target.hp = Math.max(0, target.hp - amount);
   record(emit, 'FIGHTER_DAMAGED', `${cause}: ${target.type} loses ${amount} HP (${target.hp}/${target.maxHp}).`, { fighterId: target.id, amount });
-  if (!target.hp) killFighter(state, target, emit, cause);
-  else if (amount > 0 && state.config.disruptOnHit && !target.disrupted) {
+  if (!target.hp) killFighter(state, target, emit, cause, gunfire);
+  else if (gunfire && amount > 0 && state.config.disruptOnHit && !target.disrupted) {
     target.disrupted = true;
-    record(emit, 'FIGHTER_DISRUPTED', `${target.type} is Disrupted: its next facing-in attack will be cancelled before a normal flyby.`, { fighterId: target.id, cause });
+    record(emit, 'FIGHTER_DISRUPTED', `${target.type} is Disrupted until its next enemy action.`, { fighterId: target.id, cause });
   }
 }
 
@@ -283,7 +294,7 @@ export function postAttackPosition(state, fighterId, emit, sector) {
   for (const escort of state.escorts.filter(item => item.quadrant === target.quadrant)) {
     if (!fighter(state, fighterId)) break;
     record(emit, 'ESCORT_INTERCEPT', `Escort in ${escort.quadrant} catches the passing ${target.type}.`, { fighterId, escortId: escort.id });
-    damageFighter(state, target, 1, emit, 'Escort');
+    damageFighter(state, target, 1, emit, 'Escort', false);
   }
 }
 
@@ -296,10 +307,14 @@ function enemyPhase(state, emit) {
       target.heading = turnHeadingToward(target);
       target.facing = Math.max(0, target.facing - 90);
       record(emit, 'FIGHTER_ROTATED', `${target.type} rotates 90° toward the B-17; ${target.facing === 0 ? 'now facing in, ready for its next enemy phase' : `${target.facing}° remains`}.`, { fighterId: id, facing: target.facing, heading: target.heading });
+      if (target.disrupted) {
+        target.disrupted = false;
+        record(emit, 'DISRUPT_CLEARED', `${target.type}'s Disruption clears after its enemy action.`, { fighterId: id });
+      }
     } else {
       if (target.disrupted) {
         target.disrupted = false;
-        record(emit, 'ATTACK_DISRUPTED', `${target.type}'s attack is cancelled by Disruption. Disruption clears; the fighter still makes its normal flyby.`, { fighterId: id, source: target.type });
+        record(emit, 'ATTACK_DISRUPTED', `ATTACK DISRUPTED: ${target.type}'s attack is cancelled. The fighter still makes its normal flyby.`, { fighterId: id, source: target.type });
       } else resolveAttack(state, emit, { source: target.type, fighterId: id });
       postAttackPosition(state, id, emit);
     }
@@ -371,7 +386,7 @@ function shoot(state, crew, targetId, emit, advanced = false) {
   while (fighter(state, targetId)) {
     const token = combatPull(state, emit, crew.id, targetId);
     pulls++;
-    if (token === 'Hit' || token === 'Burst') damageFighter(state, fighter(state, targetId), token === 'Burst' ? 2 : 1, emit, nameOf(crew.id));
+    if (token === 'Hit' || token === 'Burst') damageFighter(state, fighter(state, targetId), token === 'Burst' ? 2 : 1, emit, nameOf(crew.id), true);
     if (!advanced || firstMissRetry || !fighter(state, targetId)) break;
     if (token === 'Miss') {
       if (pulls === 1) {
@@ -564,6 +579,7 @@ function validateAction(state, crew, command) {
   requireRule(allowed.enabled, allowed.reason || 'That action is not available now.');
   switch (command.action) {
     case 'basicFire': case 'advancedFire': requireRule(gunArcLegal(state, crew.id, command.targetId), 'Choose a fighter inside the operating gun arc.'); break;
+    case 'directFire': requireRule(directFireGunners(state).some(gunner => gunner.id === command.gunnerId) && gunArcLegal(state, command.gunnerId, command.targetId), 'Choose an operating gunner and a fighter in that gun arc.'); break;
     case 'repair': case 'fireControl': {
       const cells = command.cells || [];
       const cap = crisisTargetCap(state, crew.id, command.action);
@@ -621,7 +637,13 @@ function resolveAction(state, crew, command, emit) {
       } else record(emit, 'ENGINE_RESTART_FAILED', `${command.targetId} remains stopped.`, { engineId: command.targetId });
       break;
     }
-    case 'directFire': spend(state, 'Officer', state.config.directFireCost ?? 1, emit); gainOpportunity(state, 1, emit, 'Pilot Direct Fire', { crewId: crew.id }); break;
+    case 'directFire': {
+      spend(state, 'Officer', state.config.directFireCost ?? 1, emit);
+      const gunner = person(state, command.gunnerId);
+      record(emit, 'PILOT_DIRECT_FIRE', `Pilot orders ${nameOf(gunner.id)} to make one Basic Fire shot.`, { crewId: crew.id, gunnerId: gunner.id, fighterId: command.targetId });
+      shoot(state, gunner, command.targetId, emit);
+      break;
+    }
     case 'convert': {
       const option = conversionOptions(state).find(item => item.to === command.to);
       state.resources[option.from] -= option.cost;
@@ -810,6 +832,10 @@ export function dispatch(original, command) {
       if (opportunityAvailability(state).enabled) {
         record(emit, 'OPPORTUNITY_WINDOW_OPENED', 'Opportunity window: take Basic Shots with eligible crew, or Continue to the enemy phase.', { crewId: crew.id });
       } else {
+        if (state.config.opportunityEnabled && state.opportunity > 0) {
+          const chance = opportunityAvailability(state);
+          record(emit, 'OPPORTUNITY_UNAVAILABLE', `No Opportunity Shot: ${chance.reason}`, { crewId: crew.id, reason: chance.reason });
+        }
         enemyPhase(state, emit);
         endActivation(state, emit);
       }

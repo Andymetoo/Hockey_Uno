@@ -138,8 +138,8 @@ test('an engine stops only when both engine squares are damaged, and repairing d
 test('every gun enforces its published quadrant and altitude coverage', () => {
   const expected = {
     pilot: [], copilot: [],
-    navigator: ['Fore/High', 'Fore/Level'], bombardier: ['Fore/High', 'Fore/Level'],
-    radio: ['Aft/High'],
+    navigator: ['Fore/High', 'Fore/Level', 'Fore/Low'], bombardier: ['Fore/High', 'Fore/Level', 'Fore/Low'],
+    radio: ['Aft/High', 'Aft/Level'],
     engineer: ['Fore/High','Fore/Level','Starboard/High','Starboard/Level','Aft/High','Aft/Level','Port/High','Port/Level'],
     ball: ['Fore/Low','Fore/Level','Starboard/Low','Starboard/Level','Aft/Low','Aft/Level','Port/Low','Port/Level'],
     leftWaist: ['Port/High','Port/Level','Port/Low'], rightWaist: ['Starboard/High','Starboard/Level','Starboard/Low'],

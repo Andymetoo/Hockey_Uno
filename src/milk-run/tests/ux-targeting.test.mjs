@@ -7,9 +7,9 @@ test('direct targeting accepts one legal fighter and rejects illegal or stale ta
   const state = activated('navigator');
   state.fighters = [fighter('fore'), fighter('aft', { quadrant: 'Aft' }), fighter('low', { altitude: 'Low' })];
   const original = structuredClone(state), initial = beginTargeting('advancedFire', 'navigator');
-  assert.deepEqual(targetOptions(state, initial).fighters, ['fore']);
+  assert.deepEqual(targetOptions(state, initial).fighters, ['fore', 'low']);
   assert.equal(selectTarget(state, initial, 'fighter', 'aft'), initial);
-  assert.equal(selectTarget(state, initial, 'fighter', 'low'), initial);
+  assert.equal(selectTarget(state, initial, 'fighter', 'low').targetId, 'low');
   const selected = selectTarget(state, initial, 'fighter', 'fore');
   assert.equal(canConfirm(state, selected), true);
   assert.deepEqual(targetingCommand(selected), { type: 'action', action: 'advancedFire', targetId: 'fore' });
