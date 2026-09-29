@@ -102,6 +102,9 @@ test('new games isolate mutable state and keep starting resources outside missio
   assert.equal(a.bags.mission.tokens.filter(t => t === 'Enemy').length, 15);
   assert.equal(a.bags.mission.tokens.filter(t => t === 'Resource').length, 20);
   assert.equal(a.bags.combat.tokens.length, 33);
+  assert.equal(a.bags.combat.tokens.filter(t => t === 'Hit').length, 16);
+  assert.equal(a.bags.combat.tokens.filter(t => t === 'Burst').length, 4);
+  assert.equal(a.bags.combat.tokens.filter(t => t === 'Miss').length, 13);
   a.crew[0].position.pop();
   a.bags.mission.tokens.pop();
   assert.notDeepEqual(a.crew[0], b.crew[0]);
@@ -111,7 +114,7 @@ test('new games isolate mutable state and keep starting resources outside missio
 
 test('all provisional defaults can be configured, with range validation and safe nonempty token systems', () => {
   assert.deepEqual(new Set(CONFIG_FIELDS.map(f => f.key)), new Set(Object.keys(DEFAULT_CONFIG)));
-  const config = normalizeConfig({ missionEnemy: 0, missionResource: 0, combatHit: 0, combatMiss: 0, maxFighters: 99, restartMax: -5, spawnFacing: '90', unavailableDraws: 'false', startingOfficer: '9', unrecognized: 123 });
+  const config = normalizeConfig({ missionEnemy: 0, missionResource: 0, combatHit: 0, combatBurst: 0, combatMiss: 1, maxFighters: 99, restartMax: -5, spawnFacing: '90', unavailableDraws: 'false', startingOfficer: '9', unrecognized: 123 });
   assert.equal(config.missionResource, 1);
   assert.equal(config.combatMiss, 1);
   assert.equal(config.maxFighters, 3);
@@ -120,4 +123,5 @@ test('all provisional defaults can be configured, with range validation and safe
   assert.equal(config.unavailableDraws, false);
   assert.equal(config.startingOfficer, 9);
   assert.equal('unrecognized' in config, false);
+  assert.throws(() => normalizeConfig({ combatHit: 0, combatBurst: 0, combatMiss: 0 }), /combat|token|empty/i, 'an empty combat bag is rejected rather than silently adding a token');
 });

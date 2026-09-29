@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { ResolutionQueue } from '../queue.mjs';
+import { eventDelay } from '../presentation.mjs';
 import { SAVE_KEY, LEGACY_SAVE_KEY, saveSession, loadSession, hasLegacyBoardSave } from '../persistence.mjs';
 import { BOARD_VERSION } from '../board.mjs';
 
@@ -117,10 +118,14 @@ test('normal presentation uses configured delay, fast uses short delays, and zer
   try {
     queue.send({ type:'action' });
     assert.equal(queue.log.length,1);
-    t.mock.timers.tick(499);assert.equal(queue.log.length,1);
+    const normalDelay = eventDelay(queue.current, 'normal', state.config);
+    assert.ok(normalDelay >= 1000, 'important rolls receive a readable normal hold');
+    t.mock.timers.tick(normalDelay - 1);assert.equal(queue.log.length,1);
     t.mock.timers.tick(1);assert.equal(queue.log.length,2);
     queue.setSpeed('fast');
-    t.mock.timers.tick(109);assert.equal(queue.log.length,2);
+    const fastDelay = eventDelay(queue.current, 'fast', state.config);
+    assert.ok(fastDelay < normalDelay);
+    t.mock.timers.tick(fastDelay - 1);assert.equal(queue.log.length,2);
     t.mock.timers.tick(1);assert.equal(queue.log.length,3);
     queue.setSpeed('instant');t.mock.timers.tick(1);
     assert.equal(queue.busy,false);

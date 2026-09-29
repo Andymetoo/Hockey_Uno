@@ -1,18 +1,19 @@
 /** Experimental v3 rules. Values here are intentionally editable, not balance claims. */
 export const DEFAULT_CONFIG = Object.freeze({
   startingOfficer: 3, startingEnlisted: 5,
-  missionEnemy: 15, missionResource: 20, combatHit: 20, combatMiss: 13,
+  missionEnemy: 15, missionResource: 20, combatHit: 16, combatBurst: 4, combatMiss: 13,
   bf109Cards: 10, bf110Cards: 6, fw190Cards: 5, me262Cards: 3, flakCards: 4,
   maxFighters: 3, flakShots: 2, spawnFacing: 0, clearFighters: true, unavailableDraws: true,
   fireCap: 4, repairCap: 3, engineerBonus: 1, eightWayWork: false,
   extinguishLeavesDamage: true, crewBlocksFirstFire: true,
-  medicalDuration: 1, repairDuration: 1, fireDuration: 1,
-  repairCost: 1, fireCost: 1, medicalCost: 1, escortCost: 1, orderShotCost: 1,
+  medicalDuration: 2, repairDuration: 2, fireDuration: 2,
+  repairCost: 1, fireCost: 1, medicalCost: 1, escortCost: 1, directFireCost: 1,
+  disruptOnHit: true, opportunityEnabled: true, startingOpportunity: 1, opportunityCap: 3, opportunityOnKill: true,
   conversionRate: 2, restartMax: 4,
   startingAltitude: 5, controlOfficerMin: 3, controlEnlistedMin: 5,
   structureSafe: 1, structureMid: 3, structureFatal: 6, structureMidMin: 3, structureHighMin: 5,
   enginesSafe: 1, enginesMid: 2, enginesAuto: 4, enginesMidMin: 3, enginesHighMin: 5,
-  outboundLength: 6, returnLength: 4, bombingMin: 3, animationMs: 750,
+  outboundLength: 14, returnLength: 5, bombingMin: 3, animationMs: 750, presentationSpeed: 'normal',
 });
 
 const number = (key, label, group, min = 0, max = 40, step = 1) => ({ key, label, group, type: 'number', min, max, step });
@@ -23,7 +24,13 @@ export const CONFIG_FIELDS = [
   number('missionEnemy', 'Mission Enemy tokens', 'Bags & resources', 0, 100),
   number('missionResource', 'Mission Resource tokens', 'Bags & resources', 0, 100),
   number('combatHit', 'Combat Hit tokens', 'Bags & resources', 0, 100),
+  number('combatBurst', 'Combat Burst ×2 tokens', 'Bags & resources', 0, 100),
   number('combatMiss', 'Combat Miss tokens', 'Bags & resources', 0, 100),
+  boolean('disruptOnHit', 'Disrupt on damaging hit', 'Combat & Opportunity'),
+  boolean('opportunityEnabled', 'Enable Opportunity shots', 'Combat & Opportunity'),
+  number('startingOpportunity', 'Starting Opportunity', 'Combat & Opportunity', 0, 20),
+  number('opportunityCap', 'Opportunity cap', 'Combat & Opportunity', 0, 20),
+  boolean('opportunityOnKill', 'Fighter kills grant 1 Opportunity', 'Combat & Opportunity'),
   number('bf109Cards', 'BF-109 cards', 'Enemy deck'),
   number('bf110Cards', 'BF-110 cards', 'Enemy deck'),
   number('fw190Cards', 'FW-190 cards', 'Enemy deck'),
@@ -47,8 +54,8 @@ export const CONFIG_FIELDS = [
   number('fireCost', 'Fire Control resource cost', 'Action costs', 0, 5),
   number('medicalCost', 'Medical resource cost', 'Action costs', 0, 5),
   number('escortCost', 'Escort Enlisted resource cost', 'Action costs', 0, 5),
-  number('orderShotCost', 'Ordered Basic Shot Officer cost', 'Action costs', 0, 5),
-  number('conversionRate', 'Copilot conversion input per 1 output', 'Action costs', 1, 5),
+  number('directFireCost', 'Pilot Direct Fire Officer cost', 'Action costs', 0, 5),
+  number('conversionRate', 'Copilot exchange: Enlisted per 1 Officer (both directions)', 'Action costs', 1, 5),
   number('restartMax', 'Engine restart succeeds on d6 ≤', 'Altitude & engines', 1, 6),
   number('startingAltitude', 'Starting altitude (0 = ground)', 'Altitude & engines', 1, 12),
   number('controlOfficerMin', 'Officer control succeeds on d6 ≥', 'Altitude & engines', 1, 6),
@@ -67,10 +74,15 @@ export const CONFIG_FIELDS = [
   number('returnLength', 'Rounds from target to HOME', 'Mission & presentation', 1, 20),
   number('bombingMin', 'Provisional bombing success: d6 ≥', 'Mission & presentation', 1, 6),
   number('animationMs', 'Event delay ms (0 = instant)', 'Mission & presentation', 0, 3000, 50),
+  { key: 'presentationSpeed', label: 'Presentation speed', group: 'Mission & presentation', type: 'select', options: [
+    { value: 'manual', label: 'Step / Manual' }, { value: 'normal', label: 'Normal' },
+    { value: 'fast', label: 'Fast' }, { value: 'instant', label: 'Instant' },
+  ] },
 ];
 
 /** Ignore unknown keys, coerce form input, and prevent impossible empty token systems. */
 export function normalizeConfig(overrides = {}) {
+  overrides = { ...overrides, ...(overrides.directFireCost === undefined && overrides.orderShotCost !== undefined ? { directFireCost: overrides.orderShotCost } : {}) };
   const config = { ...DEFAULT_CONFIG };
   for (const field of CONFIG_FIELDS) {
     const value = overrides[field.key];
@@ -84,7 +96,7 @@ export function normalizeConfig(overrides = {}) {
     }
   }
   if (config.missionEnemy + config.missionResource === 0) config.missionResource = 1;
-  if (config.combatHit + config.combatMiss === 0) config.combatMiss = 1;
+  if (config.combatHit + config.combatBurst + config.combatMiss === 0) throw new RangeError('The combat bag needs at least one Hit, Burst, or Miss token.');
   if (config.bf109Cards + config.bf110Cards + config.fw190Cards + config.me262Cards + config.flakCards === 0) config.flakCards = 1;
   config.structureMid = Math.max(config.structureSafe, config.structureMid);
   config.structureFatal = Math.max(config.structureMid + 1, config.structureFatal);

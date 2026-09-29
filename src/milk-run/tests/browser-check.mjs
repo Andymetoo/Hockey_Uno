@@ -12,6 +12,7 @@ import { DEFAULT_CONFIG, CONFIG_FIELDS } from '../config.mjs';
 import { dispatch } from '../rules.mjs';
 import { die } from '../random.mjs';
 import { BOARD, CREW_DEFS, STATIONS, ENGINE_CELLS } from '../board.mjs';
+import { legacyWitnessState } from './fixtures/legacy-witness.mjs';
 
 const root = fileURLToPath(new URL('../../../', import.meta.url));
 const artifacts = resolve(root, 'src/milk-run/.checks');
@@ -36,7 +37,7 @@ const chrome = spawn(process.env.CHROME_PATH ?? 'C:/Program Files/Google/Chrome/
 let launchError, ws;
 chrome.on('error', error => { launchError = error; });
 const sleep = ms => new Promise(done => setTimeout(done, ms));
-const exceptions = [], badResponses = [], sizes = [[1440, 1000], [390, 844], [320, 740], [768, 1024]];
+const exceptions = [], badResponses = [], sizes = [[1440, 1000], [390, 844], [320, 740], [360, 800], [430, 932], [768, 1024]];
 const viewportResults = [];
 const boardResults = [];
 try {
@@ -88,7 +89,7 @@ try {
       if (await evaluate(expression)) return;
       await sleep(50);
     }
-    throw new Error(`Timed out: ${expression}`);
+    throw new Error(`Timed out: ${expression}\nBrowser exceptions: ${JSON.stringify(exceptions)}`);
   }
   async function click(selector) {
     assert.ok(await evaluate(`!!document.querySelector(${JSON.stringify(selector)})`), `Exists: ${selector}`);
@@ -151,8 +152,8 @@ try {
         crew: [...document.querySelectorAll('#board .crew-marker')].map(g => {
           const c=g.querySelector('circle'),t=g.querySelector('text'),r=t.getBoundingClientRect();
           return {id:g.dataset.crewId,footprint:g.dataset.footprint,number:t.textContent.trim(),
-            x:number(c,'cx'),y:number(c,'cy'),circles:g.querySelectorAll('circle').length,
-            labels:g.querySelectorAll('text').length,labelHeight:r.height};
+            x:number(c,'cx'),y:number(c,'cy'),circles:g.querySelectorAll(':scope > circle').length,
+            labels:g.querySelectorAll(':scope > text').length,labelHeight:r.height};
         }),
         indicators: [...document.querySelectorAll('#board .engine-indicator')].map(g => ({
           id:g.dataset.engineId,cellId:g.closest('[data-cell]')?.dataset.cell
@@ -234,6 +235,7 @@ try {
   await touch('[data-command="startRound"]'); await flush();
   await touch('[data-crew="pilot"]');
   assert.equal((await getState()).slot,0,'touching a crew card only selects it');
+  await evaluate("document.querySelector('dialog[open]')?.close()");
   await touch('[data-ui="activate"]'); await flush();
   assert.equal((await getState()).slot,1,'one touch activates exactly once');
   await touch('[data-ui="choose"]');
@@ -256,14 +258,14 @@ try {
   invalidWork=dispatch(invalidWork,{type:'activate',crewId:'engineer'}).state;
   invalidWork.cells['A3-1']='damaged';invalidWork.cells['C6-2']='damaged';
   await inject(invalidWork);await click('[data-ui="choose"]');await click('[data-action="repair"]');
-  await click('[data-select-cell="A3-1"]');await click('[data-select-cell="C6-2"]');
-  await click('#choice-form button[type="submit"]');
+  await evaluate("document.querySelector('#board [data-cell=\"A3-1\"]').dispatchEvent(new MouseEvent('click',{bubbles:true}))");
+  await evaluate("document.querySelector('#board [data-cell=\"C6-2\"]').dispatchEvent(new MouseEvent('click',{bubbles:true}))");
   assert.deepEqual(await getState(),invalidWork,'invalid disconnected repair does not spend or advance enemies');
-  assert.ok(await evaluate("document.querySelector('#action-dialog').open"),'invalid choice keeps action sheet open');
-  assert.match(await evaluate("document.querySelector('#action-dialog [role=alert]').textContent"),/connected/i,'action error is visible inside modal');
-  assert.equal(await evaluate("document.querySelectorAll('[data-select-cell][aria-pressed=true]').length"),2,'invalid work preserves selection for correction');
-  await click('[data-select-cell="C6-2"]');await click('#choice-form button[type="submit"]');await flush();
-  assert.equal((await getState()).jobs.length,1,'correcting selection can complete the action');
+  assert.equal(await evaluate("document.querySelectorAll('#board .board-cell.target-chosen').length"),1,'disconnected target is rejected while preserving the valid primary square');
+  await click('[data-ui="work-position"]');
+  await evaluate("document.querySelector('#board [data-work-cell=\"C3-2\"]').dispatchEvent(new MouseEvent('click',{bubbles:true}))");
+  await click('[data-ui="confirm-target"]');await flush();
+  assert.equal((await getState()).jobs.length,1,'board targets and internal worker position complete the action');
 
   let attack=dispatch(createGame({missionEnemy:0,missionResource:100},'browser-attack'),{type:'startRound'}).state;
   attack=dispatch(attack,{type:'activate',crewId:'pilot'}).state;
@@ -289,27 +291,30 @@ try {
   assert.equal(await evaluate("window.milkRun.exportSession().current.type"),'ENEMY_ATTACK_ROLL','reload preserves exact visible cause');
   await click('[data-ui="step"]');
   assert.equal(await evaluate("window.milkRun.exportSession().current.type"),'ENEMY_HIT_LOCATION');
+  assert.equal(await evaluate("window.milkRun.getView().cells['C2-2']"),'healthy');
+  await click('[data-ui="step"]');
+  assert.equal(await evaluate("window.milkRun.exportSession().current.type"),'ENEMY_LOCATION_FOCUS');
   assert.ok(await evaluate("!!document.querySelector('[data-cell=\"C2-2\"].struck')"),'hit location highlights selected quarter before damage');
   assert.equal(await evaluate("document.querySelectorAll('#board .strike-ring').length"),1,'exactly one attack quarter is highlighted');
   assert.equal(await evaluate("document.querySelectorAll('#board [data-cell].struck').length"),1,'other quarters remain unstruck');
   await click('[data-ui="step"]');
   assert.equal(await evaluate("window.milkRun.getView().cells['C2-2']"),'damaged');
   assert.equal(await evaluate("window.milkRun.getView().crew.find(c=>c.id==='pilot').health"),'healthy','crew injury has its own later event');
-  assert.match(await evaluate("document.querySelector('#action-context').innerText"),/C2-2.*damaged/s,'sticky mobile dock describes the actual event');
+  assert.match(await evaluate("document.querySelector('#action-context').innerText"),/C2-2.*damaged/is,'sticky mobile dock describes the actual event');
   await evaluate("document.querySelector('#board').scrollIntoView({block:'center'})");
   await screenshot('mobile-critical-step');
   await flush();
   assert.deepEqual(await getState(),attackResult.state);
   assert.equal(await evaluate('window.milkRun.exportSession().log.length'),attackResult.events.length);
 
-  console.log('Completing full 10-round sorties through player controls on desktop and phone');
+  console.log('Completing full 19-round resource-only diagnostic sorties through player controls on desktop and phone');
   const sorties=[];
   for(const [width,height] of [[1440,1000],[390,844]]) {
     await viewport(width,height);await inject(safe);
     let current=await getState(), commands=0;
-    while(current.phase!=='ended'&&commands<300) {
-      if(['ready','roundEnd','bombing'].includes(current.phase)) {
-        const type={ready:'startRound',roundEnd:'endRound',bombing:'bomb'}[current.phase];
+    while(current.phase!=='ended'&&commands<700) {
+      if(['ready','roundEnd','bombing','opportunity'].includes(current.phase)) {
+        const type={ready:'startRound',roundEnd:'endRound',bombing:'bomb',opportunity:'continueEnemyPhase'}[current.phase];
         await click(`[data-command="${type}"]`);
       } else if(current.phase==='select') {
         const crew=current.crew.find(c=>!c.used&&c.health==='healthy'&&!c.job);
@@ -321,42 +326,69 @@ try {
       await flush();commands++;current=await getState();
       if(commands===60){const before=current;await reload();assert.deepEqual(await getState(),before,'mid-sortie autosave resumes without changing state');}
     }
-    assert.equal(current.phase,'ended');assert.equal(current.outcome,'success');assert.equal(current.round,10);assert.equal(current.mission.position,10);assert.equal(current.mission.bombed,true);assert.equal(current.stats.missionDraws,100);
+    const missionLength=safe.config.outboundLength+safe.config.returnLength;
+    const successfulDraws=Math.min(missionLength*10,safe.config.missionResource);
+    assert.equal(current.phase,'ended');assert.equal(current.outcome,'success');assert.equal(current.round,missionLength);assert.equal(current.mission.position,missionLength);assert.equal(current.mission.bombed,true);assert.equal(current.stats.missionDraws,successfulDraws);
+    assert.equal(await evaluate("window.milkRun.exportSession().log.filter(e=>e.type==='MISSION_BAG_EMPTY').length"),missionLength*10-successfulDraws,'hoarded resources stay outside this diagnostic bag; no tokens are invented after it runs out');
     assert.ok(await evaluate("!document.querySelector('#summary').hidden"),'compact telemetry visible at HOME');
-    assert.ok(await evaluate("document.querySelector('#summary').innerText.includes('100')"),'summary includes mission draws');
+    assert.ok(await evaluate(`document.querySelector('#summary').innerText.includes('${successfulDraws}')`),'summary includes mission draws');
     await evaluate("document.querySelector('#summary').scrollIntoView({block:'center'})");
     await screenshot(`home-${width}x${height}`);
     sorties.push({width,height,commands,rounds:current.round,missionDraws:current.stats.missionDraws,outcome:current.outcome});
   }
 
-  console.log('Replaying a deterministic sortie with all default combat and mission settings');
+  console.log('Preserving and resuming historical witness settings through its compatible opening decisions');
   const witness=JSON.parse(await readFile(new URL('./fixtures/baseline-home-witness.json',import.meta.url),'utf8'));
-  await viewport(390,844);await inject(createGame({},witness.seed));
-  let expected=await getState(), combatCaptured=false;
+  const legacy=legacyWitnessState(witness.seed);
+  await viewport(390,844);await inject(legacy);
+  let expected=await getState();
+  assert.deepEqual(expected.bags,legacy.bags,'migration preserves old runtime token inventories');
+  assert.equal(expected.rng,legacy.rng);assert.equal(expected.config.outboundLength,6);assert.equal(expected.config.returnLength,4);
+  assert.equal(expected.config.combatBurst,0);assert.equal(expected.config.disruptOnHit,false);assert.equal(expected.config.opportunityEnabled,false);
+  let compatibleCommands=0;
   for(const move of witness.commands) {
+    if(move.action==='orderShot') {
+      const before=await getState();
+      assert.equal(await evaluate(`window.milkRun.send(${JSON.stringify(move)})`),false,'retired ordered-shot command is explicitly rejected');
+      assert.deepEqual(await getState(),before);break;
+    }
     expected=dispatch(expected,move).state;
-    assert.equal(await evaluate(`window.milkRun.send(${JSON.stringify(move)})`),true,`default witness accepts ${JSON.stringify(move)}`);
+    assert.equal(await evaluate(`window.milkRun.send(${JSON.stringify(move)})`),true,`historical compatible command accepts ${JSON.stringify(move)}`);
     await flush();
     // Real-time timestamps belong to each execution; seeded rules and state match exactly.
     const actual=await getState();
     assert.deepEqual({...actual,endedAt:null},{...expected,endedAt:null});
-    if(!combatCaptured&&actual.fighters.length&&Object.values(actual.cells).some(s=>s!=='healthy')) {
-      await evaluate("document.querySelector('#board').scrollIntoView({block:'center'})");
-      await screenshot('default-sortie-combat-phone');combatCaptured=true;
+    compatibleCommands++;
+  }
+  assert.ok(compatibleCommands>0);
+  await screenshot('legacy-witness-migration');
+  sorties.push({width:390,height:844,seed:witness.seed,historicalMigration:true,compatibleCommands,note:'The historical fixture is unchanged. Its three retired orderShot commands and six old conversions are not a witness of the new rules.'});
+
+  console.log('Replaying the new 19-round default-rules combat/economy witness');
+  const currentWitness=JSON.parse(await readFile(new URL('./fixtures/combat-economy-home-witness.json',import.meta.url),'utf8'));
+  await inject(createGame({},currentWitness.seed));
+  let currentExpected=await getState(),capturedCombat=false;
+  for(const move of currentWitness.commands) {
+    currentExpected=dispatch(currentExpected,move).state;
+    assert.equal(await evaluate(`window.milkRun.send(${JSON.stringify(move)})`),true,`current witness accepts ${JSON.stringify(move)}`);
+    await flush();
+    const actual=await getState();assert.deepEqual({...actual,endedAt:null},{...currentExpected,endedAt:null});
+    if(!capturedCombat&&actual.stats.opportunitySpent>0&&actual.fighters.some(f=>f.disrupted)) {
+      await evaluate("document.querySelector('#board-stage').scrollIntoView({block:'start'})");
+      await screenshot('combat-economy-sortie-phone');capturedCombat=true;
     }
   }
-  const baseline=await getState();
-  assert.equal(baseline.outcome,'success');assert.equal(baseline.mission.position,10);
-  assert.ok(baseline.stats.enemyAttacks>0&&baseline.stats.fightersKilled>0&&baseline.stats.aircraftHits>0,'default witness exercises genuine combat pressure');
-  assert.ok(baseline.stats.repairs>0,'default witness completes crisis repair work');
-  assert.deepEqual(baseline.config,DEFAULT_CONFIG);
-  await evaluate("document.querySelector('#summary').scrollIntoView({block:'start'})");await screenshot('default-sortie-home-phone');
-  sorties.push({width:390,height:844,seed:witness.seed,defaultRules:true,commands:witness.commands.length,rounds:baseline.round,...baseline.stats,outcome:baseline.outcome});
+  const home=await getState();
+  assert.deepEqual(home.config,DEFAULT_CONFIG);assert.equal(home.outcome,'success');assert.equal(home.round,19);assert.equal(home.mission.position,19);
+  assert.equal(home.altitude,currentWitness.metrics.altitude);assert.equal(home.opportunity,currentWitness.metrics.opportunity);
+  assert.deepEqual(home.stats,currentWitness.metrics.stats);
+  await evaluate("document.querySelector('#summary').scrollIntoView({block:'start'})");await screenshot('combat-economy-home-phone');
+  sorties.push({width:390,height:844,seed:currentWitness.seed,defaultRules:true,commands:currentWitness.commands.length,...currentWitness.metrics});
 
   assert.equal(await evaluate("localStorage.getItem('unrelated-game-fixture')"), 'untouched');
   assert.deepEqual(exceptions, [], 'no browser runtime errors');
   assert.deepEqual(badResponses, [], 'all static assets load');
-  await writeFile(resolve(artifacts, 'browser-results.json'), JSON.stringify({ browser: version.product, viewportResults, boardResults, sorties, exceptions, badResponses, notes: 'Chromium responsive emulation; physical mobile devices remain a manual check. All 144 quarters, ten unique centered crew markers, engine indicators, exact-quarter mobile touch and hit highlighting checked. Resource-only sorties isolate UI progression; a third committed witness exercises complete default-rules combat, damage, crisis work, and HOME.' }, null, 2));
+  await writeFile(resolve(artifacts, 'browser-results.json'), JSON.stringify({ browser: version.product, viewportResults, boardResults, sorties, exceptions, badResponses, notes: 'Chromium responsive emulation; physical mobile devices remain a manual check. All 144 quarters, ten unique centered crew markers, engine indicators, exact-quarter mobile touch and hit highlighting checked. Two 19-round resource-only diagnostics isolate interface progression; the new default combat/economy witness also reaches HOME. Historical witness values remain preserved and its obsolete action is explicitly rejected.' }, null, 2));
   console.log(`Browser checks passed at ${sizes.map(([w,h]) => `${w}x${h}`).join(', ')}.`);
 } finally {
   ws?.close();

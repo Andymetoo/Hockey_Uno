@@ -23,7 +23,7 @@ export const ENGINE_INDICATORS = grid.engineIndicators;
 
 const arc = (quadrants, altitudes) => ({ quadrants, altitudes });
 export const CREW_DEFS = [
-  { id: 'pilot', number: 3, name: 'Pilot', role: 'Aircraft commander', rank: 'Officer', tags: ['Officer', 'Pilot'], abilities: ['orderShot'], station: 'pilot' },
+  { id: 'pilot', number: 3, name: 'Pilot', role: 'Aircraft commander', rank: 'Officer', tags: ['Officer', 'Pilot'], abilities: ['directFire'], station: 'pilot' },
   { id: 'copilot', number: 4, name: 'Copilot', role: 'Resource conversion', rank: 'Officer', tags: ['Officer', 'Pilot', 'Copilot'], abilities: ['convert'], station: 'copilot' },
   { id: 'navigator', number: 2, name: 'Navigator', role: 'Nose gun / evasion', rank: 'Officer', tags: ['Officer', 'Gunner', 'Navigator'], abilities: ['rotateFighter'], station: 'navigator', arc: arc(['Fore'], ['Level', 'High']) },
   { id: 'bombardier', number: 1, name: 'Bombardier', role: 'Nose gun / target', rank: 'Officer', tags: ['Officer', 'Gunner', 'Bombardier'], abilities: [], station: 'bombardier', arc: arc(['Fore'], ['Level', 'High']) },

@@ -1,10 +1,11 @@
 /** Milk Run v3 rules. Mutations are transactional; semantic events carry snapshots.
- * UI choices occur only in select/action/bombing phases. No timers or DOM here.
+ * UI choices include an explicit post-action Opportunity window. No timers or DOM here.
  */
 import { BOARD, CREW_DEFS, STATIONS, SECTIONS, QUADRANTS, ALTITUDES, getCell, neighbors } from './board.mjs';
 import { ENEMY_DEFS, RESOURCE_BY_RANK } from './config.mjs';
 import { die, drawBag, refillBag, drawDeck } from './random.mjs';
 import { resolveBombing } from './bombing.mjs';
+import { fighterHeading, turnHeadingToward, turnHeadingAway } from './spatial.mjs';
 
 const copy = value => structuredClone(value);
 const def = id => CREW_DEFS.find(item => item.id === id);
@@ -20,28 +21,60 @@ const hasAbility = (crew, ability) => def(crew.id)?.abilities?.includes(ability)
 const bump = (state, key, amount = 1) => { state.stats[key] = (state.stats[key] || 0) + amount; };
 const record = (emit, type, message, extra = {}) => emit({ type, message, ...extra });
 const status = (state, id) => state.cells[id] || 'healthy';
+const underTreatment = (state, crewId) => state.jobs.some(job => job.kind === 'medical' && job.targetId === crewId);
 
 export function isAtStation(state, crew) {
   const expected = stationCells(crew.station);
-  return expected.length > 0 && crew.health === 'healthy' && !crew.job &&
+  return expected.length > 0 && crew.health === 'healthy' && !crew.job && !underTreatment(state, crew.id) &&
     expected.every(id => crew.position.includes(id) && isSafe(state, id)) &&
     crew.position.length === expected.length;
 }
 
 export function availableCrew(state) {
-  return state.crew.filter(crew => crew.health === 'healthy' && !crew.used && !crew.job);
+  return state.crew.filter(crew => crew.health === 'healthy' && !crew.used && !crew.job && !underTreatment(state, crew.id));
+}
+
+/** Selecting a used gunner may still preview their operating arc. */
+export function operatingArc(state, crewId) {
+  const crew = person(state, crewId);
+  return crew && isAtStation(state, crew) ? def(crew.station)?.arc || null : null;
 }
 
 export function gunArcLegal(state, crewId, fighterId) {
-  const crew = person(state, crewId);
   const target = fighter(state, fighterId);
-  if (!crew || !target || !isAtStation(state, crew)) return false;
-  const arc = def(crew.station)?.arc;
-  return Boolean(arc && arc.quadrants.includes(target.quadrant) && arc.altitudes.includes(target.altitude));
+  const arc = operatingArc(state, crewId);
+  return Boolean(target && arc && arc.quadrants.includes(target.quadrant) && arc.altitudes.includes(target.altitude));
 }
 
 export function legalTargets(state, crewId) {
   return state.fighters.filter(target => gunArcLegal(state, crewId, target.id));
+}
+
+/** Both conversions conserve physical Resource tokens, including held tokens. */
+export function conversionOptions(state) {
+  const ratio = state.config.conversionRate;
+  const resourcesInBag = state.bags.mission.tokens.filter(token => token === 'Resource').length;
+  return [
+    { from: 'Enlisted', to: 'Officer', cost: ratio, gain: 1, bagNeeded: 0 },
+    { from: 'Officer', to: 'Enlisted', cost: 1, gain: ratio, bagNeeded: ratio - 1 },
+  ].map(option => {
+    const reason = state.resources[option.from] < option.cost ? `Needs ${option.cost} ${option.from} resource${option.cost === 1 ? '' : 's'}.`
+      : resourcesInBag < option.bagNeeded ? `Needs ${option.bagNeeded} Resource token${option.bagNeeded === 1 ? '' : 's'} currently in the mission bag; discard cannot be used.` : '';
+    return { ...option, enabled: !reason, reason, label: `${option.cost} ${option.from} → ${option.gain} ${option.to}` };
+  });
+}
+
+export function opportunityGunners(state) {
+  return state.crew.filter(crew => crew.used && crew.activationCompleted && operatingArc(state, crew.id) && legalTargets(state, crew.id).length);
+}
+
+export function opportunityAvailability(state) {
+  const gunners = opportunityGunners(state);
+  const reason = !state.config.opportunityEnabled ? 'Opportunity is disabled for this sortie.'
+    : state.phase !== 'opportunity' ? 'Opportunity Shots are available after the crew action, before the enemy phase.'
+    : !(state.opportunity > 0) ? 'No Opportunity tokens available.'
+    : !gunners.length ? 'No healthy gunner with a completed activation has an operating gun and legal target.' : '';
+  return { enabled: !reason, reason, gunners };
 }
 
 function stationEmpty(state, stationId, exceptId) {
@@ -56,10 +89,9 @@ function cockpitSeat(state, crew) {
 
 export function availableActions(state, crewId = state.activeCrew) {
   const crew = person(state, crewId);
-  if (!crew || crew.health !== 'healthy' || crew.job) return [];
+  if (!crew || crew.health !== 'healthy' || crew.job || underTreatment(state, crew.id)) return [];
   const rank = rankOf(crew);
   const affordable = (pool, amount) => state.resources[pool] >= amount;
-  const jobsCells = new Set(state.jobs.flatMap(job => job.cells || []));
   const actions = [];
   const add = (id, label, enabled = true, reason = '', cost) => actions.push({ id, label, enabled, ...(enabled ? {} : { reason }), ...(cost ? { cost } : {}) });
   const targets = legalTargets(state, crewId);
@@ -71,11 +103,13 @@ export function availableActions(state, crewId = state.activeCrew) {
     ['repair', 'Repair', 'damaged', state.config.repairCost],
     ['fireControl', 'Fire Control', 'fire', state.config.fireCost],
   ]) {
-    const any = BOARD.some(cell => cell.structure && status(state, cell.id) === targetStatus && !jobsCells.has(cell.id));
-    add(id, label, any && affordable(rank, cost), !any ? `No available ${targetStatus} squares.` : `Needs ${cost} ${rank} resource.`, cost ? `${cost} ${rank}` : undefined);
+    const targets = eligibleCrisisTargets(state, id);
+    const hasWorkPosition = targets.some(cell => legalWorkPositions(state, crewId, [cell.id]).length);
+    add(id, label, hasWorkPosition && affordable(rank, cost), !targets.length ? `No available ${targetStatus} squares.` : !hasWorkPosition ? 'No non-burning interior work position on a target row.' : `Needs ${cost} ${rank} resource.`, cost ? `${cost} ${rank}` : undefined);
   }
-  const injured = state.crew.some(target => target.health === 'injured' && !state.jobs.some(job => job.kind === 'medical' && job.targetId === target.id));
-  add('medical', 'Medical', injured && affordable(rank, state.config.medicalCost), !injured ? 'No untreated injured crew.' : `Needs ${state.config.medicalCost} ${rank} resource.`, state.config.medicalCost ? `${state.config.medicalCost} ${rank}` : undefined);
+  const injured = state.crew.some(target => target.health === 'injured' && !underTreatment(state, target.id));
+  const medicalTargets = eligibleMedicalTargets(state, crewId);
+  add('medical', 'Medical', medicalTargets.length > 0 && affordable(rank, state.config.medicalCost), !injured ? 'No untreated injured crew.' : !medicalTargets.length ? 'No safe interior work position on an injured crewmate’s row.' : `Needs ${state.config.medicalCost} ${rank} resource.`, state.config.medicalCost ? `${state.config.medicalCost} ${rank}` : undefined);
   add('relocate', 'Relocate', BOARD.some(cell => cell.fuselage && isSafe(state, cell.id) &&
     !(crew.position.length === 1 && crew.position[0] === cell.id) &&
     !state.crew.some(other => other.id !== crew.id && other.health !== 'dead' && other.position.includes(cell.id))), 'No other safe, unoccupied fuselage position.');
@@ -85,11 +119,15 @@ export function availableActions(state, crewId = state.activeCrew) {
     const ready = state.engines.some(engine => !engine.running && engineSquares(engine.id).every(cell => status(state, cell.id) === 'healthy'));
     add('restartEngine', 'Restart Engine', ready, 'No stopped engine has both squares repaired.');
   }
-  if (hasAbility(crew, 'orderShot')) {
-    const eligible = state.crew.some(gunner => gunner.used && gunner.id !== crew.id && legalTargets(state, gunner.id).length);
-    add('orderShot', 'Order Basic Shot', eligible && affordable('Officer', state.config.orderShotCost), !eligible ? 'No already-used gunner has a legal target.' : 'Needs Officer resources.', `${state.config.orderShotCost} Officer`);
+  if (hasAbility(crew, 'directFire')) {
+    const cost = state.config.directFireCost ?? 1;
+    const reason = !state.config.opportunityEnabled ? 'Opportunity is disabled for this sortie.' : (state.opportunity || 0) >= state.config.opportunityCap ? 'Opportunity pool is full.' : !affordable('Officer', cost) ? `Needs ${cost} Officer resource${cost === 1 ? '' : 's'}.` : '';
+    add('directFire', 'Direct Fire', !reason, reason, `${cost} Officer`);
   }
-  if (hasAbility(crew, 'convert')) add('convert', 'Convert Resources', Math.max(state.resources.Officer, state.resources.Enlisted) >= state.config.conversionRate, `Needs ${state.config.conversionRate} of one resource.`, `${state.config.conversionRate}:1`);
+  if (hasAbility(crew, 'convert')) {
+    const options = conversionOptions(state);
+    add('convert', 'Convert Resources', options.some(option => option.enabled), options.map(option => `${option.label}: ${option.reason}`).join(' '), `${state.config.conversionRate}E ↔ 1O`);
+  }
   if (hasAbility(crew, 'rotateFighter')) add('rotateFighter', 'Distract Fighter', state.fighters.some(item => item.facing < 180), 'No fighter can turn farther away.');
   if (hasAbility(crew, 'escort')) add('escort', 'Summon Escort', affordable('Enlisted', state.config.escortCost), 'Needs Enlisted resources.', `${state.config.escortCost} Enlisted`);
   add('wait', 'Hold Position');
@@ -102,6 +140,18 @@ function spend(state, rank, amount, emit) {
   state.bags.mission.discard.push(...Array(amount).fill('Resource'));
   bump(state, `${rank}Spent`, amount);
   record(emit, 'RESOURCE_SPENT', `Spent ${amount} ${rank}. ${amount} resource token${amount === 1 ? '' : 's'} will return on refill.`, { rank, amount });
+}
+
+function gainOpportunity(state, amount, emit, cause, extra = {}) {
+  if (!state.config.opportunityEnabled) return;
+  const gained = Math.min(amount, Math.max(0, state.config.opportunityCap - (state.opportunity || 0)));
+  if (!gained) {
+    record(emit, 'OPPORTUNITY_CAPPED', `${cause}: the Opportunity pool is already at its ${state.config.opportunityCap}-token cap.`, { cause, amount: 0, ...extra });
+    return;
+  }
+  state.opportunity = (state.opportunity || 0) + gained;
+  bump(state, 'opportunityGained', gained);
+  record(emit, 'OPPORTUNITY_GAINED', `${cause}: gain ${gained} Opportunity (${state.opportunity}/${state.config.opportunityCap}).`, { cause, amount: gained, ...extra });
 }
 
 function cancelJob(state, crew, emit) {
@@ -186,9 +236,9 @@ export function damageSquare(state, cellId, steps, emit, { injureCrew = true } =
 
 export function resolveAttack(state, emit, { source = 'Enemy', fighterId, roll, cellId } = {}) {
   bump(state, 'enemyAttacks');
-  record(emit, 'ENEMY_ATTACK', `${source} attacks.`, { fighterId });
+  record(emit, 'ENEMY_ATTACK', `${source} attacks.`, { fighterId, source });
   const result = roll ?? die(state, 6);
-  record(emit, 'ENEMY_ATTACK_ROLL', `${source} rolls ${result}: ${result === 1 ? 'MISS' : result === 6 ? 'CRITICAL HIT' : 'HIT'}.`, { fighterId, roll: result, result: result === 1 ? 'miss' : result === 6 ? 'critical' : 'hit' });
+  record(emit, 'ENEMY_ATTACK_ROLL', `${source} rolls ${result}: ${result === 1 ? 'MISS' : result === 6 ? 'CRITICAL HIT' : 'HIT'}.`, { fighterId, source, roll: result, result: result === 1 ? 'miss' : result === 6 ? 'critical' : 'hit' });
   if (result === 1) return;
   bump(state, 'enemyHits');
   if (result === 6) bump(state, 'enemyCrits');
@@ -203,25 +253,33 @@ function killFighter(state, target, emit, cause) {
   state.fighters.splice(index, 1);
   bump(state, 'fightersKilled');
   record(emit, 'FIGHTER_DESTROYED', `${target.type} is destroyed by ${cause}. Remaining fighters move forward in queue order.`, { fighterId: target.id });
+  if (state.config.opportunityOnKill) gainOpportunity(state, 1, emit, `${target.type} destroyed`, { fighterId: target.id });
 }
 
 function damageFighter(state, target, amount, emit, cause) {
   target.hp = Math.max(0, target.hp - amount);
   record(emit, 'FIGHTER_DAMAGED', `${cause}: ${target.type} loses ${amount} HP (${target.hp}/${target.maxHp}).`, { fighterId: target.id, amount });
   if (!target.hp) killFighter(state, target, emit, cause);
+  else if (amount > 0 && state.config.disruptOnHit && !target.disrupted) {
+    target.disrupted = true;
+    record(emit, 'FIGHTER_DISRUPTED', `${target.type} is Disrupted: its next facing-in attack will be cancelled before a normal flyby.`, { fighterId: target.id, cause });
+  }
 }
 
 export function postAttackPosition(state, fighterId, emit, sector) {
   const target = fighter(state, fighterId);
   if (!target) return;
   const origin = target.quadrant;
+  // A flyby keeps its flight direction even when its new sector changes the
+  // relative angle to the bomber. Never derive this heading from destination.
+  target.heading = fighterHeading(target);
   const destination = sector || { quadrant: QUADRANTS[die(state, 4) - 1], altitude: ALTITUDES[die(state, 3) - 1] };
   target.quadrant = destination.quadrant;
   target.altitude = destination.altitude;
-  record(emit, 'FIGHTER_MOVED', `${target.type} flies to ${target.quadrant} / ${target.altitude}.`, { fighterId });
+  record(emit, 'FIGHTER_MOVED', `${target.type} flies to ${target.quadrant} / ${target.altitude}.`, { fighterId, origin, heading: target.heading });
   const delta = Math.abs(QUADRANTS.indexOf(origin) - QUADRANTS.indexOf(target.quadrant));
   target.facing = Math.min(delta, 4 - delta) * 90;
-  record(emit, 'FIGHTER_ROTATED', `${target.type} now faces ${target.facing === 0 ? 'the B-17' : `${target.facing}° away from the B-17`}.`, { fighterId, facing: target.facing });
+  record(emit, 'FIGHTER_ROTATED', `${target.type} now faces ${target.facing === 0 ? 'the B-17' : `${target.facing}° away from the B-17`}.`, { fighterId, facing: target.facing, heading: target.heading });
   for (const escort of state.escorts.filter(item => item.quadrant === target.quadrant)) {
     if (!fighter(state, fighterId)) break;
     record(emit, 'ESCORT_INTERCEPT', `Escort in ${escort.quadrant} catches the passing ${target.type}.`, { fighterId, escortId: escort.id });
@@ -235,10 +293,14 @@ function enemyPhase(state, emit) {
     const target = fighter(state, id);
     if (!target) continue;
     if (target.facing > 0) {
+      target.heading = turnHeadingToward(target);
       target.facing = Math.max(0, target.facing - 90);
-      record(emit, 'FIGHTER_ROTATED', `${target.type} rotates 90° toward the B-17; ${target.facing === 0 ? 'now facing in, ready for its next enemy phase' : `${target.facing}° remains`}.`, { fighterId: id, facing: target.facing });
+      record(emit, 'FIGHTER_ROTATED', `${target.type} rotates 90° toward the B-17; ${target.facing === 0 ? 'now facing in, ready for its next enemy phase' : `${target.facing}° remains`}.`, { fighterId: id, facing: target.facing, heading: target.heading });
     } else {
-      resolveAttack(state, emit, { source: target.type, fighterId: id });
+      if (target.disrupted) {
+        target.disrupted = false;
+        record(emit, 'ATTACK_DISRUPTED', `${target.type}'s attack is cancelled by Disruption. Disruption clears; the fighter still makes its normal flyby.`, { fighterId: id, source: target.type });
+      } else resolveAttack(state, emit, { source: target.type, fighterId: id });
       postAttackPosition(state, id, emit);
     }
   }
@@ -283,13 +345,14 @@ function missionDraw(state, crew, emit, { unavailable = false, intercept = false
   record(emit, 'ENEMY_CARD_DRAWN', `Enemy card: ${card}.`, { enemyType: card });
   if (card === 'Flak') return flak(state, emit, 'A Flak card was drawn.');
   const enemyDef = ENEMY_DEFS[card];
-  const spawned = { id: `fighter-${state.nextId++}`, type: card, hp: enemyDef.hp, maxHp: enemyDef.hp, quadrant: QUADRANTS[die(state, 4) - 1], altitude: ALTITUDES[die(state, 3) - 1], facing: state.config.spawnFacing };
+  const spawned = { id: `fighter-${state.nextId++}`, type: card, hp: enemyDef.hp, maxHp: enemyDef.hp, quadrant: QUADRANTS[die(state, 4) - 1], altitude: ALTITUDES[die(state, 3) - 1], facing: state.config.spawnFacing, disrupted: false };
+  spawned.heading = fighterHeading(spawned);
   state.fighters.push(spawned);
   bump(state, 'fightersSpawned');
   record(emit, 'FIGHTER_SPAWNED', `${card} joins queue slot ${state.fighters.length} at ${spawned.quadrant} / ${spawned.altitude}, ${spawned.facing === 0 ? 'facing the B-17' : '90° off-angle'}.`, { fighterId: spawned.id });
 }
 
-function combatPull(state, emit, crewId) {
+function combatPull(state, emit, crewId, fighterId) {
   const result = drawBag(state, state.bags.combat);
   if (result.refilled) record(emit, 'COMBAT_BAG_REFILLED', 'The combat bag was empty. Emergency refill from its discard pool.');
   if (!result.token) {
@@ -297,7 +360,7 @@ function combatPull(state, emit, crewId) {
     return 'Miss';
   }
   state.bags.combat.discard.push(result.token);
-  record(emit, 'GUNNER_SHOT_ROLL', `${nameOf(crewId)} pulls ${result.token.toUpperCase()}.`, { crewId, token: result.token });
+  record(emit, 'GUNNER_SHOT_ROLL', `${nameOf(crewId)} pulls ${result.token.toUpperCase()}.`, { crewId, fighterId, token: result.token });
   return result.token;
 }
 
@@ -306,9 +369,9 @@ function shoot(state, crew, targetId, emit, advanced = false) {
   let firstMissRetry = false;
   record(emit, 'GUNNER_FIRE_STARTED', `${nameOf(crew.id)} uses ${advanced ? 'Advanced' : 'Basic'} Fire against ${fighter(state, targetId).type}.`, { crewId: crew.id, fighterId: targetId });
   while (fighter(state, targetId)) {
-    const token = combatPull(state, emit, crew.id);
+    const token = combatPull(state, emit, crew.id, targetId);
     pulls++;
-    if (token === 'Hit') damageFighter(state, fighter(state, targetId), 1, emit, nameOf(crew.id));
+    if (token === 'Hit' || token === 'Burst') damageFighter(state, fighter(state, targetId), token === 'Burst' ? 2 : 1, emit, nameOf(crew.id));
     if (!advanced || firstMissRetry || !fighter(state, targetId)) break;
     if (token === 'Miss') {
       if (pulls === 1) {
@@ -329,23 +392,81 @@ function connected(ids, eightWay) {
   return seen.size === ids.length;
 }
 
-function workPosition(state, crew, targetIds) {
-  const origin = getCell(targetIds[0]);
-  const candidates = BOARD.filter(cell => cell.structure && isSafe(state, cell.id) && !state.crew.some(other => other.id !== crew.id && other.health !== 'dead' && other.position.includes(cell.id)));
-  candidates.sort((a, b) => (Math.abs(a.x - origin.x) + Math.abs(a.y - origin.y)) - (Math.abs(b.x - origin.x) + Math.abs(b.y - origin.y)) || Number(b.fuselage) - Number(a.fuselage));
-  requireRule(candidates.length, 'No safe work position is available.');
-  return [candidates[0].id];
+export function eligibleCrisisTargets(state, action) {
+  const desired = action === 'repair' ? 'damaged' : action === 'fireControl' ? 'fire' : null;
+  if (!desired) return [];
+  const busy = new Set(state.jobs.flatMap(job => job.cells || []));
+  return BOARD.filter(cell => cell.structure && status(state, cell.id) === desired && !busy.has(cell.id));
 }
 
-function returnWorker(state, crew, emit) {
-  if (crew.health === 'dead') return;
-  if (stationEmpty(state, crew.station, crew.id)) {
-    crew.position = [...stationCells(crew.station)];
-    record(emit, 'CREW_RETURNED', `${nameOf(crew.id)} returns to ${STATIONS[crew.station].name}.`, { crewId: crew.id });
-  } else record(emit, 'CREW_DISPLACED', `${nameOf(crew.id)} stays at the work position because the assigned station is burning or occupied. General actions remain available.`, { crewId: crew.id });
+export function crisisTargetCap(state, crewId, action) {
+  const crew = person(state, crewId);
+  if (action === 'repair') return state.config.repairCap + (crew && hasAbility(crew, 'enhancedRepair') ? state.config.engineerBonus : 0);
+  return action === 'fireControl' ? state.config.fireCap : 0;
 }
 
-function finishJob(state, job, emit) {
+/** Used by board targeting and rule validation; the cap depends on the worker. */
+export function connectedTargetSelection(state, action, ids) {
+  const eligible = new Set(eligibleCrisisTargets(state, action).map(cell => cell.id));
+  return ids.length > 0 && new Set(ids).size === ids.length &&
+    ids.every(id => eligible.has(id)) && connected(ids, state.config.eightWayWork);
+}
+
+/** Work stays in the central C/D interior on the PRIMARY target's main row.
+ * A multi-row connected repair/fire group uses its first selected square's row.
+ * Footprints may share interior work space; rendering offsets overlapping crew.
+ */
+export function legalWorkPositions(state, crewId, targetIds) {
+  if (!person(state, crewId)) return [];
+  const origin = getCell(targetIds?.[0]);
+  if (!origin) return [];
+  const row = Math.floor(origin.y / 2);
+  return BOARD.filter(cell => cell.fuselage && Math.floor(cell.y / 2) === row && isSafe(state, cell.id))
+    .sort((a, b) => (Math.abs(a.x - origin.x) + Math.abs(a.y - origin.y)) - (Math.abs(b.x - origin.x) + Math.abs(b.y - origin.y)) || a.y - b.y || a.x - b.x);
+}
+
+export function eligibleMedicalTargets(state, crewId) {
+  return state.crew.filter(target => target.health === 'injured' && !underTreatment(state, target.id) &&
+    legalWorkPositions(state, crewId, target.position).length > 0);
+}
+
+function workPosition(state, crew, targetIds, selectedId) {
+  const candidates = legalWorkPositions(state, crew.id, targetIds);
+  requireRule(candidates.length, 'No non-burning interior work position is available on the primary target row.');
+  requireRule(!selectedId || candidates.some(cell => cell.id === selectedId), 'Choose a non-burning interior work position on the primary target row.');
+  return [selectedId || candidates[0].id];
+}
+
+function returnWorkers(state, workers, emit) {
+  const living = workers.filter(crew => crew.health !== 'dead');
+  // Plan all returns before moving anyone. A returner releases their temporary
+  // footprint; a worker unable to return remains a real occupancy blocker.
+  const returning = new Set(living.filter(crew => stationCells(crew.station).length &&
+    stationCells(crew.station).every(id => isSafe(state, id))).map(crew => crew.id));
+  let changed;
+  do {
+    changed = false;
+    const reserved = new Set();
+    for (const crew of living) {
+      if (!returning.has(crew.id)) continue;
+      const home = stationCells(crew.station);
+      const blocked = home.some(id => reserved.has(id)) || state.crew.some(other =>
+        other.id !== crew.id && other.health !== 'dead' && !returning.has(other.id) &&
+        other.position.some(id => home.includes(id)));
+      if (blocked) { returning.delete(crew.id); changed = true; }
+      else home.forEach(id => reserved.add(id));
+    }
+  } while (changed);
+  // Present individual returns sequentially, using the coherent batch plan.
+  for (const crew of living) {
+    if (returning.has(crew.id)) {
+      crew.position = [...stationCells(crew.station)];
+      record(emit, 'CREW_RETURNED', `${nameOf(crew.id)} returns to ${STATIONS[crew.station].name}.`, { crewId: crew.id });
+    } else record(emit, 'CREW_DISPLACED', `${nameOf(crew.id)} stays at the work position because the assigned station is burning or occupied. General actions remain available.`, { crewId: crew.id });
+  }
+}
+
+function finishJob(state, job, emit, deferReturn = false) {
   const crew = person(state, job.crewId);
   record(emit, 'WORK_COMPLETING', `${nameOf(job.crewId)} completes ${job.kind === 'fireControl' ? 'Fire Control' : job.kind}.`, { crewId: job.crewId });
   if (job.kind === 'medical') {
@@ -365,14 +486,14 @@ function finishJob(state, job, emit) {
     } else record(emit, 'WORK_TARGET_CHANGED', `${id}: its condition changed; this part of the job has no effect.`, { cellId: id });
   }
   state.jobs = state.jobs.filter(item => item.id !== job.id);
-  if (crew) { crew.job = null; returnWorker(state, crew, emit); }
+  if (crew) { crew.job = null; if (!deferReturn) returnWorkers(state, [crew], emit); }
   recalculateConditions(state, emit);
 }
 
 function startJob(state, crew, command, emit) {
   const kind = command.action;
   const targetCells = kind === 'medical' ? person(state, command.targetId).position : command.cells;
-  const location = workPosition(state, crew, targetCells);
+  const location = workPosition(state, crew, targetCells, command.workCellId);
   const durationKey = kind === 'fireControl' ? 'fireDuration' : `${kind}Duration`;
   const duration = state.config[durationKey];
   const costKey = kind === 'fireControl' ? 'fireCost' : `${kind}Cost`;
@@ -445,21 +566,21 @@ function validateAction(state, crew, command) {
     case 'basicFire': case 'advancedFire': requireRule(gunArcLegal(state, crew.id, command.targetId), 'Choose a fighter inside the operating gun arc.'); break;
     case 'repair': case 'fireControl': {
       const cells = command.cells || [];
-      const cap = command.action === 'repair' ? state.config.repairCap + (hasAbility(crew, 'enhancedRepair') ? state.config.engineerBonus : 0) : state.config.fireCap;
+      const cap = crisisTargetCap(state, crew.id, command.action);
       const desired = command.action === 'repair' ? 'damaged' : 'fire';
       requireRule(cells.length > 0 && cells.length <= cap, `Choose 1–${cap} connected ${desired} squares.`);
       requireRule(new Set(cells).size === cells.length, 'Choose each work square only once.');
       requireRule(cells.every(id => getCell(id)?.structure && status(state, id) === desired), `All selected squares must contain ${desired} aircraft structure.`);
       requireRule(!state.jobs.some(job => (job.cells || []).some(id => cells.includes(id))), 'A selected square already has active work.');
       requireRule(connected(cells, state.config.eightWayWork), 'Work squares must be connected.');
-      workPosition(state, crew, cells);
+      workPosition(state, crew, cells, command.workCellId);
       break;
     }
     case 'medical': {
       const target = person(state, command.targetId);
       requireRule(target?.health === 'injured', 'Choose an injured crew member.');
       requireRule(!state.jobs.some(job => job.kind === 'medical' && job.targetId === target.id), 'Medical treatment is already in progress.');
-      workPosition(state, crew, target.position);
+      workPosition(state, crew, target.position, command.workCellId);
       break;
     }
     case 'relocate': requireRule(getCell(command.targetId)?.fuselage && isSafe(state, command.targetId) && !(crew.position.length === 1 && crew.position[0] === command.targetId) && !state.crew.some(other => other.id !== crew.id && other.health !== 'dead' && other.position.includes(command.targetId)), 'Choose another unoccupied, non-burning fuselage square.'); break;
@@ -469,8 +590,12 @@ function validateAction(state, crew, command) {
       requireRule(engine && !engine.running && engineSquares(engine.id).every(cell => status(state, cell.id) === 'healthy'), 'Choose a stopped engine with both squares repaired.');
       break;
     }
-    case 'orderShot': requireRule(command.gunnerId !== crew.id && person(state, command.gunnerId)?.used && gunArcLegal(state, command.gunnerId, command.targetId), 'Choose an already-used, available gunner and a fighter in their arc.'); break;
-    case 'convert': requireRule(['Officer', 'Enlisted'].includes(command.to) && state.resources[command.to === 'Officer' ? 'Enlisted' : 'Officer'] >= state.config.conversionRate, 'Choose a pool to receive; the other pool must afford conversion.'); break;
+    case 'convert': {
+      const option = conversionOptions(state).find(item => item.to === command.to);
+      requireRule(option, 'Choose Officer or Enlisted as the receiving pool.');
+      requireRule(option.enabled, option.reason);
+      break;
+    }
     case 'rotateFighter': requireRule(fighter(state, command.targetId)?.facing < 180, 'Choose an active fighter less than 180° away.'); break;
   }
 }
@@ -496,23 +621,25 @@ function resolveAction(state, crew, command, emit) {
       } else record(emit, 'ENGINE_RESTART_FAILED', `${command.targetId} remains stopped.`, { engineId: command.targetId });
       break;
     }
-    case 'orderShot': spend(state, 'Officer', state.config.orderShotCost, emit); shoot(state, person(state, command.gunnerId), command.targetId, emit); break;
+    case 'directFire': spend(state, 'Officer', state.config.directFireCost ?? 1, emit); gainOpportunity(state, 1, emit, 'Pilot Direct Fire', { crewId: crew.id }); break;
     case 'convert': {
-      const from = command.to === 'Officer' ? 'Enlisted' : 'Officer';
-      // One of the surrendered physical tokens changes rank; only the surplus
-      // returns to discard, preserving resource-token conservation.
-      state.resources[from] -= state.config.conversionRate;
-      state.resources[command.to]++;
-      state.bags.mission.discard.push(...Array(state.config.conversionRate - 1).fill('Resource'));
-      bump(state, `${from}Spent`, state.config.conversionRate);
-      bump(state, `${command.to}Gained`);
-      record(emit, 'RESOURCES_CONVERTED', `Copilot converts ${state.config.conversionRate} ${from} to 1 ${command.to}. ${state.config.conversionRate - 1} surplus token(s) enter discard.`, { from, to: command.to });
+      const option = conversionOptions(state).find(item => item.to === command.to);
+      state.resources[option.from] -= option.cost;
+      state.resources[option.to] += option.gain;
+      const discarded = Math.max(0, option.cost - option.gain);
+      if (discarded) state.bags.mission.discard.push(...Array(discarded).fill('Resource'));
+      // Expansion takes already-present safe tokens, never an emergency refill.
+      for (let index = 0; index < option.bagNeeded; index++) state.bags.mission.tokens.splice(state.bags.mission.tokens.indexOf('Resource'), 1);
+      bump(state, `${option.from}Spent`, option.cost);
+      bump(state, `${option.to}Gained`, option.gain);
+      record(emit, 'RESOURCES_CONVERTED', `Copilot converts ${option.label}. ${discarded ? `${discarded} surplus Resource token(s) enter discard.` : `${option.bagNeeded} additional Resource token(s) leave the mission bag.`}`, { from: option.from, to: option.to, cost: option.cost, gain: option.gain, bagTaken: option.bagNeeded, discarded });
       break;
     }
     case 'rotateFighter': {
       const target = fighter(state, command.targetId);
+      target.heading = turnHeadingAway(target);
       target.facing += 90;
-      record(emit, 'FIGHTER_ROTATED', `Navigator turns ${target.type} 90° away; now ${target.facing}° off the B-17.`, { fighterId: target.id, facing: target.facing });
+      record(emit, 'FIGHTER_ROTATED', `Navigator turns ${target.type} 90° away; now ${target.facing}° off the B-17.`, { fighterId: target.id, facing: target.facing, heading: target.heading });
       break;
     }
     case 'escort': {
@@ -557,8 +684,10 @@ function startRound(state, emit) {
     refillBag(state.bags[name]);
     record(emit, name === 'mission' ? 'MISSION_BAG_REFILLED' : 'COMBAT_BAG_REFILLED', `${name === 'mission' ? 'Mission' : 'Combat'} bag receives ${count} discarded tokens. Held resources remain outside the bag.`);
   }
-  for (const job of [...state.jobs]) if (job.completeRound <= state.round) finishJob(state, job, emit);
-  for (const crew of state.crew) crew.used = false;
+  const completing = state.jobs.filter(job => job.completeRound <= state.round);
+  for (const job of completing) finishJob(state, job, emit, true);
+  returnWorkers(state, completing.map(job => person(state, job.crewId)).filter(Boolean), emit);
+  for (const crew of state.crew) { crew.used = false; crew.activationCompleted = false; }
   record(emit, 'CREW_READIED', 'Healthy crew without crisis jobs are ready.');
   if (state.escorts.length) { state.escorts = []; record(emit, 'ESCORTS_EXPIRED', 'Previous-round escorts depart.'); }
   resolveFireSpread(state, emit);
@@ -575,11 +704,11 @@ function loseAltitude(state, cause, emit) {
 }
 
 function altitudeCheck(state, cause, minimum, emit, explanation) {
-  record(emit, 'ALTITUDE_CHECK', `${cause[0].toUpperCase() + cause.slice(1)} check: ${explanation}`, { cause });
+  record(emit, 'ALTITUDE_CHECK', `${cause[0].toUpperCase() + cause.slice(1)} check: ${explanation}`, { cause, minimum });
   if (minimum === 0) { record(emit, 'ALTITUDE_MAINTAINED', `${cause}: altitude maintained without a roll.`, { cause }); return; }
   if (minimum === 7) { loseAltitude(state, cause, emit); return; }
   const roll = die(state, 6);
-  record(emit, 'ALTITUDE_ROLL', `${cause}: rolled ${roll}; ${minimum}+ maintains altitude.`, { cause, roll });
+  record(emit, 'ALTITUDE_ROLL', `${cause}: rolled ${roll}; ${minimum}+ maintains altitude.`, { cause, roll, minimum });
   if (roll < minimum) loseAltitude(state, cause, emit);
   else record(emit, 'ALTITUDE_MAINTAINED', `${cause}: altitude maintained.`, { cause });
 }
@@ -640,6 +769,8 @@ function endRound(state, emit) {
 export function dispatch(original, command) {
   requireRule(original && command, 'State and command are required.');
   const state = copy(original);
+  // Old autosaves/snapshots can resume without a version reset or RNG changes.
+  for (const target of state.fighters) target.heading = fighterHeading(target);
   const events = [];
   const emit = event => events.push({ ...event, state: copy(state) });
   requireRule(state.phase !== 'ended', 'This sortie has ended. Start a new sortie to continue.');
@@ -651,6 +782,7 @@ export function dispatch(original, command) {
       requireRule(crew, 'That crew member is not available.');
       requireRule(!command.intercept || hasAbility(crew, 'intercept') && isAtStation(state, crew), 'Intercept requires Radio at an operating station and must be declared before drawing.');
       crew.used = true;
+      crew.activationCompleted = false;
       state.slot++;
       state.activeCrew = crew.id;
       record(emit, 'CREW_ACTIVATED', `Time slot ${state.slot}/${CREW_DEFS.length}: activate ${nameOf(crew.id)}.`, { crewId: crew.id });
@@ -669,11 +801,35 @@ export function dispatch(original, command) {
     case 'action': {
       requireRule(state.phase === 'action', 'Choose an action only after activating crew and resolving its draw.');
       const crew = person(state, state.activeCrew);
-      requireRule(crew?.health === 'healthy' && !crew.job, 'The active crew member cannot act.');
+      requireRule(crew?.health === 'healthy' && !crew.job && !underTreatment(state, crew.id), 'The active crew member cannot act.');
       validateAction(state, crew, command);
       resolveAction(state, crew, command, emit);
+      crew.activationCompleted = true;
+      record(emit, 'ACTIVATION_COMPLETED', `${nameOf(crew.id)} has completed their normal action.`, { crewId: crew.id });
+      state.phase = 'opportunity';
+      if (opportunityAvailability(state).enabled) {
+        record(emit, 'OPPORTUNITY_WINDOW_OPENED', 'Opportunity window: take Basic Shots with eligible crew, or Continue to the enemy phase.', { crewId: crew.id });
+      } else {
+        enemyPhase(state, emit);
+        endActivation(state, emit);
+      }
+      break;
+    }
+    case 'continueEnemyPhase': {
+      requireRule(state.phase === 'opportunity', 'Continue only from the Opportunity window.');
       enemyPhase(state, emit);
       endActivation(state, emit);
+      break;
+    }
+    case 'opportunityShot': {
+      const availability = opportunityAvailability(state);
+      requireRule(availability.enabled, availability.reason);
+      const gunner = availability.gunners.find(crew => crew.id === command.gunnerId);
+      requireRule(gunner && gunArcLegal(state, gunner.id, command.targetId), 'Choose a healthy gunner with a completed activation, an operating gun and a fighter in its arc.');
+      state.opportunity--;
+      bump(state, 'opportunitySpent');
+      record(emit, 'OPPORTUNITY_SPENT', `Spend 1 Opportunity: ${nameOf(gunner.id)} makes exactly one Basic Shot. No activation, mission draw or enemy phase.`, { crewId: gunner.id, fighterId: command.targetId, amount: 1 });
+      shoot(state, gunner, command.targetId, emit);
       break;
     }
     case 'endRound': requireRule(state.phase === 'roundEnd', 'Complete all crew slots before ending the round.'); endRound(state, emit); break;

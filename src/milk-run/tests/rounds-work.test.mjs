@@ -37,18 +37,28 @@ test('Copilot alone converts resources at 2:1 and preserves the physical token t
   assert.throws(() => action(ordinary, 'convert', { to: 'Enlisted' }), /available/i);
 });
 
-test('Pilot orders exactly one used-gunner Basic Shot without a draw or additional enemy phase', () => {
+test('Pilot Direct Fire creates Opportunity before the enemy phase for a completed gunner', () => {
   const state = activated('pilot');
   state.crew.find(c=>c.id==='engineer').used = true;
+  state.crew.find(c=>c.id==='engineer').activationCompleted = true;
   state.fighters = [fighter('f1', { hp: 4, maxHp: 4, facing: 180 })];
   state.bags.combat = { tokens: ['Hit','Hit','Hit'], discard: [] };
-  const result = action(state, 'orderShot', { gunnerId: 'engineer', targetId: 'f1' });
-  assert.equal(result.state.fighters[0].hp, 3);
+  const result = action(state, 'directFire');
+  assert.equal(result.state.fighters[0].hp, 4, 'Direct Fire creates the currency rather than firing a gun');
+  assert.equal(result.state.opportunity, state.opportunity + 1);
   assert.equal(result.state.stats.missionDraws, state.stats.missionDraws);
   assert.equal(result.state.slot, state.slot);
-  assert.equal(result.events.filter(e=>e.type==='ENEMY_PHASE_STARTED').length, 1);
-  assert.equal(result.events.filter(e=>e.type==='GUNNER_SHOT_ROLL').length, 1);
+  assert.equal(result.state.phase, 'opportunity');
+  assert.equal(result.events.filter(e=>e.type==='ENEMY_PHASE_STARTED').length, 0);
+  assert.equal(result.events.filter(e=>e.type==='GUNNER_SHOT_ROLL').length, 0);
   assert.equal(result.state.resources.Officer, state.resources.Officer - 1);
+  const shot=dispatch(result.state,{type:'opportunityShot',gunnerId:'engineer',targetId:'f1'});
+  assert.equal(shot.state.fighters[0].hp,3);
+  assert.equal(shot.state.opportunity,result.state.opportunity-1);
+  assert.equal(shot.state.stats.missionDraws,result.state.stats.missionDraws);
+  assert.equal(shot.state.slot,result.state.slot);assert.equal(shot.state.phase,result.state.phase);
+  assert.equal(shot.events.filter(e=>e.type==='ENEMY_PHASE_STARTED').length,0);
+  assert.equal(shot.events.filter(e=>e.type==='GUNNER_SHOT_ROLL').length,1);
 });
 
 test('unavailable slots occur after active crew, waste resource draws, and still resolve enemy phases', () => {
@@ -167,7 +177,7 @@ test('healthy crew stop first fire spread; later spread kills injured crew and t
 });
 
 test('workers stay displaced if their assigned station is burning when a job completes', () => {
-  const state = activated('radio');
+  const state = activated('radio', { repairDuration: 1 });
   const id=square(0,4);state.cells[id]='damaged';
   const worked=action(state,'repair',{cells:[id]}).state;
   const workPosition=[...worked.crew.find(c=>c.id==='radio').position];
@@ -184,10 +194,12 @@ test('Medical heals injury at its configured start and never revives a dead crew
   state.crew.find(c=>c.id==='pilot').health='injured';
   const worked=action(state,'medical',{targetId:'pilot'}).state;
   assert.equal(worked.crew.find(c=>c.id==='pilot').health,'injured');
-  const healed=nextRound(worked).state;
+  const busy=nextRound(worked).state;
+  assert.equal(busy.crew.find(c=>c.id==='pilot').health,'injured', 'default medical work remains busy through the following round');
+  const healed=nextRound(busy).state;
   assert.equal(healed.crew.find(c=>c.id==='pilot').health,'healthy');
   worked.crew.find(c=>c.id==='pilot').health='dead';
-  assert.equal(nextRound(worked).state.crew.find(c=>c.id==='pilot').health,'dead');
+  assert.equal(nextRound(nextRound(worked).state).state.crew.find(c=>c.id==='pilot').health,'dead');
 });
 
 test('engine restart requires an active, correctly seated cockpit occupant and configurable dice success', () => {

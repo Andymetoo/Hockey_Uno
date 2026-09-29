@@ -1,5 +1,7 @@
-// Rules are resolved into snapshots. Only the snapshot of the presented event
-// becomes visible. Decisions cannot run until the presentation queue is empty.
+import { advanceVisual, describeEvent, eventDelay, expandPresentation } from './presentation.mjs';
+
+// Rules resolve transactionally, but only the current beat's snapshot reaches UI.
+// Synthetic draw/focus beats never consume RNG or enter the raw semantic log.
 export class ResolutionQueue {
   constructor({ state, dispatch, onChange, saved }) {
     this.dispatch = dispatch;
@@ -7,74 +9,93 @@ export class ResolutionQueue {
     this.state = saved?.state ?? state;
     this.view = saved?.view ?? this.state;
     this.pending = saved?.pending ?? [];
+    if (saved && !saved.presentationVersion) this.pending = expandPresentation(this.pending, this.view, saved.current);
     this.log = saved?.log ?? [];
     this.current = saved?.current ?? null;
-    this.speed = saved?.speed ?? (this.state.config.animationMs === 0 ? 'instant' : 'normal');
-    this.paused = Boolean(saved?.pending?.length); // Resume pending events deliberately.
+    this.speed = saved?.speed === 'step' ? 'manual' : saved?.speed ?? (this.state.config.animationMs === 0 ? 'instant' : this.state.config.presentationSpeed ?? 'normal');
+    this.presenting = saved?.presenting ?? this.pending.length > 0;
+    this.paused = this.presenting; // Restored events always await deliberate continuation.
+    this.visual = saved?.visual ?? this.log.reduce((visual, event) => advanceVisual(visual, event), {});
+    this.beat = saved?.beat ?? this.current?.beat ?? 0;
     this.timer = null;
-    this.presenting = false;
   }
   get busy() { return this.presenting || this.pending.length > 0; }
   export() {
-    return { version: 1, state: this.state, view: this.view, pending: this.pending,
-      log: this.log, current: this.current, speed: this.speed };
+    return { version: 1, presentationVersion: 2, state: this.state, view: this.view, pending: this.pending,
+      log: this.log, current: this.current, speed: this.speed, visual: this.visual, beat: this.beat, presenting: this.presenting };
   }
   changed() { this.onChange?.(this); }
   send(command) {
     if (this.busy) throw new Error('Let the current event sequence finish first.');
     const result = this.dispatch(this.state, command);
+    this.pending = expandPresentation(result.events, this.view);
     this.state = result.state;
-    this.pending = result.events;
     if (!this.pending.length) this.view = this.state;
     this.presenting = this.pending.length > 0;
     this.next();
   }
-  next() {
-    clearTimeout(this.timer);
-    const event = this.pending.shift();
-    if (!event) {
-      this.presenting = false;
-      this.view = this.state;
-      this.changed();
-      return;
-    }
-    this.presenting = true;
+  consume(event, visible) {
     const { state, ...entry } = event;
     this.view = state ?? this.view;
-    this.current = { ...entry, round: this.view.round, sequence: this.log.length + 1 };
-    this.log.push(this.current);
+    const logged = { ...entry, round: this.view.round, sequence: this.log.length + 1 };
+    if (!event.presentationOnly) this.log.push(logged);
+    this.visual = advanceVisual(this.visual, event, this.view);
+    if (visible) this.current = { ...logged, beat: ++this.beat };
+  }
+  next() {
+    clearTimeout(this.timer);
+    this.timer = null;
+    while (this.pending.length) {
+      const event = this.pending.shift();
+      const major = describeEvent(event).major;
+      this.consume(event, major);
+      if (!major) continue; // Preserve bookkeeping in the log without flashing the banner.
+      this.presenting = true;
+      this.changed();
+      if (!this.paused) this.schedule();
+      return;
+    }
+    this.presenting = false;
+    this.view = this.state;
     this.changed();
-    if (!this.paused) this.schedule();
   }
   schedule() {
     clearTimeout(this.timer);
-    const delay = this.speed === 'instant' ? 0 : this.speed === 'fast' ? 110 : (this.state.config.animationMs ?? 750);
-    this.timer = setTimeout(() => this.next(), delay);
+    this.timer = null;
+    const delay = eventDelay(this.current, this.speed, this.state.config);
+    if (Number.isFinite(delay)) this.timer = setTimeout(() => this.next(), delay);
   }
   setSpeed(speed) {
-    this.speed = speed;
+    this.speed = speed === 'step' ? 'manual' : ['manual', 'normal', 'fast', 'instant'].includes(speed) ? speed : 'normal';
+    clearTimeout(this.timer);
+    this.timer = null;
     if (this.busy && !this.paused) this.schedule();
     this.changed();
   }
   togglePause() {
     this.paused = !this.paused;
     clearTimeout(this.timer);
+    this.timer = null;
     if (!this.paused && this.busy) this.schedule();
     this.changed();
   }
-  step() { this.paused = true; this.next(); }
+  step() {
+    // Manual mode already owns the wait. Avoid leaving an invisible pause behind
+    // when the player switches a manually stepped sequence back to Normal/Fast.
+    if (this.speed !== 'manual') this.paused = true;
+    this.next();
+  }
   flush() {
     clearTimeout(this.timer);
-    // Skip delays while retaining every event in the persistent log.
+    this.timer = null;
+    // Skip waits only: snapshots, persistent visual context, and all raw events survive.
     while (this.pending.length) {
-      const { state, ...event } = this.pending.shift();
-      this.view = state ?? this.view;
-      this.current = { ...event, round: this.view.round, sequence: this.log.length + 1 };
-      this.log.push(this.current);
+      const event = this.pending.shift();
+      this.consume(event, describeEvent(event).major);
     }
     this.view = this.state;
     this.presenting = false;
     this.changed();
   }
-  dispose() { clearTimeout(this.timer); }
+  dispose() { clearTimeout(this.timer); this.timer = null; }
 }

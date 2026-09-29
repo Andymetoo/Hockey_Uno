@@ -1,18 +1,35 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { createGame } from '../state.mjs';
 import { dispatch } from '../rules.mjs';
-import { DEFAULT_CONFIG } from '../config.mjs';
+import { SAVE_KEY, loadSession } from '../persistence.mjs';
+import { legacyWitnessState } from './fixtures/legacy-witness.mjs';
 
-test('committed default-rules witness reaches HOME through combat, injuries, fire, and crisis work', async () => {
+test('historical combat witness preserves its old settings on migration and rejects its retired ordered-shot command', async () => {
   const witness=JSON.parse(await readFile(new URL('./fixtures/baseline-home-witness.json',import.meta.url),'utf8'));
-  let state=createGame({},witness.seed),events=0;
-  for(const command of witness.commands){const result=dispatch(state,command);state=result.state;events+=result.events.length;}
-  assert.deepEqual(state.config,DEFAULT_CONFIG);
-  assert.equal(state.outcome,'success');assert.equal(state.round,10);assert.equal(state.mission.position,10);
-  assert.equal(state.crew.filter(c=>c.health!=='dead').length,witness.result.alive);
-  assert.deepEqual(state.stats,witness.result.stats);
-  assert.equal(events,witness.result.events);
-  assert.ok(state.stats.fightersKilled>0&&state.stats.flakAttacks>0&&state.stats.enemyCrits>0&&state.stats.firesStarted>0&&state.stats.repairs>0&&state.stats.crewInjured>0);
+  assert.equal(witness.commands.length,207);
+  assert.equal(witness.commands.filter(c=>c.action==='orderShot').length,3);
+  assert.equal(witness.commands.filter(c=>c.action==='convert').length,6);
+  const original=legacyWitnessState(witness.seed), encoded=JSON.stringify({version:1,state:original,view:original,pending:[],log:[],current:null,speed:'normal'});
+  const migrated=loadSession({getItem:key=>key===SAVE_KEY?encoded:null});
+  assert.ok(migrated);
+  assert.deepEqual(migrated.state.bags,original.bags);
+  assert.equal(migrated.state.rng,original.rng);
+  assert.equal(migrated.state.config.outboundLength,6);
+  assert.equal(migrated.state.config.returnLength,4);
+  assert.equal(migrated.state.config.repairDuration,1);
+  assert.equal(migrated.state.config.combatBurst,0);
+  assert.equal(migrated.state.config.disruptOnHit,false);
+  assert.equal(migrated.state.config.opportunityEnabled,false);
+  let state=migrated.state;
+  for(const command of witness.commands) {
+    if(command.action==='orderShot') {
+      const before=structuredClone(state);
+      assert.throws(()=>dispatch(state,command),/available|unknown|action/i);
+      assert.deepEqual(state,before,'a retired decision cannot partially spend resources or advance the sortie');
+      break;
+    }
+    state=dispatch(state,command).state;
+  }
+  assert.ok(state.stats.missionDraws>0&&state.stats.fightersSpawned>0,'compatible opening decisions still replay');
 });

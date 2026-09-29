@@ -1,6 +1,6 @@
 # Milk Run — v3 vertical slice
 
-Milk Run is an isolated, responsive B-17 solitaire rules prototype. Fly six rounds to the target, attempt the provisional bombing step, and survive four return rounds to HOME. Mission success means reaching HOME after attempting the bombing run; the bombing result is reported separately. Aircraft geometry follows the supplied authoritative PlaneGrid mapping; unresolved numerical rules remain provisional playtest data.
+Milk Run is an isolated, responsive B-17 solitaire rules prototype. Fly fourteen rounds to the target, attempt the provisional bombing step, and survive five return rounds to HOME. Mission success means reaching HOME after attempting the bombing run; the bombing result is reported separately. Aircraft geometry follows the supplied authoritative PlaneGrid mapping; unresolved numerical rules remain provisional playtest data.
 
 ## Run and deploy
 
@@ -17,14 +17,14 @@ Milk Run uses plain HTML, CSS and browser ES modules. It adds no framework, pack
 ## Playtest controls
 
 1. Start a round. Refill bags, complete due work, ready crew, then watch fire spread.
-2. Select a ready crew member. The Radio Operator can declare Intercept **before** drawing.
-3. Activate to draw a mission token, then select one action. The action menu opens as a sheet on mobile.
-4. Watch ordered enemy resolution. Use pause, single-step, fast presentation or skip when needed.
+2. Select a crew member to preview their station, status, actions and gun arc without spending an activation. The Radio Operator can declare Intercept **before** drawing.
+3. Activate to draw and reveal a mission token, then select one action. Action groups explain General, Role and Station actions and their costs. Fire at an individual aircraft token or queue card; select crisis targets on the aircraft, then confirm.
+4. If a legal Opportunity Shot exists after the action, use the **Opportunity window** to fire with a gunner whose normal action is complete. Repeat while eligible, or choose **Continue to Enemy Phase**. Then watch ordered enemy resolution. **Step / Manual** waits for the next major beat; **Normal** gives draws, rolls and consequences readable time; **Fast** shortens the same sequence. Skip preserves the full event record.
 5. After ten crew time slots, finish the round: fighters clear, independent altitude checks resolve, and the mission advances if airborne.
 
-The flight recorder retains semantic events, including rolls and their consequences. Board squares and crew can be inspected by tapping; no critical interaction requires hover. On mobile the status header and bottom activation controls remain accessible, crew cards scroll horizontally, and detailed actions/settings open separately.
+The flight recorder groups human-readable summaries by category with expandable semantic event details. Board squares, crew and fighters can be inspected or selected by tapping; no critical interaction requires hover. On mobile the status header and bottom controls remain accessible, ten crew form a compact two-row rack, and detailed actions/settings open in sheets. Selecting a gunner previews the legal sectors and fighters without drawing or changing game state.
 
-Open **Playtest settings** to edit experimental rules, enter an RNG seed, and restart with those settings. Settings apply to a new sortie so token inventories and crew state remain coherent. **Reset defaults** restores the form's baseline values. Ordinary resource exchange is unavailable; the Copilot has the explicit conversion action.
+Open **Playtest settings** to edit experimental rules, enter an RNG seed, and restart with those settings. Rule preferences persist separately from the current sortie; structural rule changes apply to the next sortie so token inventories and crew state remain coherent. **Reset defaults** clears stored overrides and restores the canonical values. A **PLAYTEST RULES MODIFIED** indicator identifies overrides. Ordinary resource exchange is unavailable; only the Copilot can convert resource pools.
 
 The same configuration, seed, and sequence of decisions produce the same random gameplay results. Presentation timing does not consume random numbers. Real-world start/end timestamps naturally differ. Export the sortie and flight recorder as JSON to preserve a useful bug report or balance example.
 
@@ -39,21 +39,38 @@ The same configuration, seed, and sequence of decisions produce the same random 
 | `data/` | Canonical PlaneGrid CSV and the original flat board artwork retained as a visual reference. |
 | `random.mjs` | Serializable seeded PRNG, dice, mission/combat bag draw/refill and enemy deck exhaustion. |
 | `rules.mjs` | Validate decisions, resolve rules and emit semantic events with intermediate state snapshots. |
+| `spatial.mjs` | Absolute fighter headings and relative attack-facing helpers, independent of artwork. |
+| `ui-model.mjs` | Pure crew status, station information, arc previews and legal board-target choices. |
+| `targeting.mjs` | Tentative fighter, crew, work-square and worker-position selection with confirmation legality. |
+| `board-view.mjs` | Data-driven SVG geometry, individual crew/fighter tokens, arcs, work outlines, reticle and escort rendering. |
+| `views.mjs` | Crew/queue cards, draw tokens, event stage, grouped recorder and altitude track markup. |
 | `bombing.mjs` | Isolated, explicitly provisional target resolution. |
-| `queue.mjs` | Present snapshots one at a time; pause, step, accelerate or skip delays while retaining the event log. |
-| `persistence.mjs` | Versioned local autosave/resume. |
-| `main.mjs`, `styles.css`, `index.html` | Responsive board, HUD, crew selection, action sheets, settings, log and summary. |
+| `presentation.mjs`, `queue.mjs` | Add visual draw/focus beats, classify events and present snapshots one at a time; manual, normal, fast and skip retain the semantic event log. |
+| `persistence.mjs` | Versioned local autosave/resume, rules-version migration and separate next-run preferences. |
+| `main.mjs`, `styles.css`, `ux.css`, `index.html` | Responsive board, HUD, crew selection, action sheets, settings, log and summary. |
 | `tests/` | Node rules/data/presentation tests and a real Chromium responsive check. |
 
 A command resolves against a copied state. Each meaningful effect emits an event and its state snapshot. The queue owns both the final resolved state and the currently presented state. The UI renders the latter, preventing aircraft damage, injuries, altitude loss or enemy movement from appearing ahead of the event that explains it. Further player commands wait until the sequence has completed. Skipping removes delays while retaining every event in the log.
 
+Presentation-only draw and focus beats reuse an already-visible snapshot and never roll dice or mutate gameplay. A mission token first appears facedown, then reveals its result before resource gain or fighter spawn. Combat pulls identify shooter and target, reveal Hit/Burst/Miss, and then show damage before any next pull. Enemy attacks distinguish the attack roll from the location and its consequences. An empty-air location leaves a blue X until the next enemy attack; a failed attack roll has no location. The reticle contracts onto the exact quarter before damage becomes visible. Altitude checks and losses use the same serialized sequence.
+
+Board interactions keep tentative targets outside game state until confirmation. Canceling a target selection does not spend resources, advance enemies, draw tokens or consume an activation. Fighters sharing a sector remain separate numbered tokens and queue cards. Escort aircraft use blue styling; enemies use red. The recorder preserves every rule event independently of the selected presentation speed; visual-only beats do not inflate the raw log or telemetry.
+
+Starting a resolution brings the event stage into view once, including when the order came from a crew rack or enemy queue below the board. It does not keep pulling the viewport back on every beat. Opening an inspection sheet pauses automatic presentation; close the sheet and press Play to continue. Expanded recorder groups and raw event details remain open as new events arrive.
+
+Fighters store an absolute clockwise heading (`0` north, `90` east, `180` south, `270` west) separately from relative `facing`. A flyby keeps that heading when its quadrant changes; a subsequent turn updates it toward the B-17. Relative facing still decides attack versus rotate and retains the existing same/adjacent/opposite quadrant rule. Heading is recovered deterministically for old saves that lack it, without consuming RNG. An exactly opposite turn uses clockwise rotation because the old rules do not specify a preferred side.
+
 Autosave uses the localStorage key `milk-run-v3-session-2`, with board version `plane-grid-v1`. The saved session includes final state, visible state, pending snapshots, current event, log and presentation speed. Reloading in the middle of a sequence restores the pending sequence paused for deliberate continuation. Saves made with the old approximate board cannot be resumed on the corrected geometry; its damage, crew and work positions cannot be unambiguously migrated. The old `milk-run-v3-session-1` storage entry is left untouched, and the interface explains that a new sortie is needed. If browser storage is unavailable, play remains possible without reliable persistence. There is one current saved sortie per browser origin.
+
+Corrected-board saves now carry `rulesVersion: 3`, with an explicit per-round `activationCompleted` flag. Version-2 saves preserve their resolved/pending enemy sequence: migration does not replay enemies or insert a new decision into already-calculated work. Earlier used crew are marked complete; the current actor remains incomplete until a new normal action resolves. New saves preserve an open Opportunity window across reload. Migrating pre-combat-economy saves also preserves live bags/discards, resources, RNG, mission length, work durations and job dates; missing Burst count becomes 0, Opportunity remains disabled at 0, and Disruption remains disabled. Older 6/4 mission and one-round work defaults are retained where no explicit values existed. Pilot Direct Fire is unavailable in preserved Opportunity-off runs; no retired ordered-shot engine is maintained. Future Copilot decisions use reciprocal physical-token conversion. Existing sorties never merge with next-run preferences. The separate `milk-run-v3-dev-preferences-1` key stores only differences from canonical defaults; valid form changes and the speed selector save those preferences, and Reset removes that key. No other prototype's storage is touched.
+
+Legacy raw-event saves paused at `ENEMY_HIT_LOCATION` receive a missing focus beat before their pending damage. Current expanded queues retain their exact sequence. Face-down draws retain the previously visible bag inventory until reveal, including emergency refills, so Bag intelligence cannot disclose a hidden token early.
 
 ## Implemented v3 rules
 
 - Ten crew positions, rank and role tags, player-selected activation order, and ten total crew time slots per round. Injured, dead and busy crew are unavailable. Unavailable slots are consumed after available activations. By default they still draw mission tokens and face the enemy queue; drawn resources are wasted into discard. Turning off unavailable mission draws still allows existing fighters to act in those slots.
 - Mission bag economy: held resources remain outside the bag. Spent resources enter the discard; routine refill occurs at Round Start. Empty bags use their eligible discard immediately as an emergency refill. Resource draws use the activating crew member's configured rank mapping.
-- Combat tokens remain out until refill. Basic Fire draws once for free. Advanced Fire costs one Enlisted resource and continues on hits against one legal target, stopping on a miss; a first-pull miss permits exactly one additional pull and then stops.
+- Combat tokens remain out until refill: Hit deals 1 damage, Burst deals 2, and Miss deals none. Basic Fire draws once for free. Advanced Fire costs one Enlisted resource and continues on Hit or Burst against one legal target, stopping on a Miss; a first-pull Miss permits exactly one additional pull and then stops regardless of that token's result.
 - Eight gun stations with the specified quadrants/altitudes, plus two unarmed cockpit seats. Station fire or displacement prevents station actions without making a single Damage marker destroy the station.
 - Three visible ordered fighter slots. An Enemy draw at capacity becomes Flak without drawing the enemy deck. Destroyed fighters leave the queue and later fighters advance. The enemy deck refills only when exhausted.
 - Uniform twelve-sector fighter spawn and movement. Fighters begin facing the B-17 by default. Facing fighters attack; off-angle fighters rotate 90° toward it. Flyby facing depends on whether the new quadrant is the same, adjacent or opposite. Newly spawned fighters can be shot before their first enemy phase.
@@ -62,10 +79,16 @@ Autosave uses the localStorage key `milk-run-v3-session-2`, with board version `
 - Orthogonal fire-group spread at Round Start using d6: 1–2 none, 3 fore/north, 4 starboard/east, 5 aft/south, 6 port/west. Selected squares under active suppression do not spread; remaining unsuppressed squares form their own connected groups. Healthy occupied space initially stops spread and injures its occupant; spread in a later phase into that injured position kills the crew member and takes the square. A crew member straddling two squares is injured at most once per Fire Phase, so the first spread cannot injure and kill them through their two occupied squares.
 - Connected-square Repair and Fire Control, Medical treatment, abstract crisis relocation, completion/return at a configurable future Round Start, displacement if the assigned station remains burning, free-resource General Relocate, and activation-cost Man Cockpit. Fire Control normally leaves Damage; Repair restores Healthy.
 - Eight structural sections compromise dynamically when more than half their aircraft cells are Damaged/Fire. Repairs can remove compromise. Each of four engines stops when both its cells are Damaged/Fire and stays stopped after repair until a seated cockpit worker restarts it.
-- Minimal role actions: Pilot orders one already-used Gunner's Basic Shot, Copilot exchanges resources at 2:1, Navigator turns a fighter 90° away, Radio Operator declares Intercept or pays for Escort, and Engineer repairs an extra connected square. Ordered fire adds no mission draw or enemy phase.
+- Minimal role actions: Pilot **Direct Fire** costs one Officer resource and creates one Opportunity, Copilot converts resources using the physical-token rules below, Navigator turns a fighter 90° away, Radio Operator declares Intercept or pays for Escort, and Engineer repairs an extra connected square. Direct Fire consumes the Pilot's normal action and does not itself fire a gun. Its new Opportunity is immediately usable in the pre-enemy window if a completed gunner has a legal target.
+- **Opportunity** is a separate shared currency: start with 1, hold at most 3, and gain 1 for each fighter killed when the kill-reward setting is enabled. It persists between rounds and never enters either bag. After a crew action, spend one Opportunity to let one healthy gunner with a completed normal action this round, operating a usable gun, draw exactly one Basic Fire token at a legal target. This creates no activation, mission draw, time slot or enemy phase. An Opportunity kill can earn the next Opportunity; there is no additional chain limit.
+- Successful damage marks a surviving fighter **Disrupted** when enabled. It does not stack and remains while the fighter rotates. At its next facing-in attack, consume that disruption, show the cancellation, skip the attack and its roll, and perform the normal flyby. A fresh Escort hit during that flyby can apply a new Disruption.
 - Escort occupies one random quadrant for the remainder of the round and deals one damage to fighters entering it after attacking.
 - Independent control, structure and engine altitude checks at round end; losses stack. Ground means destruction. A linear outbound/target/return/HOME mission supplies a complete sortie.
-- In-memory telemetry and an end-of-sortie summary cover elapsed time, rounds, draws, fighters, Flak, attacks, hits/criticals, aircraft hits, fire, repairs, engines, compromise, altitude loss by cause, casualties and resource gains/spending.
+- In-memory telemetry and an end-of-sortie summary cover elapsed time, rounds, draws, fighters, Flak, attacks, hits/criticals, aircraft hits, fire, repairs, engines, compromise, altitude loss by cause, casualties, resource gains/spending and Opportunity gains/spending.
+
+The decision sequence is **Mission Draw → Crew Action → Opportunity Window → Enemy Phase**. `used` reserves a crew time slot at activation; separate `activationCompleted` becomes true only after the normal action resolves. The actor can then qualify for that action's window if still healthy and operating a gun. The window opens only when a legal shot is available, uses phase `opportunity`, and remains open through repeated shots until the player chooses Continue, even if the last shot removed every target. Continue runs the pending enemy phase exactly once. No Opportunity spending is allowed during `select`, `action`, `roundEnd`, or an active presentation queue. Crew without an action still consume their existing automatic time slots and enemy phases. Completion flags reset at Round Start.
+
+Round Start resolves all due job effects before planning worker returns together. Workers returning simultaneously release temporary occupancy for this plan; anyone remaining at a work position still blocks a station. A blocked return can therefore prevent a dependent return, while crossed Pilot/Copilot or Radio/Engineer workers return normally when both home stations are usable. Returns remain individually presented. Medical is disabled with an explanation when no injured target has a safe interior work position.
 
 ## Baseline values and assumptions
 
@@ -73,7 +96,7 @@ Autosave uses the localStorage key `milk-run-v3-session-2`, with board version `
 | --- | --- |
 | Starting resources | 3 Officer, 5 Enlisted, in addition to the initial bag contents |
 | Mission bag | 15 Enemy, 20 generic Resource; no Event/Tactical tokens |
-| Combat bag | 20 Hit, 13 Miss |
+| Combat bag | 16 Hit, 4 Burst, 13 Miss; independent editable counts, all-zero inventory rejected |
 | Enemy deck | 10 BF-109 (2 HP), 6 BF-110 (2 HP), 5 FW-190 (3 HP), 3 Me-262 (4 HP), **4 provisional Flak cards** |
 | Fighter cap | 3; settings permit testing a lower cap |
 | Spawn / round end | Facing B-17; surviving fighters clear at round end |
@@ -81,16 +104,18 @@ Autosave uses the localStorage key `milk-run-v3-session-2`, with board version `
 | Starting altitude | 5 steps above ground |
 | Repair / Fire Control | Up to 3 / 4 connected affected squares; Engineer adds 1 repair square |
 | Work adjacency | Orthogonal; optional eight-way work never changes fire-spread direction |
-| Work duration | 1 future Round Start for Medical, Repair and Fire Control; 0 allows immediate completion |
+| Work duration | 2 future Round Starts for Medical, Repair and Fire Control; 0 allows immediate completion |
 | Crisis costs | 1 resource of the worker's rank for each Medical, Repair or Fire Control action |
-| Escort / ordered shot | 1 Enlisted / 1 Officer resource respectively |
-| Copilot conversion | Spend 2 of one pool to gain 1 of the other pool |
+| Escort / Direct Fire | 1 Enlisted / 1 Officer resource respectively |
+| Opportunity | Enabled; start 1, cap 3, gain 1 per fighter kill; persists between rounds |
+| Disruption | Enabled after fighter damage; next facing-in attack is replaced by a normal flyby |
+| Copilot conversion | 2 Enlisted → 1 Officer, or 1 Officer → 2 Enlisted if one extra Resource remains in the mission bag |
 | Restart | Both engine squares must be Healthy; seated cockpit worker succeeds on d6 1–4 |
-| Target / return | Target after 6 completed rounds, HOME after 4 additional rounds |
+| Target / return | Target after 14 completed rounds, HOME after 5 additional rounds |
 | Bombing | One provisional d6 check, successful on 3–6; reaching HOME is possible after either result |
-| Presentation | Normal event delay 750 ms; fast and instant/skip options available |
+| Presentation | Configurable base delay; important Normal beats get longer holds, Fast shortens them, Step / Manual waits for input; skip remains available |
 
-The aircraft uses the supplied authoritative PlaneGrid mapping, with **52 damageable sub-squares** within the 144-address hit grid. Each A–F / 1–6 target cell contains four quarters: 1 upper-left, 2 upper-right, 3 lower-left, 4 lower-right. The supplied correction is incorporated in the canonical data: `C4-2` is `Fuselage`, and `C4-3` is `Empty`. Six outbound plus four return rounds and altitude 5 remain explicit temporary assumptions.
+The aircraft uses the supplied authoritative PlaneGrid mapping, with **52 damageable sub-squares** within the 144-address hit grid. Each A–F / 1–6 target cell contains four quarters: 1 upper-left, 2 upper-right, 3 lower-left, 4 lower-right. The supplied correction is incorporated in the canonical data: `C4-2` is `Fuselage`, and `C4-3` is `Empty`. Fourteen outbound plus five return rounds and altitude 5 remain editable playtest values.
 
 Altitude defaults are independently editable:
 
@@ -102,13 +127,15 @@ Altitude defaults are independently editable:
 
 Restart odds do not yet differ by crew rank/skill. No Pilot Raise Altitude action exists. Work cost, duration, safe work positioning, injury availability, suppression semantics and cockpit substitution are first-pass interpretations to verify during rules testing; the experimental numerical values remain in configuration.
 
-The default duration of 1 means a job started during Round 2 finishes at **Round 3 Start**, after Round 2's altitude checks. A repair in progress has not yet restored its squares for the current altitude check. Set a duration to 0 to test immediate work effects. Fire Control suppresses its selected fire squares immediately while the job is active. Injury or death of the worker cancels unfinished work. If a selected target's condition changes before completion, the job affects only targets still eligible for that type of work.
+The default duration of 2 means work started in Round N occupies the worker immediately and throughout Round N+1, then finishes at **Round N+2 Start**. The worker is available again in that round when healthy and usable; a Medical patient likewise remains unavailable until treatment completes. For example, work begun in Round 2 completes at Round 4 Start. A repair in progress does not restore its squares for either earlier altitude check. Set duration to 0 to test immediate work effects. Fire Control suppresses only the selected fire squares immediately. Injury or death of the worker cancels unfinished work. Repair restores only the explicitly selected squares that are still Damaged; a selected square that becomes Fire is skipped without canceling the rest of the job.
 
-Crisis movement automatically chooses the nearest unoccupied, non-burning aircraft square to the first selected target, preferring fuselage space when distances tie. There is no pathfinding or movement-distance cost. Work completes before the next Fire Phase, and workers return only when their assigned station is safe and unoccupied; otherwise they remain displaced. Taking over a cockpit seat changes the crew member's assigned station. Injured occupants still occupy their position until healed or killed.
+Crisis work separates the damaged/fire target from the worker's physical position. Repair and Fire Control use a non-burning internal C/D lane on the primary target's board row. The player chooses this position after selecting the work squares; a command without an explicit work position chooses a legal position deterministically for existing saves and scripted playtests. Internal work positions may share a crew footprint. The renderer bounds worker circles, selection strokes and status badges inside that exact footprint; dense stacks use smaller numbered markers, while normal station markers retain their centered positions. Wing targets remain on the wing and receive their own work outline; the worker remains inside the fuselage. There is no pathfinding or movement-distance cost. Work completes before the next Fire Phase, followed by the coherent return batch described above. Taking over a cockpit seat changes the crew member's assigned station. Injured occupants still occupy their position until healed or killed.
 
-Copilot conversion preserves the number of generic physical resource tokens: of two tokens paid, one becomes the received resource in the other pool and the one surplus token goes to mission discard. The telemetry records two resources spent and one gained. This differs from a normal action payment, where every spent token enters discard.
+Copilot conversion preserves the total of held resources plus mission-bag Resource tokens plus Resource discard. Converting **2 Enlisted → 1 Officer** relabels one held token and puts the surplus token in mission discard. Converting **1 Officer → 2 Enlisted** relabels the held token and removes one additional Resource token from the mission bag to supply the second output. A token in discard cannot supply this conversion; if the bag contains no Resource token, the action explains why that direction is unavailable. Neither direction creates a physical token. Ordinary action payments still put every spent resource token into mission discard.
 
-Configuration normalization clamps inputs to their visible ranges, orders the altitude thresholds, and prevents an initially empty mission bag, combat bag or enemy deck. These safeguards do not invent tokens when a running mission bag has no eligible refill tokens because all resources are held outside it.
+The configurable conversion ratio applies reciprocally: at ratio N, N Enlisted become one Officer with N−1 tokens entering discard; one Officer becomes N Enlisted only when N−1 Resource tokens can be taken from the bag.
+
+Configuration normalization clamps inputs to their visible ranges and orders the altitude thresholds. Hit, Burst and Miss counts are independent, including individual zeroes; a total of zero combat tokens is an explicit validation error. Existing nonempty safeguards for the mission bag and enemy deck remain. No safeguard invents a resource when a running mission bag has no eligible refill tokens because all resources are held outside it.
 
 ## Authoritative board data and rendering
 
@@ -169,23 +196,42 @@ The baseline deliberately excludes Event cards, Locked In, Desperation, fighter 
 
 Remaining design decisions include the original physical mission length, initial altitude, Flak deck count, crisis costs and exact work timing, whether healthy crew should block first fire spread or move, whether engine restart should vary by skill, unavailable-slot pressure, bombing success consequences, and final resource/bag/enemy balance. Aircraft/station geometry now follows the supplied authoritative mapping. Playtest observations should include the exported seed, configuration and log so a specific sortie can be reproduced.
 
+Burst, Disrupted and Opportunity now have the explicit rules described above. The former Pilot ordered-shot action is retired. Opportunity is not stamina, and no fighter-persistence, exhaustion or additional combat-frequency system has been added.
+
 ## Validation
+
+Files changed in the post-audit corrective pass are all inside this project:
+
+- Rules/state/save migration: `rules.mjs`, `state.mjs`, `persistence.mjs`.
+- Presentation and interaction: `queue.mjs`, `presentation.mjs`, `main.mjs`, `targeting.mjs`, `ui-model.mjs`, `board-view.mjs`, `ux.css`.
+- New focused regressions: `tests/corrective-rules.test.mjs`, `tests/presentation-corrections.test.mjs`, `tests/crew-renderer.test.mjs`, `tests/corrective-browser-check.mjs`.
+- Updated existing tests: `tests/combat-economy.test.mjs`, `tests/dev-preferences.test.mjs`, `tests/rounds-work.test.mjs`, `tests/ux-rules.test.mjs`, `tests/ux-model.test.mjs`, `tests/ux-targeting.test.mjs`, `tests/browser-check.mjs`, `tests/ux-browser-check.mjs`, `tests/rules-browser-check.mjs`.
+- Sortie replay and documentation: `tests/generate-economy-witness.mjs`, `tests/fixtures/combat-economy-home-witness.json`, and this README. The historical witness JSON is unchanged.
+
+No root navigation, deployment configuration, board CSV, original artwork or unrelated prototype needed changing for this pass.
 
 From the repository root:
 
 ```sh
 node --test src/milk-run/tests/*.test.mjs
 node src/milk-run/tests/browser-check.mjs
+node src/milk-run/tests/ux-browser-check.mjs
+node src/milk-run/tests/rules-browser-check.mjs
+node src/milk-run/tests/corrective-browser-check.mjs
 ```
 
 The automated rules suite exercises bag depletion/refill and resource circulation, deterministic RNG, board invariants, combat arcs and Advanced Fire, fighter capacity/facing/queue behavior, spatial damage and crew casualties, fire/work/repair, structure/engines, stacking altitude checks, round clearing, unavailable slots, mission completion, and presentation/persistence contracts.
 
-The browser check starts its own temporary static server and headless Chromium, checks desktop/tablet/mobile viewports, exercises real controls, and captures screenshots/results under the locally ignored `.checks/` directory. It uses native Node test/HTTP/WebSocket APIs and no added test dependency. A recent Node release with built-in `fetch` and `WebSocket` is required. On systems without Chrome at the script's Windows default, set `CHROME_PATH` to a compatible Chromium executable. The browser script uses debugging port 9337 while running.
+The browser checks start temporary static servers and headless Chromium, exercise real controls and touch events, and capture screenshots/results under the locally ignored `.checks/` directory. They use native Node test/HTTP/WebSocket APIs and no added test dependency. A recent Node release with built-in `fetch` and `WebSocket` is required. On systems without Chrome at the scripts' Windows default, set `CHROME_PATH` to a compatible Chromium executable. The baseline script uses debugging port 9337, UX uses 9338, and combat/economy uses 9339. Their artifacts live in `.checks/`, `.checks/ux/` and `.checks/combat-economy/` respectively.
 
-Verified results after the board correction: **64/64 Node tests pass**. Nine additional tests cover CSV loading/validation, exact quarter geometry and counts, authoritative engine/crew footprints, all empty-square hits, overlapping damage consequences and board-version save isolation. Existing footprint tests now hit both vulnerable squares of each of the six multi-square crew, and compromise checks cover all eight authoritative sections.
+Verified after the corrective pass: **156/156 Node tests pass**. Existing coverage still verifies board invariants, both vulnerable squares of straddling crew, gun arcs, absolute headings, Hit/Burst/Miss and Advanced Fire, Disruption lifetime, physical-token conservation, N+2 work timing, selected-square completion and persisted defaults. New regressions cover mutual returns in both processing orders, genuine remaining blockers, workers bounded to their semantic footprints, Medical reachability, concealed normal/emergency draws, legacy focus restoration, completion-based Opportunity eligibility, repeated pre-enemy shots, Pilot-created immediate Opportunity, explicit Continue, window reload and version-2 completion metadata migration.
 
-Chromium checks pass at **1440×1000, 768×1024, 390×844 and 320×740**, with no runtime exceptions or failed asset requests. At each viewport the browser asserts all 144 quarter rectangles, exactly ten unique crew markers at their complete footprint centers, and four non-structural engine indicators. It also verifies touch inspection of corrected `C4-2` and empty `C4-3`, exact-quarter hit highlighting, action sheets, no horizontal overflow, and the existing presentation/autosave controls. The desktop and mobile screenshots were visually compared with `data/original-board-reference.png`. A separate browser smoke check also loaded the canonical CSV and corrected board through the existing Vite server.
+Chromium checks run at **1440×1000, 768×1024, 320×740, 360×800, 390×844 and 430×932**. Every viewport checks the 144 exact quarters, ten unique crew tokens and four non-structural engine indicators without page overflow. Phone layouts use two rows of five crew and viewport-sized action sheets. Real touch checks cover crew preview and activation, individual aircraft in shared sectors, Basic/Advanced/Opportunity fire, board Repair/Fire Control targets, internal worker positions and direct Medical targeting. Presentation checks cover visible token faces, separate critical-hit consequences, reticle focus, attack misses versus persistent empty-air X markers, escort placement/interception/expiry and independent altitude rolls. The focused economy browser suite checks a visible Burst ×2, Disrupted board/card markers and a cancelled attack, three chained Opportunity kills, Direct Fire, both conversions and an unavailable reverse exchange, preference persistence/reset, and an all-zero combat inventory error.
 
-Two ten-round sorties complete through the actual desktop/phone controls; a third replays the regenerated default-rules combat witness through all 207 commands to HOME. The witness is `tests/fixtures/baseline-home-witness.json`, seed `corrected-plane-grid-0`: ten rounds, 100 mission draws, 69 enemy attacks, 15 repaired squares, nine crew alive and altitude 2 at HOME. Its decisions were regenerated because the original approximation exposed different squares to hits; the gameplay rules and default values were not changed. The fixture includes the decisions: a seed alone is insufficient to reproduce a run with different player choices. Browser results and screenshots are written to `.checks/`.
+The corrective browser suite adds actual touch regressions at desktop and **320/360/390px**: Radio → Preview board → Intercept → Activate, shared checkbox state in both directions, action completion before Opportunity, window reload, Pilot-created shots before enemies, reachable Medical patients, bounded worker rendering and all crew statuses. Crew name/status/control labels are now 10px in the mobile rack with 11px status icons; cards remain two rows of five at approximately 80px height. Work deadlines and full role details remain in the tap-opened sheet. Its artifacts are under `.checks/corrective/` and it uses debugging port 9340.
+
+The browser suite completes two **19-round** resource-only diagnostic sorties through desktop and phone controls. It also replays `tests/fixtures/combat-economy-home-witness.json`, seed `combat-economy-0`: **469 commands under exact current defaults**, 19 rounds, 190 mission draws, 51 explicit Opportunity windows, 57 Opportunity shots, 16 Burst pulls, eleven conversions, crisis work and an engine restart. It reaches HOME at altitude 5 with all ten crew alive. Node validation also checks physical-resource conservation after every command. The bounded generator in `tests/generate-economy-witness.mjs` uses visible game state without reading future RNG results; its seed and decision sequence are retained for reproduction.
+
+The previous `tests/fixtures/baseline-home-witness.json` remains unchanged as a historical artifact. Its three retired `orderShot` commands and six conversions use the previous rules, so it is deliberately not presented as a current-rules HOME witness. Tests preserve its old bag/config/RNG values during migration, replay its compatible opening, and verify that the retired action is rejected transactionally. No legacy rules engine was added to keep that replay working.
 
 Visual checks supplement the rules suite. Resource-only diagnostic sorties isolate interface progression, while the default-rules witness exercises combat and crisis work. These results establish functional completion, not final balance or a survival-probability claim. Responsive testing uses Chromium device emulation; physical phones have not been tested.
