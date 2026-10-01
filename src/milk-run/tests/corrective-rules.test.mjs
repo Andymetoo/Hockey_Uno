@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { STATIONS } from '../board.mjs';
+import { BOARD, STATIONS } from '../board.mjs';
 import { dispatch, availableCrew, availableActions, isAtStation, resolveAltitude, opportunityAvailability, eligibleMedicalTargets } from '../rules.mjs';
 import { fresh, activated, fighter, collect } from './fixtures.mjs';
 import { createGame } from '../state.mjs';
@@ -75,10 +75,10 @@ test('a genuinely remaining worker blocks a return; completing workers do not ev
   assert.ok(member(result.state, 'engineer').job);
 });
 
-test('Medical requires a reachable injured patient and explains a fully burning interior row', () => {
+test('Medical requires a reachable patient when target and adjacent interior rows are burning', () => {
   const s = activated('radio');
   member(s, 'pilot').health = 'injured';
-  for (const id of ['C2-2', 'C2-4', 'D2-1', 'D2-3']) s.cells[id] = 'fire';
+  for (const cell of BOARD.filter(c => c.fuselage && [0,1,2].includes(Math.floor(c.y/2)))) s.cells[cell.id] = 'fire';
   const medical = availableActions(s).find(a => a.id === 'medical');
   assert.equal(medical.enabled, false);
   assert.match(medical.reason, /safe interior work position/i);

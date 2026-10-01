@@ -74,11 +74,11 @@ test('medical targets injured crew directly and excludes deaths and patients alr
   assert.equal(canConfirm(state, work), true);
 });
 
-test('medical targeting excludes patients without any safe interior work position on their row', () => {
+test('medical targeting excludes patients without safe work positions in the target or adjacent rows', () => {
   const state = activated('pilot');
   state.crew.find(c => c.id === 'radio').health = 'injured';
   state.crew.find(c => c.id === 'tail').health = 'injured';
-  for (const id of ['C3-2', 'C3-4', 'D3-1', 'D3-3']) state.cells[id] = 'fire';
+  for (const id of ['C2-2','C2-4','D2-1','D2-3','C3-2','C3-4','D3-1','D3-3','C4-2','C4-4','D4-1','D4-3']) state.cells[id] = 'fire';
   const initial = beginTargeting('medical', 'pilot');
   assert.deepEqual(targetOptions(state, initial).crew, ['tail']);
   assert.equal(selectTarget(state, initial, 'crew', 'radio'), initial);

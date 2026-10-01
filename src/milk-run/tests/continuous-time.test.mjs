@@ -154,16 +154,16 @@ for (const [kind, configKey, setup, extra, targetOutcome] of [
   ['repair', 'v2RepairTime', state => { state.cells['B2-4'] = 'damaged'; }, { cells: ['B2-4'] }, state => assert.equal(state.cells['B2-4'], 'healthy')],
   ['fireControl', 'v2FireTime', state => { state.cells['B2-4'] = 'fire'; }, { cells: ['B2-4'] }, state => assert.equal(state.cells['B2-4'], 'damaged')],
   ['medical', 'v2MedicalTime', state => { member(state, 'pilot').health = 'injured'; }, { targetId: 'pilot' }, state => assert.equal(member(state, 'pilot').health, 'healthy')],
-]) test(`V2 ${kind} takes six future Time tokens, without retroactively counting its starting draw`, () => {
+]) test(`V2 ${kind} takes four future Time tokens, without retroactively counting its starting draw`, () => {
   let state = fresh({ v2TimePerProgress: 20 });
   setup(state);
   state = act(activate(state, 'Time', 'radio').state, kind, extra).state;
-  assert.equal(state.config[configKey], 6);
-  assert.equal(state.jobs[0].remainingTime, 6);
+  assert.equal(state.config[configKey], 4);
+  assert.equal(state.jobs[0].remainingTime, 4);
   assert.equal('completeRound' in state.jobs[0], false);
   state = turn(state, 'Resource').state;
-  assert.equal(state.jobs[0].remainingTime, 6, 'Resource draws do not count as work Time');
-  for (let remaining = 5; remaining >= 1; remaining--) {
+  assert.equal(state.jobs[0].remainingTime, 4, 'Resource draws do not count as work Time');
+  for (let remaining = 3; remaining >= 1; remaining--) {
     state = turn(state, 'Time').state;
     assert.equal(state.jobs[0].remainingTime, remaining);
     assert.deepEqual(availableActions(state, 'radio'), []);
@@ -175,13 +175,13 @@ for (const [kind, configKey, setup, extra, targetOutcome] of [
   assert.deepEqual(member(complete.state, 'radio').position, STATIONS.radio.cells);
 });
 
-for (const kind of ['repair', 'fireControl', 'medical']) test(`V2 assisted ${kind} takes four future Time and reserves both workers`, () => {
+for (const kind of ['repair', 'fireControl', 'medical']) test(`V2 assisted ${kind} takes two future Time and reserves both workers`, () => {
   let state = fresh({ v2TimePerProgress: 20 });
   state.cells['B2-4'] = kind === 'fireControl' ? 'fire' : 'damaged';
   if (kind === 'medical') member(state, 'pilot').health = 'injured';
   const extra = kind === 'medical' ? { targetId: 'pilot' } : { cells: ['B2-4'] };
   state = act(activate(state, 'Time', 'radio').state, kind, { ...extra, assistantId: 'engineer' }).state;
-  assert.equal(state.jobs[0].remainingTime, 4);
+  assert.equal(state.jobs[0].remainingTime, 2);
   assert.equal(state.jobs[0].assistantId, 'engineer');
   assert.equal(member(state, 'engineer').cycleSlotConsumed, false, 'assistance must not erase an unconsumed time slot');
   for (const id of ['radio', 'engineer']) {
@@ -189,7 +189,7 @@ for (const kind of ['repair', 'fireControl', 'medical']) test(`V2 assisted ${kin
     assert.equal(availableCrew(state).some(crew => crew.id === id), false);
     assert.deepEqual(availableActions(state, id), []);
   }
-  for (let remaining = 3; remaining >= 1; remaining--) {
+  for (let remaining = 1; remaining >= 1; remaining--) {
     state = turn(state, 'Time').state;
     assert.equal(state.jobs[0].remainingTime, remaining);
   }
@@ -314,7 +314,7 @@ test('V2 assistant unused slot still produces mission and enemy pressure while t
   }
   assert.equal(state.stats.missionDraws, 10);
   assert.ok(events.some(event => event.type === 'UNAVAILABLE_CREW_SLOT' && event.crewId === 'engineer'));
-  assert.equal(state.jobs[0].remainingTime, 4);
+  assert.equal(state.jobs[0].remainingTime, 2);
   assert.equal(member(state, 'engineer').job, state.jobs[0].id);
 });
 
@@ -401,6 +401,7 @@ for (const injuredWorker of ['radio', 'engineer']) test(`V2 injury to assisted-j
   let state = fresh();
   state.cells['B2-4'] = 'damaged';
   state = act(activate(state, 'Resource', 'radio').state, 'repair', { cells: ['B2-4'], workCellId: 'C2-2', assistantId: 'engineer', assistantWorkCellId: 'C2-4' }).state;
+  const positions = Object.fromEntries(state.crew.map(crew => [crew.id, [...crew.position]]));
   const used = Object.fromEntries(state.crew.map(crew => [crew.id, crew.cycleSlotConsumed]));
   const { events, emit } = collect();
   damageSquare(state, member(state, injuredWorker).position[0], 1, emit);
@@ -409,7 +410,7 @@ for (const injuredWorker of ['radio', 'engineer']) test(`V2 injury to assisted-j
   for (const id of ['radio', 'engineer']) {
     assert.equal(member(state, id).job, null);
     assert.equal(member(state, id).cycleSlotConsumed, used[id]);
-    assert.deepEqual(member(state, id).position, STATIONS[id].cells);
+    assert.deepEqual(member(state, id).position, positions[id]);
   }
   assert.equal(state.cells['B2-4'], 'damaged', 'cancelled work does not grant its repair');
   assert.equal(events.filter(event => event.type === 'WORK_CANCELLED').length, 1);
@@ -499,7 +500,10 @@ for (const mode of ['any-action', 'attack-pass-only']) for (const facing of [0, 
   const expected = mode === 'any-action' || facing === 0 ? 1 : 2;
   assert.equal(result.state.fighters[0].engagementRemaining, expected);
   assert.equal(Boolean(result.state.fighters[0].disrupted), false);
-  if (disrupted && facing === 0) assert.equal(result.events.filter(event => event.type === 'ATTACK_DISRUPTED').length, 1);
+  if (disrupted && facing === 0) {
+    assert.equal(result.events.filter(event => event.type === 'ATTACK_DISRUPTED').length, 0);
+    assert.equal(result.events.find(event => event.type === 'DISRUPT_ACCURACY_RESOLVED').result, 'off-target');
+  }
   if (facing === 180) assert.equal(result.events.filter(event => event.type === 'FIGHTER_ROTATED').length, 1);
 });
 

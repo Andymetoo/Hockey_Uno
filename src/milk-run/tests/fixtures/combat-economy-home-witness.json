@@ -1,6 +1,6 @@
 {
   "seed": "combat-economy-0",
-  "note": "Successful deterministic legal-command witness under exact current defaults; not a balance or win-rate claim.",
+  "note": "Successful deterministic legal-command witness under exact current defaults; not a balance or win-rate claim. V1 now records 29 explicit WORK_COMPLETED summaries; verified against the pre-pass engine with identical state, RNG, action legality and existing event snapshot timing after every command.",
   "config": {
     "startingOfficer": 3,
     "startingEnlisted": 5,
@@ -1868,7 +1868,8 @@
       "SECTION_RESTORED": 2,
       "FIRE_STOPPED_BY_CREW": 2,
       "CREW_KILLED": 1,
-      "MISSION_ENDED": 1
+      "MISSION_ENDED": 1,
+      "WORK_COMPLETED": 29
     }
   }
 }

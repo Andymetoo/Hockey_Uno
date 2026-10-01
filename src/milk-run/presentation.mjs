@@ -14,6 +14,7 @@ const categoryIcons = { crew: '●', resource: '+', gunfire: '⌖', enemy: '✈'
 
 export function eventCategory(event) {
   const type = event?.type ?? '';
+  if (/^FIGHTER_KILL_TIME_/.test(type)) return 'time';
   if (type === 'FIGHTER_BREAKING_OFF' || type === 'FIGHTER_DISENGAGED') return 'departure';
   if (/^(TIME_|PROGRESS_|CHECKPOINT_)/.test(type) || type === 'MISSION_TOKEN_DRAWN' && event.token === 'Time') return 'time';
   if (type === 'ENGAGEMENT_SPENT') return 'enemy';
@@ -41,6 +42,7 @@ export function describeEvent(event = {}) {
     category, icon: categoryIcons[category], title: friendly(type) || 'Ready for orders',
     detail: event.message ?? '', major: !compact.has(type), kind: 'text', tone: category,
   };
+  if (type === 'UNAVAILABLE_CREW_SLOT') description.title = 'Unavailable crew slot — time passes';
   if (type === 'ENEMY_PHASE_STARTED' && /no active fighters/i.test(event.message ?? '')) description.major = false;
   if (type === 'FIRE_PHASE_STARTED' && /^Fire phase: 0 unsuppressed/i.test(event.message ?? '') && !continuous) description.major = false;
   if (type === 'ALTITUDE_CHECK' && event.minimum === 0 && !continuous) description.major = false;
@@ -57,8 +59,8 @@ export function describeEvent(event = {}) {
   }
   if (type === 'ENEMY_ATTACK') description.title = `${event.source || event.message?.replace(/ attacks\.$/, '') || 'Enemy'} attacks`;
   if (type === 'ENEMY_ATTACK_ROLL') Object.assign(description, {
-    kind: 'die', title: event.result === 'miss' ? 'MISS' : event.result === 'critical' ? 'CRITICAL HIT' : 'HIT',
-    tone: event.result === 'miss' ? 'miss' : 'enemy', roll: event.roll,
+    kind: 'die', title: event.result === 'off-target' ? 'OFF TARGET' : event.result === 'miss' ? 'MISS' : event.result === 'critical' ? 'CRITICAL HIT' : 'HIT',
+    tone: ['off-target', 'miss'].includes(event.result) ? 'miss' : 'enemy', roll: event.roll,
   });
   if (type === 'ENEMY_HIT_LOCATION' || type === 'ENEMY_LOCATION_FOCUS') Object.assign(description, {
     kind: 'location', title: event.cellId ?? 'Hit location', tone: 'enemy',
@@ -66,17 +68,33 @@ export function describeEvent(event = {}) {
   });
   if (type === 'ATTACK_EMPTY_SPACE') Object.assign(description, { title: 'EMPTY SPACE · NO DAMAGE', tone: 'miss' });
   if (type === 'AIRCRAFT_SQUARE_DAMAGED') description.title = `${event.cellId ?? ''} · DAMAGED`;
+  if (type === 'AIRCRAFT_SQUARE_REPAIRED') description.title = `${event.cellId ?? ''} · REPAIRED`;
+  if (type === 'FIRE_EXTINGUISHED') description.title = `${event.cellId ?? ''} · FIRE EXTINGUISHED`;
   if (type === 'FIRE_STARTED') description.title = `${event.cellId ?? ''} · FIRE`;
+  if (type === 'FIRE_SPREAD_ROLL') {
+    const result = event.result ?? event.message?.match(/: spread ([a-z]+)|: (no spread)/i)?.[1] ?? (event.message?.includes('no spread') ? 'no spread' : 'result');
+    Object.assign(description, { kind: 'die', roll: event.roll, title: `FIRE SPREAD · ${result === 'no spread' ? 'NO SPREAD' : upper(result)}` });
+  }
+  if (type === 'FIRE_SPREAD_BLOCKED') description.title = `FIRE SPREAD BLOCKED · ${event.cellId ?? ''}`;
+  if (type === 'FIRE_STOPPED_BY_CREW') description.title = `FIRE SPREAD BLOCKED BY CREW · ${event.cellId ?? ''}`;
+  if (type === 'WORK_COMPLETED') description.title = `${upper(event.kind === 'fireControl' ? 'Fire Control' : event.kind)} COMPLETED`;
+  if (type === 'WORK_CANCELLED') description.title = `${upper(event.kind === 'fireControl' ? 'Fire Control' : event.kind)} CANCELLED`;
+  if (type === 'STATION_MANNED' || type === 'COCKPIT_MANNED') description.title = event.message?.replace(/\.$/, '') || 'Crew takes station';
+  if (type === 'CREW_RELOCATED') description.title = event.message?.replace(/\.$/, '') || 'Crew changes position';
+  if (type === 'CREW_RETURNED') description.title = event.message?.replace(/\.$/, '') || 'Crew returns home';
   if (type === 'CREW_KILLED') description.title = 'CREW LOST';
   if (type === 'GUNNER_FIRE_STARTED') description.title = event.message?.replace(/\.$/, '') || 'Gunner opens fire';
   if (type === 'ADVANCED_FIRE_RETRY') description.title = 'First miss · one free pull';
-  if (type === 'FIGHTER_DISRUPTED') description.title = 'DISRUPTED · NEXT ATTACK CANCELLED';
-  if (type === 'ATTACK_DISRUPTED') description.title = 'ATTACK DISRUPTED';
+  if (type === 'FIGHTER_DISRUPTED') description.title = event.disruptEffect === 'accuracy-penalty' ? 'DISRUPTED · NEEDS 4+' : event.disruptEffect === 'auto-miss' ? 'DISRUPTED · AUTO MISS' : 'DISRUPTED · NEXT ATTACK CANCELLED';
+  if (type === 'ATTACK_DISRUPTED') description.title = continuous ? 'DISRUPTED · AUTO MISS' : 'ATTACK DISRUPTED';
   if (type === 'OPPORTUNITY_GAINED') description.title = '+1 OPPORTUNITY';
   if (type === 'OPPORTUNITY_SPENT') description.title = 'OPPORTUNITY SHOT · ONE BASIC PULL';
   if (type === 'OPPORTUNITY_CAPPED') description.title = 'OPPORTUNITY AT CAP';
   if (type === 'ACTIVATION_COMPLETED') description.title = 'Crew action complete';
   if (type === 'TIME_GAINED') description.title = '+1 TIME';
+  if (type === 'FIGHTER_KILL_TIME_TAKEN') description.title = 'FIGHTER KILL · TIME CLAIMED';
+  if (type === 'FIGHTER_KILL_TIME_UNAVAILABLE') description.title = 'FIGHTER KILL · NO TIME IN BAG';
+  if (type === 'FIGHTER_KILL_TIME_FULL') description.title = 'TIME TRACK FULL · NO ADDITIONAL TIME';
   if (type === 'PROGRESS_PENDING') description.title = 'PROGRESS CHECKPOINT AFTER THIS TURN';
   if (type === 'PROGRESS_STARTED') description.title = 'Progress checkpoint';
   if (type === 'CHECKPOINT_JOBS_COMPLETED') description.title = 'Checkpoint · completed work checked';
@@ -200,8 +218,8 @@ export function advanceVisual(previous = {}, event = {}, view) {
   });
   if (type === 'ENEMY_ATTACK_ROLL') {
     visual.attackResult = event.result;
-    visual.attackMissFighter = event.result === 'miss' ? event.fighterId ?? null : null;
-    if (event.result === 'miss') Object.assign(visual, { focusCell: null, locationCell: null });
+    visual.attackMissFighter = ['off-target', 'miss'].includes(event.result) ? event.fighterId ?? null : null;
+    if (['off-target', 'miss'].includes(event.result)) Object.assign(visual, { focusCell: null, locationCell: null });
   }
   if (type === 'ATTACK_DISRUPTED') Object.assign(visual, {
     token:null, activeFighterId:event.fighterId, attackerId:event.fighterId,
@@ -232,7 +250,73 @@ export function advanceVisual(previous = {}, event = {}, view) {
   return visual;
 }
 
-const groupStarts = new Set(['ROUND_STARTED', 'CREW_ACTIVATED', 'UNAVAILABLE_CREW_SLOT', 'CREW_ACTION', 'OPPORTUNITY_SPENT', 'GUNNER_FIRE_STARTED', 'ENEMY_ATTACK', 'ATTACK_DISRUPTED', 'FLAK_STARTED', 'ROUND_END_STARTED', 'ALTITUDE_CHECK', 'MISSION_ADVANCED', 'BOMBING_ROLL', 'WORK_COMPLETING', 'PROGRESS_STARTED', 'CHECKPOINT_JOBS_COMPLETED', 'AIRCRAFT_CONDITION_CHECKED', 'PROGRESS_BAGS_REFILLED', 'WORK_TIME_ADVANCED', 'ENGAGEMENT_SPENT', 'FIGHTER_BREAKING_OFF']);
+const groupStarts = new Set(['ROUND_STARTED', 'CREW_ACTIVATED', 'UNAVAILABLE_CREW_SLOT', 'CREW_ACTION', 'OPPORTUNITY_SPENT', 'GUNNER_FIRE_STARTED', 'ENEMY_PHASE_STARTED', 'ENEMY_ATTACK', 'ATTACK_DISRUPTED', 'FLAK_STARTED', 'ROUND_END_STARTED', 'ALTITUDE_CHECK', 'MISSION_ADVANCED', 'BOMBING_ROLL', 'WORK_COMPLETING', 'WORK_CANCELLED', 'FIRE_PHASE_STARTED', 'PROGRESS_STARTED', 'CHECKPOINT_JOBS_COMPLETED', 'AIRCRAFT_CONDITION_CHECKED', 'PROGRESS_BAGS_REFILLED', 'WORK_TIME_ADVANCED', 'ENGAGEMENT_SPENT', 'FIGHTER_BREAKING_OFF']);
+
+const stationNames = {
+  pilot: 'Pilot seat', copilot: 'Copilot seat', navigator: 'Navigator / nose gun', bombardier: 'Bombardier / nose gun',
+  radio: 'Radio / dorsal gun', engineer: 'Engineer / top turret', ball: 'Ball turret',
+  leftWaist: 'Port waist gun', rightWaist: 'Starboard waist gun', tail: 'Tail gun',
+};
+const crewNames = {
+  pilot: 'Pilot', copilot: 'Copilot', navigator: 'Navigator', bombardier: 'Bombardier', radio: 'Radio Operator',
+  engineer: 'Engineer', ball: 'Ball Turret Gunner', leftWaist: 'Left Waist Gunner', rightWaist: 'Right Waist Gunner', tail: 'Tail Gunner',
+};
+const crewName = id => crewNames[id] ?? id ?? 'Crew';
+
+function outcomeSummary(events) {
+  const find = type => events.find(event => event.type === type);
+  const all = type => events.filter(event => event.type === type);
+  const work = find('WORK_COMPLETED');
+  if (work) {
+    const cells = work.cells ?? [];
+    if (work.kind === 'medical') {
+      const patient = work.message?.match(/Medical completed:\s*([^.]+)/i)?.[1] ?? `${crewName(work.targetId)} treated`;
+      return `Medical completed · ${patient.trim()}`;
+    }
+    const kind = work.kind === 'fireControl' ? 'Fire Control' : 'Repair';
+    const verb = work.kind === 'fireControl' ? 'extinguished' : 'repaired';
+    return `${kind} completed · ${cells.length ? `${cells.join(', ')} ${verb}` : 'no selected cells changed'}`;
+  }
+  const cancelled = find('WORK_CANCELLED');
+  if (cancelled) return cancelled.message?.replace(/\.$/, '') || `${cancelled.kind ?? 'Work'} cancelled`;
+
+  const spreadRolls = all('FIRE_SPREAD_ROLL');
+  if (find('FIRE_PHASE_STARTED') || spreadRolls.length) {
+    const rolls = spreadRolls.map(event => `${event.cellId} d${event.roll} ${event.result ?? 'no spread'}`);
+    const blocked = all('FIRE_SPREAD_BLOCKED').map(event => `${(event.cells ?? [event.cellId]).filter(Boolean).join(', ')} blocked${event.direction ? ` ${event.direction}` : ''}`);
+    const ignited = all('FIRE_STARTED').map(event => event.cellId).filter(Boolean);
+    const result = [...rolls, ...blocked, ...(ignited.length ? [`fire at ${[...new Set(ignited)].join(', ')}`] : [])].join(' · ');
+    return `Fire Spread · ${result || 'no unsuppressed fire to spread'}`;
+  }
+
+  const action = find('CREW_ACTION')?.action;
+  if (['manStation', 'manCockpit', 'returnHome'].includes(action)) {
+    const station = find('STATION_MANNED') ?? find('COCKPIT_MANNED');
+    const lead = action === 'returnHome' ? 'Return Home' : 'Man Station';
+    return station ? `${lead} · ${crewName(station.crewId)} → ${stationNames[station.stationId] ?? station.stationId}` : lead;
+  }
+  if (action === 'leaveStation' || action === 'relocate') {
+    const move = find('CREW_RELOCATED');
+    return move ? `${action === 'leaveStation' ? 'Leave Station' : 'Crew repositioned'} · ${crewName(move.crewId)} → ${move.cellId}` : action;
+  }
+
+  const unavailable = find('UNAVAILABLE_CREW_SLOT');
+  if (unavailable) {
+    const token = find('MISSION_TOKEN_DRAWN')?.token;
+    const time = find('TIME_GAINED');
+    const parts = [crewName(unavailable.crewId), token ? `${token} draw` : find('UNAVAILABLE_DRAW_SKIPPED') ? 'mission draw skipped' : 'no action'];
+    if (time) {
+      const meter = time.message?.match(/TIME (\d+)\/(\d+)/i);
+      parts.push(`+1 Time${meter ? ` · ${meter[1]}/${meter[2]}` : ''}`);
+    }
+    return `Unavailable crew slot · ${parts.join(' · ')}`;
+  }
+
+  if (find('ENEMY_PHASE_STARTED')) return /no active fighters/i.test(find('ENEMY_PHASE_STARTED').message ?? '') ? 'Enemy phase · no active fighters' : 'Enemy phase resolved';
+  const spread = find('FIRE_SPREAD_ROLL');
+  if (spread) return `Fire Spread d${spread.roll} · ${spread.result ?? 'no spread'}`;
+  return null;
+}
 
 /** Each compact recorder entry expands to the original semantic event objects. */
 export function groupEvents(log = []) {
@@ -260,9 +344,12 @@ export function groupEvents(log = []) {
       const count = group.events.filter(event => event.type === type).length;
       return count ? [`${count > 1 ? `${count} squares ` : ''}${label}`] : [];
     });
-    const detail = [result ? describeEvent(result).title : '', pullsSummary, location?.cellId ?? '', ...effects, ...consequences.map(event => describeEvent(event).title)].filter(Boolean).join(' · ');
-    group.title = `${first.message?.split(/\. /)[0]?.replace(/\.$/, '') || group.title}${detail ? ` — ${detail}` : ''}`;
-    group.summary = detail || group.events.at(-1).message || '';
+    const detail = [result ? describeEvent(result).title : '', pullsSummary, location?.cellId ? `Hit location rolled · ${location.cellId}` : '', ...effects, ...consequences.map(event => describeEvent(event).title)].filter(Boolean).join(' · ');
+    const outcome = outcomeSummary(group.events);
+    group.title = outcome
+      ? outcome
+      : `${first.message?.split(/\. /)[0]?.replace(/\.$/, '') || group.title}${detail ? ` · ${detail}` : ''}`;
+    group.summary = outcome || detail || group.events.at(-1).message || '';
   }
   return groups;
 }

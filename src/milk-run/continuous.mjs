@@ -43,6 +43,23 @@ export function gainTime(state, emit, completeJobs) {
   }
 }
 
+/** Fighter kills can claim a real Time token already in the mission bag. */
+export function gainFighterKillTime(state, emit, completeJobs) {
+  if (state.pendingProgress || state.time >= state.config.v2TimePerProgress) {
+    record(emit, 'FIGHTER_KILL_TIME_FULL', 'Time track already full; no additional Time gained.');
+    return false;
+  }
+  const index = state.bags.mission.tokens.indexOf('Time');
+  if (index < 0) {
+    record(emit, 'FIGHTER_KILL_TIME_UNAVAILABLE', 'B-17 gunfire destroyed a fighter, but no Time token remains in the mission bag.');
+    return false;
+  }
+  state.bags.mission.tokens.splice(index, 1);
+  record(emit, 'FIGHTER_KILL_TIME_TAKEN', 'B-17 gunfire pulls 1 Time token from the mission bag.');
+  gainTime(state, emit, completeJobs);
+  return true;
+}
+
 function progressCheckpoint(state, emit, shared) {
   observe(state, 'progressCheckpoints');
   record(emit, 'PROGRESS_STARTED', 'Progress checkpoint: complete work, spread fire, then check altitude.');
@@ -88,6 +105,13 @@ function progressCheckpoint(state, emit, shared) {
     record(emit, 'ESCORTS_EXPIRED', 'Escorts depart at the Progress checkpoint.');
   }
   record(emit, 'PROGRESS_COMPLETED', `Progress checkpoint complete. Time reset; accumulated Time tokens returned${state.config.v2RefillAtProgress === false ? '; discards retained for emergency refill' : ' and discards refilled'}.`);
+}
+
+/** Close a between-turn shot chain without spending a Turn or an enemy phase. */
+export function completeBetweenTurnProgress(state, emit, shared) {
+  state.phase = 'select';
+  progressCheckpoint(state, emit, shared);
+  if (state.phase === 'select') record(emit, 'CREW_SELECTION_READY', 'Choose the next available crew member.');
 }
 
 function finishTurn(state, emit, shared) {

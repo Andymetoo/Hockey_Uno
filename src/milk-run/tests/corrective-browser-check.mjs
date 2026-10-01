@@ -85,7 +85,7 @@ try {
   const medical = activated('pilot');
   medical.crew.find(c => c.id === 'radio').health = 'injured';
   medical.crew.find(c => c.id === 'tail').health = 'injured';
-  for (const cell of BOARD.filter(c => c.fuselage && c.id[1] === '3')) medical.cells[cell.id] = 'fire';
+  for (const cell of BOARD.filter(c => c.fuselage && ['2','3','4'].includes(c.id[1]))) medical.cells[cell.id] = 'fire';
   await inject(medical); await choose('medical');
   assert.equal(await evaluate("document.querySelector('#crew-list [data-crew=radio]').classList.contains('target-legal')"), false);
   assert.equal(await evaluate("document.querySelector('#crew-list [data-crew=tail]').classList.contains('target-legal')"), true);
@@ -122,10 +122,18 @@ try {
     for (const status of ['dead','injured','used','ready','repair','medical','fire','treated','active','selected']) {
       assert.ok(await evaluate(`!!document.querySelector('#crew-list .status-${status}')`), `${width}: ${status} visible`);
     }
+    await evaluate('new Promise(resolve=>setTimeout(resolve,160))');
+    const tilts = await evaluate(`Object.fromEntries([...document.querySelectorAll('.crew-card')].map(e=>{
+      const m=new DOMMatrixReadOnly(getComputedStyle(e).transform);
+      return [[...e.classList].find(c=>c.startsWith('status-')),Math.atan2(m.b,m.a)*180/Math.PI];
+    }))`);
+    for (const status of ['ready','selected','active']) assert.ok(Math.abs(tilts[`status-${status}`]) < 0.01, `${width}: ${status} level`);
+    for (const status of ['dead','injured','used','repair','medical','fire','treated']) assert.ok(Math.abs(tilts[`status-${status}`]) >= 2 && Math.abs(tilts[`status-${status}`]) <= 3, `${width}: ${status} tilted`);
     if (width < 650) {
       assert.ok(await evaluate("[...document.querySelectorAll('.crew-status')].every(e=>parseFloat(getComputedStyle(e).fontSize)>=10)"));
-      const rows = await evaluate("[...new Set([...document.querySelectorAll('.crew-card')].map(e=>Math.round(e.getBoundingClientRect().top)))].length");
-      assert.equal(rows,2);
+      // offsetTop measures layout rows; rotated bounding boxes have different tops.
+      const rows = await evaluate("Object.values([...document.querySelectorAll('.crew-card')].reduce((rows,e)=>{rows[e.offsetTop]=(rows[e.offsetTop]||0)+1;return rows;},{}))");
+      assert.deepEqual(rows,[5,5]);
     }
     await screenshot(`crew-states-${width}`);
   }

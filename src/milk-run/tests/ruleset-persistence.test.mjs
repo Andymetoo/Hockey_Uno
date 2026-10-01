@@ -14,10 +14,11 @@ const sessionFor = state => ({ version: 1, presentationVersion: 2, state, view: 
 
 const V2_DEFAULTS = {
   v2CrewCycleTurns: 10,
-  v2MissionEnemy: 15, v2MissionResource: 20, v2MissionTime: 10,
+  v2MissionEnemy: 20, v2MissionResource: 12, v2MissionTime: 10,
   v2TimePerProgress: 4, v2OutboundLength: 8, v2ReturnLength: 3,
-  v2RepairTime: 6, v2FireTime: 6, v2MedicalTime: 6,
-  v2AssistedRepairTime: 4, v2AssistedFireTime: 4, v2AssistedMedicalTime: 4,
+  v2RepairTime: 4, v2FireTime: 4, v2MedicalTime: 4,
+  v2AssistedRepairTime: 2, v2AssistedFireTime: 2, v2AssistedMedicalTime: 2,
+  v2FighterKillGrantsTime: true, v2DisruptEnabled: true, v2DisruptEffect: 'accuracy-penalty', v2MaxEscorts: 1,
   v2Bf109Engagement: 5, v2Bf110Engagement: 5, v2Fw190Engagement: 5, v2Me262Engagement: 5,
   v2EngagementMode: 'any-action',
 };
@@ -32,12 +33,13 @@ test('V1 remains the explicit default and every V2 default is independent and re
   assert.equal(v1.config.returnLength, 5);
   assert.deepEqual(Object.fromEntries(Object.keys(V2_DEFAULTS).map(key => [key, DEFAULT_CONFIG[key]])), V2_DEFAULTS);
   for (const key of Object.keys(V2_DEFAULTS)) assert.ok(CONFIG_FIELDS.some(field => field.key === key), `${key} appears in Dev settings`);
-  assert.equal(v2.bags.mission.tokens.filter(token => token === 'Enemy').length, 15);
-  assert.equal(v2.bags.mission.tokens.filter(token => token === 'Resource').length, 20);
+  assert.equal(v2.bags.mission.tokens.filter(token => token === 'Enemy').length, 20);
+  assert.equal(v2.bags.mission.tokens.filter(token => token === 'Resource').length, 12);
   assert.equal(v2.bags.mission.tokens.filter(token => token === 'Time').length, 10);
   assert.equal(v1.bags.mission.tokens.filter(token => token === 'Time').length, 0);
   assert.equal(v2.config.maxFighters, 3);
   assert.deepEqual(CONFIG_FIELDS.find(field => field.key === 'v2EngagementMode').options.map(option => option.value), ['any-action', 'attack-pass-only']);
+  assert.deepEqual(CONFIG_FIELDS.find(field => field.key === 'v2DisruptEffect').options.map(option => option.value), ['auto-miss', 'accuracy-penalty']);
 });
 
 test('V2 Dev settings normalize and persist independently of V1 mission and work values', () => {

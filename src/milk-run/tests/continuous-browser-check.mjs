@@ -58,14 +58,14 @@ try {
   await touch('#board [data-cell="E3-1"]'); await click('[data-ui="work-position"]');
   await touch('#board [data-work-cell="D3-1"]');
   await evaluate("const select=document.querySelector('#job-assistant');select.value='radio';select.dispatchEvent(new Event('change',{bubbles:true}))");
-  assert.match(await evaluate("document.querySelector('#target-detail').textContent"), /4 future Time/);
+  assert.match(await evaluate("document.querySelector('#target-detail').textContent"), /2 future Time/);
   await click('[data-ui="confirm-target"]'); await flush();
   const assisted = await getState();
-  assert.equal(assisted.jobs[0].assistantId, 'radio'); assert.equal(assisted.jobs[0].remainingTime, 4);
+  assert.equal(assisted.jobs[0].assistantId, 'radio'); assert.equal(assisted.jobs[0].remainingTime, 2);
   assert.equal(assisted.crew.find(c => c.id === 'radio').cycleSlotConsumed, false);
-  assert.match(await evaluate("document.querySelector('#crew-list [data-crew=radio]').textContent"), /4 Time/);
+  assert.match(await evaluate("document.querySelector('#crew-list [data-crew=radio]').textContent"), /2 Time/);
   await screenshot('assisted-job'); await b.reload(); assert.deepEqual(await getState(), assisted);
-  note('V2 Assist UI creates four-Time work, preserves the assistant slot and resumes exact timers');
+  note('V2 Assist UI creates two-Time work, preserves the assistant slot and resumes exact timers');
 
   await click('[data-ui="new-sortie"]'); await click('#sortie-form input[value="v1"]');
   await click('#sortie-form button[type="submit"]');
@@ -92,6 +92,75 @@ try {
   await click('#sortie-dialog [data-ui="close"]');
   await click('[data-ui="dev"]'); await click('[data-ui="reset-defaults"]'); await click('#dev-dialog [data-ui="close"]');
   note('Preferred V2 and invalid next-sortie settings neither convert nor block the active V1 save');
+
+  for (const effect of ['auto-miss', 'accuracy-penalty']) {
+    const s = fresh({ v2DisruptEffect: effect });
+    s.phase = 'action'; s.activeCrew = 'engineer';
+    Object.assign(s.crew.find(c => c.id === 'engineer'), { used: true, cycleSlotConsumed: true });
+    s.fighters = [fighter('disrupt', { hp: 3, maxHp: 3, engagementRemaining: 5 })];
+    s.bags.combat = { tokens: ['Hit'], discard: [] };
+    await inject(s, { speed: 'manual' });
+    await evaluate("window.milkRun.send({type:'action',action:'basicFire',targetId:'disrupt'})");
+    for (let i = 0; i < 80 && (await b.current())?.type !== 'FIGHTER_DISRUPTED'; i++) await click('[data-ui=step]');
+    assert.equal((await b.current()).type, 'FIGHTER_DISRUPTED');
+    const title = effect === 'auto-miss' ? 'DISRUPTED · AUTO MISS' : 'DISRUPTED · NEEDS 4+';
+    assert.equal(await evaluate("document.querySelector('.stage-title').textContent"), title);
+    await b.reload();
+    assert.equal(await evaluate("document.querySelector('.stage-title').textContent"), title);
+    await evaluate("document.querySelector('#log-details').open=true");
+    await b.waitFor("!!document.querySelector('#event-log [data-log-group]')");
+    assert.ok(await evaluate(`[...document.querySelectorAll('#event-log .log-event-message b')].some(e=>e.textContent===${JSON.stringify(title)})`));
+    await screenshot(`disrupt-${effect}`); await flush();
+  }
+  note('Disrupt Auto Miss and Needs 4+ banners and recorder entries retain their resolved mode through reload');
+
+  for (const width of [320, 360, 390]) {
+    await viewport(width, 844);
+    const s = fresh({ opportunityEnabled: true });
+    s.time = 3; s.timeTokens = Array(3).fill('Time');
+    for (let i = 0; i < 3; i++) s.bags.mission.tokens.splice(s.bags.mission.tokens.indexOf('Time'), 1);
+    Object.assign(s.crew.find(c => c.id === 'engineer'), { used: true, cycleSlotConsumed: true, activationCompleted: true });
+    s.fighters = ['first', 'second'].map(id => fighter(id, { hp: 1, engagementRemaining: 5 }));
+    s.bags.combat = { tokens: ['Hit', 'Hit'], discard: [] };
+    await inject(s);
+    await evaluate("window.milkRun.send({type:'opportunityShot',gunnerId:'engineer',targetId:'first'});window.milkRun.flush()");
+    const pending = await getState();
+    assert.equal(pending.phase, 'betweenOpportunity'); assert.equal(pending.time, 4);
+    assert.ok(await evaluate("!!document.querySelector('[data-command=continueProgress]')"));
+    await b.reload(); assert.deepEqual(await getState(), pending);
+    await touch('#crew-list [data-crew=pilot]');
+    assert.equal(await evaluate("!!document.querySelector('#action-content [data-ui=activate]')"), false);
+    await click('#action-dialog [data-ui=close]');
+    await evaluate("window.milkRun.send({type:'opportunityShot',gunnerId:'engineer',targetId:'second'});window.milkRun.flush()");
+    const chained = await getState(); assert.equal(chained.time, 4);
+    assert.deepEqual(chained.bags.mission.tokens, pending.bags.mission.tokens);
+    assert.equal(chained.opportunity, s.opportunity);
+    await touch('[data-command=continueProgress]'); await flush();
+    const end = await getState(); assert.equal(end.mission.position, 1); assert.equal(end.time, 0);
+    assert.equal(end.stats.enemyAttacks, 0); assert.equal(end.stats.turns, 0); assert.equal(end.stats.missionDraws, 0);
+    assert.deepEqual(end.crewCycle, s.crewCycle);
+    assert.ok(await evaluate('document.documentElement.scrollWidth <= innerWidth + 1'));
+    await screenshot(`between-turn-progress-${width}`);
+  }
+  note('320/360/390: between-turn kill chains stop at full Time, resume exactly, and Continue to Progress without another activation or enemy phase');
+
+  for (const phase of ['select', 'action', 'opportunity', 'betweenOpportunity', 'bombing', 'ended']) {
+    const s = fresh(); s.phase = phase;
+    if (phase === 'action') s.activeCrew = 'pilot';
+    s.jobs = [{ id: 'abort-check', kind: 'fireControl', crewId: 'engineer', cells: ['E3-1'], remainingTime: 1 }];
+    s.cells['E3-1'] = 'fire';
+    Object.assign(s.crew.find(c => c.id === 'engineer'), { job: 'abort-check', position: ['C3-2'], used: true, cycleSlotConsumed: true });
+    await inject(s); await click('[data-job=abort-check]');
+    assert.equal(await evaluate("document.querySelector('[data-ui=abort-work]').disabled"), phase !== 'select', phase);
+    if (phase === 'select') {
+      await click('[data-ui=abort-work]'); await flush();
+      const end = await getState(); assert.equal(end.jobs.length, 0);
+      assert.deepEqual(end.resources, s.resources); assert.deepEqual(end.bags, s.bags);
+      assert.deepEqual(end.crew.find(c => c.id === 'engineer').position, ['C3-2']);
+      assert.equal(end.crew.find(c => c.id === 'engineer').cycleSlotConsumed, true);
+    } else await click('#info-dialog [data-ui=close]');
+  }
+  note('Abort Work is enabled only at normal V2 crew selection; it preserves position, resources and consumed slots');
 
   assert.deepEqual(b.exceptions, []); assert.deepEqual(b.badResponses, []);
   await b.writeResults({ browser: b.version.product, checks, exceptions: b.exceptions, badResponses: b.badResponses });

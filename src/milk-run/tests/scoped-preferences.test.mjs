@@ -22,6 +22,10 @@ test('configuration fields identify their exact ruleset scope and fixed Cycle re
   const cycle = CONFIG_FIELDS.find(field => field.key === 'v2CrewCycleTurns');
   assert.equal(cycle.min, 10); assert.equal(cycle.max, 10);
   assert.match(cycle.fixedReason, /ten crew.*one Turn/);
+  const opportunityPhase = CONFIG_FIELDS.find(field => field.key === 'v2OpportunityProvokesEnemyPhase');
+  assert.equal(opportunityPhase.type, 'boolean');
+  assert.equal(opportunityPhase.scope, 'v2');
+  assert.equal(DEFAULT_CONFIG.v2OpportunityProvokesEnemyPhase, false);
 });
 
 test('modified scope reporting excludes inactive rules and chooser preferences from the active sortie', () => {
@@ -124,7 +128,7 @@ test('scope resets preserve all other records and suppress legacy values without
   const common = storage.getItem(DEV_PREFERENCE_KEYS.common), v1 = storage.getItem(DEV_PREFERENCE_KEYS.v1), chooser = storage.getItem(DEV_PREFERENCE_KEYS.preferences);
   assert.equal(resetDevPreferencesScope('v2', storage), true);
   loaded = loadDevPreferences(storage);
-  assert.equal(loaded.v2RepairTime, 6);
+  assert.equal(loaded.v2RepairTime, 4);
   assert.equal(storage.getItem(DEV_PREFERENCE_KEYS.common), common);
   assert.equal(storage.getItem(DEV_PREFERENCE_KEYS.v1), v1);
   assert.equal(storage.getItem(DEV_PREFERENCE_KEYS.preferences), chooser);
@@ -158,14 +162,16 @@ test('newer preference documents are not overwritten and a failed scoped write r
   for (const [key, value] of Object.entries(before)) assert.equal(storage.getItem(key), value);
 });
 
-test('V2 saves without the newly added refill preference restore exact snapshots without inserting config', () => {
+test('older V2 saves without newer optional preferences restore exact snapshots without inserting config', () => {
   const storage = memoryStorage();
   const state = createGame({}, 'existing-v2', 'v2-continuous');
   delete state.config.v2RefillAtProgress;
+  delete state.config.v2OpportunityProvokesEnemyPhase;
   for (const key of ['bf109Hp', 'bf110Hp', 'fw190Hp', 'me262Hp']) delete state.config[key];
   state.time = 2; state.timeTokens = ['Time', 'Time'];
   const session = { version: 1, state, view: structuredClone(state), pending: [{ type: 'TIME_GAINED', state: structuredClone(state) }], log: [] };
   saveSession(session, storage);
   assert.deepEqual(loadSession(storage), session);
   assert.equal('v2RefillAtProgress' in loadSession(storage).state.config, false);
+  assert.equal('v2OpportunityProvokesEnemyPhase' in loadSession(storage).state.config, false);
 });

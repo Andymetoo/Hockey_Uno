@@ -46,6 +46,7 @@ try {
     v2AssistedRepairTime: 2, v2AssistedFireTime: 3, v2AssistedMedicalTime: 4,
     v2Bf109Engagement: 3, v2Bf110Engagement: 4, v2Fw190Engagement: 6, v2Me262Engagement: 7,
     v2EngagementMode: 'attack-pass-only', v2RefillAtProgress: false,
+    v2FighterKillGrantsTime: false, v2DisruptEnabled: false, v2DisruptEffect: 'auto-miss', v2MaxEscorts: 3,
   };
   const oldV1 = await getState(); await editFields(custom);
   assert.deepEqual(await getState(), oldV1, 'editing all construction controls preserves active V1');
@@ -68,7 +69,8 @@ try {
   assert.deepEqual(await getState(), customV2);
   await editFields({ outboundLength: 11 }); await click('[data-ui=reset-v2]');
   preferences = await evaluate('window.milkRun.getPreferences()');
-  assert.equal(preferences.outboundLength, 11); assert.equal(preferences.v2RepairTime, 6); assert.equal(preferences.combatHit, 9);
+  assert.equal(preferences.outboundLength, 11); assert.equal(preferences.v2RepairTime, 4); assert.equal(preferences.combatHit, 9);
+  for (const key of Object.keys(DEFAULT_CONFIG).filter(key => key.startsWith('v2'))) assert.equal(preferences[key], DEFAULT_CONFIG[key], `Reset V2: ${key}`);
   await click('#dev-dialog [data-ui=close]'); await b.reload();
   assert.deepEqual(await getState(), customV2);
   assert.deepEqual(await evaluate('window.milkRun.getPreferences()'), preferences);
@@ -118,12 +120,12 @@ try {
   working = dispatch(working, { type: 'activate', crewId: 'engineer' }).state;
   working = dispatch(working, { type: 'action', action: 'repair', cells: ['E3-1'], assistantId: 'radio', workCellId: 'D3-1' }).state;
   await inject(working, { speed: 'manual' });
-  assert.match(await evaluate("document.querySelector('#active-jobs').textContent"), /REPAIR.*4 TIME REMAINING/);
+  assert.match(await evaluate("document.querySelector('#active-jobs').textContent"), /REPAIR.*2 TIME REMAINING/);
   assert.match(await evaluate("document.querySelector('#active-jobs').textContent"), /Engineer.*Radio/s);
   await evaluate("window.milkRun.send({type:'activate',crewId:'pilot'})");
   await nextUntil('WORK_TIME_ADVANCED');
-  assert.equal((await getView()).jobs[0].remainingTime, 3);
-  assert.match(await evaluate("document.querySelector('#active-jobs').textContent"), /3 TIME REMAINING/);
+  assert.equal((await getView()).jobs[0].remainingTime, 1);
+  assert.match(await evaluate("document.querySelector('#active-jobs').textContent"), /1 TIME REMAINING/);
   await screenshot('visible-job-countdown');
   const savedCountdown = await getView(); await b.reload(); assert.deepEqual(await getView(), savedCountdown); await flush();
   note('Assisted job names and numerical Time decrement appear in the actual queue and survive reload');
@@ -166,6 +168,11 @@ try {
   await click('[data-ui=dev]'); await click('[data-ui=reset-defaults]');
   assert.deepEqual(await evaluate('window.milkRun.getPreferences()'), DEFAULT_CONFIG);
   await click('#dev-dialog [data-ui=close]');
+  await click('[data-ui=new-sortie]'); await launch('v2-continuous');
+  const canonical = await getState();
+  assert.deepEqual(canonical.config, { ...DEFAULT_CONFIG, preferredRuleset: 'v2-continuous' });
+  assert.deepEqual(['Enemy', 'Resource', 'Time'].map(t => canonical.bags.mission.tokens.filter(v => v === t).length), [20, 12, 10]);
+  note('Reset defaults followed by a new V2 sortie restores canonical combat/work rules and the physical 20/12/10 bag');
   assert.deepEqual(b.exceptions, []); assert.deepEqual(b.badResponses, []);
   await b.writeResults({ browser: b.version.product, widths, checks, exceptions: b.exceptions, badResponses: b.badResponses });
   console.log(JSON.stringify({ passed: checks.length, widths, artifacts: b.artifacts }, null, 2));

@@ -1,8 +1,9 @@
 import { normalizeConfig, ENEMY_DEFS } from './config.mjs';
 import { BOARD, BOARD_VERSION, CREW_DEFS, ENGINE_CELLS, STATIONS } from './board.mjs';
 import { seedToInt } from './random.mjs';
-import { RULESETS } from './rulesets.mjs';
+import { RULESETS, V2_CONFIG_VERSION } from './rulesets.mjs';
 import { createV2Telemetry } from './telemetry.mjs';
+import { CREW_POSITION_VERSION } from './crew-position.mjs';
 
 const copies = (count, value) => Array.from({ length: count }, () => value);
 export function createGame(overrides = {}, seed = 'MILK-RUN', ruleset = overrides.preferredRuleset ?? 'v1') {
@@ -13,16 +14,16 @@ export function createGame(overrides = {}, seed = 'MILK-RUN', ruleset = override
     throw new RangeError('V2 needs at least as many mission Time tokens as Time Required Per Progress.');
   }
   return {
-    version: 1, rulesVersion: continuous ? 4 : 3, ruleset, boardVersion: BOARD_VERSION, config, seed: String(seed), rng: seedToInt(seed),
+    version: 1, rulesVersion: continuous ? 4 : 3, ruleset, boardVersion: BOARD_VERSION, crewPositionVersion: CREW_POSITION_VERSION, config, seed: String(seed), rng: seedToInt(seed),
     round: 0, slot: 0, altitude: config.startingAltitude,
-    ...(continuous ? { crewCycle: { number: 1, turn: 0 }, time: 0, timeTokens: [], pendingProgress: false, telemetry: createV2Telemetry() } : {}),
+    ...(continuous ? { v2ConfigVersion: V2_CONFIG_VERSION, crewCycle: { number: 1, turn: 0 }, time: 0, timeTokens: [], pendingProgress: false, telemetry: createV2Telemetry() } : {}),
     mission: { position: 0, bombed: false, bombingResult: null },
     resources: { Officer: config.startingOfficer, Enlisted: config.startingEnlisted },
     opportunity: config.opportunityEnabled ? Math.min(config.startingOpportunity, config.opportunityCap) : 0,
     crew: CREW_DEFS.map((member) => ({
       id: member.id, health: 'healthy', used: false, activationCompleted: false,
       ...(continuous ? { cycleSlotConsumed: false } : {}),
-      position: [...STATIONS[member.station].cells], station: member.station, job: null,
+      position: [...STATIONS[member.station].cells], station: member.station, homeStation: member.station, displaced: false, job: null,
     })),
     fighters: [],
     cells: Object.fromEntries(BOARD.filter((cell) => cell.structure).map((cell) => [cell.id, 'healthy'])),

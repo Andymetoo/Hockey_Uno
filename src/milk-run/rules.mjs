@@ -7,8 +7,9 @@ import { die, drawBag, refillBag, drawDeck } from './random.mjs';
 import { resolveBombing } from './bombing.mjs';
 import { fighterHeading, turnHeadingToward, turnHeadingAway } from './spatial.mjs';
 import { isV2 } from './rulesets.mjs';
-import { engagementFor, spendEngagement, gainTime, completeContinuousTurn, continueCycle } from './continuous.mjs';
+import { engagementFor, spendEngagement, gainTime, gainFighterKillTime, completeContinuousTurn, continueCycle, completeBetweenTurnProgress } from './continuous.mjs';
 import { observe, ensureV2Telemetry } from './telemetry.mjs';
+import { homeStationId, currentStationId, leaveStation, migrateCrewPositions } from './crew-position.mjs';
 
 const copy = value => structuredClone(value);
 const def = id => CREW_DEFS.find(item => item.id === id);
@@ -28,7 +29,7 @@ const underTreatment = (state, crewId) => state.jobs.some(job => job.kind === 'm
 
 export function isAtStation(state, crew) {
   const expected = stationCells(crew.station);
-  return expected.length > 0 && crew.health === 'healthy' && !crew.job && !underTreatment(state, crew.id) &&
+  return currentStationId(crew) !== null && expected.length > 0 && crew.health === 'healthy' && !crew.job && !underTreatment(state, crew.id) &&
     expected.every(id => crew.position.includes(id) && isSafe(state, id)) &&
     crew.position.length === expected.length;
 }
@@ -58,7 +59,7 @@ export function legalTargets(state, crewId) {
 }
 
 export function directFireGunners(state) {
-  return state.crew.filter(crew => hasTag(crew, 'Gunner') && operatingArc(state, crew.id) && legalTargets(state, crew.id).length);
+  return state.crew.filter(crew => operatingArc(state, crew.id) && legalTargets(state, crew.id).length);
 }
 
 /** Both conversions conserve physical Resource tokens, including held tokens. */
@@ -87,7 +88,7 @@ export function opportunityAvailability(state) {
   const completed = completedOpportunityGunners(state);
   const gunners = opportunityGunners(state);
   const reason = !state.config.opportunityEnabled ? 'Opportunity is disabled for this sortie.'
-    : !['select','opportunity'].includes(state.phase) ? 'Opportunity Shots are available between crew activations or after an action before the enemy phase.'
+    : !['select','opportunity', ...(isV2(state) ? ['betweenOpportunity'] : [])].includes(state.phase) ? 'Opportunity Shots are available between crew activations or after an action before the enemy phase.'
     : !state.fighters.length ? 'No active fighters to target.'
     : !completed.length ? 'No healthy gunner has completed their normal activation at a usable gun station.'
     : !gunners.length ? 'No fighter is inside any completed gunner’s operating arc.'
@@ -98,7 +99,35 @@ export function opportunityAvailability(state) {
 function stationEmpty(state, stationId, exceptId) {
   const cells = stationCells(stationId);
   return cells.length && cells.every(id => isSafe(state, id)) && !state.crew.some(crew =>
-    crew.id !== exceptId && crew.health !== 'dead' && crew.position.some(id => cells.includes(id)));
+    crew.id !== exceptId && crew.health === 'healthy' && crew.position.some(id => cells.includes(id)));
+}
+
+export function eligibleStations(state, crewId) {
+  const crew = person(state, crewId);
+  if (!crew || crew.health !== 'healthy' || crew.job || underTreatment(state, crewId)) return [];
+  return Object.keys(STATIONS).filter(id => (def(id)?.arc || ['pilot', 'copilot'].includes(id)) &&
+    currentStationId(crew) !== id && stationEmpty(state, id, crewId));
+}
+
+// Leaving a station is one abstract move to the nearest safe interior space.
+// Prefer clear space; shared space is a fallback, never a station assignment.
+export function stationExitPosition(state, crewId) {
+  const crew = person(state, crewId), current = crew && currentStationId(crew);
+  if (!current) return null;
+  const origin = getCell(crew.position[0]);
+  const occupied = id => state.crew.some(c => c.id !== crewId && c.health !== 'dead' && c.position.includes(id));
+  return BOARD.filter(c => c.fuselage && isSafe(state, c.id) && !stationCells(current).includes(c.id))
+    .sort((a, b) => Number(occupied(a.id)) - Number(occupied(b.id)) ||
+      (Math.abs(a.x-origin.x)+Math.abs(a.y-origin.y)) - (Math.abs(b.x-origin.x)+Math.abs(b.y-origin.y)) || a.y-b.y || a.x-b.x)[0]?.id ?? null;
+}
+
+function occupyStation(state, crew, stationId, emit, type = 'STATION_MANNED') {
+  // Incapacitated former occupants keep their physical footprint, but relinquish
+  // the assignment permanently. Healing cannot reclaim or evict this operator.
+  for (const other of state.crew) if (other.id !== crew.id && other.station === stationId) leaveStation(other);
+  crew.station = stationId; crew.displaced = false;
+  crew.position = [...stationCells(stationId)];
+  record(emit, type, `${nameOf(crew.id)} occupies ${STATIONS[stationId].name}. Home station: ${STATIONS[homeStationId(crew)].name}.`, { crewId: crew.id, stationId });
 }
 
 function cockpitSeat(state, crew) {
@@ -113,7 +142,7 @@ export function availableActions(state, crewId = state.activeCrew) {
   const actions = [];
   const add = (id, label, enabled = true, reason = '', cost) => actions.push({ id, label, enabled, ...(enabled ? {} : { reason }), ...(cost ? { cost } : {}) });
   const targets = legalTargets(state, crewId);
-  if (def(crew.id).arc) {
+  if (operatingArc(state, crew.id) || def(crew.id).arc) {
     add('basicFire', 'Basic Fire', targets.length > 0, 'No fighter in an operating gun arc.');
     add('advancedFire', 'Advanced Fire', targets.length > 0 && affordable('Enlisted', 1), targets.length ? 'Needs 1 Enlisted resource.' : 'No fighter in an operating gun arc.', '1 Enlisted');
   }
@@ -133,6 +162,9 @@ export function availableActions(state, crewId = state.activeCrew) {
     !state.crew.some(other => other.id !== crew.id && other.health !== 'dead' && other.position.includes(cell.id))), 'No other safe, unoccupied fuselage position.');
   const seats = ['pilot', 'copilot'].some(id => stationEmpty(state, id, crew.id) && !(crew.station === id && isAtStation(state, crew)));
   add('manCockpit', 'Man Cockpit', seats, 'No empty, safe cockpit seat.');
+  add('manStation', 'Man Station', eligibleStations(state, crewId).length > 0, 'No vacant, non-burning station is available.');
+  add('returnHome', 'Return Home', eligibleStations(state, crewId).includes(homeStationId(crew)), 'Home station is occupied, burning, or already assigned to this crew member.');
+  add('leaveStation', 'Leave Station', Boolean(stationExitPosition(state, crewId)), 'No occupied station or safe interior space to leave for.');
   if (cockpitSeat(state, crew)) {
     const ready = state.engines.some(engine => !engine.running && engineSquares(engine.id).every(cell => status(state, cell.id) === 'healthy'));
     add('restartEngine', 'Restart Engine', ready, 'No stopped engine has both squares repaired.');
@@ -147,8 +179,11 @@ export function availableActions(state, crewId = state.activeCrew) {
     add('convert', 'Convert Resources', options.some(option => option.enabled), options.map(option => `${option.label}: ${option.reason}`).join(' '), `${state.config.conversionRate}E ↔ 1O`);
   }
   if (hasAbility(crew, 'rotateFighter')) add('rotateFighter', 'Distract Fighter', state.fighters.some(item => item.facing < 180), 'No fighter can turn farther away.');
-  if (hasAbility(crew, 'escort')) add('escort', 'Summon Escort', affordable('Enlisted', state.config.escortCost), 'Needs Enlisted resources.', `${state.config.escortCost} Enlisted`);
-  add('wait', 'Hold Position');
+  if (hasAbility(crew, 'escort')) {
+    const atCap = isV2(state) && state.config.v2MaxEscorts !== null && state.escorts.length >= state.config.v2MaxEscorts;
+    add('escort', 'Summon Escort', !atCap && affordable('Enlisted', state.config.escortCost), atCap ? `Maximum ${state.config.v2MaxEscorts} simultaneous Escort${state.config.v2MaxEscorts === 1 ? '' : 's'} already active.` : 'Needs Enlisted resources.', `${state.config.escortCost} Enlisted`);
+  }
+  add('wait', 'No Action');
   return actions;
 }
 
@@ -172,20 +207,26 @@ function gainOpportunity(state, amount, emit, cause, extra = {}) {
   record(emit, 'OPPORTUNITY_GAINED', `${cause}: gain ${gained} Opportunity (${state.opportunity}/${state.config.opportunityCap}).`, { cause, amount: gained, ...extra });
 }
 
+export function canAbortWork(state, jobId) {
+  return isV2(state) && !state.outcome && state.phase === 'select' && !state.activeCrew && !state.pendingProgress &&
+    state.jobs.some(job => job.id === jobId);
+}
+
+function cancelWork(state, job, emit, reason) {
+  const workers = jobWorkers(state, job);
+  state.jobs = state.jobs.filter(item => item.id !== job.id);
+  for (const worker of workers) { worker.job = null; leaveStation(worker); }
+  record(emit, 'WORK_CANCELLED', `${job.kind === 'fireControl' ? 'Fire Control' : job.kind} cancelled: ${reason}${job.kind === 'fireControl' ? ' Fire suppression ends.' : ''} Workers remain at their work positions.`, {
+    crewId: job.crewId, jobId: job.id, kind: job.kind, cells: [...(job.cells ?? [])], targetId: job.targetId,
+    workers: workers.map(worker => worker.id),
+  });
+}
+
 function cancelJob(state, crew, emit) {
   if (!crew.job) return;
-  if (isV2(state)) {
-    const job = state.jobs.find(item => item.id === crew.job);
-    const workers = jobWorkers(state, job);
-    state.jobs = state.jobs.filter(item => item.id !== crew.job);
-    for (const worker of workers) worker.job = null;
-    record(emit, 'WORK_CANCELLED', `${nameOf(crew.id)} can no longer continue crisis work. The job and its workers are released.`, { crewId: crew.id });
-    returnWorkers(state, workers, emit);
-    return;
-  }
-  state.jobs = state.jobs.filter(job => job.id !== crew.job);
-  crew.job = null;
-  record(emit, 'WORK_CANCELLED', `${nameOf(crew.id)} can no longer continue crisis work.`, { crewId: crew.id });
+  const job = state.jobs.find(item => item.id === crew.job);
+  if (job) cancelWork(state, job, emit, `${nameOf(crew.id)} is ${crew.health}.`);
+  else crew.job = null;
 }
 
 function injure(state, crew, emit, cause) {
@@ -261,17 +302,18 @@ export function damageSquare(state, cellId, steps, emit, { injureCrew = true } =
   recalculateConditions(state, emit);
 }
 
-export function resolveAttack(state, emit, { source = 'Enemy', fighterId, roll, cellId } = {}) {
+export function resolveAttack(state, emit, { source = 'Enemy', fighterId, roll, resultOverride, cellId } = {}) {
   bump(state, 'enemyAttacks');
   record(emit, 'ENEMY_ATTACK', `${source} attacks.`, { fighterId, source });
   const result = roll ?? die(state, 6);
-  record(emit, 'ENEMY_ATTACK_ROLL', `${source} rolls ${result}: ${result === 1 ? 'MISS' : result === 6 ? 'CRITICAL HIT' : 'HIT'}.`, { fighterId, source, roll: result, result: result === 1 ? 'miss' : result === 6 ? 'critical' : 'hit' });
-  if (result === 1) return;
+  const outcome = resultOverride ?? (result === 1 ? 'miss' : result === 6 ? 'critical' : 'hit');
+  record(emit, 'ENEMY_ATTACK_ROLL', `${source} rolls ${result}: ${outcome === 'off-target' ? 'OFF TARGET' : outcome === 'miss' ? 'MISS' : outcome === 'critical' ? 'CRITICAL HIT' : 'HIT'}.`, { fighterId, source, roll: result, result: outcome });
+  if (outcome === 'off-target' || outcome === 'miss') return;
   bump(state, 'enemyHits');
-  if (result === 6) bump(state, 'enemyCrits');
+  if (outcome === 'critical') bump(state, 'enemyCrits');
   const location = cellId ?? `${'ABCDEF'[die(state, 6) - 1]}${die(state, 6)}-${die(state, 4)}`;
   record(emit, 'ENEMY_HIT_LOCATION', `Hit location: ${location}.`, { cellId: location, fighterId });
-  damageSquare(state, location, result === 6 ? 2 : 1, emit);
+  damageSquare(state, location, outcome === 'critical' ? 2 : 1, emit);
 }
 
 function killFighter(state, target, emit, cause, gunfire = false) {
@@ -282,15 +324,18 @@ function killFighter(state, target, emit, cause, gunfire = false) {
   if (isV2(state)) observe(state, 'fightersDestroyed');
   record(emit, 'FIGHTER_DESTROYED', `${target.type} is destroyed by ${cause}. Remaining fighters move forward in queue order.`, { fighterId: target.id });
   if (gunfire && state.config.opportunityOnKill) gainOpportunity(state, 1, emit, `${target.type} destroyed by B-17 gunfire`, { fighterId: target.id });
+  if (isV2(state) && gunfire && state.config.v2FighterKillGrantsTime) gainFighterKillTime(state, emit, jobs => completeJobs(state, jobs, emit));
 }
 
 function damageFighter(state, target, amount, emit, cause, gunfire = false) {
   target.hp = Math.max(0, target.hp - amount);
   record(emit, 'FIGHTER_DAMAGED', `${cause}: ${target.type} loses ${amount} HP (${target.hp}/${target.maxHp}).`, { fighterId: target.id, amount });
   if (!target.hp) killFighter(state, target, emit, cause, gunfire);
-  else if (gunfire && amount > 0 && state.config.disruptOnHit && !target.disrupted) {
+  else if (gunfire && amount > 0 && (isV2(state) ? state.config.v2DisruptEnabled : state.config.disruptOnHit) && !target.disrupted) {
     target.disrupted = true;
-    record(emit, 'FIGHTER_DISRUPTED', `${target.type} is Disrupted until its next enemy action.`, { fighterId: target.id, cause });
+    record(emit, 'FIGHTER_DISRUPTED', `${target.type} is Disrupted until its next enemy action.`, {
+      fighterId: target.id, cause, ...(isV2(state) ? { disruptEffect: state.config.v2DisruptEffect } : {}),
+    });
   }
 }
 
@@ -330,11 +375,23 @@ function enemyPhase(state, emit) {
         record(emit, 'DISRUPT_CLEARED', `${target.type}'s Disruption clears after its enemy action.`, { fighterId: id });
       }
     } else {
-      if (target.disrupted) {
+      const disrupted = target.disrupted;
+      if (disrupted && isV2(state) && state.config.v2DisruptEffect === 'accuracy-penalty') {
+        const roll = die(state, 6);
+        const outcome = roll <= 3 ? 'off-target' : roll <= 5 ? 'hit' : 'critical';
+        resolveAttack(state, emit, { source: target.type, fighterId: id, roll, resultOverride: outcome });
+        record(emit, 'DISRUPT_ACCURACY_RESOLVED', `${target.type}'s Disrupt accuracy roll resolves as ${outcome === 'off-target' ? 'Off Target' : outcome === 'critical' ? 'Critical' : 'Hit'}.`, { fighterId: id, roll, result: outcome });
+      } else if (disrupted && !isV2(state)) {
         target.disrupted = false;
         record(emit, 'ATTACK_DISRUPTED', `ATTACK DISRUPTED: ${target.type}'s attack is cancelled. The fighter still makes its normal flyby.`, { fighterId: id, source: target.type });
+      } else if (disrupted) {
+        record(emit, 'ATTACK_DISRUPTED', `ATTACK DISRUPTED: ${target.type}'s attack is an automatic miss. The fighter still makes its normal flyby.`, { fighterId: id, source: target.type, disruptEffect: 'auto-miss' });
       } else resolveAttack(state, emit, { source: target.type, fighterId: id });
       postAttackPosition(state, id, emit);
+      if (disrupted && isV2(state)) {
+        target.disrupted = false;
+        record(emit, 'DISRUPT_CLEARED', `${target.type}'s Disruption clears after its enemy action.`, { fighterId: id });
+      }
     }
     if (isV2(state)) {
       observe(state, 'fighterActionsCompleted');
@@ -456,7 +513,8 @@ export function connectedTargetSelection(state, action, ids) {
     ids.every(id => eligible.has(id)) && connected(ids, state.config.eightWayWork);
 }
 
-/** Work stays in the central C/D interior on the PRIMARY target's main row.
+/** Work prefers the central C/D interior on the PRIMARY target's main row.
+ * Fuselage work can use an immediately adjacent main row when its row burns.
  * A multi-row connected repair/fire group uses its first selected square's row.
  * Footprints may share interior work space; rendering offsets overlapping crew.
  */
@@ -465,7 +523,10 @@ export function legalWorkPositions(state, crewId, targetIds) {
   const origin = getCell(targetIds?.[0]);
   if (!origin) return [];
   const row = Math.floor(origin.y / 2);
-  return BOARD.filter(cell => cell.fuselage && Math.floor(cell.y / 2) === row && isSafe(state, cell.id))
+  const sameRow = BOARD.filter(cell => cell.fuselage && Math.floor(cell.y / 2) === row && isSafe(state, cell.id));
+  const candidates = sameRow.length || !(origin.fuselage || origin.section === 'Fuselage') ? sameRow
+    : BOARD.filter(cell => cell.fuselage && Math.abs(Math.floor(cell.y / 2) - row) === 1 && isSafe(state, cell.id));
+  return candidates
     .sort((a, b) => (Math.abs(a.x - origin.x) + Math.abs(a.y - origin.y)) - (Math.abs(b.x - origin.x) + Math.abs(b.y - origin.y)) || a.y - b.y || a.x - b.x);
 }
 
@@ -476,8 +537,8 @@ export function eligibleMedicalTargets(state, crewId) {
 
 function workPosition(state, crew, targetIds, selectedId) {
   const candidates = legalWorkPositions(state, crew.id, targetIds);
-  requireRule(candidates.length, 'No non-burning interior work position is available on the primary target row.');
-  requireRule(!selectedId || candidates.some(cell => cell.id === selectedId), 'Choose a non-burning interior work position on the primary target row.');
+  requireRule(candidates.length, 'No safe interior work position is available in the target row or permitted adjacent rows.');
+  requireRule(!selectedId || candidates.some(cell => cell.id === selectedId), 'Choose a highlighted, non-burning interior work position.');
   return [selectedId || candidates[0].id];
 }
 
@@ -485,15 +546,15 @@ function returnWorkers(state, workers, emit) {
   const living = workers.filter(crew => crew.health !== 'dead');
   // Plan all returns before moving anyone. A returner releases their temporary
   // footprint; a worker unable to return remains a real occupancy blocker.
-  const returning = new Set(living.filter(crew => stationCells(crew.station).length &&
-    stationCells(crew.station).every(id => isSafe(state, id))).map(crew => crew.id));
+  const returning = new Set(living.filter(crew => stationCells(homeStationId(crew)).length &&
+    stationCells(homeStationId(crew)).every(id => isSafe(state, id))).map(crew => crew.id));
   let changed;
   do {
     changed = false;
     const reserved = new Set();
     for (const crew of living) {
       if (!returning.has(crew.id)) continue;
-      const home = stationCells(crew.station);
+      const home = stationCells(homeStationId(crew));
       const blocked = home.some(id => reserved.has(id)) || state.crew.some(other =>
         other.id !== crew.id && other.health !== 'dead' && !returning.has(other.id) &&
         other.position.some(id => home.includes(id)));
@@ -504,9 +565,13 @@ function returnWorkers(state, workers, emit) {
   // Present individual returns sequentially, using the coherent batch plan.
   for (const crew of living) {
     if (returning.has(crew.id)) {
+      crew.station = homeStationId(crew); crew.displaced = false;
       crew.position = [...stationCells(crew.station)];
       record(emit, 'CREW_RETURNED', `${nameOf(crew.id)} returns to ${STATIONS[crew.station].name}.`, { crewId: crew.id });
-    } else record(emit, 'CREW_DISPLACED', `${nameOf(crew.id)} stays at the work position because the assigned station is burning or occupied. General actions remain available.`, { crewId: crew.id });
+    } else {
+      leaveStation(crew);
+      record(emit, 'CREW_DISPLACED', `${nameOf(crew.id)} stays at the work position because the home station is burning or occupied. General actions remain available.`, { crewId: crew.id });
+    }
   }
 }
 
@@ -522,23 +587,32 @@ function completeJobs(state, jobs, emit) {
 
 function finishJob(state, job, emit, deferReturn = false) {
   record(emit, 'WORK_COMPLETING', `${nameOf(job.crewId)} completes ${job.kind === 'fireControl' ? 'Fire Control' : job.kind}.`, { crewId: job.crewId });
+  const completedCells = [];
+  let medicalComplete = false;
   if (job.kind === 'medical') {
     const target = person(state, job.targetId);
     if (target?.health === 'injured') {
       target.health = 'healthy';
+      medicalComplete = true;
       record(emit, 'CREW_HEALED', `${nameOf(target.id)} is healthy again.`, { crewId: target.id });
     } else record(emit, 'MEDICAL_NO_EFFECT', `${nameOf(job.targetId)} no longer has a treatable injury.`, { crewId: job.targetId });
   } else for (const id of job.cells) {
     if (job.kind === 'repair' && status(state, id) === 'damaged') {
       state.cells[id] = 'healthy';
       bump(state, 'repairs');
+      completedCells.push(id);
       record(emit, 'AIRCRAFT_SQUARE_REPAIRED', `${id}: damaged structure is repaired to healthy.`, { cellId: id, crewId: job.crewId });
     } else if (job.kind === 'fireControl' && status(state, id) === 'fire') {
       state.cells[id] = state.config.extinguishLeavesDamage ? 'damaged' : 'healthy';
+      completedCells.push(id);
       record(emit, 'FIRE_EXTINGUISHED', `${id}: fire is extinguished, leaving ${state.cells[id]} structure.`, { cellId: id, crewId: job.crewId });
     } else record(emit, 'WORK_TARGET_CHANGED', `${id}: its condition changed; this part of the job has no effect.`, { cellId: id });
   }
   state.jobs = state.jobs.filter(item => item.id !== job.id);
+  const workName = job.kind === 'fireControl' ? 'Fire Control' : job.kind === 'medical' ? 'Medical' : 'Repair';
+  const summary = job.kind === 'medical' ? `${workName} completed${medicalComplete ? `: ${nameOf(job.targetId)} treated.` : ': no treatment was needed.'}`
+    : `${workName} completed: ${completedCells.length ? `${completedCells.join(', ')} ${job.kind === 'fireControl' ? 'extinguished' : 'repaired'}.` : 'no selected cells changed.'}`;
+  record(emit, 'WORK_COMPLETED', summary, { crewId: job.crewId, jobId: job.id, kind: job.kind, cells: completedCells, targetId: job.targetId });
   if (isV2(state)) observe(state, 'jobsCompleted');
   const workers = jobWorkers(state, job);
   for (const worker of workers) worker.job = null;
@@ -557,12 +631,14 @@ function startJob(state, crew, command, emit) {
   const costKey = kind === 'fireControl' ? 'fireCost' : `${kind}Cost`;
   if (state.config[costKey]) spend(state, rankOf(crew), state.config[costKey], emit);
   crew.position = location;
+  leaveStation(crew);
   record(emit, 'CREW_RELOCATED', `${nameOf(crew.id)} moves to safe work position ${location.join(', ')}.`, { crewId: crew.id, cellId: location[0] });
   const job = { id: `job-${state.nextId++}`, kind, crewId: crew.id, targetId: command.targetId || null, cells: kind === 'medical' ? [] : [...command.cells], ...(isV2(state) ? { remainingTime: duration, ...(assistant ? { assistantId: assistant.id } : {}) } : { completeRound: state.round + duration }), workPosition: location };
   crew.job = job.id;
   if (assistant) {
     assistant.job = job.id;
     assistant.position = workPosition(state, assistant, targetCells, command.assistantWorkCellId || location[0]);
+    leaveStation(assistant);
     record(emit, 'CREW_RELOCATED', `${nameOf(assistant.id)} assists at ${assistant.position.join(', ')}. Their Crew Cycle slot remains ${assistant.cycleSlotConsumed ? 'consumed' : 'unconsumed'}.`, { crewId: assistant.id, cellId: assistant.position[0] });
   }
   state.jobs.push(job);
@@ -570,40 +646,44 @@ function startJob(state, crew, command, emit) {
     observe(state, 'jobsBegun');
     if (assistant) observe(state, 'assistedJobs');
   }
-  record(emit, 'WORK_STARTED', `${nameOf(crew.id)} starts ${kind === 'fireControl' ? 'Fire Control' : kind}${kind === 'medical' ? ` on ${nameOf(command.targetId)}` : ` at ${command.cells.join(', ')}`}. ${duration === 0 ? 'Completes now.' : isV2(state) ? `${duration} future Time${assistant ? ` with ${nameOf(assistant.id)} assisting` : ''}.` : `Completes at Round ${job.completeRound} Start.`}${kind === 'fireControl' ? ' Selected fires are suppressed while this job remains active.' : ''}`, { crewId: crew.id, jobId: job.id });
+  record(emit, 'WORK_STARTED', `${nameOf(crew.id)} starts ${kind === 'fireControl' ? 'Fire Control' : kind}${kind === 'medical' ? ` on ${nameOf(command.targetId)}` : ` at ${command.cells.join(', ')}`}. ${duration === 0 ? 'Completes now.' : isV2(state) ? `${duration} future Time${assistant ? ` with ${nameOf(assistant.id)} assisting` : ''}.` : `Completes at Round ${job.completeRound} Start.`}${kind === 'fireControl' ? ' Selected fires are suppressed while this job remains active.' : ''}`, { crewId: crew.id, jobId: job.id, kind, cells: [...job.cells], targetId: job.targetId });
   if (duration === 0) finishJob(state, job, emit);
 }
 
 export function resolveFireSpread(state, emit) {
-  const suppressed = new Set(state.jobs.filter(job => job.kind === 'fireControl').flatMap(job => job.cells));
-  const remaining = new Set(BOARD.filter(cell => cell.structure && status(state, cell.id) === 'fire' && !suppressed.has(cell.id)).map(cell => cell.id));
-  const groups = [];
-  while (remaining.size) {
-    const first = remaining.values().next().value;
-    remaining.delete(first);
+  const spreadCandidates = new Set(BOARD.filter(cell => cell.structure && status(state, cell.id) === 'fire').map(cell => cell.id));
+  const suppressedAtStart = new Set(state.jobs.filter(job => job.kind === 'fireControl').flatMap(job => job.cells));
+  const initialSources = new Set([...spreadCandidates].filter(id => !suppressedAtStart.has(id)));
+  const initialGroups = [];
+  const initialRemaining = new Set(initialSources);
+  while (initialRemaining.size) {
+    const first = initialRemaining.values().next().value;
+    initialRemaining.delete(first);
     const group = [first];
-    for (let index = 0; index < group.length; index++) for (const adjacent of neighbors(group[index], false)) if (remaining.delete(adjacent.id)) group.push(adjacent.id);
-    groups.push(group);
+    for (let index = 0; index < group.length; index++) for (const adjacent of neighbors(group[index], false)) if (initialRemaining.delete(adjacent.id)) group.push(adjacent.id);
+    initialGroups.push(group);
   }
-  record(emit, 'FIRE_PHASE_STARTED', `Fire phase: ${groups.length} unsuppressed fire group${groups.length === 1 ? '' : 's'}; ${suppressed.size} square${suppressed.size === 1 ? '' : 's'} under suppression.`);
+  record(emit, 'FIRE_PHASE_STARTED', `Fire phase: ${initialGroups.length} unsuppressed fire group${initialGroups.length === 1 ? '' : 's'}; ${suppressedAtStart.size} square${suppressedAtStart.size === 1 ? '' : 's'} under suppression.`);
   const directions = { 3: [0, -1, 'fore'], 4: [1, 0, 'starboard'], 5: [0, 1, 'aft'], 6: [-1, 0, 'port'] };
   const spreadThisPhase = new Set();
   // A straddling crew member is struck once by a spread phase. Both occupied
   // subcells stop this first spread; another round can kill the injured member.
   const healthyAtStart = new Set(state.crew.filter(crew => crew.health === 'healthy').map(crew => crew.id));
   const affectedCrew = new Set();
-  for (const group of groups) {
+  // The phase's source groups and protection are fixed at its start. Injury
+  // removes the job immediately, but cannot add a retroactive roll this phase.
+  for (const group of initialGroups) {
     const roll = die(state, 6);
     const direction = directions[roll];
-    record(emit, 'FIRE_SPREAD_ROLL', `Fire group at ${group[0]} rolls ${roll}: ${direction ? `spread ${direction[2]}` : 'no spread'}.`, { roll, cellId: group[0] });
+    record(emit, 'FIRE_SPREAD_ROLL', `Fire group at ${group[0]} rolls ${roll}: ${direction ? `spread ${direction[2]}` : 'no spread'}.`, { roll, cellId: group[0], cells: [...group], result: direction?.[2] ?? 'no spread' });
     if (!direction) continue;
     const destinations = new Set();
     for (const id of group) {
       const source = getCell(id);
       const destination = BOARD.find(cell => cell.x === source.x + direction[0] && cell.y === source.y + direction[1]);
-      if (destination?.structure && status(state, destination.id) !== 'fire' && !suppressed.has(destination.id) && !spreadThisPhase.has(destination.id)) destinations.add(destination.id);
+      if (destination?.structure && status(state, destination.id) !== 'fire' && !suppressedAtStart.has(destination.id) && !spreadThisPhase.has(destination.id)) destinations.add(destination.id);
     }
-    if (!destinations.size) record(emit, 'FIRE_SPREAD_BLOCKED', 'This fire has no new aircraft square in that direction.');
+    if (!destinations.size) record(emit, 'FIRE_SPREAD_BLOCKED', `Fire from ${group.join(', ')} is blocked; no new aircraft square can catch fire in that direction.`, { cellId: group[0], cells: [...group], direction: direction[2] });
     for (const id of destinations) {
       spreadThisPhase.add(id);
       const occupants = state.crew.filter(crew => crew.health !== 'dead' && crew.position.includes(id));
@@ -659,6 +739,9 @@ function validateAction(state, crew, command) {
     }
     case 'relocate': requireRule(getCell(command.targetId)?.fuselage && isSafe(state, command.targetId) && !(crew.position.length === 1 && crew.position[0] === command.targetId) && !state.crew.some(other => other.id !== crew.id && other.health !== 'dead' && other.position.includes(command.targetId)), 'Choose another unoccupied, non-burning fuselage square.'); break;
     case 'manCockpit': requireRule(['pilot', 'copilot'].includes(command.stationId) && stationEmpty(state, command.stationId, crew.id) && !(crew.station === command.stationId && isAtStation(state, crew)), 'Choose an empty, non-burning cockpit seat.'); break;
+    case 'manStation': requireRule(eligibleStations(state, crew.id).includes(command.stationId), 'Choose a vacant, non-burning station.'); break;
+    case 'returnHome': requireRule(eligibleStations(state, crew.id).includes(homeStationId(crew)), 'Home station is not vacant and safe.'); break;
+    case 'leaveStation': requireRule(stationExitPosition(state, crew.id), 'No safe interior space is available to leave for.'); break;
     case 'restartEngine': {
       const engine = state.engines.find(item => item.id === command.targetId);
       requireRule(engine && !engine.running && engineSquares(engine.id).every(cell => status(state, cell.id) === 'healthy'), 'Choose a stopped engine with both squares repaired.');
@@ -681,8 +764,16 @@ function resolveAction(state, crew, command, emit) {
     case 'basicFire': shoot(state, crew, command.targetId, emit); break;
     case 'advancedFire': spend(state, 'Enlisted', 1, emit); shoot(state, crew, command.targetId, emit, true); break;
     case 'repair': case 'fireControl': case 'medical': startJob(state, crew, command, emit); break;
-    case 'relocate': crew.position = [command.targetId]; record(emit, 'CREW_RELOCATED', `${nameOf(crew.id)} relocates to ${command.targetId}.`, { crewId: crew.id, cellId: command.targetId }); break;
-    case 'manCockpit': crew.station = command.stationId; crew.position = [...stationCells(command.stationId)]; record(emit, 'COCKPIT_MANNED', `${nameOf(crew.id)} occupies the ${STATIONS[command.stationId].name}.`, { crewId: crew.id }); break;
+    case 'relocate': crew.position = [command.targetId]; leaveStation(crew); record(emit, 'CREW_RELOCATED', `${nameOf(crew.id)} relocates to ${command.targetId}.`, { crewId: crew.id, cellId: command.targetId }); break;
+    case 'manCockpit': occupyStation(state, crew, command.stationId, emit, 'COCKPIT_MANNED'); break;
+    case 'manStation': occupyStation(state, crew, command.stationId, emit); break;
+    case 'returnHome': occupyStation(state, crew, homeStationId(crew), emit, 'STATION_MANNED'); break;
+    case 'leaveStation': {
+      const cellId = stationExitPosition(state, crew.id);
+      crew.position = [cellId]; leaveStation(crew);
+      record(emit, 'CREW_RELOCATED', `${nameOf(crew.id)} leaves the station for safe interior position ${cellId}.`, { crewId: crew.id, cellId });
+      break;
+    }
     case 'restartEngine': {
       const roll = die(state, 6);
       record(emit, 'ENGINE_RESTART_ROLL', `${nameOf(crew.id)} rolls ${roll} to restart ${command.targetId}; 1–${state.config.restartMax} succeeds.`, { roll, engineId: command.targetId });
@@ -729,7 +820,7 @@ function resolveAction(state, crew, command, emit) {
       record(emit, 'ESCORT_SUMMONED', isV2(state) ? `Escort arrives in ${quadrant} until the next Progress checkpoint.` : `Escort arrives in ${quadrant} for the rest of Round ${state.round}.`, { quadrant });
       break;
     }
-    case 'wait': record(emit, 'CREW_HELD_POSITION', `${nameOf(crew.id)} holds position.`, { crewId: crew.id }); break;
+    case 'wait': record(emit, 'CREW_HELD_POSITION', `${nameOf(crew.id)} finishes their turn without taking an action.`, { crewId: crew.id }); break;
   }
 }
 
@@ -854,7 +945,7 @@ function endRound(state, emit) {
 
 export function dispatch(original, command) {
   requireRule(original && command, 'State and command are required.');
-  const state = copy(original);
+  const state = migrateCrewPositions(copy(original));
   if (state.ruleset === undefined) state.ruleset = 'v1';
   requireRule(['v1', 'v2-continuous'].includes(state.ruleset), 'Unknown sortie ruleset.');
   requireRule(command.ruleset === undefined || command.ruleset === state.ruleset, 'Ruleset changes apply only to a new sortie.');
@@ -865,14 +956,22 @@ export function dispatch(original, command) {
   const emit = event => events.push({ ...event, state: copy(state) });
   requireRule(state.phase !== 'ended', 'This sortie has ended. Start a new sortie to continue.');
   switch (command.type) {
+    case 'abortWork': {
+      requireRule(canAbortWork(state, command.jobId), 'Abort Work requires an active job during normal V2 crew selection, with no pending Progress or action.');
+      const job = state.jobs.find(item => item.id === command.jobId);
+      requireRule(job, 'That work is no longer active.');
+      cancelWork(state, job, emit, 'the crew aborts the assignment.');
+      break;
+    }
     case 'startRound': requireRule(!isV2(state) && state.phase === 'ready', 'A round can start only from the V1 ready phase.'); startRound(state, emit); break;
     case 'advanceUnavailable': {
-      requireRule(isV2(state) && state.phase === 'select' && !availableCrew(state).length, 'Continue unavailable Turns only when no V2 crew can act.');
+      requireRule(isV2(state) && state.phase === 'select' && !state.pendingProgress && !availableCrew(state).length, 'Continue unavailable Turns only when no V2 crew can act and no Progress is pending.');
       continueCycle(state, emit, continuousSystems(state, emit));
       break;
     }
     case 'activate': {
       requireRule(state.phase === 'select', 'Choose crew only during the crew selection phase.');
+      requireRule(!isV2(state) || !state.pendingProgress, 'Close the Opportunity window and resolve pending Progress before activating crew.');
       const crew = availableCrew(state).find(item => item.id === command.crewId);
       requireRule(crew, 'That crew member is not available.');
       requireRule(!command.intercept || hasAbility(crew, 'intercept') && isAtStation(state, crew), 'Intercept requires Radio at an operating station and must be declared before drawing.');
@@ -921,6 +1020,22 @@ export function dispatch(original, command) {
       endActivation(state, emit);
       break;
     }
+    case 'continueBetweenOpportunity': {
+      requireRule(isV2(state) && state.config.v2OpportunityProvokesEnemyPhase && state.phase === 'betweenOpportunity' && !state.pendingProgress,
+        'Continue to the enemy phase only after an experimental between-turn Opportunity sequence.');
+      record(emit, 'OPPORTUNITY_WINDOW_CLOSED', 'Between-turn Opportunity sequence closed; resolve one enemy phase before the next crew activation.');
+      enemyPhase(state, emit);
+      state.activeCrew = null;
+      state.phase = 'select';
+      record(emit, 'CREW_SELECTION_READY', 'Enemy phase complete. Choose the next available crew member.');
+      break;
+    }
+    case 'continueProgress': {
+      requireRule(isV2(state) && ['select', 'betweenOpportunity'].includes(state.phase) && !state.activeCrew && state.pendingProgress,
+        'Continue to Progress only after a between-turn Opportunity chain fills Time.');
+      completeBetweenTurnProgress(state, emit, continuousSystems(state, emit));
+      break;
+    }
     case 'opportunityShot': {
       const availability = opportunityAvailability(state);
       requireRule(availability.enabled, availability.reason);
@@ -930,6 +1045,13 @@ export function dispatch(original, command) {
       bump(state, 'opportunitySpent');
       record(emit, 'OPPORTUNITY_SPENT', `Spend 1 Opportunity: ${nameOf(gunner.id)} makes exactly one Basic Shot. No activation, mission draw or enemy phase.`, { crewId: gunner.id, fighterId: command.targetId, amount: 1 });
       shoot(state, gunner, command.targetId, emit);
+      if (isV2(state) && state.phase === 'select' && state.pendingProgress) {
+        state.phase = 'betweenOpportunity';
+        record(emit, 'OPPORTUNITY_WINDOW_OPENED', 'Finish any Opportunity Shots, then Continue to Progress before activating crew. No enemy phase is due.');
+      } else if (isV2(state) && state.phase === 'select' && state.config.v2OpportunityProvokesEnemyPhase) {
+        state.phase = 'betweenOpportunity';
+        record(emit, 'OPPORTUNITY_WINDOW_OPENED', 'Between-turn Opportunity window: chain any remaining shots, then continue to the enemy phase before activating crew.');
+      }
       break;
     }
     case 'endRound': requireRule(!isV2(state) && state.phase === 'roundEnd', 'Complete all V1 crew slots before ending the round.'); endRound(state, emit); break;

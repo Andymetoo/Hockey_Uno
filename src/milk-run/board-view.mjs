@@ -2,6 +2,7 @@ import { BOARD, SECTIONS, CREW_DEFS, STATIONS, QUADRANTS, ALTITUDES, getCell } f
 import { crewStatus, footprintCenter, arcPreview } from './ui-model.mjs';
 import { fighterHeading } from './spatial.mjs';
 import { targetOptions } from './targeting.mjs';
+import { currentStationId } from './crew-position.mjs';
 
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const bx=89,by=87,step=36;
@@ -23,7 +24,7 @@ export function crewMarkerLayout(state) {
       bounds:{left:bx+Math.min(...cells.map(c=>c.x))*step,top:by+Math.min(...cells.map(c=>c.y))*step,
         right:bx+(Math.max(...cells.map(c=>c.x))+1)*step,bottom:by+(Math.max(...cells.map(c=>c.y))+1)*step},
       footprint:[...crew.position].sort().join(' '),
-      fixed:!crew.job&&assigned.length===crew.position.length&&assigned.every(id=>crew.position.includes(id))}];
+      fixed:currentStationId(crew)!==null&&assigned.length===crew.position.length&&assigned.every(id=>crew.position.includes(id))}];
   });
   // A replacement may legitimately share a cockpit footprint with its dead
   // former occupant. Keep the living operator centered and stack the casualty.
@@ -76,7 +77,7 @@ export function crewMarkerLayout(state) {
 }
 
 export const sectorPoint=(q,a)=>{const i=ALTITUDES.indexOf(a);return q==='Fore'?[232+i*74,47]:q==='Aft'?[232+i*74,563]:q==='Port'?[47,234+i*74]:[567,234+i*74];};
-export function boardMarkup(s,{selectedCrew,interaction:t,visual={},current,previousFighters=new Map()}={}) {
+export function boardMarkup(s,{selectedCrew,interaction:t,visual={},current,previousFighters=new Map(),hitMap=null,hitMapEnabled=false,hitMapStructure=true,hitMapEmpty=true}={}) {
   const options=targetOptions(s,t),preview=arcPreview(s,t?.gunnerId??t?.crewId??selectedCrew);
   const aimed=t&&['basicFire','advancedFire','opportunityShot','directFire','rotateFighter'].includes(t.action)&&t.stage!=='gunner';
   const worked=new Set(s.jobs.flatMap(j=>j.cells??[]));
@@ -89,6 +90,12 @@ export function boardMarkup(s,{selectedCrew,interaction:t,visual={},current,prev
     const description=c.structure?`${SECTIONS[c.section].name}, ${state}${c.engine?`, engine ${c.engine}`:''}`:indicator?`${indicator.id} running indicator only; no aircraft structure`:'open sky';
     svg+=`<g data-cell="${c.id}" ${t?.stage==='work'&&legal?`data-work-cell="${c.id}"`:''} data-structure="${c.structure}" data-section="${c.section??''}" class="board-cell ${focus===c.id?'struck':''} ${legal?'target-legal':''} ${chosen?'target-chosen':''} ${work?'work-chosen':''}" role="button" tabindex="${t?legal||chosen?'0':'-1':'0'}" aria-label="${esc(c.id+': '+description)}"><title>${esc(c.id+': '+description)}</title><rect class="square-fill" x="${x}" y="${y}" width="36" height="36" fill="${!c.structure?'#f2f0e5':state==='fire'?'#d86a30':SECTIONS[c.section].color}" stroke="#a4ad99" stroke-width=".5"/>${state==='damaged'?`<rect x="${x}" y="${y}" width="36" height="36" fill="url(#hatch)"/><path d="M${x+9} ${y+9}l18 18m0-18l-18 18" stroke="#754123" stroke-width="2.4"/>`:state==='fire'?`<text x="${x+18}" y="${y+26}" class="fire-symbol" text-anchor="middle">♨</text>`:''}${c.engine?`<text x="${x+4}" y="${y+11}" class="engine-cell">${c.engine}</text>`:''}${indicator?`<g class="engine-indicator" data-engine-id="${indicator.id}"><circle cx="${x+18}" cy="${y+18}" r="12" fill="${indicator.running?'#b6cf87':'#e2c2a1'}" stroke="#607e41" stroke-width="1.7"/><text x="${x+18}" y="${y+22}" text-anchor="middle">${indicator.running?'↻':'×'}${indicator.id.slice(1)}</text></g>`:''}${worked.has(c.id)?`<rect class="work-outline" x="${x+3}" y="${y+3}" width="30" height="30" fill="none" stroke="#245fa0" stroke-width="3" stroke-dasharray="4 2"/>`:''}${legal||chosen||work?`<rect class="target-outline" x="${x+2}" y="${y+2}" width="32" height="32" fill="${chosen||work?'#fff7a755':'none'}" stroke="${chosen||work?'#ab4600':t.stage==='work'?'#246aab':'#21623c'}" stroke-width="4"/>`:''}</g>`;
   }
+  if(hitMapEnabled)for(const c of BOARD){
+    const count=c.structure?(hitMapStructure?hitMap?.structure?.[c.id]??0:0):(hitMapEmpty?hitMap?.empty?.[c.id]??0:0);
+    if(!count)continue;
+    const x=bx+c.x*step,y=by+c.y*step,color=c.structure?'#245fa0':'#bd5d32',kind=c.structure?'aircraft':'empty-space';
+    svg+=`<g class="hit-map-mark ${c.structure?'hit-map-aircraft':'hit-map-empty'}" data-hit-map-cell="${c.id}" data-hit-map-rolls="${count}" data-hit-map-kind="${kind}" pointer-events="none"><title>${c.id}: ${count} ${kind} hit-location roll${count===1?'':'s'}</title><rect x="${x+1.5}" y="${y+1.5}" width="33" height="33" fill="none" stroke="${color}" stroke-width="2.5" stroke-dasharray="4 2"/><circle cx="${x+28}" cy="${y+8}" r="7"/><text x="${x+28}" y="${y+11}" text-anchor="middle">${count}</text></g>`;
+  }
   for(let i=0;i<=6;i++)svg+=`<path class="grid-rule" d="M${bx+i*72} ${by}v432 M${bx} ${by+i*72}h432" stroke="#607565" opacity=".65" stroke-width="1.4"/>`;
   const crewLayout=new Map(crewMarkerLayout(s).map(marker=>[marker.id,marker]));
   for(const c of s.crew) {
@@ -97,7 +104,7 @@ export function boardMarkup(s,{selectedCrew,interaction:t,visual={},current,prev
     const {x,y,anchor,radius,numberSize,badge}=marker;
     const legal=options.crew.includes(c.id),chosen=t?.targetId===c.id||t?.gunnerId===c.id;
     const transparent=t&&(t.stage==='work'||['repair','fireControl'].includes(t.action));
-    svg+=`<g class="crew-marker status-${status.id} ${radius<14?'compact-marker':''} ${legal?'target-legal':''} ${chosen?'target-chosen':''} ${transparent?'pass-through':''}" data-crew-id="${c.id}" data-footprint="${c.position.join(' ')}" role="button" tabindex="${transparent?'-1':'0'}" aria-label="${esc(d.name+', '+status.label+', '+c.position.join(' + '))}"><title>${esc(d.name+' · '+status.label+' · '+c.position.join(' + '))}</title>${x!==anchor.x||y!==anchor.y?`<path class="crew-anchor" d="M${anchor.x} ${anchor.y}L${x} ${y}" stroke="#173e38"/>`:''}<circle class="crew-body" cx="${x}" cy="${y}" r="${radius}" stroke="#faf5df" stroke-width="1.6"/><text x="${x}" y="${y+numberSize*.34}" style="font-size:${numberSize}px" text-anchor="middle">${d.number}</text>${badge?`<g class="crew-state-dot"><circle cx="${badge.x}" cy="${badge.y}" r="${badge.radius}"/><text x="${badge.x}" y="${badge.y+badge.fontSize*.32}" style="font-size:${badge.fontSize}px" text-anchor="middle">${status.icon}</text></g>`:''}</g>`;
+    svg+=`<g class="crew-marker status-${status.id} ${radius<14?'compact-marker':''} ${legal?'target-legal':''} ${chosen?'target-chosen':''} ${transparent?'pass-through':''}" data-crew-id="${c.id}" data-footprint="${c.position.join(' ')}" role="button" tabindex="${transparent?'-1':'0'}" aria-label="${esc(d.name+', '+status.label+', '+c.position.join(' + '))}"><title>${esc(d.name+' · '+status.label+' · '+c.position.join(' + '))}</title>${x!==anchor.x||y!==anchor.y?`<path class="crew-anchor" d="M${anchor.x} ${anchor.y}L${x} ${y}" stroke="#173e38"/>`:''}${c.health==='dead'?`<path class="crew-body casualty-shape" d="M${x} ${y-radius}L${x+radius*.86} ${y-radius*.5}L${x+radius*.86} ${y+radius*.5}L${x} ${y+radius}L${x-radius*.86} ${y+radius*.5}L${x-radius*.86} ${y-radius*.5}Z" stroke="#faf5df" stroke-width="1.6"/>`:`<circle class="crew-body" cx="${x}" cy="${y}" r="${radius}" stroke="#faf5df" stroke-width="1.6"/>`}<text x="${x}" y="${y+numberSize*.34}" style="font-size:${numberSize}px" text-anchor="middle">${d.number}</text>${badge?`<g class="crew-state-dot"><circle cx="${badge.x}" cy="${badge.y}" r="${badge.radius}"/><text x="${badge.x}" y="${badge.y+badge.fontSize*.32}" style="font-size:${badge.fontSize}px" text-anchor="middle">${status.icon}</text></g>`:''}</g>`;
   }
   for(const q of QUADRANTS)for(const a of ALTITUDES) {
     const [x,y]=sectorPoint(q,a),fighters=s.fighters.filter(f=>f.quadrant===q&&f.altitude===a),legal=preview.sectors.includes(`${q}/${a}`);

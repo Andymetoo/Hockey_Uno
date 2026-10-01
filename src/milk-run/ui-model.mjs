@@ -2,6 +2,7 @@
 import { CREW_DEFS, STATIONS, getCell } from './board.mjs';
 import { availableCrew, isAtStation, legalTargets, operatingArc } from './rules.mjs';
 import { isV2 } from './rulesets.mjs';
+import { homeStationId, currentStationId } from './crew-position.mjs';
 
 export const crewDefinition = id => CREW_DEFS.find(c => c.id === id);
 export const SHORT_NAMES = { pilot:'Pilot',copilot:'Copilot',navigator:'Nav',bombardier:'Bomb',engineer:'Eng.',radio:'Radio',ball:'Ball',leftWaist:'L. Waist',rightWaist:'R. Waist',tail:'Tail' };
@@ -18,11 +19,12 @@ export function crewStatus(state, crew, selected = false) {
   return {id:'ready',label:'Ready',short:'READY',icon:'●'};
 }
 export function stationStatus(state, crew) {
-  const station=STATIONS[crew.station];
-  const operator=state.crew.find(c=>c.station===crew.station&&isAtStation(state,c));
-  const cockpit=['pilot','copilot'].includes(crew.station);
+  const homeId=homeStationId(crew),currentId=currentStationId(crew),station=STATIONS[currentId??homeId];
+  const operator=state.crew.find(c=>currentStationId(c)===(currentId??homeId)&&isAtStation(state,c));
+  const cockpit=['pilot','copilot'].includes(currentId??homeId);
   const operating=isAtStation(state,crew);
-  return { name:station?.name??'No station',operating,cockpit,
+  return { name:station?.name??'No station',operating,cockpit,homeId,currentId,
+    homeName:STATIONS[homeId]?.name??'Unknown',currentName:currentId?STATIONS[currentId].name:'None',displaced:currentId===null,
     label:operating?(cockpit?'CONTROLLING AIRCRAFT':'OPERATING STATION'):operator?`COVERED BY ${crewDefinition(operator.id).name.toUpperCase()}`:cockpit?'SEAT UNCONTROLLED':'STATION UNOPERATED',
     position:crew.position.join(' + '),job:state.jobs.find(j=>j.id===crew.job)??null };
 }
