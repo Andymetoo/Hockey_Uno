@@ -1,17 +1,22 @@
 /** Presentation only: no draws, dice, rule mutations or hidden-state lookups. */
 const friendly = value => String(value ?? '').replaceAll('_', ' ').toLowerCase().replace(/^./, letter => letter.toUpperCase());
 const upper = value => String(value ?? '').toUpperCase();
+const continuousEvent = event => (event?.ruleset ?? event?.state?.ruleset) === 'v2-continuous';
+const eventFighter = event => event?.state?.fighters?.find(fighter => fighter.id === event.fighterId);
 const compact = new Set([
   'MISSION_BAG_REFILLED', 'COMBAT_BAG_REFILLED', 'ENEMY_DECK_SHUFFLED',
   'CREW_READIED', 'CREW_ACTION_READY', 'CREW_SELECTION_READY', 'NEXT_ROUND_READY',
   'GUNNER_FIRE_ENDED', 'FLAK_ENDED', 'WORK_TARGET_CHANGED', 'MEDICAL_NO_EFFECT',
   'UNAVAILABLE_DRAW_SKIPPED', 'AIRCRAFT_HIT_BURNING', 'CREW_HELD_POSITION',
-  'ACTIVATION_COMPLETED', 'OPPORTUNITY_WINDOW_OPENED',
+  'ACTIVATION_COMPLETED', 'OPPORTUNITY_WINDOW_OPENED', 'CREW_CYCLE_REFRESHED', 'TURN_COMPLETE', 'ENGAGEMENT_SPENT', 'FIGHTER_DISENGAGED',
 ]);
-const categoryIcons = { crew: '●', resource: '+', gunfire: '⌖', enemy: '✈', damage: '◆', injury: '✚', repair: '⚒', altitude: '↕' };
+const categoryIcons = { crew: '●', resource: '+', gunfire: '⌖', enemy: '✈', damage: '◆', injury: '✚', repair: '⚒', altitude: '↕', time: '◷', departure: '↗' };
 
 export function eventCategory(event) {
   const type = event?.type ?? '';
+  if (type === 'FIGHTER_BREAKING_OFF' || type === 'FIGHTER_DISENGAGED') return 'departure';
+  if (/^(TIME_|PROGRESS_|CHECKPOINT_)/.test(type) || type === 'MISSION_TOKEN_DRAWN' && event.token === 'Time') return 'time';
+  if (type === 'ENGAGEMENT_SPENT') return 'enemy';
   if (type === 'OPPORTUNITY_WINDOW_OPENED') return 'crew';
   if (/^OPPORTUNITY_/.test(type)) return 'resource';
   if (type === 'FIGHTER_DISRUPTED') return 'gunfire';
@@ -30,14 +35,15 @@ export function eventCategory(event) {
 export function describeEvent(event = {}) {
   event ??= {};
   const type = event.type ?? '';
+  const continuous = continuousEvent(event);
   const category = eventCategory(event);
   const description = {
     category, icon: categoryIcons[category], title: friendly(type) || 'Ready for orders',
     detail: event.message ?? '', major: !compact.has(type), kind: 'text', tone: category,
   };
   if (type === 'ENEMY_PHASE_STARTED' && /no active fighters/i.test(event.message ?? '')) description.major = false;
-  if (type === 'FIRE_PHASE_STARTED' && /^Fire phase: 0 unsuppressed/i.test(event.message ?? '')) description.major = false;
-  if (type === 'ALTITUDE_CHECK' && event.minimum === 0) description.major = false;
+  if (type === 'FIRE_PHASE_STARTED' && /^Fire phase: 0 unsuppressed/i.test(event.message ?? '') && !continuous) description.major = false;
+  if (type === 'ALTITUDE_CHECK' && event.minimum === 0 && !continuous) description.major = false;
   if (type === 'ALTITUDE_MAINTAINED' && /without a roll/i.test(event.message ?? '')) description.major = false;
   if (type === 'MISSION_TOKEN_DRAWING' || type === 'COMBAT_TOKEN_DRAWING') {
     Object.assign(description, { kind: 'token', tokenBack: true, token: '', tone: 'neutral',
@@ -47,7 +53,7 @@ export function describeEvent(event = {}) {
     const value = upper(event.token);
     Object.assign(description, { kind: 'token', token: event.token, tokenBack: false,
       title: value === 'BURST' ? 'BURST ×2' : value,
-      tone: value === 'ENEMY' ? 'enemy' : value === 'RESOURCE' ? 'resource' : value === 'MISS' ? 'miss' : 'hit' });
+      tone: value === 'ENEMY' ? 'enemy' : value === 'RESOURCE' ? 'resource' : value === 'TIME' ? 'time' : value === 'MISS' ? 'miss' : 'hit' });
   }
   if (type === 'ENEMY_ATTACK') description.title = `${event.source || event.message?.replace(/ attacks\.$/, '') || 'Enemy'} attacks`;
   if (type === 'ENEMY_ATTACK_ROLL') Object.assign(description, {
@@ -70,6 +76,29 @@ export function describeEvent(event = {}) {
   if (type === 'OPPORTUNITY_SPENT') description.title = 'OPPORTUNITY SHOT · ONE BASIC PULL';
   if (type === 'OPPORTUNITY_CAPPED') description.title = 'OPPORTUNITY AT CAP';
   if (type === 'ACTIVATION_COMPLETED') description.title = 'Crew action complete';
+  if (type === 'TIME_GAINED') description.title = '+1 TIME';
+  if (type === 'PROGRESS_PENDING') description.title = 'PROGRESS CHECKPOINT AFTER THIS TURN';
+  if (type === 'PROGRESS_STARTED') description.title = 'Progress checkpoint';
+  if (type === 'CHECKPOINT_JOBS_COMPLETED') description.title = 'Checkpoint · completed work checked';
+  if (type === 'AIRCRAFT_CONDITION_CHECKED') description.title = 'Aircraft condition checked';
+  if (type === 'PROGRESS_BAGS_REFILLED') description.title = event.normalRefill === false ? 'Time returned · discard refill OFF' : 'Bags refilled · Time reset';
+  if (type === 'PROGRESS_COMPLETED') description.title = 'Progress complete · Time reset';
+  if (type === 'CREW_CYCLE_REFRESHED') description.title = 'Crew readiness refreshed';
+  if (type === 'TURN_COMPLETE') description.title = 'Turn complete';
+  if (type === 'FIGHTER_DISENGAGED') description.title = 'Engagement ended · fighter disengages';
+  if (type === 'FIGHTER_BREAKING_OFF') description.title = `${event.enemyType ?? eventFighter(event)?.type ?? 'Fighter'} BREAKS OFF`;
+  if (type === 'ENGAGEMENT_SPENT' && continuous) {
+    const remaining = event.engagementRemaining ?? eventFighter(event)?.engagementRemaining;
+    description.major = remaining > 0;
+    description.title = `${event.enemyType ?? eventFighter(event)?.type ?? 'Fighter'} · ${remaining ?? '?'} ENGAGEMENT REMAINING`;
+  }
+  if (type === 'WORK_TIME_ADVANCED') {
+    const job = event.state?.jobs?.find(job => job.id === event.jobId);
+    const kind = event.kind ?? job?.kind;
+    const name = kind === 'fireControl' ? 'FIRE CONTROL' : upper(kind) || 'WORK';
+    description.title = `${name} · ${event.remainingTime ?? job?.remainingTime ?? '?'} TIME REMAINING`;
+  }
+  if (type === 'FIRE_PHASE_STARTED' && continuous) description.title = 'Checkpoint · fire spread';
   if (type === 'OPPORTUNITY_WINDOW_OPENED') description.title = 'Opportunity window · fire or continue';
   if (type === 'FIGHTER_MOVED') description.title = 'Flyby · fighter repositions';
   if (type === 'FIGHTER_ROTATED') description.title = event.facing === 0 ? 'Fighter facing the B-17' : `Fighter ${event.facing ?? 90}° away`;
@@ -178,20 +207,32 @@ export function advanceVisual(previous = {}, event = {}, view) {
     token:null, activeFighterId:event.fighterId, attackerId:event.fighterId,
     attackMissFighter:null, attackResult:'disrupted', focusCell:null, locationCell:null, escortId:null,
   });
+  if (type === 'FIGHTER_BREAKING_OFF') Object.assign(visual, {
+    departingFighter: event.fighterId, activeFighterId: event.fighterId,
+    token: null, shooterId: null, attackerId: null, attackMissFighter: null,
+    attackResult: null, focusCell: null, locationCell: null, emptyMissCell: null, escortId: null,
+  });
+  if (type === 'FIGHTER_DISENGAGED') visual.departingFighter = null;
+  if (type === 'WORK_TIME_ADVANCED') visual.jobCountdown = { jobId: event.jobId, remainingTime: event.remainingTime ?? view?.jobs?.find(job => job.id === event.jobId)?.remainingTime };
+  if (type === 'CREW_ACTION_READY' || type === 'PROGRESS_STARTED') visual.jobCountdown = null;
+  if (type === 'PROGRESS_STARTED') Object.assign(visual, {
+    token: null, activeFighterId: null, shooterId: null, attackerId: null, attackMissFighter: null,
+    attackResult: null, focusCell: null, locationCell: null, emptyMissCell: null, escortId: null, departingFighter: null,
+  });
   if (type === 'ENEMY_HIT_LOCATION') { visual.locationCell = event.cellId; visual.focusCell = null; }
   if (type === 'ENEMY_LOCATION_FOCUS') visual.focusCell = event.cellId;
   if (type === 'ATTACK_EMPTY_SPACE') visual.emptyMissCell = event.cellId;
   if (['FIGHTER_MOVED', 'FIGHTER_ROTATED', 'FIGHTER_SPAWNED', 'ESCORT_INTERCEPT'].includes(type)) visual.activeFighterId = event.fighterId ?? null;
   if (type === 'ESCORT_INTERCEPT') visual.escortId = event.escortId;
   if (type === 'ESCORTS_EXPIRED') visual.escortId = null;
-  if (type === 'FIGHTERS_CLEARED') Object.assign(visual, { activeFighterId: null, attackerId: null, attackMissFighter: null });
+  if (type === 'FIGHTERS_CLEARED' || type === 'FIGHTER_DISENGAGED') Object.assign(visual, { activeFighterId: null, attackerId: null, attackMissFighter: null });
   if (type === 'ALTITUDE_CHECK') Object.assign(visual, { token: null, altitudeCause: event.cause, altitudeMinimum: event.minimum, altitudeRoll: null });
   if (type === 'ALTITUDE_ROLL') visual.altitudeRoll = event.roll;
   if (type === 'ALTITUDE_LOST') visual.altitude = view?.altitude;
   return visual;
 }
 
-const groupStarts = new Set(['ROUND_STARTED', 'CREW_ACTIVATED', 'UNAVAILABLE_CREW_SLOT', 'CREW_ACTION', 'OPPORTUNITY_SPENT', 'GUNNER_FIRE_STARTED', 'ENEMY_ATTACK', 'ATTACK_DISRUPTED', 'FLAK_STARTED', 'ROUND_END_STARTED', 'ALTITUDE_CHECK', 'MISSION_ADVANCED', 'BOMBING_ROLL', 'WORK_COMPLETING']);
+const groupStarts = new Set(['ROUND_STARTED', 'CREW_ACTIVATED', 'UNAVAILABLE_CREW_SLOT', 'CREW_ACTION', 'OPPORTUNITY_SPENT', 'GUNNER_FIRE_STARTED', 'ENEMY_ATTACK', 'ATTACK_DISRUPTED', 'FLAK_STARTED', 'ROUND_END_STARTED', 'ALTITUDE_CHECK', 'MISSION_ADVANCED', 'BOMBING_ROLL', 'WORK_COMPLETING', 'PROGRESS_STARTED', 'CHECKPOINT_JOBS_COMPLETED', 'AIRCRAFT_CONDITION_CHECKED', 'PROGRESS_BAGS_REFILLED', 'WORK_TIME_ADVANCED', 'ENGAGEMENT_SPENT', 'FIGHTER_BREAKING_OFF']);
 
 /** Each compact recorder entry expands to the original semantic event objects. */
 export function groupEvents(log = []) {

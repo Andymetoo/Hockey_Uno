@@ -248,10 +248,12 @@ try {
   for(const field of CONFIG_FIELDS) assert.ok(await evaluate(`!!document.querySelector('#dev-form [name="${field.key}"]')`),`editable rule: ${field.key}`);
   await evaluate(`(() => {const f=document.querySelector('#dev-form');f.elements.namedItem('startingOfficer').value=9;f.elements.namedItem('missionEnemy').value=0;f.elements.namedItem('outboundLength').value=1;f.elements.namedItem('animationMs').value=0;f.elements.namedItem('seed').value='browser-custom-seed';})()`);
   await click('[data-ui="apply-dev"]');
+  await click('#sortie-form input[value="v1"]'); await click('#sortie-form button[type="submit"]');
   const customized=await getState();
   assert.equal(customized.seed,'browser-custom-seed');assert.equal(customized.resources.Officer,9);assert.equal(customized.config.missionEnemy,0);assert.equal(customized.config.outboundLength,1);assert.equal(customized.config.animationMs,0);
   assert.equal(await evaluate("document.querySelector('#speed').value"),'instant','zero animation delay selects instant presentation');
   await click('[data-ui="dev"]');await click('[data-ui="reset-defaults"]');await click('[data-ui="apply-dev"]');
+  await click('#sortie-form input[value="v1"]'); await click('#sortie-form button[type="submit"]');
   assert.deepEqual((await getState()).config,DEFAULT_CONFIG,'Reset Defaults resets every experimental value');
 
   let invalidWork=dispatch(createGame({missionEnemy:0},'browser-invalid-work'),{type:'startRound'}).state;

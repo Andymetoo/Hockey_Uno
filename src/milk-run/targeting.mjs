@@ -1,4 +1,5 @@
-import { legalTargets, eligibleCrisisTargets, eligibleMedicalTargets, crisisTargetCap, connectedTargetSelection, legalWorkPositions, opportunityGunners, opportunityAvailability, directFireGunners } from './rules.mjs';
+import { legalTargets, eligibleCrisisTargets, eligibleMedicalTargets, crisisTargetCap, connectedTargetSelection, legalWorkPositions, opportunityGunners, opportunityAvailability, directFireGunners, eligibleAssistants } from './rules.mjs';
+import { isV2 } from './rulesets.mjs';
 
 export const DIRECT_ACTIONS = ['basicFire','advancedFire','opportunityShot','directFire','rotateFighter','repair','fireControl','medical'];
 export function beginTargeting(action, crewId) { return {action,crewId,cells:[],targetId:null,workCellId:null,gunnerId:null,stage:['opportunityShot','directFire'].includes(action)?'gunner':'target'}; }
@@ -24,12 +25,17 @@ export function selectTarget(s,t,kind,id) {
   return t;
 }
 export function needsWorkPosition(t) {return ['repair','fireControl','medical'].includes(t.action);}
+export function assistantOptions(s,t) {
+  if(!isV2(s)||!t||!needsWorkPosition(t))return [];
+  const targets=t.action==='medical'?(s.crew.find(c=>c.id===t.targetId)?.position??[]):t.cells;
+  return eligibleAssistants(s,t.crewId).filter(c=>c.id!==t.targetId&&(!t.workCellId||legalWorkPositions(s,c.id,targets).some(position=>position.id===t.workCellId)));
+}
 export function canConfirm(s,t) {
   if(!t)return false;
   if(t.action==='opportunityShot'&&(!opportunityAvailability(s).enabled||!opportunityGunners(s).some(c=>c.id===t.gunnerId)))return false;
   if(t.action==='directFire'&&!directFireGunners(s).some(c=>c.id===t.gunnerId))return false;
   const options=targetOptions(s,t);
-  if(needsWorkPosition(t))return (t.action==='medical'?options.crew.includes(t.targetId):t.cells.length>0)&&t.stage==='work'&&options.work.includes(t.workCellId);
+  if(needsWorkPosition(t))return (t.action==='medical'?options.crew.includes(t.targetId):t.cells.length>0)&&t.stage==='work'&&options.work.includes(t.workCellId)&&(!t.assistantId||assistantOptions(s,t).some(c=>c.id===t.assistantId));
   return options.fighters.includes(t.targetId);
 }
-export function targetingCommand(t) {return t.action==='opportunityShot'?{type:'opportunityShot',gunnerId:t.gunnerId,targetId:t.targetId}:{type:'action',action:t.action,...(t.cells.length?{cells:t.cells}:{}),...(t.targetId?{targetId:t.targetId}:{}),...(t.gunnerId?{gunnerId:t.gunnerId}:{}),...(t.workCellId?{workCellId:t.workCellId}:{})};}
+export function targetingCommand(t) {return t.action==='opportunityShot'?{type:'opportunityShot',gunnerId:t.gunnerId,targetId:t.targetId}:{type:'action',action:t.action,...(t.cells.length?{cells:t.cells}:{}),...(t.targetId?{targetId:t.targetId}:{}),...(t.gunnerId?{gunnerId:t.gunnerId}:{}),...(t.workCellId?{workCellId:t.workCellId}:{}),...(t.assistantId?{assistantId:t.assistantId}:{})};}

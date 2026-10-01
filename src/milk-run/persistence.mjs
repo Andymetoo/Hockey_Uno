@@ -1,32 +1,114 @@
 import { BOARD_VERSION } from './board.mjs';
-import { DEFAULT_CONFIG, normalizeConfig } from './config.mjs';
+import { DEFAULT_CONFIG, normalizeConfig, configScope } from './config.mjs';
+import { RULESETS, isV2 } from './rulesets.mjs';
 
 // Old geometry cannot safely reinterpret damage, crew positions or pending hits.
 // Keep that sortie untouched rather than mixing two board definitions.
 export const LEGACY_SAVE_KEY = 'milk-run-v3-session-1';
 export const SAVE_KEY = 'milk-run-v3-session-2';
 export const DEV_PREFERENCES_KEY = 'milk-run-v3-dev-preferences-1';
+export const DEV_PREFERENCE_KEYS = Object.freeze({
+  common: 'milk-run-dev-common-1', v1: 'milk-run-dev-v1-1',
+  v2: 'milk-run-dev-v2-1', preferences: 'milk-run-dev-chooser-1',
+});
+
+const preferenceScopes = Object.keys(DEV_PREFERENCE_KEYS);
+const knownConfigKeys = new Set(Object.keys(DEFAULT_CONFIG));
+const isObject = value => value && typeof value === 'object' && !Array.isArray(value);
+
+function readPreferenceDocument(storage, key) {
+  const raw = storage.getItem(key);
+  let data;
+  try { data = JSON.parse(raw ?? 'null'); } catch { data = null; }
+  return { raw, data: isObject(data) && data.version === 1 && isObject(data.overrides) ? data : null,
+    newer: isObject(data) && Number.isFinite(data.version) && data.version > 1 };
+}
+
+function readPreferenceScopes(storage) {
+  const legacy = readPreferenceDocument(storage, DEV_PREFERENCES_KEY);
+  return Object.fromEntries(preferenceScopes.map(scope => {
+    const document = readPreferenceDocument(storage, DEV_PREFERENCE_KEYS[scope]);
+    // An explicit empty scoped document is a reset, and must shadow old values.
+    const source = document.raw === null ? legacy.data?.overrides ?? {} : document.data?.overrides ?? {};
+    const overrides = Object.fromEntries(Object.entries(source).filter(([key]) =>
+      document.raw === null ? configScope(key) === scope : !knownConfigKeys.has(key) || configScope(key) === scope));
+    return [scope, { ...document, overrides }];
+  }));
+}
+
+function updatePreferenceStorage(storage, changes) {
+  const previous = changes.map(([key]) => [key, storage.getItem(key)]);
+  try {
+    for (const [key, value] of changes) {
+      if (value === null) storage.removeItem(key);
+      else storage.setItem(key, value);
+    }
+  } catch (error) {
+    // Avoid leaving a partially saved collection when one write fails.
+    for (const [key, value] of previous.reverse()) {
+      try {
+        if (value === null) storage.removeItem(key);
+        else storage.setItem(key, value);
+      } catch { /* A denied store may also deny rollback. */ }
+    }
+    throw error;
+  }
+}
 
 // Preferences describe the next sortie. They never modify an existing save.
 export function loadDevPreferences(storage) {
   try {
-    const data = JSON.parse((storage ?? globalThis.localStorage).getItem(DEV_PREFERENCES_KEY) ?? 'null');
-    if (!data || data.version !== 1 || !data.overrides || typeof data.overrides !== 'object' || Array.isArray(data.overrides)) return { ...DEFAULT_CONFIG };
-    return normalizeConfig(data.overrides);
+    const scopes = readPreferenceScopes(storage ?? globalThis.localStorage);
+    const config = { ...DEFAULT_CONFIG };
+    for (const scope of preferenceScopes) {
+      // One corrupted scope must not erase independently saved rules elsewhere.
+      // Normalize with defaults first, then copy only this scope's known fields.
+      let normalized;
+      try { normalized = normalizeConfig(scopes[scope].overrides); }
+      catch { normalized = DEFAULT_CONFIG; }
+      for (const key of knownConfigKeys) if (configScope(key) === scope) config[key] = normalized[key];
+    }
+    return config;
   } catch { return { ...DEFAULT_CONFIG }; }
 }
 
 export function saveDevPreferences(config, storage) {
   try {
     const normalized = normalizeConfig(config);
-    const overrides = Object.fromEntries(Object.entries(normalized).filter(([key, value]) => value !== DEFAULT_CONFIG[key]));
-    (storage ?? globalThis.localStorage).setItem(DEV_PREFERENCES_KEY, JSON.stringify({ version: 1, overrides }));
+    const target = storage ?? globalThis.localStorage;
+    const scopes = readPreferenceScopes(target);
+    if (preferenceScopes.some(scope => scopes[scope].newer)) return false;
+    const changes = preferenceScopes.map(scope => {
+      const unknown = Object.fromEntries(Object.entries(scopes[scope].overrides).filter(([key]) => !knownConfigKeys.has(key)));
+      const overrides = { ...unknown, ...Object.fromEntries(Object.entries(normalized).filter(([key, value]) => configScope(key) === scope && value !== DEFAULT_CONFIG[key])) };
+      return [DEV_PREFERENCE_KEYS[scope], JSON.stringify({ ...scopes[scope].data, version: 1, overrides })];
+    });
+    // The old document remains an untouched archive. Subsequent loads use the
+    // independent scoped records; their presence also prevents reset resurrection.
+    updatePreferenceStorage(target, changes);
+    return true;
+  } catch { return false; }
+}
+
+export function resetDevPreferencesScope(scope, storage) {
+  if (scope === 'all') return resetDevPreferences(storage);
+  if (scope === 'v2-continuous') scope = 'v2';
+  if (!preferenceScopes.includes(scope)) return false;
+  try {
+    const target = storage ?? globalThis.localStorage;
+    const document = readPreferenceScopes(target)[scope];
+    if (document.newer) return false;
+    const overrides = Object.fromEntries(Object.entries(document.overrides).filter(([key]) => !knownConfigKeys.has(key)));
+    updatePreferenceStorage(target, [[DEV_PREFERENCE_KEYS[scope], JSON.stringify({ ...document.data, version: 1, overrides })]]);
     return true;
   } catch { return false; }
 }
 
 export function resetDevPreferences(storage) {
-  try { (storage ?? globalThis.localStorage).removeItem(DEV_PREFERENCES_KEY); return true; }
+  try {
+    updatePreferenceStorage(storage ?? globalThis.localStorage, [DEV_PREFERENCES_KEY, ...Object.values(DEV_PREFERENCE_KEYS)].map(key => [key, null]));
+    return true;
+  }
   catch { return false; }
 }
 
@@ -46,6 +128,10 @@ const OLD_RULE_DEFAULTS = {
   disruptOnHit: false, opportunityEnabled: false, startingOpportunity: 0,
 };
 function migrateSnapshot(snapshot, speed) {
+  // Rules identity is a separate axis from historical V1 schema versions.
+  // A missing identity always means V1, irrespective of next-sortie preferences.
+  if (snapshot.ruleset === undefined) snapshot = { ...snapshot, ruleset: 'v1' };
+  if (isV2(snapshot)) return snapshot;
   if (snapshot.rulesVersion === 3) return snapshot;
   if (snapshot.rulesVersion === 2) return migrateActivationCompletion(snapshot);
   const prior = snapshot.config;
@@ -74,6 +160,25 @@ export function saveSession(session, storage) {
   try { (storage ?? globalThis.localStorage).setItem(SAVE_KEY, JSON.stringify(session)); return true; }
   catch { return false; }
 }
+
+const whole = (value, minimum = 0) => Number.isSafeInteger(value) && value >= minimum;
+function validContinuousSnapshot(snapshot) {
+  // Presentation snapshots may show a timer at zero just before completion or
+  // departure. Validate stored clocks, but never reconstruct or advance them.
+  return snapshot.rulesVersion === 4 &&
+    snapshot.config.v2CrewCycleTurns === 10 &&
+    whole(snapshot.crewCycle?.number, 1) && whole(snapshot.crewCycle?.turn) &&
+    whole(snapshot.time) && typeof snapshot.pendingProgress === 'boolean' &&
+    Array.isArray(snapshot.timeTokens) && snapshot.timeTokens.every(token => token === 'Time') &&
+    Array.isArray(snapshot.crew) && snapshot.crew.every(crew => typeof crew.cycleSlotConsumed === 'boolean') &&
+    Array.isArray(snapshot.jobs) && snapshot.jobs.every(job => whole(job.remainingTime)) &&
+    Array.isArray(snapshot.fighters) && snapshot.fighters.every(fighter => whole(fighter.engagementRemaining)) &&
+    Object.keys(DEFAULT_CONFIG).filter(key => key.startsWith('v2')).every(key =>
+      key === 'v2RefillAtProgress' ? snapshot.config[key] === undefined || typeof snapshot.config[key] === 'boolean' :
+      key === 'v2EngagementMode' ? ['any-action', 'attack-pass-only'].includes(snapshot.config[key]) :
+        whole(snapshot.config[key], ['v2MissionEnemy', 'v2MissionResource'].includes(key) ? 0 : 1));
+}
+
 export function loadSession(storage) {
   try {
     const data = JSON.parse((storage ?? globalThis.localStorage).getItem(SAVE_KEY) ?? 'null');
@@ -84,8 +189,16 @@ export function loadSession(storage) {
       data.state.boardVersion !== BOARD_VERSION || data.view.boardVersion !== BOARD_VERSION ||
       data.pending.some(event => event.state?.boardVersion !== BOARD_VERSION)) return null;
     const snapshots = [data.state, data.view, ...data.pending.map(event => event.state)];
+    // V2 uses a distinct schema version so older V1-only clients reject its
+    // snapshots rather than applying a round lifecycle after a deployment rollback.
     if (snapshots.some(snapshot => !snapshot.config || typeof snapshot.config !== 'object' || Array.isArray(snapshot.config) ||
-      snapshot.rulesVersion !== undefined && ![1, 2, 3].includes(snapshot.rulesVersion))) return null;
+      (isV2(snapshot) ? snapshot.rulesVersion !== 4 :
+        snapshot.rulesVersion !== undefined && ![1, 2, 3].includes(snapshot.rulesVersion)))) return null;
+    const identity = snapshot => snapshot.ruleset === undefined ? 'v1' : snapshot.ruleset;
+    const ruleset = identity(data.state);
+    if (!RULESETS.includes(ruleset) || snapshots.some(snapshot =>
+      identity(snapshot) !== ruleset ||
+      isV2(snapshot) && !validContinuousSnapshot(snapshot))) return null;
     data.state = migrateSnapshot(data.state, data.speed);
     data.view = migrateSnapshot(data.view, data.speed);
     data.pending = data.pending.map(event => ({ ...event, state: migrateSnapshot(event.state, data.speed) }));

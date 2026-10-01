@@ -1,6 +1,7 @@
 // Pure view models: selecting and previewing never mutates a game or consumes RNG.
 import { CREW_DEFS, STATIONS, getCell } from './board.mjs';
 import { availableCrew, isAtStation, legalTargets, operatingArc } from './rules.mjs';
+import { isV2 } from './rulesets.mjs';
 
 export const crewDefinition = id => CREW_DEFS.find(c => c.id === id);
 export const SHORT_NAMES = { pilot:'Pilot',copilot:'Copilot',navigator:'Nav',bombardier:'Bomb',engineer:'Eng.',radio:'Radio',ball:'Ball',leftWaist:'L. Waist',rightWaist:'R. Waist',tail:'Tail' };
@@ -12,7 +13,7 @@ export function crewStatus(state, crew, selected = false) {
   if(crew.health==='injured')return {id:'injured',label:'Injured',short:'HURT',icon:'✚',job:null};
   if(job){const types={repair:['repair','Repair','FIX','⚒'],fireControl:['fire','Fire Control','FIRE','♨'],medical:['medical','Medical','MED','✚']};const [id,label,short,icon]=types[job.kind]??['working','Working','WORK','⌛'];return {id,label,short,icon,job};}
   if(state.phase==='action'&&state.activeCrew===crew.id&&!crew.activationCompleted)return {id:'active',label:'Acting',short:'ACT',icon:'▶'};
-  if(crew.used)return {id:'used',label:'Used / tapped',short:'USED',icon:'✓'};
+  if(isV2(state)?crew.cycleSlotConsumed:crew.used)return {id:'used',label:isV2(state)?'Cycle slot consumed':'Used / tapped',short:'USED',icon:'✓'};
   if(selected)return {id:'selected',label:'Selected',short:'READY',icon:'◉'};
   return {id:'ready',label:'Ready',short:'READY',icon:'●'};
 }

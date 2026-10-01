@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DEFAULT_CONFIG, CONFIG_FIELDS, normalizeConfig } from '../config.mjs';
 import { createGame } from '../state.mjs';
-import { DEV_PREFERENCES_KEY, SAVE_KEY, LEGACY_SAVE_KEY, loadDevPreferences, saveDevPreferences,
+import { DEV_PREFERENCES_KEY, DEV_PREFERENCE_KEYS, SAVE_KEY, LEGACY_SAVE_KEY, loadDevPreferences, saveDevPreferences,
   resetDevPreferences, isConfigModified, loadSession, saveSession } from '../persistence.mjs';
 
 function memoryStorage() {
@@ -57,9 +57,11 @@ test('dev preferences persist only explicit differences and restore a fresh norm
   const storage = memoryStorage();
   const config = normalizeConfig({ combatHit: 0, combatBurst: 2, combatMiss: 7, presentationSpeed: 'fast', fireDuration: 3 });
   assert.equal(saveDevPreferences({ ...config, seed: 'not-a-rule', irrelevant: true }, storage), true);
-  assert.deepEqual(JSON.parse(storage.getItem(DEV_PREFERENCES_KEY)), { version: 1, overrides: {
-    combatHit: 0, combatBurst: 2, combatMiss: 7, fireDuration: 3, presentationSpeed: 'fast',
+  assert.deepEqual(JSON.parse(storage.getItem(DEV_PREFERENCE_KEYS.common)), { version: 1, overrides: {
+    combatHit: 0, combatBurst: 2, combatMiss: 7, presentationSpeed: 'fast',
   } });
+  assert.deepEqual(JSON.parse(storage.getItem(DEV_PREFERENCE_KEYS.v1)), { version: 1, overrides: { fireDuration: 3 } });
+  assert.equal(storage.getItem(DEV_PREFERENCES_KEY), null, 'fresh preferences use independent scope records');
   assert.deepEqual(loadDevPreferences(storage), config);
   const loaded = loadDevPreferences(storage); loaded.combatHit = 99;
   assert.equal(loadDevPreferences(storage).combatHit, 0, 'editing a form cannot mutate the persisted object');
@@ -99,12 +101,13 @@ test('resetting preferences restores current defaults while preserving the activ
 test('invalid or unavailable preference storage is recoverable and a failed save keeps prior preferences', () => {
   const storage = memoryStorage();
   saveDevPreferences({ presentationSpeed: 'manual' }, storage);
-  const before = storage.getItem(DEV_PREFERENCES_KEY);
+  const before = storage.getItem(DEV_PREFERENCE_KEYS.common);
   assert.equal(saveDevPreferences({ combatHit: 0, combatBurst: 0, combatMiss: 0 }, storage), false);
-  assert.equal(storage.getItem(DEV_PREFERENCES_KEY), before);
+  assert.equal(storage.getItem(DEV_PREFERENCE_KEYS.common), before);
   for (const corrupt of ['not json', 'null', '{}', '{"version":1,"overrides":[]}', '{"version":2,"overrides":{}}', '{"version":1,"overrides":{"combatHit":0,"combatBurst":0,"combatMiss":0}}']) {
-    storage.setItem(DEV_PREFERENCES_KEY, corrupt);
-    assert.deepEqual(loadDevPreferences(storage), DEFAULT_CONFIG);
+    const corruptStorage = memoryStorage();
+    corruptStorage.setItem(DEV_PREFERENCES_KEY, corrupt);
+    assert.deepEqual(loadDevPreferences(corruptStorage), DEFAULT_CONFIG);
   }
   const denied = { getItem() { throw new Error('denied'); }, setItem() { throw new Error('denied'); }, removeItem() { throw new Error('denied'); } };
   assert.deepEqual(loadDevPreferences(denied), DEFAULT_CONFIG);

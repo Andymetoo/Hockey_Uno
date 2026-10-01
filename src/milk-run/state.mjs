@@ -1,18 +1,27 @@
 import { normalizeConfig, ENEMY_DEFS } from './config.mjs';
 import { BOARD, BOARD_VERSION, CREW_DEFS, ENGINE_CELLS, STATIONS } from './board.mjs';
 import { seedToInt } from './random.mjs';
+import { RULESETS } from './rulesets.mjs';
+import { createV2Telemetry } from './telemetry.mjs';
 
 const copies = (count, value) => Array.from({ length: count }, () => value);
-export function createGame(overrides = {}, seed = 'MILK-RUN') {
+export function createGame(overrides = {}, seed = 'MILK-RUN', ruleset = overrides.preferredRuleset ?? 'v1') {
+  if (!RULESETS.includes(ruleset)) throw new RangeError(`Unknown sortie ruleset: ${ruleset}`);
   const config = normalizeConfig(overrides);
+  const continuous = ruleset === 'v2-continuous';
+  if (continuous && config.v2MissionTime < config.v2TimePerProgress) {
+    throw new RangeError('V2 needs at least as many mission Time tokens as Time Required Per Progress.');
+  }
   return {
-    version: 1, rulesVersion: 3, boardVersion: BOARD_VERSION, config, seed: String(seed), rng: seedToInt(seed),
+    version: 1, rulesVersion: continuous ? 4 : 3, ruleset, boardVersion: BOARD_VERSION, config, seed: String(seed), rng: seedToInt(seed),
     round: 0, slot: 0, altitude: config.startingAltitude,
+    ...(continuous ? { crewCycle: { number: 1, turn: 0 }, time: 0, timeTokens: [], pendingProgress: false, telemetry: createV2Telemetry() } : {}),
     mission: { position: 0, bombed: false, bombingResult: null },
     resources: { Officer: config.startingOfficer, Enlisted: config.startingEnlisted },
     opportunity: config.opportunityEnabled ? Math.min(config.startingOpportunity, config.opportunityCap) : 0,
     crew: CREW_DEFS.map((member) => ({
       id: member.id, health: 'healthy', used: false, activationCompleted: false,
+      ...(continuous ? { cycleSlotConsumed: false } : {}),
       position: [...STATIONS[member.station].cells], station: member.station, job: null,
     })),
     fighters: [],
@@ -20,15 +29,18 @@ export function createGame(overrides = {}, seed = 'MILK-RUN') {
     engines: Object.keys(ENGINE_CELLS).map((id) => ({ id, running: true })),
     compromised: [], jobs: [], escorts: [],
     bags: {
-      mission: { tokens: [...copies(config.missionEnemy, 'Enemy'), ...copies(config.missionResource, 'Resource')], discard: [] },
+      mission: { tokens: continuous
+        ? [...copies(config.v2MissionEnemy, 'Enemy'), ...copies(config.v2MissionResource, 'Resource'), ...copies(config.v2MissionTime, 'Time')]
+        : [...copies(config.missionEnemy, 'Enemy'), ...copies(config.missionResource, 'Resource')], discard: [] },
       combat: { tokens: [...copies(config.combatHit, 'Hit'), ...copies(config.combatBurst, 'Burst'), ...copies(config.combatMiss, 'Miss')], discard: [] },
     },
     deck: {
       cards: [...Object.entries(ENEMY_DEFS).flatMap(([type, definition]) => copies(config[definition.countKey], type)), ...copies(config.flakCards, 'Flak')],
       discard: [],
     },
-    phase: 'ready', activeCrew: null,
+    phase: continuous ? 'select' : 'ready', activeCrew: null,
     stats: {
+      ...(continuous ? { turns: 0 } : {}),
       rounds: 0, missionDraws: 0, fightersSpawned: 0, fightersKilled: 0,
       flakAttacks: 0, enemyAttacks: 0, enemyHits: 0, enemyCrits: 0,
       aircraftHits: 0, firesStarted: 0, repairs: 0,

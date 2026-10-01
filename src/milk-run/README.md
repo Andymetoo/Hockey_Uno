@@ -1,4 +1,66 @@
-# Milk Run — v3 vertical slice
+# Milk Run — V1 and experimental V2
+
+New sorties offer **V1 — Round-Based** (the current/classic rules) or **V2 — Continuous Time — EXPERIMENTAL**. The `v3` names in old storage keys and historical documentation are implementation versions, not the new player-facing ruleset. V1 keeps its 14/5 mission, N+2 work, ten-slot rounds, fighter clearing, and Round Start refill/fire behavior.
+
+## V2 continuous-time playtest
+
+The UI/dev-tools pass keeps the active ruleset visible and shows six compact V2 status values: Crew Cycle slots, Time pips/count, outbound/return Progress, altitude, resources and Opportunity. Active jobs identify their countdown and both workers when assisted. Enemy queue cards show Engagement; a separate **BREAKS OFF** beat holds the zero-Engagement fighter on screen before departure, with no destruction styling or kill reward.
+
+Progress uses the existing resolution queue for work-completion acknowledgement, Fire Spread, aircraft condition, independent altitude checks, movement and bag refill. Completed jobs still resolve on the triggering Time draw before the crew action; the checkpoint acknowledges that work before hazards rather than completing it twice. Manual playback can inspect every checkpoint stage, including an undamaged aircraft's safe checks.
+
+There are no V2 rounds. Choose and activate a crew member, draw a mission token, take an action (or Continue), resolve any Opportunity shots, and resolve the enemy queue. Three clocks operate independently:
+
+- **Crew Cycle:** ten Turns, one normal activation slot per crew member. Refreshing slots only changes readiness. Injured, dead and working crew still consume their slots with mission draws and enemy pressure under the existing default. Slots are separate from availability: a released worker can act immediately if their slot is unconsumed, otherwise they wait for the next cycle.
+- **Time / Progress:** a Time draw adds one Time and reduces every already-active job by one. Zero-Time jobs complete immediately, including batch station returns. Jobs started afterward wait for future draws. At 4/4 Time, a checkpoint waits until the current action, Opportunity window and enemy phase finish. It spreads unsuppressed fire, recalculates aircraft condition, checks Control/Structure/Engines independently, and advances one Progress if airborne. Then Time resets, its held tokens return, and both bags refill from discard. Crew readiness and surviving fighters are unchanged.
+- **Engagement:** each fighter has its own remaining enemy actions. The default counts attacks, rotations and Disrupted actions. Attack Pass Only counts attacks and Disrupted flybys but not pure rotations. A fighter completes its action before departing at zero. Excess Enemy draws still produce immediate Flak at the three-fighter cap.
+
+| V2 setting | Default |
+| --- | --- |
+| Crew Cycle Turns | 10 (fixed, per playtest clarification) |
+| Mission Enemy / Resource / Time tokens | 15 / 20 / 10 |
+| Time Required Per Progress | 4 |
+| Outbound / return Progress | 8 / 3 |
+| Repair / Fire Control / Medical Time | 6 / 6 / 6 |
+| Assisted Repair / Fire Control / Medical Time | 4 / 4 / 4 |
+| BF-109 / BF-110 / FW-190 / Me-262 Engagement | 5 / 5 / 5 / 5 |
+| Engagement Countdown Mode | Any Enemy Action |
+| Normal discard refill at Progress | ON |
+
+V2 settings are independent of V1 and apply only to a fresh sortie. Shared gunfire, Hit/Burst/Miss, Burst ×2, Disrupt, kill rewards, Opportunity, Pilot Direct Fire, arcs, damage, medical availability and station-return rules use the existing implementation. Resource denomination still comes from the activating crew member. Held Resources and accumulated Time remain outside the bag; emergency refills use eligible discard only and cannot prematurely recycle Time.
+
+Optional Assist assigns a healthy second worker when starting Repair, Fire Control or Medical. Both workers become busy; an unconsumed assistant slot is preserved and eventually produces the normal unavailable Turn if the job remains active. Used crew may assist without receiving another normal activation. Both share the selected safe work position and use the existing batch return rules. If either worker is injured or killed, the whole job cancels and releases its workers, extending the existing worker-incapacitation rule. Assist adds no second resource cost. These assistant edge cases are provisional interpretations, not V1 changes.
+
+The user clarified two initially unspecified clock mappings: Crew Cycles stay fixed at ten Turns, and Escorts expire at the next Progress checkpoint. V2 launch rejects a Time-token inventory smaller than the Progress threshold, since those physical tokens cannot recycle before a checkpoint. All other listed V2 values are editable. A cycle with no available crew offers **Continue unavailable Turns**; each press processes at most one cycle so the interface cannot enter an unbounded automatic loop.
+
+Turning **Normal bag refill at Progress** OFF retains mission/combat discard until an emergency refill. Accumulated Time always returns at Progress, even with this toggle OFF; recycling those physical Time tokens is required for the next checkpoint. Held Resources remain out of the bag. Crew Cycle Turns is displayed as fixed at ten, with the physical reason (ten crew, one slot each), preserving the prior playtest clarification.
+
+## Scoped Dev tools and playtest telemetry
+
+Dev tools group controls under **COMMON**, **V1 — ROUND-BASED**, and **V2 — CONTINUOUS TIME · EXPERIMENTAL**. Common controls include combat bags, Opportunity, Disrupt and individually editable fighter HP (unchanged defaults: BF-109 2, BF-110 2, FW-190 3, Me-262 4). Every V2-only control is marked experimental. Construction settings apply to the next sortie; changing preferences or resetting one group never changes the live sortie's bags, timers or crew.
+
+Preferences use separate localStorage records: `milk-run-dev-common-1`, `milk-run-dev-v1-1`, `milk-run-dev-v2-1`, and `milk-run-dev-chooser-1`. Legacy `milk-run-v3-dev-preferences-1` overrides are read by scope and preserved as an archive on migration. **Reset V1 Defaults** and **Reset V2 Defaults** affect only their own scope; an explicit empty scoped record prevents old values returning from the archive. **Reset All Defaults** removes the scoped records and legacy preferences without touching sortie saves. The modified-rules indicator reports Common and the active ruleset, so inactive-rule preferences cannot mark the current sortie as modified.
+
+V2's end report adds Turns, completed Crew Cycles, Time draws, checkpoints, Turns per physical Progress, fighter actions, Engagement countdown spent, natural disengagements, jobs begun/completed, assisted jobs, altitude losses and outbound/return Time draws. Fighter action averages include every spawned fighter, including early kills and fighters still present; rotations count as actual actions even in Attack Pass Only mode, while the separate countdown average counts only eligible decrements. A fatal checkpoint counts as a checkpoint but adds no physical Progress. Time by leg means drawn Time tokens, not real-world minutes. These observations never drive rules or score.
+
+New sorties save all instrumentation. Older V2 saves remain exact on load; new counters begin on the next command and are explicitly marked as partial history. Historical job totals or fighter lifetimes are never inferred from remaining timers.
+
+## Ruleset architecture and persistence
+
+`rulesets.mjs` defines explicit identities (`v1`, `v2-continuous`) and mission lengths. `continuous.mjs` owns only V2 Time, Engagement, checkpoint and Crew Cycle sequencing. `rules.mjs` dispatches according to the saved identity and supplies its shared combat/damage/work functions to that lifecycle; V1 continues through its original round handlers. No command changes an active sortie's identity.
+
+Every fresh state stores `ruleset`. Missing identifiers on old saves and all their queued snapshots migrate to `v1`. V1 retains `rulesVersion: 3`; V2 uses `rulesVersion: 4` so a previous V1-only client rejects the new schema rather than interpreting it as round-based. V2 additionally stores `crewCycle.number/turn`, each crew member's `cycleSlotConsumed`, `time`, held `timeTokens`, `pendingProgress`, job `remainingTime`/optional `assistantId`, and fighter `engagementRemaining`. These values are restored exactly, including mid-draw and pending checkpoint snapshots; missing V2 timers, crossed schema versions or mixed rulesets are rejected rather than inferred. Existing save keys remain supported, and next-sortie Dev preferences remain separate from the active session. Starting a clean sortie from the ruleset chooser replaces the current session without manually clearing storage.
+
+## V2 pass validation
+
+Run all Milk Run unit regressions with `node --test src/milk-run/tests/*.test.mjs`. Verified after the UI/dev-tools pass: **275/275 tests pass**, retaining all 233 tests from the engine pass (including the 168 original V1 regressions) and adding 42 scoped-preference, telemetry, tuning, UI and presentation checks. The historical 19-round default-rules combat witness retains its exact decisions and metrics; only its default-config assertion excludes the newly added preference/V2 keys. Preference-storage assertions now follow the intentional split into independent records.
+
+Run `node src/milk-run/tests/continuous-browser-check.mjs` for the new ruleset chooser, Time checkpoint ordering, exact reload, Assist, Engagement display and clean V1 restart. It also verifies that invalid next-sortie V2 preferences cannot corrupt or block an active V1 save. Checks cover desktop, tablet, 320px, 360px and 390px touch layouts, with screenshots/results in `.checks/continuous/`. The existing `browser-check.mjs`, `ux-browser-check.mjs`, `rules-browser-check.mjs` and `corrective-browser-check.mjs` continue to cover V1; their Dev launch steps now explicitly choose V1 in the new picker.
+
+Run `node src/milk-run/tests/dev-tools-browser-check.mjs` for all V2 settings through the actual form, scoped resets and reload, compact six-value HUD, Time thresholds up to 40, live assisted-job countdown, distinct break-off before removal, inspectable checkpoint beats, and a complete 8/3 V2 diagnostic sortie to HOME with telemetry. Artifacts are in `.checks/dev-tools/`. All six browser scripts passed; combined widths tested were **320, 360, 390, 430, 768 and 1440px**. The V2-specific checks cover 320/360/390/768/1440px. The V2 HOME diagnostic uses a Time-only bag to isolate progression; it is not a claim about default-rules survival or balance. The V1 browser suite also replays the unchanged default-rules combat witness to HOME.
+
+A separate seeded audit exercised 1,189 commands across 15 sorties with crisis work, Assist, casualties and checkpoints. Physical mission-token totals were conserved after every command and 28,667 presentation snapshots round-tripped exactly through JSON save/load. This checks engine and persistence behavior, not playtest balance.
+
+The historical V1 architecture and validation notes below remain useful background. Any references there to rounds apply to V1.
 
 Milk Run is an isolated, responsive B-17 solitaire rules prototype. Fly fourteen rounds to the target, attempt the provisional bombing step, and survive five return rounds to HOME. Mission success means reaching HOME after attempting the bombing run; the bombing result is reported separately. Aircraft geometry follows the supplied authoritative PlaneGrid mapping; unresolved numerical rules remain provisional playtest data.
 

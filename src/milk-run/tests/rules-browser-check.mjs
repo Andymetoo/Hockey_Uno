@@ -43,7 +43,7 @@ try {
   assert.deepEqual(await getState(),initial,'editing next-run preferences does not modify the current sortie');
   let preferences=await evaluate('window.milkRun.getPreferences()');
   for(const [key,value] of Object.entries(overrides))assert.equal(preferences[key],value,key);
-  assert.equal(await evaluate("document.querySelector('#rules-modified').hidden"),false);
+  assert.equal(await evaluate("document.querySelector('#rules-modified').hidden"),true,'next-sortie preferences do not mark the active canonical sortie as modified');
   await close();await b.reload();
   assert.deepEqual(await getState(),initial);
   preferences=await evaluate('window.milkRun.getPreferences()');
@@ -51,6 +51,7 @@ try {
   await click('[data-ui="dev"]');
   assert.equal(await evaluate("document.querySelector('#dev-form [name=combatHit]').value"),'0');
   await click('[data-ui="apply-dev"]');
+  await evaluate("document.querySelector('#sortie-form').elements.ruleset.value='v1';document.querySelector('#sortie-form').requestSubmit()");
   const custom=await getState();
   assert.equal(custom.opportunity,2);assert.equal(custom.bags.combat.tokens.length,10);
   assert.equal(custom.bags.combat.tokens.filter(t=>t==='Burst').length,8);
@@ -68,6 +69,7 @@ try {
   assert.deepEqual(await getState(),beforeInvalid,'all-zero combat bag cannot launch');
   assert.ok(await evaluate("!!document.querySelector('#dev-dialog .action-error')"));
   await click('[data-ui="reset-defaults"]');await click('[data-ui="apply-dev"]');
+  await evaluate("document.querySelector('#sortie-form').elements.ruleset.value='v1';document.querySelector('#sortie-form').requestSubmit()");
   assert.deepEqual((await getState()).config,DEFAULT_CONFIG);
   assert.equal(await evaluate("document.querySelector('#rules-modified').hidden"),true);
   note('Canonical defaults, independent token counts, persistent next-run preferences, modified indicator, non-destructive reset and explicit empty-bag rejection');

@@ -37,7 +37,25 @@ export class ResolutionQueue {
   consume(event, visible) {
     const { state, ...entry } = event;
     this.view = state ?? this.view;
-    const logged = { ...entry, round: this.view.round, sequence: this.log.length + 1 };
+    // Snapshot metadata becomes small, explicit presentation fields before the
+    // snapshot is removed from the recorder/current beat. Titles and timing on
+    // resumed queues therefore use the same clocks as the original event.
+    if (this.view.ruleset === 'v2-continuous') {
+      const fighter = this.view.fighters?.find(fighter => fighter.id === event.fighterId);
+      if (event.type === 'ENGAGEMENT_SPENT' || event.type === 'FIGHTER_BREAKING_OFF') {
+        entry.enemyType ??= fighter?.type;
+        entry.engagementRemaining ??= fighter?.engagementRemaining;
+      }
+      if (event.type === 'WORK_TIME_ADVANCED') {
+        const job = this.view.jobs?.find(job => job.id === event.jobId);
+        entry.kind ??= job?.kind;
+        entry.remainingTime ??= job?.remainingTime;
+      }
+    }
+    const clock = this.view.ruleset === 'v2-continuous'
+      ? { ruleset: this.view.ruleset, crewCycle: this.view.crewCycle.number, cycleTurn: this.view.crewCycle.turn }
+      : { round: this.view.round };
+    const logged = { ...entry, ...clock, sequence: this.log.length + 1 };
     if (!event.presentationOnly) this.log.push(logged);
     this.visual = advanceVisual(this.visual, event, this.view);
     if (visible) this.current = { ...logged, beat: ++this.beat };

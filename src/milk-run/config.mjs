@@ -1,8 +1,10 @@
-/** Experimental v3 rules. Values here are intentionally editable, not balance claims. */
+/** V1 rules and separate V2 playtest values. V2 values are provisional. */
 export const DEFAULT_CONFIG = Object.freeze({
+  preferredRuleset: 'v1',
   startingOfficer: 3, startingEnlisted: 5,
   missionEnemy: 15, missionResource: 20, combatHit: 16, combatBurst: 4, combatMiss: 13,
   bf109Cards: 10, bf110Cards: 6, fw190Cards: 5, me262Cards: 3, flakCards: 4,
+  bf109Hp: 2, bf110Hp: 2, fw190Hp: 3, me262Hp: 4,
   maxFighters: 3, flakShots: 2, spawnFacing: 0, clearFighters: true, unavailableDraws: true,
   fireCap: 4, repairCap: 3, engineerBonus: 1, eightWayWork: false,
   extinguishLeavesDamage: true, crewBlocksFirstFire: true,
@@ -14,11 +16,47 @@ export const DEFAULT_CONFIG = Object.freeze({
   structureSafe: 1, structureMid: 3, structureFatal: 6, structureMidMin: 3, structureHighMin: 5,
   enginesSafe: 1, enginesMid: 2, enginesAuto: 4, enginesMidMin: 3, enginesHighMin: 5,
   outboundLength: 14, returnLength: 5, bombingMin: 3, animationMs: 750, presentationSpeed: 'normal',
+  v2CrewCycleTurns: 10,
+  v2MissionEnemy: 15, v2MissionResource: 20, v2MissionTime: 10,
+  v2TimePerProgress: 4, v2OutboundLength: 8, v2ReturnLength: 3,
+  v2RepairTime: 6, v2FireTime: 6, v2MedicalTime: 6,
+  v2AssistedRepairTime: 4, v2AssistedFireTime: 4, v2AssistedMedicalTime: 4,
+  v2Bf109Engagement: 5, v2Bf110Engagement: 5, v2Fw190Engagement: 5, v2Me262Engagement: 5,
+  v2EngagementMode: 'any-action', v2RefillAtProgress: true,
 });
+
+const V1_FIELDS = new Set(['missionEnemy', 'missionResource', 'clearFighters', 'medicalDuration', 'repairDuration', 'fireDuration', 'outboundLength', 'returnLength']);
+export function configScope(key) {
+  return key === 'preferredRuleset' ? 'preferences' : key.startsWith('v2') ? 'v2' : V1_FIELDS.has(key) ? 'v1' : 'common';
+}
 
 const number = (key, label, group, min = 0, max = 40, step = 1) => ({ key, label, group, type: 'number', min, max, step });
 const boolean = (key, label, group) => ({ key, label, group, type: 'boolean' });
 export const CONFIG_FIELDS = [
+  { key: 'preferredRuleset', label: 'Preferred ruleset for new sorties', group: 'New sortie', type: 'select', options: [
+    { value: 'v1', label: 'V1 — Round-Based' }, { value: 'v2-continuous', label: 'V2 — Continuous Time — EXPERIMENTAL' },
+  ] },
+  { ...number('v2CrewCycleTurns', 'V2 Crew Cycle Turns (fixed at 10)', 'V2 — Continuous Time (Experimental)', 10, 10), fixedReason: 'Fixed at 10: each of the ten crew must account for one Turn before readiness refreshes.' },
+  number('v2MissionEnemy', 'V2 Mission Enemy tokens', 'V2 — Continuous Time (Experimental)', 0, 100),
+  number('v2MissionResource', 'V2 Mission Resource tokens', 'V2 — Continuous Time (Experimental)', 0, 100),
+  number('v2MissionTime', 'V2 Mission Time tokens', 'V2 — Continuous Time (Experimental)', 1, 100),
+  number('v2TimePerProgress', 'V2 Time Required Per Progress', 'V2 — Continuous Time (Experimental)', 1, 40),
+  boolean('v2RefillAtProgress', 'Refill mission and combat discards at Progress', 'V2 — Continuous Time (Experimental)'),
+  number('v2OutboundLength', 'V2 Outbound Progress', 'V2 — Continuous Time (Experimental)', 1, 40),
+  number('v2ReturnLength', 'V2 Return Progress', 'V2 — Continuous Time (Experimental)', 1, 40),
+  number('v2RepairTime', 'V2 Repair Time', 'V2 — Crisis work (Experimental)', 1, 40),
+  number('v2FireTime', 'V2 Fire Control Time', 'V2 — Crisis work (Experimental)', 1, 40),
+  number('v2MedicalTime', 'V2 Medical Time', 'V2 — Crisis work (Experimental)', 1, 40),
+  number('v2AssistedRepairTime', 'V2 Assisted Repair Time', 'V2 — Crisis work (Experimental)', 1, 40),
+  number('v2AssistedFireTime', 'V2 Assisted Fire Control Time', 'V2 — Crisis work (Experimental)', 1, 40),
+  number('v2AssistedMedicalTime', 'V2 Assisted Medical Time', 'V2 — Crisis work (Experimental)', 1, 40),
+  number('v2Bf109Engagement', 'V2 BF-109 Engagement', 'V2 — Fighter Engagement (Experimental)', 1, 40),
+  number('v2Bf110Engagement', 'V2 BF-110 Engagement', 'V2 — Fighter Engagement (Experimental)', 1, 40),
+  number('v2Fw190Engagement', 'V2 FW-190 Engagement', 'V2 — Fighter Engagement (Experimental)', 1, 40),
+  number('v2Me262Engagement', 'V2 Me-262 Engagement', 'V2 — Fighter Engagement (Experimental)', 1, 40),
+  { key: 'v2EngagementMode', label: 'V2 Engagement Countdown Mode', group: 'V2 — Fighter Engagement (Experimental)', type: 'select', options: [
+    { value: 'any-action', label: 'Any Enemy Action (default)' }, { value: 'attack-pass-only', label: 'Attack Pass Only (experimental)' },
+  ] },
   number('startingOfficer', 'Starting Officer resources', 'Bags & resources'),
   number('startingEnlisted', 'Starting Enlisted resources', 'Bags & resources'),
   number('missionEnemy', 'Mission Enemy tokens', 'Bags & resources', 0, 100),
@@ -36,6 +74,10 @@ export const CONFIG_FIELDS = [
   number('fw190Cards', 'FW-190 cards', 'Enemy deck'),
   number('me262Cards', 'Me-262 cards', 'Enemy deck'),
   number('flakCards', 'Flak cards (provisional)', 'Enemy deck'),
+  number('bf109Hp', 'BF-109 hit points', 'Enemy pressure', 1, 20),
+  number('bf110Hp', 'BF-110 hit points', 'Enemy pressure', 1, 20),
+  number('fw190Hp', 'FW-190 hit points', 'Enemy pressure', 1, 20),
+  number('me262Hp', 'Me-262 hit points', 'Enemy pressure', 1, 20),
   number('maxFighters', 'Active fighter cap', 'Enemy pressure', 1, 3),
   number('flakShots', 'Shots per Flak event', 'Enemy pressure', 1, 8),
   { key: 'spawnFacing', label: 'Fighter spawn facing', group: 'Enemy pressure', type: 'select', options: [{ value: 0, label: 'Toward B-17' }, { value: 90, label: '90° off-angle' }] },
@@ -78,7 +120,7 @@ export const CONFIG_FIELDS = [
     { value: 'manual', label: 'Step / Manual' }, { value: 'normal', label: 'Normal' },
     { value: 'fast', label: 'Fast' }, { value: 'instant', label: 'Instant' },
   ] },
-];
+].map(field => ({ ...field, scope: configScope(field.key) }));
 
 /** Ignore unknown keys, coerce form input, and prevent impossible empty token systems. */
 export function normalizeConfig(overrides = {}) {
@@ -105,11 +147,20 @@ export function normalizeConfig(overrides = {}) {
   return config;
 }
 
+/** Scope badges describe actual rule changes, optionally for only one sortie. */
+export function modifiedConfigScopes(config, activeRuleset) {
+  const relevant = activeRuleset === 'v1' ? ['common', 'v1'] : activeRuleset === 'v2-continuous' ? ['common', 'v2'] : ['common', 'v1', 'v2', 'preferences'];
+  try {
+    const normalized = normalizeConfig(config);
+    return relevant.filter(scope => Object.keys(DEFAULT_CONFIG).some(key => configScope(key) === scope && normalized[key] !== DEFAULT_CONFIG[key]));
+  } catch { return relevant; }
+}
+
 export const ENEMY_DEFS = Object.freeze({
-  'BF-109': { name: 'BF-109', hp: 2, countKey: 'bf109Cards', abilities: [] },
-  'BF-110': { name: 'BF-110', hp: 2, countKey: 'bf110Cards', abilities: [] },
-  'FW-190': { name: 'FW-190', hp: 3, countKey: 'fw190Cards', abilities: [] },
-  'Me-262': { name: 'Me-262', hp: 4, countKey: 'me262Cards', abilities: [] },
+  'BF-109': { name: 'BF-109', hp: 2, hpKey: 'bf109Hp', countKey: 'bf109Cards', abilities: [] },
+  'BF-110': { name: 'BF-110', hp: 2, hpKey: 'bf110Hp', countKey: 'bf110Cards', abilities: [] },
+  'FW-190': { name: 'FW-190', hp: 3, hpKey: 'fw190Hp', countKey: 'fw190Cards', abilities: [] },
+  'Me-262': { name: 'Me-262', hp: 4, hpKey: 'me262Hp', countKey: 'me262Cards', abilities: [] },
 });
 
 export const RESOURCE_BY_RANK = Object.freeze({ Officer: 'Officer', Enlisted: 'Enlisted' });
