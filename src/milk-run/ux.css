@@ -143,3 +143,26 @@ dialog{background-color:#d8d2bb;background-image:repeating-linear-gradient(0deg,
 .crew-marker.target-chosen>.crew-body{stroke:#ffad3d;stroke-width:5}
 .crew-location{display:block;font-size:9px;line-height:1.2;font-weight:700;white-space:normal}
 @media(max-width:650px){.crew-location{font-size:8px;margin-top:2px}}
+/* Keep frequently used presentation controls and playtest tools out of the board stack. */
+.playback-topline{max-width:1600px;margin:0 auto;padding:4px 28px;display:flex;justify-content:flex-end;border-bottom:1px solid #c6cebb;background:#f0eedf}
+.playback-topline .playback{width:min(100%,420px);padding:0;align-items:center}
+.diagnostic-panel{grid-column:1/-1;padding:5px 8px}
+.diagnostic-panel .diagnostic-tools{margin:0}
+@media(max-width:650px){
+  .playback-topline{padding:3px 6px;justify-content:center}
+  .playback-topline .playback{width:100%;gap:4px}
+  .playback-topline .playback label{margin-right:auto}
+  .playback-topline .playback button,.playback-topline .playback select{min-height:38px}
+  .tabletop{gap:6px}
+  .mission-panel{order:1}
+  .board-panel{order:2}
+  .crew-panel{order:3}
+  .right-rail{order:4}
+  .diagnostic-panel{order:5}
+  .log-panel{order:6}
+  .summary-panel{order:7}
+  .diagnostic-tools{gap:4px 7px}
+  .diagnostic-tools>div{flex:1 1 auto}
+  .diagnostic-tools button{flex:1 1 100%}
+  .diagnostic-tools label{flex:1 1 auto}
+}

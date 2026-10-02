@@ -34,6 +34,7 @@ $('#app').innerHTML = `
     <button class="quiet" data-ui="help" aria-label="How to play"><span class="desktop-label">Field guide</span><span class="mobile-label">Guide</span></button>
     <button class="quiet" data-ui="dev" aria-label="Playtest settings"><span class="desktop-label">Playtest settings</span><span class="mobile-label">Dev</span></button>
   </header>
+  <div class="playback-topline"><div class="playback" aria-label="Presentation controls"><label>Speed <select id="speed" aria-label="Presentation speed"><option value="manual">Step / Manual</option><option value="normal">Normal</option><option value="fast">Fast</option><option value="instant">Instant</option></select></label><button data-ui="pause" class="quiet">Pause</button><button data-ui="step" class="quiet">Step</button><button data-ui="skip" class="quiet">Skip</button></div></div>
   <div id="status" class="status-strip" aria-label="Sortie status"></div>
   <div id="time-status" class="time-status" hidden aria-live="polite"></div>
   <main class="tabletop">
@@ -41,17 +42,16 @@ $('#app').innerHTML = `
     <section class="crew-panel panel"><div class="panel-label">02 / YOUR CREW <span id="available-count">AVAILABLE 10/10</span></div><div id="crew-list" class="crew-list"></div><div id="active-jobs" class="active-jobs" hidden></div><p class="crew-note">One draw. One action. Then the fighters.<br>Injured, busy and lost crew still consume time.</p></section>
     <section class="board-panel panel">
       <div class="board-heading"><div><div class="eyebrow">BOEING B-17 / FLYING FORTRESS</div><h1>The long way home.</h1></div><button class="board-badge" id="enemy-shortcut" data-ui="enemies">0 / 3 HOSTILES<br>VIEW QUEUE ↓</button></div>
-      <div id="board-stage" class="board-stage" aria-live="polite"></div><div class="board-and-altitude"><div id="board" class="board-wrap"></div><div id="altitude-track" class="altitude-track" aria-label="Altitude track"></div></div><div id="target-detail" class="target-detail" hidden></div>
-      <div class="diagnostic-tools"><div><b>PLAYTEST DIAGNOSTICS</b><small>Enemy hit-location rolls · this sortie</small></div><button class="quiet" data-ui="hit-map-toggle" aria-pressed="false">Show hit-location overlay</button><label for="hit-map-structure"><input id="hit-map-structure" type="checkbox" checked disabled><span data-hit-map-count="structure">Aircraft · 0</span></label><label for="hit-map-empty"><input id="hit-map-empty" type="checkbox" checked disabled><span data-hit-map-count="empty">Empty space · 0</span></label></div>
+      <div id="board-stage" class="board-stage" aria-live="polite"></div><div id="conditions" class="conditions"></div><div class="board-and-altitude"><div id="board" class="board-wrap"></div><div id="altitude-track" class="altitude-track" aria-label="Altitude track"></div></div><div id="target-detail" class="target-detail" hidden></div>
       <div class="board-key"><span><i class="key-damage">×</i> Damage</span><span><i class="key-fire">♨</i> Fire</span><span><i class="key-crew">3</i> Crew</span><span>Quarter: 1 2 / 3 4</span></div>
-      <div id="conditions" class="conditions"></div>
       <div id="section-key" class="section-key"></div>
     </section>
     <aside class="right-rail">
       <section class="enemy-panel panel"><div class="panel-label">03 / ENEMY QUEUE <span id="fighter-count"></span></div><div id="enemies"></div><p class="small muted">Resolve from top to bottom. Facing arrows show whether each fighter attacks or turns.</p></section>
-      <section class="event-panel panel"><div class="panel-label">04 / RESOLUTION <span id="queue-count"></span></div><div id="event" class="event-card" role="status" aria-live="polite"></div><div class="playback"><label>Speed <select id="speed" aria-label="Presentation speed"><option value="manual">Step / Manual</option><option value="normal">Normal</option><option value="fast">Fast</option><option value="instant">Instant</option></select></label><button data-ui="pause" class="quiet">Pause</button><button data-ui="step" class="quiet">Step</button><button data-ui="skip" class="quiet">Skip</button></div></section>
+      <section class="event-panel panel"><div class="panel-label">04 / RESOLUTION <span id="queue-count"></span></div><div id="event" class="event-card" role="status" aria-live="polite"></div></section>
       <section class="bag-panel panel"><details><summary>Bag intelligence</summary><div id="bags"></div></details></section>
     </aside>
+    <section class="diagnostic-panel panel"><div class="diagnostic-tools"><div><b>PLAYTEST DIAGNOSTICS</b><small>Enemy hit-location rolls · this sortie</small></div><button class="quiet" data-ui="hit-map-toggle" aria-pressed="false">Show hit-location overlay</button><label for="hit-map-structure"><input id="hit-map-structure" type="checkbox" checked disabled><span data-hit-map-count="structure">Aircraft · 0</span></label><label for="hit-map-empty"><input id="hit-map-empty" type="checkbox" checked disabled><span data-hit-map-count="empty">Empty space · 0</span></label></div></section>
     <section class="log-panel panel"><details id="log-details"><summary>Flight recorder <span id="log-count"></span></summary><div class="log-tools"><button class="quiet" data-ui="export">Export sortie + log</button></div><ol id="event-log" reversed></ol></details></section>
     <section id="summary" class="summary-panel panel" hidden></section>
   </main>
@@ -410,8 +410,6 @@ $('#speed').addEventListener('change',e=>{queue.setSpeed(e.target.value);remembe
 $('#dev-form').addEventListener('change',()=>{if(!$('#dev-form').checkValidity())return;try{rememberPreferences(readDevForm());$('#dev-form').closest('.dialog-content').querySelector('.action-error')?.remove();}catch(error){$('#dev-prefs-status').textContent='Not saved: '+error.message;}});
 $('#log-details').addEventListener('toggle',()=>{if($('#log-details').open)renderLog();});
 document.querySelectorAll('dialog').forEach(d=>d.addEventListener('click',e=>{if(e.target===d){const r=d.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)closeDialog();}}));
-// Keep playback beside the board at every width; the same controls serve mobile.
-$('#board-stage').after($('.playback'));
 const savedSession=loadSession();
 const legacyBoardSave=!savedSession&&hasLegacyBoardSave();
 initialize(savedSession?.state.config??DEFAULT_CONFIG,'MILK-RUN',savedSession);
