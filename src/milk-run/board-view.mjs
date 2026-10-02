@@ -3,6 +3,7 @@ import { crewStatus, footprintCenter, arcPreview } from './ui-model.mjs';
 import { fighterHeading } from './spatial.mjs';
 import { targetOptions } from './targeting.mjs';
 import { currentStationId } from './crew-position.mjs';
+import { isV2 } from './rulesets.mjs';
 
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const bx=89,by=87,step=36;
@@ -77,6 +78,23 @@ export function crewMarkerLayout(state) {
 }
 
 export const sectorPoint=(q,a)=>{const i=ALTITUDES.indexOf(a);return q==='Fore'?[232+i*74,47]:q==='Aft'?[232+i*74,563]:q==='Port'?[47,234+i*74]:[567,234+i*74];};
+const engagementConfigKey={'BF-109':'v2Bf109Engagement','BF-110':'v2Bf110Engagement','FW-190':'v2Fw190Engagement','Me-262':'v2Me262Engagement'};
+function fighterSegments(value,maximum,radius,kind) {
+  if(!Number.isFinite(maximum)||maximum<=0)return '';
+  const gap=Math.min(8,180/maximum),span=360/maximum-gap;
+  return Array.from({length:maximum},(_,index)=>{
+    const start=(-90+index*360/maximum+gap/2)*Math.PI/180,end=(-90+index*360/maximum+360/maximum-gap/2)*Math.PI/180;
+    const x1=radius*Math.cos(start),y1=radius*Math.sin(start),x2=radius*Math.cos(end),y2=radius*Math.sin(end);
+    const filled=index<value;
+    return `<path class="fighter-status-segment ${kind} ${filled?'filled':'depleted'}" d="M${x1.toFixed(2)} ${y1.toFixed(2)}A${radius} ${radius} 0 ${span>180?1:0} 1 ${x2.toFixed(2)} ${y2.toFixed(2)}"/>`;
+  }).join('');
+}
+function fighterStatusMarkup(state,f) {
+  const hpMaximum=Math.max(1,Math.floor(f.maxHp??1)),hp=Math.max(0,Math.min(hpMaximum,f.hp??0));
+  const key=engagementConfigKey[f.type],engMaximum=key?Math.max(1,Math.floor(state.config[key]??0)):0,eng=Math.max(0,Math.min(engMaximum,f.engagementRemaining??0));
+  const engagement=isV2(state)&&engMaximum?`<g class="fighter-engagement-ring" aria-hidden="true">${fighterSegments(eng,engMaximum,36,'engagement')}</g>`:'';
+  return `<g class="fighter-status-indicators" aria-hidden="true"><g class="fighter-hp-ring">${fighterSegments(hp,hpMaximum,29,'hp')}</g>${engagement}</g>`;
+}
 export function boardMarkup(s,{selectedCrew,interaction:t,visual={},current,previousFighters=new Map(),hitMap=null,hitMapEnabled=false,hitMapStructure=true,hitMapEmpty=true}={}) {
   const options=targetOptions(s,t),preview=arcPreview(s,t?.gunnerId??t?.crewId??selectedCrew);
   const aimed=t&&['basicFire','advancedFire','opportunityShot','directFire','rotateFighter'].includes(t.action)&&t.stage!=='gunner';
@@ -116,7 +134,10 @@ export function boardMarkup(s,{selectedCrew,interaction:t,visual={},current,prev
       const previous=previousFighters.get(f.id),moving=current?.type==='FIGHTER_MOVED'&&current.fighterId===f.id&&previous;
       const rotating=current?.type==='FIGHTER_ROTATED'&&current.fighterId===f.id&&previous&&previous.heading!==heading;
       const turn=previous?((heading-previous.heading+540)%360)-180:0;
-      svg+=`<g class="fighter-marker ${legal?'target-legal':''} ${dim?'target-dim':''} ${selected?'target-chosen':''} ${visual.activeFighterId===f.id?'resolving':''} ${visual.departingFighter===f.id?'departing':''}" data-fighter="${f.id}" data-heading="${heading}" data-disrupted="${Boolean(f.disrupted)}" role="button" tabindex="0" aria-label="Fighter ${s.fighters.indexOf(f)+1}, ${esc(f.type)}, ${f.hp} HP, ${q} ${a}" transform="translate(${px} ${py})">${moving?`<animateTransform attributeName="transform" type="translate" from="${previous.x} ${previous.y}" to="${px} ${py}" dur=".65s" fill="freeze"/>`:''}<circle r="44" class="fighter-touch"/><g transform="rotate(${heading})">${rotating?`<animateTransform attributeName="transform" type="rotate" from="${previous.heading}" to="${previous.heading+turn}" dur=".55s" fill="freeze"/>`:''}<path class="fighter-shape" d="M0 -19L4 -7L17 3L17 7L4 3L3 13L8 17L8 20L0 17L-8 20L-8 17L-3 13L-4 3L-17 7L-17 3L-4 -7Z"/></g><circle class="fighter-id-disc" cx="13" cy="16" r="10"/><text x="13" y="20" class="fighter-number" text-anchor="middle">${s.fighters.indexOf(f)+1}</text>${f.disrupted?'<g class="disrupt-marker"><rect x="-26" y="-26" width="18" height="15" rx="3"/><text x="-17" y="-14" text-anchor="middle">D</text></g>':''}${current?.type==='ATTACK_DISRUPTED'&&current.fighterId===f.id?'<text class="attack-disrupted" x="0" y="-33" text-anchor="middle">ATTACK DISRUPTED</text>':''}${visual.attackMissFighter===f.id?'<text x="0" y="-29" class="attack-miss" text-anchor="middle">MISS</text>':''}</g>`;
+      const hpLabel=`HP ${f.hp}/${f.maxHp}`;
+      const engagementKey=engagementConfigKey[f.type],engagementMax=engagementKey?s.config[engagementKey]:0;
+      const engagementLabel=isV2(s)&&engagementMax?` Engagement ${f.engagementRemaining}/${engagementMax}`:'';
+      svg+=`<g class="fighter-marker ${legal?'target-legal':''} ${dim?'target-dim':''} ${selected?'target-chosen':''} ${visual.activeFighterId===f.id?'resolving':''} ${visual.departingFighter===f.id?'departing':''}" data-fighter="${f.id}" data-heading="${heading}" data-disrupted="${Boolean(f.disrupted)}" role="button" tabindex="0" aria-label="Fighter ${s.fighters.indexOf(f)+1}, ${esc(f.type)}, ${hpLabel}${engagementLabel}, ${q} ${a}" transform="translate(${px} ${py})"><title>${esc(`${f.type} · ${hpLabel}${engagementLabel}`)}</title>${moving?`<animateTransform attributeName="transform" type="translate" from="${previous.x} ${previous.y}" to="${px} ${py}" dur=".65s" fill="freeze"/>`:''}<circle r="44" class="fighter-touch"/>${fighterStatusMarkup(s,f)}<g transform="rotate(${heading})">${rotating?`<animateTransform attributeName="transform" type="rotate" from="${previous.heading}" to="${previous.heading+turn}" dur=".55s" fill="freeze"/>`:''}<path class="fighter-shape" d="M0 -19L4 -7L17 3L17 7L4 3L3 13L8 17L8 20L0 17L-8 20L-8 17L-3 13L-4 3L-17 7L-17 3L-4 -7Z"/></g><circle class="fighter-id-disc" cx="13" cy="16" r="10"/><text x="13" y="20" class="fighter-number" text-anchor="middle">${s.fighters.indexOf(f)+1}</text>${f.disrupted?'<g class="disrupt-marker"><rect x="-26" y="-26" width="18" height="15" rx="3"/><text x="-17" y="-14" text-anchor="middle">D</text></g>':''}${current?.type==='ATTACK_DISRUPTED'&&current.fighterId===f.id?'<text class="attack-disrupted" x="0" y="-33" text-anchor="middle">ATTACK DISRUPTED</text>':''}${visual.attackMissFighter===f.id?'<text x="0" y="-29" class="attack-miss" text-anchor="middle">MISS</text>':''}</g>`;
     });
   }
   for(const e of s.escorts) {
