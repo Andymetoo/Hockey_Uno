@@ -2,6 +2,7 @@ import { BOARD_VERSION, STATIONS } from './board.mjs';
 import { DEFAULT_CONFIG, normalizeConfig, configScope } from './config.mjs';
 import { RULESETS, isV2, V2_CONFIG_VERSION } from './rulesets.mjs';
 import { CREW_POSITION_VERSION, migrateCrewPositions } from './crew-position.mjs';
+import { validateBombRunSnapshot } from './bombing.mjs';
 
 // Old geometry cannot safely reinterpret damage, crew positions or pending hits.
 // Keep that sortie untouched rather than mixing two board definitions.
@@ -16,6 +17,7 @@ export const DEV_PREFERENCE_KEYS = Object.freeze({
 const preferenceScopes = Object.keys(DEV_PREFERENCE_KEYS);
 const knownConfigKeys = new Set(Object.keys(DEFAULT_CONFIG));
 const COMPAT_V2_CONFIG_KEYS = ['v2FighterKillGrantsTime', 'v2DisruptEnabled', 'v2DisruptEffect', 'v2MaxEscorts'];
+const PLAYTEST_V2_CONFIG_KEYS = ['v2NavigatorUnmannedTimePenalty', 'v2CrewCycleRefreshGrantsTime', 'v2UnavailableCrewPressure'];
 const isObject = value => value && typeof value === 'object' && !Array.isArray(value);
 
 function readPreferenceDocument(storage, key) {
@@ -168,15 +170,21 @@ function validContinuousSnapshot(snapshot) {
   // Presentation snapshots may show a timer at zero just before completion or
   // departure. Validate stored clocks, but never reconstruct or advance them.
   return snapshot.rulesVersion === 4 &&
+    validateBombRunSnapshot(snapshot) &&
     [1, V2_CONFIG_VERSION].includes(snapshot.v2ConfigVersion ?? 1) &&
     snapshot.config.v2CrewCycleTurns === 10 &&
     whole(snapshot.crewCycle?.number, 1) && whole(snapshot.crewCycle?.turn) &&
     whole(snapshot.time) && typeof snapshot.pendingProgress === 'boolean' &&
     Array.isArray(snapshot.timeTokens) && snapshot.timeTokens.every(token => token === 'Time') &&
+    (snapshot.overflowTimeTokens === undefined || Array.isArray(snapshot.overflowTimeTokens) && snapshot.overflowTimeTokens.length <= 1 && snapshot.overflowTimeTokens.every(token => token === 'Time')) &&
     Array.isArray(snapshot.crew) && snapshot.crew.every(crew => typeof crew.cycleSlotConsumed === 'boolean') &&
     Array.isArray(snapshot.jobs) && snapshot.jobs.every(job => whole(job.remainingTime)) &&
     Array.isArray(snapshot.fighters) && snapshot.fighters.every(fighter => whole(fighter.engagementRemaining)) &&
     Object.keys(DEFAULT_CONFIG).filter(key => key.startsWith('v2')).every(key => {
+      if (PLAYTEST_V2_CONFIG_KEYS.includes(key) && snapshot.config[key] === undefined) return true;
+      if (key === 'v2NavigatorUnmannedTimePenalty') return whole(snapshot.config[key]);
+      if (key === 'v2CrewCycleRefreshGrantsTime') return typeof snapshot.config[key] === 'boolean';
+      if (key === 'v2UnavailableCrewPressure') return ['full', 'draw-only', 'compressed'].includes(snapshot.config[key]);
       if (COMPAT_V2_CONFIG_KEYS.includes(key) && snapshot.config[key] === undefined) return (snapshot.v2ConfigVersion ?? 1) === 1;
       if (key === 'v2RefillAtProgress') return snapshot.config[key] === undefined || typeof snapshot.config[key] === 'boolean';
       if (key === 'v2OpportunityProvokesEnemyPhase') return snapshot.config[key] === undefined || typeof snapshot.config[key] === 'boolean';
@@ -190,14 +198,14 @@ function validContinuousSnapshot(snapshot) {
 
 function migrateV2Config(snapshot) {
   if (!isV2(snapshot)) return snapshot;
-  if (snapshot.v2ConfigVersion === V2_CONFIG_VERSION) return snapshot;
   // Schema 1's missing fields mean the rules that existed when it was saved,
   // never today's new-sortie defaults. Preserve any explicitly saved additions.
   const config = { ...snapshot.config };
   const legacy = { v2FighterKillGrantsTime: false, v2DisruptEnabled: config.disruptOnHit === true,
     v2DisruptEffect: 'auto-miss', v2MaxEscorts: null };
   for (const key of COMPAT_V2_CONFIG_KEYS) if (config[key] === undefined) config[key] = legacy[key];
-  return { ...snapshot, config, v2ConfigVersion: V2_CONFIG_VERSION };
+  for (const key of PLAYTEST_V2_CONFIG_KEYS) if (config[key] === undefined) config[key] = DEFAULT_CONFIG[key];
+  return { ...snapshot, config, overflowTimeTokens: snapshot.overflowTimeTokens ?? [], v2ConfigVersion: V2_CONFIG_VERSION };
 }
 
 export function loadSession(storage) {

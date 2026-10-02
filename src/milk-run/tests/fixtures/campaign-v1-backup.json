@@ -1,0 +1,2466 @@
+{
+  "kind": "milk-run-campaign-backup",
+  "version": 1,
+  "store": {
+    "kind": "milk-run-campaign-store",
+    "version": 1,
+    "activeCampaignId": "legacy-hangar-1",
+    "campaigns": [
+      {
+        "id": "legacy-hangar-1",
+        "name": "Milk Run Campaign",
+        "createdAt": "2026-10-01T12:00:00.000Z",
+        "stats": {
+          "totalSorties": 2,
+          "completedMissions": 1,
+          "abortedMissions": 1,
+          "planesLost": 1,
+          "crewKIA": 1,
+          "fightersDestroyed": 0,
+          "cumulativeBombingScore": 0,
+          "bombingOutcomes": {
+            "miss": 1
+          }
+        },
+        "currentAircraftId": "legacy-hangar-15",
+        "roster": {
+          "pilot": "legacy-hangar-3",
+          "copilot": "legacy-hangar-4",
+          "navigator": "legacy-hangar-5",
+          "bombardier": "legacy-hangar-6",
+          "radio": "legacy-hangar-7",
+          "engineer": "legacy-hangar-8",
+          "ball": "legacy-hangar-9",
+          "leftWaist": "legacy-hangar-10",
+          "rightWaist": "legacy-hangar-11",
+          "tail": "legacy-hangar-16"
+        },
+        "aircraft": [
+          {
+            "id": "legacy-hangar-2",
+            "name": "Milk Run",
+            "serial": "",
+            "createdAt": "2026-10-01T12:00:00.000Z",
+            "replacement": false,
+            "missionsFlown": 2,
+            "missionsSurvived": 1,
+            "missionsAborted": 1,
+            "fightersDestroyed": 0,
+            "bombingHistory": [
+              {
+                "sortieId": "legacy-hangar-13",
+                "number": 1,
+                "date": "2026-10-01T12:00:01.000Z",
+                "target": {
+                  "id": "bremen",
+                  "name": "Bremen",
+                  "difficulty": "Standard",
+                  "ranges": {
+                    "course": [
+                      3,
+                      4
+                    ],
+                    "drift": [
+                      2,
+                      4
+                    ],
+                    "release": [
+                      4,
+                      5
+                    ]
+                  },
+                  "thresholds": {
+                    "destroyed": 8,
+                    "heavy": 6,
+                    "partial": 4,
+                    "minimal": 1,
+                    "miss": 0
+                  },
+                  "modifiers": {}
+                },
+                "status": "committed",
+                "dice": [
+                  1,
+                  1,
+                  1,
+                  1
+                ],
+                "placement": {
+                  "course": 0,
+                  "drift": 1,
+                  "release": 2
+                },
+                "unusedDie": 3,
+                "score": 0,
+                "slotScores": {
+                  "course": 1,
+                  "drift": 2,
+                  "release": 0
+                },
+                "outcome": "miss",
+                "officerRerollsSpent": 0,
+                "freeRerollUsed": false,
+                "noDropReason": null
+              }
+            ],
+            "timesDamaged": 0,
+            "finalState": {
+              "sortieId": "legacy-hangar-14",
+              "altitude": 5,
+              "compromisedSections": [],
+              "enginesLost": 0,
+              "survived": false
+            },
+            "lost": true,
+            "lostOnSortieId": "legacy-hangar-14",
+            "lostOnMission": 2
+          },
+          {
+            "id": "legacy-hangar-15",
+            "name": "Replacement B-17 2",
+            "serial": "",
+            "createdAt": "2026-10-01T12:00:00.000Z",
+            "replacement": true,
+            "missionsFlown": 0,
+            "missionsSurvived": 0,
+            "missionsAborted": 0,
+            "fightersDestroyed": 0,
+            "bombingHistory": [],
+            "timesDamaged": 0,
+            "finalState": null,
+            "lost": false,
+            "lostOnSortieId": null,
+            "lostOnMission": null
+          }
+        ],
+        "crew": [
+          {
+            "id": "legacy-hangar-3",
+            "name": "Pilot 1",
+            "role": "pilot",
+            "homeStation": "pilot",
+            "createdAt": "2026-10-01T12:00:00.000Z",
+            "replacement": false,
+            "missionsFlown": 2,
+            "fighterKills": 0,
+            "woundsSuffered": 0,
+            "jobsCompleted": {
+              "repair": 0,
+              "fireControl": 0,
+              "medical": 0
+            },
+            "kia": false,
+            "killedOnSortieId": null,
+            "killedOnMission": null,
+            "history": [
+              {
+                "sortieId": "legacy-hangar-13",
+                "number": 1,
+                "date": "2026-10-01T12:00:01.000Z",
+                "result": "RETURNED HOME",
+                "id": "legacy-hangar-3",
+                "role": "pilot",
+                "health": "healthy",
+                "fighterKills": 0,
+                "wounds": 0,
+                "jobsCompleted": {
+                  "repair": 0,
+                  "fireControl": 0,
+                  "medical": 0
+                }
+              },
+              {
+                "sortieId": "legacy-hangar-14",
+                "number": 2,
+                "date": "2026-10-01T12:00:01.001Z",
+                "result": "ABORTED — AIRCRAFT LOST",
+                "id": "legacy-hangar-3",
+                "role": "pilot",
+                "health": "healthy",
+                "fighterKills": 0,
+                "wounds": 0,
+                "jobsCompleted": {
+                  "repair": 0,
+                  "fireControl": 0,
+                  "medical": 0
+                }
+              }
+            ]
+          },
+          {
+            "id": "legacy-hangar-4",
+            "name": "Copilot 1",
+            "role": "copilot",
+            "homeStation": "copilot",
+            "createdAt": "2026-10-01T12:00:00.000Z",
+            "replacement": false,
+            "missionsFlown": 2,
+            "fighterKills": 0,
+            "woundsSuffered": 0,
+            "jobsCompleted": {
+              "repair": 0,
+              "fireControl": 0,
+              "medical": 0
+            },
+            "kia": false,
+            "killedOnSortieId": null,
+            "killedOnMission": null,
+            "history": [
+              {
+                "sortieId": "legacy-hangar-13",
+                "number": 1,
+                "date": "2026-10-01T12:00:01.000Z",
+                "result": "RETURNED HOME",
+                "id": "legacy-hangar-4",
+                "role": "copilot",
+                "health": "healthy",
+                "fighterKills": 0,
+                "wounds": 0,
+                "jobsCompleted": {
+                  "repair": 0,
+                  "fireControl": 0,
+                  "medical": 0
+                }
+              },
+              {
+                "sortieId": "legacy-hangar-14",
+                "number": 2,
+                "date": "2026-10-01T12:00:01.001Z",
+                "result": "ABORTED — AIRCRAFT LOST",
+                "id": "legacy-hangar-4",
+                "role": "copilot",
+                "health": "healthy",
+                "fighterKills": 0,
+                "wounds": 0,
+                "jobsCompleted": {
+                  "repair": 0,
+                  "fireControl": 0,
+                  "medical": 0
+                }
+              }
+            ]
+          },
+          {
+            "id": "legacy-hangar-5",
+            "name": "Navigator 1",
+            "role": "navigator",
+            "homeStation": "navigator",
+            "createdAt": "2026-10-01T12:00:00.000Z",
+            "replacement": false,
+            "missionsFlown": 2,
+            "fighterKills": 0,
+            "woundsSuffered": 0,
+            "jobsCompleted": {
+              "repair": 0,
+              "fireControl": 0,
+              "medical": 0
+            },
+            "kia": false,
+            "killedOnSortieId": null,
+            "killedOnMission": null,
+            "history": [
+              {
+                "sortieId": "legacy-hangar-13",
+                "number": 1,
+                "date": "2026-10-01T12:00:01.000Z",
+                "result": "RETURNED HOME",
+                "id": "legacy-hangar-5",
+                "role": "navigator",
+                "health": "healthy",
+                "fighterKills": 0,
+                "wounds": 0,
+                "jobsCompleted": {
+                  "repair": 0,
+                  "fireControl": 0,
+                  "medical": 0
+                }
+              },
+              {
+                "sortieId": "legacy-hangar-14",
+                "number": 2,
+                "date": "2026-10-01T12:00:01.001Z",
+                "result": "ABORTED — AIRCRAFT LOST",
+                "id": "legacy-hangar-5",
+                "role": "navigator",
+                "health": "healthy",
+                "fighterKills": 0,
+                "wounds": 0,
+                "jobsCompleted": {
+                  "repair": 0,
+                  "fireControl": 0,
+                  "medical": 0
+                }
+              }
+            ]
+          },
+          {
+            "id": "legacy-hangar-6",
+            "name": "Bombardier 1",
+            "role": "bombardier",
+            "homeStation": "bombardier",
+            "createdAt": "2026-10-01T12:00:00.000Z",
+            "replacement": false,
+            "missionsFlown": 2,
+            "fighterKills": 0,
+            "woundsSuffered": 0,
+            "jobsCompleted": {
+              "repair": 0,
+              "fireControl": 0,
+              "medical": 0
+            },
+            "kia": false,
+            "killedOnSortieId": null,
+            "killedOnMission": null,
+            "history": [
+              {
+                "sortieId": "legacy-hangar-13",
+                "number": 1,
+                "date": "2026-10-01T12:00:01.000Z",
+                "result": "RETURNED HOME",
+                "id": "legacy-hangar-6",
+                "role": "bombardier",
+                "health": "healthy",
+                "fighterKills": 0,
+                "wounds": 0,
+                "jobsCompleted": {
+                  "repair": 0,
+                  "fireControl": 0,
+                  "medical": 0
+                }
+              },
+              {
+                "sortieId": "legacy-hangar-14",
+                "number": 2,
+                "date": "2026-10-01T12:00:01.001Z",
+                "result": "ABORTED — AIRCRAFT LOST",
+                "id": "legacy-hangar-6",
+                "role": "bombardier",
+                "health": "healthy",
+                "fighterKills": 0,
+                "wounds": 0,
+                "jobsCompleted": {
+                  "repair": 0,
+                  "fireControl": 0,
+                  "medical": 0
+                }
+              }
+            ]
+          },
+          {
+            "id": "legacy-hangar-7",
+            "name": "Radio Operator 1",
+            "role": "radio",
+            "homeStation": "radio",
+            "createdAt": "2026-10-01T12:00:00.000Z",
+            "replacement": false,
+            "missionsFlown": 2,
+            "fighterKills": 0,
+            "woundsSuffered": 0,
+            "jobsCompleted": {
+              "repair": 0,
+              "fireControl": 0,
+              "medical": 0
+            },
+            "kia": false,
+            "killedOnSortieId": null,
+            "killedOnMission": null,
+            "history": [
+              {
+                "sortieId": "legacy-hangar-13",
+                "number": 1,
+                "date": "2026-10-01T12:00:01.000Z",
+                "result": "RETURNED HOME",
+                "id": "legacy-hangar-7",
+                "role": "radio",
+                "health": "healthy",
+                "fighterKills": 0,
+                "wounds": 0,
+                "jobsCompleted": {
+                  "repair": 0,
+                  "fireControl": 0,
+                  "medical": 0
+                }
+              },
+              {
+                "sortieId": "legacy-hangar-14",
+                "number": 2,
+                "date": "2026-10-01T12:00:01.001Z",
+                "result": "ABORTED — AIRCRAFT LOST",
+                "id": "legacy-hangar-7",
+                "role": "radio",
+                "health": "healthy",
+                "fighterKills": 0,
+                "wounds": 0,
+                "jobsCompleted": {
+                  "repair": 0,
+                  "fireControl": 0,
+                  "medical": 0
+                }
+              }
+            ]
+          },
+          {
+            "id": "legacy-hangar-8",
+            "name": "Engineer 1",
+            "role": "engineer",
+            "homeStation": "engineer",
+            "createdAt": "2026-10-01T12:00:00.000Z",
+            "replacement": false,
+            "missionsFlown": 2,
+            "fighterKills": 0,
+            "woundsSuffered": 0,
+            "jobsCompleted": {
+              "repair": 0,
+              "fireControl": 0,
+              "medical": 0
+            },
+            "kia": false,
+            "killedOnSortieId": null,
+            "killedOnMission": null,
+            "history": [
+              {
+                "sortieId": "legacy-hangar-13",
+                "number": 1,
+                "date": "2026-10-01T12:00:01.000Z",
+                "result": "RETURNED HOME",
+                "id": "legacy-hangar-8",
+                "role": "engineer",
+                "health": "healthy",
+                "fighterKills": 0,
+                "wounds": 0,
+                "jobsCompleted": {
+                  "repair": 0,
+                  "fireControl": 0,
+                  "medical": 0
+                }
+              },
+              {
+                "sortieId": "legacy-hangar-14",
+                "number": 2,
+                "date": "2026-10-01T12:00:01.001Z",
+                "result": "ABORTED — AIRCRAFT LOST",
+                "id": "legacy-hangar-8",
+                "role": "engineer",
+                "health": "healthy",
+                "fighterKills": 0,
+                "wounds": 0,
+                "jobsCompleted": {
+                  "repair": 0,
+                  "fireControl": 0,
+                  "medical": 0
+                }
+              }
+            ]
+          },
+          {
+            "id": "legacy-hangar-9",
+            "name": "Ball Turret 1",
+            "role": "ball",
+            "homeStation": "ball",
+            "createdAt": "2026-10-01T12:00:00.000Z",
+            "replacement": false,
+            "missionsFlown": 2,
+            "fighterKills": 0,
+            "woundsSuffered": 0,
+            "jobsCompleted": {
+              "repair": 0,
+              "fireControl": 0,
+              "medical": 0
+            },
+            "kia": false,
+            "killedOnSortieId": null,
+            "killedOnMission": null,
+            "history": [
+              {
+                "sortieId": "legacy-hangar-13",
+                "number": 1,
+                "date": "2026-10-01T12:00:01.000Z",
+                "result": "RETURNED HOME",
+                "id": "legacy-hangar-9",
+                "role": "ball",
+                "health": "healthy",
+                "fighterKills": 0,
+                "wounds": 0,
+                "jobsCompleted": {
+                  "repair": 0,
+                  "fireControl": 0,
+                  "medical": 0
+                }
+              },
+              {
+                "sortieId": "legacy-hangar-14",
+                "number": 2,
+                "date": "2026-10-01T12:00:01.001Z",
+                "result": "ABORTED — AIRCRAFT LOST",
+                "id": "legacy-hangar-9",
+                "role": "ball",
+                "health": "healthy",
+                "fighterKills": 0,
+                "wounds": 0,
+                "jobsCompleted": {
+                  "repair": 0,
+                  "fireControl": 0,
+                  "medical": 0
+                }
+              }
+            ]
+          },
+          {
+            "id": "legacy-hangar-10",
+            "name": "Left Waist 1",
+            "role": "leftWaist",
+            "homeStation": "leftWaist",
+            "createdAt": "2026-10-01T12:00:00.000Z",
+            "replacement": false,
+            "missionsFlown": 2,
+            "fighterKills": 0,
+            "woundsSuffered": 0,
+            "jobsCompleted": {
+              "repair": 0,
+              "fireControl": 0,
+              "medical": 0
+            },
+            "kia": false,
+            "killedOnSortieId": null,
+            "killedOnMission": null,
+            "history": [
+              {
+                "sortieId": "legacy-hangar-13",
+                "number": 1,
+                "date": "2026-10-01T12:00:01.000Z",
+                "result": "RETURNED HOME",
+                "id": "legacy-hangar-10",
+                "role": "leftWaist",
+                "health": "healthy",
+                "fighterKills": 0,
+                "wounds": 0,
+                "jobsCompleted": {
+                  "repair": 0,
+                  "fireControl": 0,
+                  "medical": 0
+                }
+              },
+              {
+                "sortieId": "legacy-hangar-14",
+                "number": 2,
+                "date": "2026-10-01T12:00:01.001Z",
+                "result": "ABORTED — AIRCRAFT LOST",
+                "id": "legacy-hangar-10",
+                "role": "leftWaist",
+                "health": "healthy",
+                "fighterKills": 0,
+                "wounds": 0,
+                "jobsCompleted": {
+                  "repair": 0,
+                  "fireControl": 0,
+                  "medical": 0
+                }
+              }
+            ]
+          },
+          {
+            "id": "legacy-hangar-11",
+            "name": "Right Waist 1",
+            "role": "rightWaist",
+            "homeStation": "rightWaist",
+            "createdAt": "2026-10-01T12:00:00.000Z",
+            "replacement": false,
+            "missionsFlown": 2,
+            "fighterKills": 0,
+            "woundsSuffered": 0,
+            "jobsCompleted": {
+              "repair": 0,
+              "fireControl": 0,
+              "medical": 0
+            },
+            "kia": false,
+            "killedOnSortieId": null,
+            "killedOnMission": null,
+            "history": [
+              {
+                "sortieId": "legacy-hangar-13",
+                "number": 1,
+                "date": "2026-10-01T12:00:01.000Z",
+                "result": "RETURNED HOME",
+                "id": "legacy-hangar-11",
+                "role": "rightWaist",
+                "health": "healthy",
+                "fighterKills": 0,
+                "wounds": 0,
+                "jobsCompleted": {
+                  "repair": 0,
+                  "fireControl": 0,
+                  "medical": 0
+                }
+              },
+              {
+                "sortieId": "legacy-hangar-14",
+                "number": 2,
+                "date": "2026-10-01T12:00:01.001Z",
+                "result": "ABORTED — AIRCRAFT LOST",
+                "id": "legacy-hangar-11",
+                "role": "rightWaist",
+                "health": "healthy",
+                "fighterKills": 0,
+                "wounds": 0,
+                "jobsCompleted": {
+                  "repair": 0,
+                  "fireControl": 0,
+                  "medical": 0
+                }
+              }
+            ]
+          },
+          {
+            "id": "legacy-hangar-12",
+            "name": "Tail Gunner 1",
+            "role": "tail",
+            "homeStation": "tail",
+            "createdAt": "2026-10-01T12:00:00.000Z",
+            "replacement": false,
+            "missionsFlown": 2,
+            "fighterKills": 0,
+            "woundsSuffered": 0,
+            "jobsCompleted": {
+              "repair": 0,
+              "fireControl": 0,
+              "medical": 0
+            },
+            "kia": true,
+            "killedOnSortieId": "legacy-hangar-14",
+            "killedOnMission": 2,
+            "history": [
+              {
+                "sortieId": "legacy-hangar-13",
+                "number": 1,
+                "date": "2026-10-01T12:00:01.000Z",
+                "result": "RETURNED HOME",
+                "id": "legacy-hangar-12",
+                "role": "tail",
+                "health": "healthy",
+                "fighterKills": 0,
+                "wounds": 0,
+                "jobsCompleted": {
+                  "repair": 0,
+                  "fireControl": 0,
+                  "medical": 0
+                }
+              },
+              {
+                "sortieId": "legacy-hangar-14",
+                "number": 2,
+                "date": "2026-10-01T12:00:01.001Z",
+                "result": "ABORTED — AIRCRAFT LOST",
+                "id": "legacy-hangar-12",
+                "role": "tail",
+                "health": "dead",
+                "fighterKills": 0,
+                "wounds": 0,
+                "jobsCompleted": {
+                  "repair": 0,
+                  "fireControl": 0,
+                  "medical": 0
+                }
+              }
+            ]
+          },
+          {
+            "id": "legacy-hangar-16",
+            "name": "Tail Gunner 2",
+            "role": "tail",
+            "homeStation": "tail",
+            "createdAt": "2026-10-01T12:00:00.000Z",
+            "replacement": true,
+            "missionsFlown": 0,
+            "fighterKills": 0,
+            "woundsSuffered": 0,
+            "jobsCompleted": {
+              "repair": 0,
+              "fireControl": 0,
+              "medical": 0
+            },
+            "kia": false,
+            "killedOnSortieId": null,
+            "killedOnMission": null,
+            "history": []
+          }
+        ],
+        "sorties": [
+          {
+            "id": "legacy-hangar-13",
+            "number": 1,
+            "date": "2026-10-01T12:00:01.000Z",
+            "startedAt": "2026-10-01T12:00:00.000Z",
+            "seed": "legacy-hangar",
+            "target": {
+              "id": "bremen",
+              "name": "Bremen",
+              "difficulty": "Standard",
+              "ranges": {
+                "course": [
+                  3,
+                  4
+                ],
+                "drift": [
+                  2,
+                  4
+                ],
+                "release": [
+                  4,
+                  5
+                ]
+              },
+              "thresholds": {
+                "destroyed": 8,
+                "heavy": 6,
+                "partial": 4,
+                "minimal": 1,
+                "miss": 0
+              },
+              "modifiers": {}
+            },
+            "result": "RETURNED HOME",
+            "reason": "HOME",
+            "outcome": "success",
+            "completed": true,
+            "aborted": false,
+            "aircraftId": "legacy-hangar-2",
+            "aircraftSurvived": true,
+            "crewOutcomes": [
+              {
+                "id": "legacy-hangar-3",
+                "role": "pilot",
+                "health": "healthy",
+                "fighterKills": 0,
+                "wounds": 0,
+                "jobsCompleted": {
+                  "repair": 0,
+                  "fireControl": 0,
+                  "medical": 0
+                }
+              },
+              {
+                "id": "legacy-hangar-4",
+                "role": "copilot",
+                "health": "healthy",
+                "fighterKills": 0,
+                "wounds": 0,
+                "jobsCompleted": {
+                  "repair": 0,
+                  "fireControl": 0,
+                  "medical": 0
+                }
+              },
+              {
+                "id": "legacy-hangar-5",
+                "role": "navigator",
+                "health": "healthy",
+                "fighterKills": 0,
+                "wounds": 0,
+                "jobsCompleted": {
+                  "repair": 0,
+                  "fireControl": 0,
+                  "medical": 0
+                }
+              },
+              {
+                "id": "legacy-hangar-6",
+                "role": "bombardier",
+                "health": "healthy",
+                "fighterKills": 0,
+                "wounds": 0,
+                "jobsCompleted": {
+                  "repair": 0,
+                  "fireControl": 0,
+                  "medical": 0
+                }
+              },
+              {
+                "id": "legacy-hangar-7",
+                "role": "radio",
+                "health": "healthy",
+                "fighterKills": 0,
+                "wounds": 0,
+                "jobsCompleted": {
+                  "repair": 0,
+                  "fireControl": 0,
+                  "medical": 0
+                }
+              },
+              {
+                "id": "legacy-hangar-8",
+                "role": "engineer",
+                "health": "healthy",
+                "fighterKills": 0,
+                "wounds": 0,
+                "jobsCompleted": {
+                  "repair": 0,
+                  "fireControl": 0,
+                  "medical": 0
+                }
+              },
+              {
+                "id": "legacy-hangar-9",
+                "role": "ball",
+                "health": "healthy",
+                "fighterKills": 0,
+                "wounds": 0,
+                "jobsCompleted": {
+                  "repair": 0,
+                  "fireControl": 0,
+                  "medical": 0
+                }
+              },
+              {
+                "id": "legacy-hangar-10",
+                "role": "leftWaist",
+                "health": "healthy",
+                "fighterKills": 0,
+                "wounds": 0,
+                "jobsCompleted": {
+                  "repair": 0,
+                  "fireControl": 0,
+                  "medical": 0
+                }
+              },
+              {
+                "id": "legacy-hangar-11",
+                "role": "rightWaist",
+                "health": "healthy",
+                "fighterKills": 0,
+                "wounds": 0,
+                "jobsCompleted": {
+                  "repair": 0,
+                  "fireControl": 0,
+                  "medical": 0
+                }
+              },
+              {
+                "id": "legacy-hangar-12",
+                "role": "tail",
+                "health": "healthy",
+                "fighterKills": 0,
+                "wounds": 0,
+                "jobsCompleted": {
+                  "repair": 0,
+                  "fireControl": 0,
+                  "medical": 0
+                }
+              }
+            ],
+            "fightersDestroyed": 0,
+            "enemyTypesDestroyed": {},
+            "bombing": {
+              "target": {
+                "id": "bremen",
+                "name": "Bremen",
+                "difficulty": "Standard",
+                "ranges": {
+                  "course": [
+                    3,
+                    4
+                  ],
+                  "drift": [
+                    2,
+                    4
+                  ],
+                  "release": [
+                    4,
+                    5
+                  ]
+                },
+                "thresholds": {
+                  "destroyed": 8,
+                  "heavy": 6,
+                  "partial": 4,
+                  "minimal": 1,
+                  "miss": 0
+                },
+                "modifiers": {}
+              },
+              "status": "committed",
+              "dice": [
+                1,
+                1,
+                1,
+                1
+              ],
+              "placement": {
+                "course": 0,
+                "drift": 1,
+                "release": 2
+              },
+              "unusedDie": 3,
+              "score": 0,
+              "slotScores": {
+                "course": 1,
+                "drift": 2,
+                "release": 0
+              },
+              "outcome": "miss",
+              "officerRerollsSpent": 0,
+              "freeRerollUsed": false,
+              "noDropReason": null
+            },
+            "progressReached": 11,
+            "missionLength": 11,
+            "turns": 0,
+            "finalAltitude": 5,
+            "finalCompromisedSections": [],
+            "enginesLost": 0,
+            "aircraftHits": 0,
+            "config": {
+              "preferredRuleset": "v1",
+              "startingOfficer": 3,
+              "startingEnlisted": 5,
+              "missionEnemy": 15,
+              "missionResource": 20,
+              "combatHit": 16,
+              "combatBurst": 4,
+              "combatMiss": 13,
+              "bf109Cards": 10,
+              "bf110Cards": 6,
+              "fw190Cards": 5,
+              "me262Cards": 3,
+              "flakCards": 4,
+              "bf109Hp": 2,
+              "bf110Hp": 2,
+              "fw190Hp": 3,
+              "me262Hp": 4,
+              "maxFighters": 3,
+              "flakShots": 2,
+              "spawnFacing": 0,
+              "clearFighters": true,
+              "unavailableDraws": true,
+              "fireCap": 4,
+              "repairCap": 3,
+              "engineerBonus": 1,
+              "eightWayWork": false,
+              "extinguishLeavesDamage": true,
+              "crewBlocksFirstFire": true,
+              "medicalDuration": 2,
+              "repairDuration": 2,
+              "fireDuration": 2,
+              "repairCost": 1,
+              "fireCost": 1,
+              "medicalCost": 1,
+              "escortCost": 1,
+              "directFireCost": 1,
+              "disruptOnHit": true,
+              "opportunityEnabled": true,
+              "startingOpportunity": 1,
+              "opportunityCap": 3,
+              "opportunityOnKill": true,
+              "conversionRate": 2,
+              "restartMax": 4,
+              "startingAltitude": 5,
+              "controlOfficerMin": 3,
+              "controlEnlistedMin": 5,
+              "structureSafe": 1,
+              "structureMid": 3,
+              "structureFatal": 6,
+              "structureMidMin": 3,
+              "structureHighMin": 5,
+              "enginesSafe": 1,
+              "enginesMid": 2,
+              "enginesAuto": 4,
+              "enginesMidMin": 3,
+              "enginesHighMin": 5,
+              "outboundLength": 14,
+              "returnLength": 5,
+              "bombingMin": 3,
+              "animationMs": 750,
+              "presentationSpeed": "normal",
+              "v2CrewCycleTurns": 10,
+              "v2MissionEnemy": 20,
+              "v2MissionResource": 12,
+              "v2MissionTime": 10,
+              "v2TimePerProgress": 4,
+              "v2OutboundLength": 8,
+              "v2ReturnLength": 3,
+              "v2NavigatorUnmannedTimePenalty": 0,
+              "v2CrewCycleRefreshGrantsTime": false,
+              "v2UnavailableCrewPressure": "full",
+              "v2RepairTime": 4,
+              "v2FireTime": 4,
+              "v2MedicalTime": 4,
+              "v2AssistedRepairTime": 2,
+              "v2AssistedFireTime": 2,
+              "v2AssistedMedicalTime": 2,
+              "v2FighterKillGrantsTime": true,
+              "v2DisruptEnabled": true,
+              "v2DisruptEffect": "accuracy-penalty",
+              "v2MaxEscorts": 1,
+              "v2OpportunityProvokesEnemyPhase": false,
+              "v2Bf109Engagement": 5,
+              "v2Bf110Engagement": 5,
+              "v2Fw190Engagement": 5,
+              "v2Me262Engagement": 5,
+              "v2EngagementMode": "any-action",
+              "v2RefillAtProgress": true
+            },
+            "telemetry": {
+              "version": 1,
+              "completeHistory": true,
+              "sinceTurn": 0,
+              "existingFighters": 0,
+              "timeTokensDrawn": 0,
+              "outboundTime": 0,
+              "returnTime": 0,
+              "progressCheckpoints": 0,
+              "fighterActionsCompleted": 0,
+              "engagementActionsSpent": 0,
+              "fightersSpawned": 0,
+              "fightersDestroyed": 0,
+              "fightersDisengaged": 0,
+              "jobsBegun": 0,
+              "jobsCompleted": 0,
+              "assistedJobs": 0,
+              "enemyPhases": 0
+            }
+          },
+          {
+            "id": "legacy-hangar-14",
+            "number": 2,
+            "date": "2026-10-01T12:00:01.001Z",
+            "startedAt": "2026-10-01T12:00:00.000Z",
+            "seed": "legacy-hangar",
+            "target": {
+              "id": "bremen",
+              "name": "Bremen",
+              "difficulty": "Standard",
+              "ranges": {
+                "course": [
+                  3,
+                  4
+                ],
+                "drift": [
+                  2,
+                  4
+                ],
+                "release": [
+                  4,
+                  5
+                ]
+              },
+              "thresholds": {
+                "destroyed": 8,
+                "heavy": 6,
+                "partial": 4,
+                "minimal": 1,
+                "miss": 0
+              },
+              "modifiers": {}
+            },
+            "result": "ABORTED — AIRCRAFT LOST",
+            "reason": {
+              "cause": "structure",
+              "compromisedSections": 6
+            },
+            "outcome": "destroyed",
+            "completed": false,
+            "aborted": true,
+            "aircraftId": "legacy-hangar-2",
+            "aircraftSurvived": false,
+            "crewOutcomes": [
+              {
+                "id": "legacy-hangar-3",
+                "role": "pilot",
+                "health": "healthy",
+                "fighterKills": 0,
+                "wounds": 0,
+                "jobsCompleted": {
+                  "repair": 0,
+                  "fireControl": 0,
+                  "medical": 0
+                }
+              },
+              {
+                "id": "legacy-hangar-4",
+                "role": "copilot",
+                "health": "healthy",
+                "fighterKills": 0,
+                "wounds": 0,
+                "jobsCompleted": {
+                  "repair": 0,
+                  "fireControl": 0,
+                  "medical": 0
+                }
+              },
+              {
+                "id": "legacy-hangar-5",
+                "role": "navigator",
+                "health": "healthy",
+                "fighterKills": 0,
+                "wounds": 0,
+                "jobsCompleted": {
+                  "repair": 0,
+                  "fireControl": 0,
+                  "medical": 0
+                }
+              },
+              {
+                "id": "legacy-hangar-6",
+                "role": "bombardier",
+                "health": "healthy",
+                "fighterKills": 0,
+                "wounds": 0,
+                "jobsCompleted": {
+                  "repair": 0,
+                  "fireControl": 0,
+                  "medical": 0
+                }
+              },
+              {
+                "id": "legacy-hangar-7",
+                "role": "radio",
+                "health": "healthy",
+                "fighterKills": 0,
+                "wounds": 0,
+                "jobsCompleted": {
+                  "repair": 0,
+                  "fireControl": 0,
+                  "medical": 0
+                }
+              },
+              {
+                "id": "legacy-hangar-8",
+                "role": "engineer",
+                "health": "healthy",
+                "fighterKills": 0,
+                "wounds": 0,
+                "jobsCompleted": {
+                  "repair": 0,
+                  "fireControl": 0,
+                  "medical": 0
+                }
+              },
+              {
+                "id": "legacy-hangar-9",
+                "role": "ball",
+                "health": "healthy",
+                "fighterKills": 0,
+                "wounds": 0,
+                "jobsCompleted": {
+                  "repair": 0,
+                  "fireControl": 0,
+                  "medical": 0
+                }
+              },
+              {
+                "id": "legacy-hangar-10",
+                "role": "leftWaist",
+                "health": "healthy",
+                "fighterKills": 0,
+                "wounds": 0,
+                "jobsCompleted": {
+                  "repair": 0,
+                  "fireControl": 0,
+                  "medical": 0
+                }
+              },
+              {
+                "id": "legacy-hangar-11",
+                "role": "rightWaist",
+                "health": "healthy",
+                "fighterKills": 0,
+                "wounds": 0,
+                "jobsCompleted": {
+                  "repair": 0,
+                  "fireControl": 0,
+                  "medical": 0
+                }
+              },
+              {
+                "id": "legacy-hangar-12",
+                "role": "tail",
+                "health": "dead",
+                "fighterKills": 0,
+                "wounds": 0,
+                "jobsCompleted": {
+                  "repair": 0,
+                  "fireControl": 0,
+                  "medical": 0
+                }
+              }
+            ],
+            "fightersDestroyed": 0,
+            "enemyTypesDestroyed": {},
+            "bombing": {
+              "target": {
+                "id": "bremen",
+                "name": "Bremen",
+                "difficulty": "Standard",
+                "ranges": {
+                  "course": [
+                    3,
+                    4
+                  ],
+                  "drift": [
+                    2,
+                    4
+                  ],
+                  "release": [
+                    4,
+                    5
+                  ]
+                },
+                "thresholds": {
+                  "destroyed": 8,
+                  "heavy": 6,
+                  "partial": 4,
+                  "minimal": 1,
+                  "miss": 0
+                },
+                "modifiers": {}
+              },
+              "status": "aborted",
+              "dice": [
+                1,
+                1,
+                1,
+                1
+              ],
+              "placement": {
+                "course": 0,
+                "drift": 1,
+                "release": 2
+              },
+              "unusedDie": 3,
+              "score": null,
+              "slotScores": null,
+              "outcome": null,
+              "officerRerollsSpent": 0,
+              "freeRerollUsed": false,
+              "noDropReason": null
+            },
+            "progressReached": 3,
+            "missionLength": 4,
+            "turns": 0,
+            "finalAltitude": 5,
+            "finalCompromisedSections": [],
+            "enginesLost": 0,
+            "aircraftHits": 0,
+            "config": {
+              "preferredRuleset": "v1",
+              "startingOfficer": 3,
+              "startingEnlisted": 5,
+              "missionEnemy": 15,
+              "missionResource": 20,
+              "combatHit": 16,
+              "combatBurst": 4,
+              "combatMiss": 13,
+              "bf109Cards": 10,
+              "bf110Cards": 6,
+              "fw190Cards": 5,
+              "me262Cards": 3,
+              "flakCards": 4,
+              "bf109Hp": 2,
+              "bf110Hp": 2,
+              "fw190Hp": 3,
+              "me262Hp": 4,
+              "maxFighters": 3,
+              "flakShots": 2,
+              "spawnFacing": 0,
+              "clearFighters": true,
+              "unavailableDraws": true,
+              "fireCap": 4,
+              "repairCap": 3,
+              "engineerBonus": 1,
+              "eightWayWork": false,
+              "extinguishLeavesDamage": true,
+              "crewBlocksFirstFire": true,
+              "medicalDuration": 2,
+              "repairDuration": 2,
+              "fireDuration": 2,
+              "repairCost": 1,
+              "fireCost": 1,
+              "medicalCost": 1,
+              "escortCost": 1,
+              "directFireCost": 1,
+              "disruptOnHit": true,
+              "opportunityEnabled": true,
+              "startingOpportunity": 1,
+              "opportunityCap": 3,
+              "opportunityOnKill": true,
+              "conversionRate": 2,
+              "restartMax": 4,
+              "startingAltitude": 5,
+              "controlOfficerMin": 3,
+              "controlEnlistedMin": 5,
+              "structureSafe": 1,
+              "structureMid": 3,
+              "structureFatal": 6,
+              "structureMidMin": 3,
+              "structureHighMin": 5,
+              "enginesSafe": 1,
+              "enginesMid": 2,
+              "enginesAuto": 4,
+              "enginesMidMin": 3,
+              "enginesHighMin": 5,
+              "outboundLength": 14,
+              "returnLength": 5,
+              "bombingMin": 3,
+              "animationMs": 750,
+              "presentationSpeed": "normal",
+              "v2CrewCycleTurns": 10,
+              "v2MissionEnemy": 20,
+              "v2MissionResource": 12,
+              "v2MissionTime": 10,
+              "v2TimePerProgress": 4,
+              "v2OutboundLength": 8,
+              "v2ReturnLength": 3,
+              "v2NavigatorUnmannedTimePenalty": 0,
+              "v2CrewCycleRefreshGrantsTime": false,
+              "v2UnavailableCrewPressure": "full",
+              "v2RepairTime": 4,
+              "v2FireTime": 4,
+              "v2MedicalTime": 4,
+              "v2AssistedRepairTime": 2,
+              "v2AssistedFireTime": 2,
+              "v2AssistedMedicalTime": 2,
+              "v2FighterKillGrantsTime": true,
+              "v2DisruptEnabled": true,
+              "v2DisruptEffect": "accuracy-penalty",
+              "v2MaxEscorts": 1,
+              "v2OpportunityProvokesEnemyPhase": false,
+              "v2Bf109Engagement": 5,
+              "v2Bf110Engagement": 5,
+              "v2Fw190Engagement": 5,
+              "v2Me262Engagement": 5,
+              "v2EngagementMode": "any-action",
+              "v2RefillAtProgress": true
+            },
+            "telemetry": {
+              "version": 1,
+              "completeHistory": true,
+              "sinceTurn": 0,
+              "existingFighters": 0,
+              "timeTokensDrawn": 0,
+              "outboundTime": 0,
+              "returnTime": 0,
+              "progressCheckpoints": 0,
+              "fighterActionsCompleted": 0,
+              "engagementActionsSpent": 0,
+              "fightersSpawned": 0,
+              "fightersDestroyed": 0,
+              "fightersDisengaged": 0,
+              "jobsBegun": 0,
+              "jobsCompleted": 0,
+              "assistedJobs": 0,
+              "enemyPhases": 0
+            }
+          }
+        ],
+        "activeSortie": {
+          "campaignId": "legacy-hangar-1",
+          "sortieId": "legacy-hangar-17",
+          "sortieNumber": 3,
+          "aircraftId": "legacy-hangar-15",
+          "crewIds": {
+            "pilot": "legacy-hangar-3",
+            "copilot": "legacy-hangar-4",
+            "navigator": "legacy-hangar-5",
+            "bombardier": "legacy-hangar-6",
+            "radio": "legacy-hangar-7",
+            "engineer": "legacy-hangar-8",
+            "ball": "legacy-hangar-9",
+            "leftWaist": "legacy-hangar-10",
+            "rightWaist": "legacy-hangar-11",
+            "tail": "legacy-hangar-16"
+          },
+          "startedAt": "2026-10-01T12:00:00.000Z"
+        }
+      }
+    ]
+  },
+  "activeSession": {
+    "version": 1,
+    "presentationVersion": 2,
+    "state": {
+      "version": 1,
+      "rulesVersion": 4,
+      "ruleset": "v2-continuous",
+      "boardVersion": "plane-grid-v1",
+      "crewPositionVersion": 1,
+      "config": {
+        "preferredRuleset": "v1",
+        "startingOfficer": 3,
+        "startingEnlisted": 5,
+        "missionEnemy": 15,
+        "missionResource": 20,
+        "combatHit": 16,
+        "combatBurst": 4,
+        "combatMiss": 13,
+        "bf109Cards": 10,
+        "bf110Cards": 6,
+        "fw190Cards": 5,
+        "me262Cards": 3,
+        "flakCards": 4,
+        "bf109Hp": 2,
+        "bf110Hp": 2,
+        "fw190Hp": 3,
+        "me262Hp": 4,
+        "maxFighters": 3,
+        "flakShots": 2,
+        "spawnFacing": 0,
+        "clearFighters": true,
+        "unavailableDraws": true,
+        "fireCap": 4,
+        "repairCap": 3,
+        "engineerBonus": 1,
+        "eightWayWork": false,
+        "extinguishLeavesDamage": true,
+        "crewBlocksFirstFire": true,
+        "medicalDuration": 2,
+        "repairDuration": 2,
+        "fireDuration": 2,
+        "repairCost": 1,
+        "fireCost": 1,
+        "medicalCost": 1,
+        "escortCost": 1,
+        "directFireCost": 1,
+        "disruptOnHit": true,
+        "opportunityEnabled": true,
+        "startingOpportunity": 1,
+        "opportunityCap": 3,
+        "opportunityOnKill": true,
+        "conversionRate": 2,
+        "restartMax": 4,
+        "startingAltitude": 5,
+        "controlOfficerMin": 3,
+        "controlEnlistedMin": 5,
+        "structureSafe": 1,
+        "structureMid": 3,
+        "structureFatal": 6,
+        "structureMidMin": 3,
+        "structureHighMin": 5,
+        "enginesSafe": 1,
+        "enginesMid": 2,
+        "enginesAuto": 4,
+        "enginesMidMin": 3,
+        "enginesHighMin": 5,
+        "outboundLength": 14,
+        "returnLength": 5,
+        "bombingMin": 3,
+        "animationMs": 750,
+        "presentationSpeed": "normal",
+        "v2CrewCycleTurns": 10,
+        "v2MissionEnemy": 20,
+        "v2MissionResource": 12,
+        "v2MissionTime": 10,
+        "v2TimePerProgress": 4,
+        "v2OutboundLength": 8,
+        "v2ReturnLength": 3,
+        "v2NavigatorUnmannedTimePenalty": 0,
+        "v2CrewCycleRefreshGrantsTime": false,
+        "v2UnavailableCrewPressure": "full",
+        "v2RepairTime": 4,
+        "v2FireTime": 4,
+        "v2MedicalTime": 4,
+        "v2AssistedRepairTime": 2,
+        "v2AssistedFireTime": 2,
+        "v2AssistedMedicalTime": 2,
+        "v2FighterKillGrantsTime": true,
+        "v2DisruptEnabled": true,
+        "v2DisruptEffect": "accuracy-penalty",
+        "v2MaxEscorts": 1,
+        "v2OpportunityProvokesEnemyPhase": false,
+        "v2Bf109Engagement": 5,
+        "v2Bf110Engagement": 5,
+        "v2Fw190Engagement": 5,
+        "v2Me262Engagement": 5,
+        "v2EngagementMode": "any-action",
+        "v2RefillAtProgress": true
+      },
+      "seed": "legacy-replacement",
+      "rng": 562706411,
+      "round": 0,
+      "slot": 0,
+      "altitude": 5,
+      "v2ConfigVersion": 2,
+      "crewCycle": {
+        "number": 1,
+        "turn": 0
+      },
+      "time": 0,
+      "timeTokens": [],
+      "overflowTimeTokens": [],
+      "pendingProgress": false,
+      "telemetry": {
+        "version": 1,
+        "completeHistory": true,
+        "sinceTurn": 0,
+        "existingFighters": 0,
+        "timeTokensDrawn": 0,
+        "outboundTime": 0,
+        "returnTime": 0,
+        "progressCheckpoints": 0,
+        "fighterActionsCompleted": 0,
+        "engagementActionsSpent": 0,
+        "fightersSpawned": 0,
+        "fightersDestroyed": 0,
+        "fightersDisengaged": 0,
+        "jobsBegun": 0,
+        "jobsCompleted": 0,
+        "assistedJobs": 0,
+        "enemyPhases": 0
+      },
+      "mission": {
+        "position": 0,
+        "bombed": false,
+        "bombingResult": null
+      },
+      "resources": {
+        "Officer": 3,
+        "Enlisted": 5
+      },
+      "opportunity": 1,
+      "crew": [
+        {
+          "id": "pilot",
+          "health": "healthy",
+          "used": false,
+          "activationCompleted": false,
+          "cycleSlotConsumed": false,
+          "position": [
+            "C2-2"
+          ],
+          "station": "pilot",
+          "homeStation": "pilot",
+          "displaced": false,
+          "job": null
+        },
+        {
+          "id": "copilot",
+          "health": "healthy",
+          "used": false,
+          "activationCompleted": false,
+          "cycleSlotConsumed": false,
+          "position": [
+            "D2-1"
+          ],
+          "station": "copilot",
+          "homeStation": "copilot",
+          "displaced": false,
+          "job": null
+        },
+        {
+          "id": "navigator",
+          "health": "healthy",
+          "used": false,
+          "activationCompleted": false,
+          "cycleSlotConsumed": false,
+          "position": [
+            "D1-3"
+          ],
+          "station": "navigator",
+          "homeStation": "navigator",
+          "displaced": false,
+          "job": null
+        },
+        {
+          "id": "bombardier",
+          "health": "healthy",
+          "used": false,
+          "activationCompleted": false,
+          "cycleSlotConsumed": false,
+          "position": [
+            "C1-4"
+          ],
+          "station": "bombardier",
+          "homeStation": "bombardier",
+          "displaced": false,
+          "job": null
+        },
+        {
+          "id": "radio",
+          "health": "healthy",
+          "used": false,
+          "activationCompleted": false,
+          "cycleSlotConsumed": false,
+          "position": [
+            "C3-2",
+            "D3-1"
+          ],
+          "station": "radio",
+          "homeStation": "radio",
+          "displaced": false,
+          "job": null
+        },
+        {
+          "id": "engineer",
+          "health": "healthy",
+          "used": false,
+          "activationCompleted": false,
+          "cycleSlotConsumed": false,
+          "position": [
+            "C2-4",
+            "D2-3"
+          ],
+          "station": "engineer",
+          "homeStation": "engineer",
+          "displaced": false,
+          "job": null
+        },
+        {
+          "id": "ball",
+          "health": "healthy",
+          "used": false,
+          "activationCompleted": false,
+          "cycleSlotConsumed": false,
+          "position": [
+            "C3-4",
+            "D3-3"
+          ],
+          "station": "ball",
+          "homeStation": "ball",
+          "displaced": false,
+          "job": null
+        },
+        {
+          "id": "leftWaist",
+          "health": "healthy",
+          "used": false,
+          "activationCompleted": false,
+          "cycleSlotConsumed": false,
+          "position": [
+            "C4-2",
+            "C4-4"
+          ],
+          "station": "leftWaist",
+          "homeStation": "leftWaist",
+          "displaced": false,
+          "job": null
+        },
+        {
+          "id": "rightWaist",
+          "health": "healthy",
+          "used": false,
+          "activationCompleted": false,
+          "cycleSlotConsumed": false,
+          "position": [
+            "D4-1",
+            "D4-3"
+          ],
+          "station": "rightWaist",
+          "homeStation": "rightWaist",
+          "displaced": false,
+          "job": null
+        },
+        {
+          "id": "tail",
+          "health": "healthy",
+          "used": false,
+          "activationCompleted": false,
+          "cycleSlotConsumed": false,
+          "position": [
+            "C6-2",
+            "D6-1"
+          ],
+          "station": "tail",
+          "homeStation": "tail",
+          "displaced": false,
+          "job": null
+        }
+      ],
+      "fighters": [],
+      "cells": {
+        "C1-4": "healthy",
+        "D1-3": "healthy",
+        "C2-1": "healthy",
+        "C2-2": "healthy",
+        "D2-1": "healthy",
+        "D2-2": "healthy",
+        "B2-4": "healthy",
+        "C2-3": "healthy",
+        "C2-4": "healthy",
+        "D2-3": "healthy",
+        "D2-4": "healthy",
+        "E2-3": "healthy",
+        "A3-1": "healthy",
+        "A3-2": "healthy",
+        "B3-1": "healthy",
+        "B3-2": "healthy",
+        "C3-1": "healthy",
+        "C3-2": "healthy",
+        "D3-1": "healthy",
+        "D3-2": "healthy",
+        "E3-1": "healthy",
+        "E3-2": "healthy",
+        "F3-1": "healthy",
+        "F3-2": "healthy",
+        "A3-3": "healthy",
+        "A3-4": "healthy",
+        "B3-3": "healthy",
+        "B3-4": "healthy",
+        "C3-3": "healthy",
+        "C3-4": "healthy",
+        "D3-3": "healthy",
+        "D3-4": "healthy",
+        "E3-3": "healthy",
+        "E3-4": "healthy",
+        "F3-3": "healthy",
+        "F3-4": "healthy",
+        "C4-2": "healthy",
+        "D4-1": "healthy",
+        "C4-4": "healthy",
+        "D4-3": "healthy",
+        "C5-1": "healthy",
+        "C5-2": "healthy",
+        "D5-1": "healthy",
+        "D5-2": "healthy",
+        "B5-4": "healthy",
+        "C5-3": "healthy",
+        "C5-4": "healthy",
+        "D5-3": "healthy",
+        "D5-4": "healthy",
+        "E5-3": "healthy",
+        "C6-2": "healthy",
+        "D6-1": "healthy"
+      },
+      "engines": [
+        {
+          "id": "E1",
+          "running": true
+        },
+        {
+          "id": "E2",
+          "running": true
+        },
+        {
+          "id": "E3",
+          "running": true
+        },
+        {
+          "id": "E4",
+          "running": true
+        }
+      ],
+      "compromised": [],
+      "jobs": [],
+      "escorts": [],
+      "bags": {
+        "mission": {
+          "tokens": [
+            "Enemy",
+            "Enemy",
+            "Enemy",
+            "Enemy",
+            "Enemy",
+            "Enemy",
+            "Enemy",
+            "Enemy",
+            "Enemy",
+            "Enemy",
+            "Enemy",
+            "Enemy",
+            "Enemy",
+            "Enemy",
+            "Enemy",
+            "Enemy",
+            "Enemy",
+            "Enemy",
+            "Enemy",
+            "Enemy",
+            "Resource",
+            "Resource",
+            "Resource",
+            "Resource",
+            "Resource",
+            "Resource",
+            "Resource",
+            "Resource",
+            "Resource",
+            "Resource",
+            "Resource",
+            "Resource",
+            "Time",
+            "Time",
+            "Time",
+            "Time",
+            "Time",
+            "Time",
+            "Time",
+            "Time",
+            "Time",
+            "Time"
+          ],
+          "discard": []
+        },
+        "combat": {
+          "tokens": [
+            "Hit",
+            "Hit",
+            "Hit",
+            "Hit",
+            "Hit",
+            "Hit",
+            "Hit",
+            "Hit",
+            "Hit",
+            "Hit",
+            "Hit",
+            "Hit",
+            "Hit",
+            "Hit",
+            "Hit",
+            "Hit",
+            "Burst",
+            "Burst",
+            "Burst",
+            "Burst",
+            "Miss",
+            "Miss",
+            "Miss",
+            "Miss",
+            "Miss",
+            "Miss",
+            "Miss",
+            "Miss",
+            "Miss",
+            "Miss",
+            "Miss",
+            "Miss",
+            "Miss"
+          ],
+          "discard": []
+        }
+      },
+      "deck": {
+        "cards": [
+          "BF-109",
+          "BF-109",
+          "BF-109",
+          "BF-109",
+          "BF-109",
+          "BF-109",
+          "BF-109",
+          "BF-109",
+          "BF-109",
+          "BF-109",
+          "BF-110",
+          "BF-110",
+          "BF-110",
+          "BF-110",
+          "BF-110",
+          "BF-110",
+          "FW-190",
+          "FW-190",
+          "FW-190",
+          "FW-190",
+          "FW-190",
+          "Me-262",
+          "Me-262",
+          "Me-262",
+          "Flak",
+          "Flak",
+          "Flak",
+          "Flak"
+        ],
+        "discard": []
+      },
+      "phase": "select",
+      "activeCrew": null,
+      "stats": {
+        "turns": 0,
+        "rounds": 0,
+        "missionDraws": 0,
+        "fightersSpawned": 0,
+        "fightersKilled": 0,
+        "flakAttacks": 0,
+        "enemyAttacks": 0,
+        "enemyHits": 0,
+        "enemyCrits": 0,
+        "aircraftHits": 0,
+        "firesStarted": 0,
+        "repairs": 0,
+        "enginesDisabled": 0,
+        "enginesRestarted": 0,
+        "compromisedSections": 0,
+        "altitudeLostByCause": {
+          "control": 0,
+          "structure": 0,
+          "engines": 0
+        },
+        "crewInjured": 0,
+        "crewKilled": 0,
+        "OfficerGained": 0,
+        "OfficerSpent": 0,
+        "EnlistedGained": 0,
+        "EnlistedSpent": 0,
+        "opportunityGained": 0,
+        "opportunitySpent": 0
+      },
+      "startedAt": 1790981235898,
+      "endedAt": null,
+      "outcome": null,
+      "nextId": 1,
+      "campaign": {
+        "campaignId": "legacy-hangar-1",
+        "sortieId": "legacy-hangar-17",
+        "sortieNumber": 3,
+        "aircraftId": "legacy-hangar-15",
+        "crewIds": {
+          "pilot": "legacy-hangar-3",
+          "copilot": "legacy-hangar-4",
+          "navigator": "legacy-hangar-5",
+          "bombardier": "legacy-hangar-6",
+          "radio": "legacy-hangar-7",
+          "engineer": "legacy-hangar-8",
+          "ball": "legacy-hangar-9",
+          "leftWaist": "legacy-hangar-10",
+          "rightWaist": "legacy-hangar-11",
+          "tail": "legacy-hangar-16"
+        },
+        "startedAt": "2026-10-01T12:00:00.000Z"
+      }
+    },
+    "view": {
+      "version": 1,
+      "rulesVersion": 4,
+      "ruleset": "v2-continuous",
+      "boardVersion": "plane-grid-v1",
+      "crewPositionVersion": 1,
+      "config": {
+        "preferredRuleset": "v1",
+        "startingOfficer": 3,
+        "startingEnlisted": 5,
+        "missionEnemy": 15,
+        "missionResource": 20,
+        "combatHit": 16,
+        "combatBurst": 4,
+        "combatMiss": 13,
+        "bf109Cards": 10,
+        "bf110Cards": 6,
+        "fw190Cards": 5,
+        "me262Cards": 3,
+        "flakCards": 4,
+        "bf109Hp": 2,
+        "bf110Hp": 2,
+        "fw190Hp": 3,
+        "me262Hp": 4,
+        "maxFighters": 3,
+        "flakShots": 2,
+        "spawnFacing": 0,
+        "clearFighters": true,
+        "unavailableDraws": true,
+        "fireCap": 4,
+        "repairCap": 3,
+        "engineerBonus": 1,
+        "eightWayWork": false,
+        "extinguishLeavesDamage": true,
+        "crewBlocksFirstFire": true,
+        "medicalDuration": 2,
+        "repairDuration": 2,
+        "fireDuration": 2,
+        "repairCost": 1,
+        "fireCost": 1,
+        "medicalCost": 1,
+        "escortCost": 1,
+        "directFireCost": 1,
+        "disruptOnHit": true,
+        "opportunityEnabled": true,
+        "startingOpportunity": 1,
+        "opportunityCap": 3,
+        "opportunityOnKill": true,
+        "conversionRate": 2,
+        "restartMax": 4,
+        "startingAltitude": 5,
+        "controlOfficerMin": 3,
+        "controlEnlistedMin": 5,
+        "structureSafe": 1,
+        "structureMid": 3,
+        "structureFatal": 6,
+        "structureMidMin": 3,
+        "structureHighMin": 5,
+        "enginesSafe": 1,
+        "enginesMid": 2,
+        "enginesAuto": 4,
+        "enginesMidMin": 3,
+        "enginesHighMin": 5,
+        "outboundLength": 14,
+        "returnLength": 5,
+        "bombingMin": 3,
+        "animationMs": 750,
+        "presentationSpeed": "normal",
+        "v2CrewCycleTurns": 10,
+        "v2MissionEnemy": 20,
+        "v2MissionResource": 12,
+        "v2MissionTime": 10,
+        "v2TimePerProgress": 4,
+        "v2OutboundLength": 8,
+        "v2ReturnLength": 3,
+        "v2NavigatorUnmannedTimePenalty": 0,
+        "v2CrewCycleRefreshGrantsTime": false,
+        "v2UnavailableCrewPressure": "full",
+        "v2RepairTime": 4,
+        "v2FireTime": 4,
+        "v2MedicalTime": 4,
+        "v2AssistedRepairTime": 2,
+        "v2AssistedFireTime": 2,
+        "v2AssistedMedicalTime": 2,
+        "v2FighterKillGrantsTime": true,
+        "v2DisruptEnabled": true,
+        "v2DisruptEffect": "accuracy-penalty",
+        "v2MaxEscorts": 1,
+        "v2OpportunityProvokesEnemyPhase": false,
+        "v2Bf109Engagement": 5,
+        "v2Bf110Engagement": 5,
+        "v2Fw190Engagement": 5,
+        "v2Me262Engagement": 5,
+        "v2EngagementMode": "any-action",
+        "v2RefillAtProgress": true
+      },
+      "seed": "legacy-replacement",
+      "rng": 562706411,
+      "round": 0,
+      "slot": 0,
+      "altitude": 5,
+      "v2ConfigVersion": 2,
+      "crewCycle": {
+        "number": 1,
+        "turn": 0
+      },
+      "time": 0,
+      "timeTokens": [],
+      "overflowTimeTokens": [],
+      "pendingProgress": false,
+      "telemetry": {
+        "version": 1,
+        "completeHistory": true,
+        "sinceTurn": 0,
+        "existingFighters": 0,
+        "timeTokensDrawn": 0,
+        "outboundTime": 0,
+        "returnTime": 0,
+        "progressCheckpoints": 0,
+        "fighterActionsCompleted": 0,
+        "engagementActionsSpent": 0,
+        "fightersSpawned": 0,
+        "fightersDestroyed": 0,
+        "fightersDisengaged": 0,
+        "jobsBegun": 0,
+        "jobsCompleted": 0,
+        "assistedJobs": 0,
+        "enemyPhases": 0
+      },
+      "mission": {
+        "position": 0,
+        "bombed": false,
+        "bombingResult": null
+      },
+      "resources": {
+        "Officer": 3,
+        "Enlisted": 5
+      },
+      "opportunity": 1,
+      "crew": [
+        {
+          "id": "pilot",
+          "health": "healthy",
+          "used": false,
+          "activationCompleted": false,
+          "cycleSlotConsumed": false,
+          "position": [
+            "C2-2"
+          ],
+          "station": "pilot",
+          "homeStation": "pilot",
+          "displaced": false,
+          "job": null
+        },
+        {
+          "id": "copilot",
+          "health": "healthy",
+          "used": false,
+          "activationCompleted": false,
+          "cycleSlotConsumed": false,
+          "position": [
+            "D2-1"
+          ],
+          "station": "copilot",
+          "homeStation": "copilot",
+          "displaced": false,
+          "job": null
+        },
+        {
+          "id": "navigator",
+          "health": "healthy",
+          "used": false,
+          "activationCompleted": false,
+          "cycleSlotConsumed": false,
+          "position": [
+            "D1-3"
+          ],
+          "station": "navigator",
+          "homeStation": "navigator",
+          "displaced": false,
+          "job": null
+        },
+        {
+          "id": "bombardier",
+          "health": "healthy",
+          "used": false,
+          "activationCompleted": false,
+          "cycleSlotConsumed": false,
+          "position": [
+            "C1-4"
+          ],
+          "station": "bombardier",
+          "homeStation": "bombardier",
+          "displaced": false,
+          "job": null
+        },
+        {
+          "id": "radio",
+          "health": "healthy",
+          "used": false,
+          "activationCompleted": false,
+          "cycleSlotConsumed": false,
+          "position": [
+            "C3-2",
+            "D3-1"
+          ],
+          "station": "radio",
+          "homeStation": "radio",
+          "displaced": false,
+          "job": null
+        },
+        {
+          "id": "engineer",
+          "health": "healthy",
+          "used": false,
+          "activationCompleted": false,
+          "cycleSlotConsumed": false,
+          "position": [
+            "C2-4",
+            "D2-3"
+          ],
+          "station": "engineer",
+          "homeStation": "engineer",
+          "displaced": false,
+          "job": null
+        },
+        {
+          "id": "ball",
+          "health": "healthy",
+          "used": false,
+          "activationCompleted": false,
+          "cycleSlotConsumed": false,
+          "position": [
+            "C3-4",
+            "D3-3"
+          ],
+          "station": "ball",
+          "homeStation": "ball",
+          "displaced": false,
+          "job": null
+        },
+        {
+          "id": "leftWaist",
+          "health": "healthy",
+          "used": false,
+          "activationCompleted": false,
+          "cycleSlotConsumed": false,
+          "position": [
+            "C4-2",
+            "C4-4"
+          ],
+          "station": "leftWaist",
+          "homeStation": "leftWaist",
+          "displaced": false,
+          "job": null
+        },
+        {
+          "id": "rightWaist",
+          "health": "healthy",
+          "used": false,
+          "activationCompleted": false,
+          "cycleSlotConsumed": false,
+          "position": [
+            "D4-1",
+            "D4-3"
+          ],
+          "station": "rightWaist",
+          "homeStation": "rightWaist",
+          "displaced": false,
+          "job": null
+        },
+        {
+          "id": "tail",
+          "health": "healthy",
+          "used": false,
+          "activationCompleted": false,
+          "cycleSlotConsumed": false,
+          "position": [
+            "C6-2",
+            "D6-1"
+          ],
+          "station": "tail",
+          "homeStation": "tail",
+          "displaced": false,
+          "job": null
+        }
+      ],
+      "fighters": [],
+      "cells": {
+        "C1-4": "healthy",
+        "D1-3": "healthy",
+        "C2-1": "healthy",
+        "C2-2": "healthy",
+        "D2-1": "healthy",
+        "D2-2": "healthy",
+        "B2-4": "healthy",
+        "C2-3": "healthy",
+        "C2-4": "healthy",
+        "D2-3": "healthy",
+        "D2-4": "healthy",
+        "E2-3": "healthy",
+        "A3-1": "healthy",
+        "A3-2": "healthy",
+        "B3-1": "healthy",
+        "B3-2": "healthy",
+        "C3-1": "healthy",
+        "C3-2": "healthy",
+        "D3-1": "healthy",
+        "D3-2": "healthy",
+        "E3-1": "healthy",
+        "E3-2": "healthy",
+        "F3-1": "healthy",
+        "F3-2": "healthy",
+        "A3-3": "healthy",
+        "A3-4": "healthy",
+        "B3-3": "healthy",
+        "B3-4": "healthy",
+        "C3-3": "healthy",
+        "C3-4": "healthy",
+        "D3-3": "healthy",
+        "D3-4": "healthy",
+        "E3-3": "healthy",
+        "E3-4": "healthy",
+        "F3-3": "healthy",
+        "F3-4": "healthy",
+        "C4-2": "healthy",
+        "D4-1": "healthy",
+        "C4-4": "healthy",
+        "D4-3": "healthy",
+        "C5-1": "healthy",
+        "C5-2": "healthy",
+        "D5-1": "healthy",
+        "D5-2": "healthy",
+        "B5-4": "healthy",
+        "C5-3": "healthy",
+        "C5-4": "healthy",
+        "D5-3": "healthy",
+        "D5-4": "healthy",
+        "E5-3": "healthy",
+        "C6-2": "healthy",
+        "D6-1": "healthy"
+      },
+      "engines": [
+        {
+          "id": "E1",
+          "running": true
+        },
+        {
+          "id": "E2",
+          "running": true
+        },
+        {
+          "id": "E3",
+          "running": true
+        },
+        {
+          "id": "E4",
+          "running": true
+        }
+      ],
+      "compromised": [],
+      "jobs": [],
+      "escorts": [],
+      "bags": {
+        "mission": {
+          "tokens": [
+            "Enemy",
+            "Enemy",
+            "Enemy",
+            "Enemy",
+            "Enemy",
+            "Enemy",
+            "Enemy",
+            "Enemy",
+            "Enemy",
+            "Enemy",
+            "Enemy",
+            "Enemy",
+            "Enemy",
+            "Enemy",
+            "Enemy",
+            "Enemy",
+            "Enemy",
+            "Enemy",
+            "Enemy",
+            "Enemy",
+            "Resource",
+            "Resource",
+            "Resource",
+            "Resource",
+            "Resource",
+            "Resource",
+            "Resource",
+            "Resource",
+            "Resource",
+            "Resource",
+            "Resource",
+            "Resource",
+            "Time",
+            "Time",
+            "Time",
+            "Time",
+            "Time",
+            "Time",
+            "Time",
+            "Time",
+            "Time",
+            "Time"
+          ],
+          "discard": []
+        },
+        "combat": {
+          "tokens": [
+            "Hit",
+            "Hit",
+            "Hit",
+            "Hit",
+            "Hit",
+            "Hit",
+            "Hit",
+            "Hit",
+            "Hit",
+            "Hit",
+            "Hit",
+            "Hit",
+            "Hit",
+            "Hit",
+            "Hit",
+            "Hit",
+            "Burst",
+            "Burst",
+            "Burst",
+            "Burst",
+            "Miss",
+            "Miss",
+            "Miss",
+            "Miss",
+            "Miss",
+            "Miss",
+            "Miss",
+            "Miss",
+            "Miss",
+            "Miss",
+            "Miss",
+            "Miss",
+            "Miss"
+          ],
+          "discard": []
+        }
+      },
+      "deck": {
+        "cards": [
+          "BF-109",
+          "BF-109",
+          "BF-109",
+          "BF-109",
+          "BF-109",
+          "BF-109",
+          "BF-109",
+          "BF-109",
+          "BF-109",
+          "BF-109",
+          "BF-110",
+          "BF-110",
+          "BF-110",
+          "BF-110",
+          "BF-110",
+          "BF-110",
+          "FW-190",
+          "FW-190",
+          "FW-190",
+          "FW-190",
+          "FW-190",
+          "Me-262",
+          "Me-262",
+          "Me-262",
+          "Flak",
+          "Flak",
+          "Flak",
+          "Flak"
+        ],
+        "discard": []
+      },
+      "phase": "select",
+      "activeCrew": null,
+      "stats": {
+        "turns": 0,
+        "rounds": 0,
+        "missionDraws": 0,
+        "fightersSpawned": 0,
+        "fightersKilled": 0,
+        "flakAttacks": 0,
+        "enemyAttacks": 0,
+        "enemyHits": 0,
+        "enemyCrits": 0,
+        "aircraftHits": 0,
+        "firesStarted": 0,
+        "repairs": 0,
+        "enginesDisabled": 0,
+        "enginesRestarted": 0,
+        "compromisedSections": 0,
+        "altitudeLostByCause": {
+          "control": 0,
+          "structure": 0,
+          "engines": 0
+        },
+        "crewInjured": 0,
+        "crewKilled": 0,
+        "OfficerGained": 0,
+        "OfficerSpent": 0,
+        "EnlistedGained": 0,
+        "EnlistedSpent": 0,
+        "opportunityGained": 0,
+        "opportunitySpent": 0
+      },
+      "startedAt": 1790981235898,
+      "endedAt": null,
+      "outcome": null,
+      "nextId": 1,
+      "campaign": {
+        "campaignId": "legacy-hangar-1",
+        "sortieId": "legacy-hangar-17",
+        "sortieNumber": 3,
+        "aircraftId": "legacy-hangar-15",
+        "crewIds": {
+          "pilot": "legacy-hangar-3",
+          "copilot": "legacy-hangar-4",
+          "navigator": "legacy-hangar-5",
+          "bombardier": "legacy-hangar-6",
+          "radio": "legacy-hangar-7",
+          "engineer": "legacy-hangar-8",
+          "ball": "legacy-hangar-9",
+          "leftWaist": "legacy-hangar-10",
+          "rightWaist": "legacy-hangar-11",
+          "tail": "legacy-hangar-16"
+        },
+        "startedAt": "2026-10-01T12:00:00.000Z"
+      }
+    },
+    "pending": [],
+    "log": [],
+    "current": null,
+    "speed": "normal",
+    "visual": {},
+    "beat": 0,
+    "presenting": false
+  }
+}

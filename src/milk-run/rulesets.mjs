@@ -8,6 +8,7 @@ export function isV2(state) {
 }
 
 export function missionLengths(state) {
+  if (isV2(state) && state.mission.aborted) return { outboundLength: state.mission.abortProgress, returnLength: state.mission.abortProgress };
   return isV2(state)
     ? { outboundLength: state.config.v2OutboundLength, returnLength: state.config.v2ReturnLength }
     : { outboundLength: state.config.outboundLength, returnLength: state.config.returnLength };

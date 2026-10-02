@@ -8,6 +8,7 @@ export function createV2Telemetry() {
     progressCheckpoints: 0, fighterActionsCompleted: 0, engagementActionsSpent: 0,
     fightersSpawned: 0, fightersDestroyed: 0, fightersDisengaged: 0,
     jobsBegun: 0, jobsCompleted: 0, assistedJobs: 0,
+    enemyPhases: 0,
   };
 }
 
@@ -27,7 +28,7 @@ export function ensureV2Telemetry(state) {
 
 export function observe(state, key, amount = 1) {
   const telemetry = ensureV2Telemetry(state);
-  if (telemetry) telemetry[key] += amount;
+  if (telemetry) telemetry[key] = (telemetry[key] ?? 0) + amount;
 }
 
 export function v2TelemetryRows(state) {
@@ -37,6 +38,8 @@ export function v2TelemetryRows(state) {
   const value = key => t?.[key] ?? 'Not recorded';
   const rows = [
     { label: 'Total Turns', value: totalTurns(state) },
+    { label: 'Unavailable Crew Pressure', value: ({ full: 'Full Pressure', 'draw-only': 'Draw Only', compressed: 'Compressed Pressure' })[state.config.v2UnavailableCrewPressure ?? 'full'] },
+    { label: 'Enemy phases', value: value('enemyPhases') },
     { label: 'Crew Cycles completed', value: state.crewCycle.number - 1 },
     { label: 'Time tokens drawn', value: value('timeTokensDrawn') },
     { label: 'Progress checkpoints', value: value('progressCheckpoints') },

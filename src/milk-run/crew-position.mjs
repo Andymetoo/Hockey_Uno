@@ -24,3 +24,19 @@ export function leaveStation(crew) {
   crew.station = null;
   crew.displaced = true;
 }
+
+/** Specialist functions depend on the qualified person actually seated there.
+ * Readiness is deliberately irrelevant: a tapped Officer still mans a station.
+ */
+export function specialistOperator(state, stationId) {
+  if (!['navigator', 'bombardier'].includes(stationId)) return null;
+  return state.crew.find(crew => currentStationId(crew) === stationId &&
+    crew.health === 'healthy' && !crew.job &&
+    !state.jobs.some(job => job.kind === 'medical' && job.targetId === crew.id) &&
+    crew.position.every(id => state.cells[id] !== 'fire') &&
+    (crew.id === stationId || CREW_DEFS.find(def => def.id === crew.id)?.rank === 'Officer')) ?? null;
+}
+
+export function effectiveTimeThreshold(state) {
+  return state.config.v2TimePerProgress + (specialistOperator(state, 'navigator') ? 0 : state.config.v2NavigatorUnmannedTimePenalty ?? 0);
+}

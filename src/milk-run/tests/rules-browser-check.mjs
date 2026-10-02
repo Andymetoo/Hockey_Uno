@@ -79,7 +79,8 @@ try {
   await touch('#board [data-fighter="burst-survivor"]');await click('[data-ui="confirm-target"]');
   await advanceTo('GUNNER_SHOT_ROLL');
   assert.equal((await current()).token,'Burst');assert.equal((await getView()).fighters[0].hp,4);
-  assert.match(await evaluate("document.querySelector('#board-stage .draw-token').textContent"),/BURST\s*×2/i);
+  assert.equal(await evaluate("document.querySelector('#board-stage .draw-token strong').textContent"),'×2','Burst center uses the high-contrast double-damage glyph');
+  assert.equal(await evaluate("document.querySelector('#board-stage .draw-token').getAttribute('aria-label')"),'BURST ×2','Burst identity remains explicit to assistive technology');
   await sleep(600);await screenshot('burst-token');
   await advanceTo('FIGHTER_DAMAGED');assert.equal((await getView()).fighters[0].hp,2);
   await advanceTo('FIGHTER_DISRUPTED');

@@ -10,13 +10,13 @@ export function createGame(overrides = {}, seed = 'MILK-RUN', ruleset = override
   if (!RULESETS.includes(ruleset)) throw new RangeError(`Unknown sortie ruleset: ${ruleset}`);
   const config = normalizeConfig(overrides);
   const continuous = ruleset === 'v2-continuous';
-  if (continuous && config.v2MissionTime < config.v2TimePerProgress) {
-    throw new RangeError('V2 needs at least as many mission Time tokens as Time Required Per Progress.');
+  if (continuous && config.v2MissionTime < config.v2TimePerProgress + config.v2NavigatorUnmannedTimePenalty) {
+    throw new RangeError('V2 needs at least as many mission Time tokens as Time Required Per Progress, including the Navigator Unmanned Time Penalty.');
   }
   return {
     version: 1, rulesVersion: continuous ? 4 : 3, ruleset, boardVersion: BOARD_VERSION, crewPositionVersion: CREW_POSITION_VERSION, config, seed: String(seed), rng: seedToInt(seed),
     round: 0, slot: 0, altitude: config.startingAltitude,
-    ...(continuous ? { v2ConfigVersion: V2_CONFIG_VERSION, crewCycle: { number: 1, turn: 0 }, time: 0, timeTokens: [], pendingProgress: false, telemetry: createV2Telemetry() } : {}),
+    ...(continuous ? { v2ConfigVersion: V2_CONFIG_VERSION, crewCycle: { number: 1, turn: 0 }, time: 0, timeTokens: [], overflowTimeTokens: [], pendingProgress: false, telemetry: createV2Telemetry() } : {}),
     mission: { position: 0, bombed: false, bombingResult: null },
     resources: { Officer: config.startingOfficer, Enlisted: config.startingEnlisted },
     opportunity: config.opportunityEnabled ? Math.min(config.startingOpportunity, config.opportunityCap) : 0,

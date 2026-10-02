@@ -47,6 +47,7 @@ try {
     v2Bf109Engagement: 3, v2Bf110Engagement: 4, v2Fw190Engagement: 6, v2Me262Engagement: 7,
     v2EngagementMode: 'attack-pass-only', v2RefillAtProgress: false,
     v2FighterKillGrantsTime: false, v2DisruptEnabled: false, v2DisruptEffect: 'auto-miss', v2MaxEscorts: 3,
+    v2NavigatorUnmannedTimePenalty: 1, v2CrewCycleRefreshGrantsTime: true, v2UnavailableCrewPressure: 'compressed',
   };
   const oldV1 = await getState(); await editFields(custom);
   assert.deepEqual(await getState(), oldV1, 'editing all construction controls preserves active V1');
@@ -152,7 +153,11 @@ try {
   await inject(fresh({ v2MissionEnemy: 0, v2MissionResource: 0, v2MissionTime: 4 }), { speed: 'instant' });
   await evaluate(`(() => {for(let guard=0;guard<100;guard++) {
     const s=window.milkRun.getState();if(s.phase==='ended')return;
-    if(s.phase==='bombing')document.querySelector('[data-command=bomb]').click();
+    if(s.phase==='bombing') {
+      const run=s.mission.bombRun,slot=['course','drift','release'].find(id=>run.placement[id]===null);
+      if(slot) { const used=Object.values(run.placement);window.milkRun.send({type:'placeBombDie',slot,dieIndex:[0,1,2,3].find(i=>!used.includes(i))}); }
+      else document.querySelector('[data-command=commitBombRun]').click();
+    }
     else if(s.phase==='select') { const crew=s.crew.find(c=>!c.cycleSlotConsumed&&c.health==='healthy'&&!c.job);window.milkRun.send({type:'activate',crewId:crew.id}); }
     else if(s.phase==='action')window.milkRun.send({type:'action',action:'wait'});
     else throw Error('Unexpected phase '+s.phase);

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createGame } from '../state.mjs';
 import { STATIONS } from '../board.mjs';
 import { availableCrew, availableActions, dispatch, isAtStation, damageSquare, postAttackPosition } from '../rules.mjs';
-import { fighter, rngForIndexes, rngForDice, collect } from './fixtures.mjs';
+import { fighter, rngForIndexes, rngForDice, collect, commitTestBombRun } from './fixtures.mjs';
 
 const member = (state, id) => state.crew.find(crew => crew.id === id);
 const fresh = (config = {}) => createGame({ opportunityEnabled: false, v2MissionEnemy: 0, v2MissionResource: 80, v2MissionTime: 20, ...config }, 'continuous-tests', 'v2-continuous');
@@ -22,7 +22,7 @@ function turn(state, token = 'Resource', crewId) {
   const result = act(activation.state);
   return { state: result.state, events: [...activation.events, ...result.events] };
 }
-const timeCount = state => [...state.bags.mission.tokens, ...state.bags.mission.discard, ...state.timeTokens].filter(token => token === 'Time').length;
+const timeCount = state => [...state.bags.mission.tokens, ...state.bags.mission.discard, ...state.timeTokens, ...(state.overflowTimeTokens ?? [])].filter(token => token === 'Time').length;
 const resourceCount = state => state.resources.Officer + state.resources.Enlisted + [...state.bags.mission.tokens, ...state.bags.mission.discard].filter(token => token === 'Resource').length;
 const safeFighter = (id = 'f1', overrides = {}) => fighter(id, { facing: 180, engagementRemaining: 5, ...overrides });
 
@@ -484,7 +484,7 @@ test('V2 configured mission lengths change only the V2 target and HOME checkpoin
   assert.equal(state.mission.position, 1);
   assert.equal(state.config.outboundLength, 14);
   assert.equal(state.config.returnLength, 5);
-  state = dispatch(state, { type: 'bomb' }).state;
+  state = commitTestBombRun(state).state;
   state = turn(state, 'Time').state;
   assert.equal(state.phase, 'ended');
   assert.equal(state.outcome, 'success');
@@ -552,7 +552,7 @@ test('V2 8 outbound / 3 return mission reaches TARGET, resumes selection after b
     if (index === 31) {
       assert.equal(state.mission.position, 8);
       assert.equal(state.phase, 'bombing');
-      const bombing = dispatch(state, { type: 'bomb' }); state = bombing.state; events.push(...bombing.events);
+      const bombing = commitTestBombRun(state); state = bombing.state; events.push(...bombing.events);
       assert.equal(state.phase, 'select');
       assert.equal(state.mission.bombed, true);
     }
@@ -565,6 +565,7 @@ test('V2 8 outbound / 3 return mission reaches TARGET, resumes selection after b
   assert.deepEqual(state.timeTokens, []);
   assert.equal(state.pendingProgress, false);
   assert.equal(events.filter(event => event.type === 'MISSION_ADVANCED').length, 11);
-  assert.equal(events.filter(event => event.type === 'BOMBING_ROLL').length, 1);
+  assert.equal(events.filter(event => event.type === 'BOMB_RUN_ROLLED').length, 1);
+  assert.equal(events.filter(event => event.type === 'BOMBING_RESOLVED').length, 1);
   assert.equal(events.some(event => ['ROUND_STARTED', 'ROUND_END_STARTED'].includes(event.type)), false);
 });

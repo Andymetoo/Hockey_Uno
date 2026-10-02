@@ -4,7 +4,7 @@ import { createGame } from '../state.mjs';
 import { availableCrew, dispatch } from '../rules.mjs';
 import { saveSession, loadSession } from '../persistence.mjs';
 import { v2TelemetryRows } from '../telemetry.mjs';
-import { rngForIndexes } from './fixtures.mjs';
+import { rngForIndexes, commitTestBombRun } from './fixtures.mjs';
 
 const fresh = overrides => createGame({ opportunityEnabled: false, v2MissionEnemy: 10, v2MissionResource: 80, v2MissionTime: 40, ...overrides }, 'telemetry-controls', 'v2-continuous');
 function activate(state, token = 'Time', crewId = availableCrew(state)[0].id) {
@@ -20,7 +20,7 @@ const member = (state, id) => state.crew.find(c => c.id === id);
 test('V2 full 8/3 mission records Turns, cycles, Time by leg, checkpoints and average Progress', () => {
   let state = fresh({ v2MissionEnemy: 0, v2MissionResource: 0, v2MissionTime: 4 });
   while (state.phase !== 'ended') {
-    state = state.phase === 'bombing' ? dispatch(state, { type: 'bomb' }).state : step(state);
+    state = state.phase === 'bombing' ? commitTestBombRun(state).state : step(state);
   }
   assert.equal(state.outcome, 'success');
   assert.equal(state.stats.turns, 44);

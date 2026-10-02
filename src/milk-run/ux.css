@@ -141,6 +141,37 @@ dialog{background-color:#d8d2bb;background-image:repeating-linear-gradient(0deg,
 .crew-marker.status-dead>.crew-body{fill:#332c2a}
 .crew-marker.target-legal>.crew-body{stroke:#2777b7;stroke-width:4}
 .crew-marker.target-chosen>.crew-body{stroke:#ffad3d;stroke-width:5}
+/* Status uses the existing tilt, a written label, and a distinct color. */
+.crew-card.status-working,.crew-card.status-repair,.crew-card.status-fire,.crew-card.status-medical{background:#756321;border-color:#c9ad42;color:#fff2b8}
+.crew-card.status-working .crew-status,.crew-card.status-repair .crew-status,.crew-card.status-fire .crew-status,.crew-card.status-medical .crew-status,
+.crew-card.status-working .crew-copy small,.crew-card.status-repair .crew-copy small,.crew-card.status-fire .crew-copy small,.crew-card.status-medical .crew-copy small{color:#fff0b0}
+.crew-card.status-injured{background:#875d55;border-color:#d49989;color:#ffe7df}
+.crew-card.status-injured .crew-status,.crew-card.status-injured .crew-copy small{color:#ffe2d7}
+.crew-card.status-treated{background:#355e60;border-color:#8bc3bc;color:#e1fff5}
+.crew-card.status-treated .crew-status,.crew-card.status-treated .crew-copy small{color:#c5eee5}
+.crew-card.status-dead{background:#303230;border-color:#64685f;color:#dddfd5}
+.crew-card.status-dead .crew-status,.crew-card.status-dead .crew-copy small{color:#c9cbc3}
+.crew-card.is-displaced:not(.status-injured):not(.status-dead):not(.status-treated){border-left-color:#9bb8c9}
+.crew-card.is-displaced .crew-location{color:#c7e1ee;background:#394d58;padding:1px 3px;border-radius:2px}
+/* Keep the physical token rim; strengthen only its central result. */
+.draw-token[data-token="Hit"]{background:#916020;outline-color:#bc934b}
+.draw-token[data-token="Burst"]{background:#4a271c;outline-color:#d39359;border-color:#f4c797}
+.draw-token[data-token="Miss"]{background:#294856;outline-color:#749cae}
+.draw-token[data-token="Hit"] strong,.draw-token[data-token="Burst"] strong,.draw-token[data-token="Miss"] strong{color:#fff9e9;font-size:18px;font-weight:950;line-height:1;letter-spacing:.4px;text-shadow:0 1px 2px #000}
+.draw-token[data-token="Burst"] strong{font-size:27px}
+.draw-token[data-token="Hit"] .token-symbol,.draw-token[data-token="Burst"] .token-symbol,.draw-token[data-token="Miss"] .token-symbol{font-size:16px;color:#fff1d0}
+.draw-token[data-token="Hit"] small,.draw-token[data-token="Burst"] small,.draw-token[data-token="Miss"] small{color:#fff0d4}
+.board-stage.critical-hit{background:#59281f;border:2px solid #e5a15a;box-shadow:inset 0 0 0 2px #381b14}
+.board-stage.critical-hit .stage-title{color:#ffe9ad;font-size:23px;font-weight:950;letter-spacing:1px}
+.board-stage.critical-hit .stage-detail{color:#ffddca}
+.die-face.tone-critical{background:#fee1ae;color:#471c15;border:2px solid #c25c36}
+.log-group.sortie-ending{background:#e4d6b4;border:2px solid #776343!important;border-radius:5px;margin:8px 0}
+.log-group.sortie-ending .log-group-title{font-size:15px;font-weight:900;color:#392d22}
+.sortie-result{border-left:5px solid #c5854b;padding:15px 18px;background:#293b33;color:#f3e6c9;margin:12px 0}
+.sortie-result h2{margin:0 0 8px;font-family:inherit;font-size:26px;font-weight:900;letter-spacing:1px}
+.sortie-result p{margin:5px 0}.sortie-result.lost{background:#452f29;border-color:#bb725b}
+.hud-time .navigation-warning{font-size:8px!important;color:#ffce8f!important;white-space:normal}.hud-time .time-bank{color:#f9dd82!important}
+.job-assist-note{display:block;color:#e8c971;font-size:10px;margin-top:4px}
 .crew-location{display:block;font-size:9px;line-height:1.2;font-weight:700;white-space:normal}
 @media(max-width:650px){.crew-location{font-size:8px;margin-top:2px}}
 /* Keep frequently used presentation controls and playtest tools out of the board stack. */

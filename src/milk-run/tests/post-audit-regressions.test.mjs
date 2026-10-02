@@ -7,13 +7,13 @@ import { saveSession, loadSession } from '../persistence.mjs';
 import { ResolutionQueue } from '../queue.mjs';
 import { describeEvent } from '../presentation.mjs';
 import { STATIONS } from '../board.mjs';
-import { activated, fighter, collect, rngForDice } from './fixtures.mjs';
+import { activated, fighter, collect, rngForDice, nextBombRunCommand } from './fixtures.mjs';
 
 const member = (s, id) => s.crew.find(c => c.id === id);
 const fresh = () => createGame({}, 'post-audit', 'v2-continuous');
 const sessionFor = s => ({ version: 1, presentationVersion: 2, state: s, view: structuredClone(s), pending: [], log: [], current: null, speed: 'manual' });
 const storage = () => { const data = new Map(); return { getItem: k => data.get(k), setItem: (k, v) => data.set(k, v) }; };
-const timeCount = s => [...s.bags.mission.tokens, ...s.bags.mission.discard, ...(s.timeTokens ?? [])].filter(t => t === 'Time').length;
+const timeCount = s => [...s.bags.mission.tokens, ...s.bags.mission.discard, ...(s.timeTokens ?? []), ...(s.overflowTimeTokens ?? [])].filter(t => t === 'Time').length;
 const resourceCount = s => s.resources.Officer + s.resources.Enlisted + [...s.bags.mission.tokens, ...s.bags.mission.discard].filter(t => t === 'Resource').length;
 function resume(s) { const store = storage(); saveSession(s, store); return loadSession(store); }
 function shooting(action = 'basicFire', time = 3) {
@@ -47,7 +47,8 @@ for (const disruptOnHit of [false, true]) test(`actual legacy V2 save preserves 
       const displaced = Boolean(c.job) || c.position.length !== STATIONS[c.station].cells.length || !STATIONS[c.station].cells.every(id => c.position.includes(id));
       return { ...c, homeStation: c.station, station: displaced ? null : c.station, displaced };
     });
-    assert.deepEqual(s, { ...snapshots[i], crewPositionVersion: 1, crew: expectedCrew, v2ConfigVersion: 2, config: { ...snapshots[i].config,
+    assert.deepEqual(s, { ...snapshots[i], overflowTimeTokens: [], crewPositionVersion: 1, crew: expectedCrew, v2ConfigVersion: 2, config: { ...snapshots[i].config,
+      v2NavigatorUnmannedTimePenalty: 0, v2CrewCycleRefreshGrantsTime: false, v2UnavailableCrewPressure: 'full',
       v2FighterKillGrantsTime: false, v2DisruptEnabled: disruptOnHit, v2DisruptEffect: 'auto-miss', v2MaxEscorts: null } });
     for (const k of ['v2RepairTime', 'v2FireTime', 'v2MedicalTime']) assert.equal(s.config[k], 6);
     for (const k of ['v2AssistedRepairTime', 'v2AssistedFireTime', 'v2AssistedMedicalTime']) assert.equal(s.config[k], 4);
@@ -108,12 +109,14 @@ for (const action of ['basicFire', 'advancedFire', 'opportunityShot', 'directFir
     assert.equal(end.state.mission.position, 1); assert.equal(timeCount(end.state), 10);
     assert.ok(end.events.findIndex(e => e.type === 'PROGRESS_STARTED') > end.events.findIndex(e => e.type === 'ENEMY_PHASE_STARTED'));
   });
-  for (const [time, pending] of [[4, true], [4, false], [3, true]]) test(`${action}: full/pending (${time}, ${pending}) preserves bag Time and still awards Opportunity`, () => {
+  for (const [time, pending] of [[4, true], [4, false], [3, true]]) test(`${action}: full/pending (${time}, ${pending}) banks physical overflow and still awards Opportunity`, () => {
     const s = shooting(action, time); s.pendingProgress = pending;
     const before = [...s.bags.mission.tokens]; const r = dispatch(s, shot(action));
+    before.splice(before.indexOf('Time'), 1);
     assert.deepEqual(r.state.bags.mission.tokens, before); assert.equal(r.state.time, time);
+    assert.deepEqual(r.state.overflowTimeTokens, ['Time']);
     assert.equal(timeCount(r.state), 10); assert.ok(r.events.some(e => e.type === 'OPPORTUNITY_GAINED'));
-    assert.match(r.events.find(e => e.type === 'FIGHTER_KILL_TIME_FULL').message, /Time track already full/);
+    assert.match(r.events.find(e => e.type === 'BONUS_TIME_BANKED').message, /BONUS TIME BANKED/);
     assert.ok(!r.events.some(e => e.type === 'TIME_GAINED'));
   });
 }
@@ -126,12 +129,13 @@ test('between-turn kill chain closes to Progress before activation, without an e
   assert.throws(() => dispatch(r.state, { type: 'continueEnemyPhase' }));
   const bag = [...r.state.bags.mission.tokens];
   r = dispatch(resume(sessionFor(r.state)).state, { type: 'opportunityShot', gunnerId: 'engineer', targetId: 'next' });
+  bag.splice(bag.indexOf('Time'), 1);
   assert.deepEqual(r.state.bags.mission.tokens, bag); assert.equal(r.state.time, 4);
   assert.equal(r.state.opportunity, s.opportunity, 'each spent Opportunity is independently earned back');
-  assert.ok(r.events.some(e => e.type === 'FIGHTER_KILL_TIME_FULL'));
+  assert.ok(r.events.some(e => e.type === 'BONUS_TIME_BANKED'));
   const end = dispatch(r.state, { type: 'continueProgress' });
   assert.equal(end.state.phase, 'select'); assert.equal(end.state.mission.position, 1);
-  assert.equal(end.state.time, 0); assert.equal(timeCount(end.state), 10);
+  assert.equal(end.state.time, 1); assert.equal(timeCount(end.state), 10);
   assert.equal(end.state.stats.turns, s.stats.turns); assert.equal(end.state.stats.missionDraws, s.stats.missionDraws);
   assert.deepEqual(end.state.crewCycle, s.crewCycle); assert.deepEqual(end.state.crew, s.crew);
   assert.ok(!end.events.some(e => e.type === 'ENEMY_PHASE_STARTED'));
@@ -256,7 +260,7 @@ test('two full V2 diagnostics are deterministic, conserve physical tokens, and r
     const resources = resourceCount(s), trace = [];
     while (s.phase !== 'ended') {
       const command = s.phase === 'select' ? { type: 'activate', crewId: availableCrew(s)[0].id }
-        : s.phase === 'action' ? { type: 'action', action: 'wait' } : { type: 'bomb' };
+        : s.phase === 'action' ? { type: 'action', action: 'wait' } : nextBombRunCommand(s);
       const before = s, result = dispatch(s, command); s = result.state;
       assert.equal(timeCount(s), 10); assert.equal(resourceCount(s), resources);
       const session = { ...sessionFor(s), view: before, pending: result.events, presenting: true };

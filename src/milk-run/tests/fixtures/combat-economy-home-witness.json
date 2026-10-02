@@ -1,7 +1,8 @@
 {
-  "seed": "combat-economy-0",
-  "note": "Successful deterministic legal-command witness under exact current defaults; not a balance or win-rate claim. V1 now records 29 explicit WORK_COMPLETED summaries; verified against the pre-pass engine with identical state, RNG, action legality and existing event snapshot timing after every command.",
+  "seed": "combat-economy-21",
+  "note": "Successful deterministic legal-command witness under exact current defaults; not a balance or win-rate claim.",
   "config": {
+    "preferredRuleset": "v1",
     "startingOfficer": 3,
     "startingEnlisted": 5,
     "missionEnemy": 15,
@@ -14,6 +15,10 @@
     "fw190Cards": 5,
     "me262Cards": 3,
     "flakCards": 4,
+    "bf109Hp": 2,
+    "bf110Hp": 2,
+    "fw190Hp": 3,
+    "me262Hp": 4,
     "maxFighters": 3,
     "flakShots": 2,
     "spawnFacing": 0,
@@ -57,7 +62,34 @@
     "returnLength": 5,
     "bombingMin": 3,
     "animationMs": 750,
-    "presentationSpeed": "normal"
+    "presentationSpeed": "normal",
+    "v2CrewCycleTurns": 10,
+    "v2MissionEnemy": 20,
+    "v2MissionResource": 12,
+    "v2MissionTime": 10,
+    "v2TimePerProgress": 4,
+    "v2OutboundLength": 8,
+    "v2ReturnLength": 3,
+    "v2NavigatorUnmannedTimePenalty": 0,
+    "v2CrewCycleRefreshGrantsTime": false,
+    "v2UnavailableCrewPressure": "full",
+    "v2RepairTime": 4,
+    "v2FireTime": 4,
+    "v2MedicalTime": 4,
+    "v2AssistedRepairTime": 2,
+    "v2AssistedFireTime": 2,
+    "v2AssistedMedicalTime": 2,
+    "v2FighterKillGrantsTime": true,
+    "v2DisruptEnabled": true,
+    "v2DisruptEffect": "accuracy-penalty",
+    "v2MaxEscorts": 1,
+    "v2OpportunityProvokesEnemyPhase": false,
+    "v2Bf109Engagement": 5,
+    "v2Bf110Engagement": 5,
+    "v2Fw190Engagement": 5,
+    "v2Me262Engagement": 5,
+    "v2EngagementMode": "any-action",
+    "v2RefillAtProgress": true
   },
   "commands": [
     {
@@ -73,32 +105,6 @@
     },
     {
       "type": "activate",
-      "crewId": "navigator"
-    },
-    {
-      "type": "action",
-      "action": "advancedFire",
-      "targetId": "fighter-1"
-    },
-    {
-      "type": "activate",
-      "crewId": "ball"
-    },
-    {
-      "type": "action",
-      "action": "advancedFire",
-      "targetId": "fighter-3"
-    },
-    {
-      "type": "opportunityShot",
-      "gunnerId": "ball",
-      "targetId": "fighter-3"
-    },
-    {
-      "type": "continueEnemyPhase"
-    },
-    {
-      "type": "activate",
       "crewId": "copilot"
     },
     {
@@ -112,7 +118,23 @@
     },
     {
       "type": "action",
-      "action": "wait"
+      "action": "repair",
+      "cells": [
+        "F3-1"
+      ],
+      "workCellId": "D3-1"
+    },
+    {
+      "type": "activate",
+      "crewId": "ball"
+    },
+    {
+      "type": "action",
+      "action": "repair",
+      "cells": [
+        "D5-1"
+      ],
+      "workCellId": "C5-2"
     },
     {
       "type": "activate",
@@ -125,14 +147,61 @@
       "targetId": "fighter-4"
     },
     {
-      "type": "opportunityShot",
-      "gunnerId": "navigator",
+      "type": "activate",
+      "crewId": "tail"
+    },
+    {
+      "type": "action",
+      "action": "advancedFire",
       "targetId": "fighter-4"
     },
     {
       "type": "opportunityShot",
-      "gunnerId": "navigator",
+      "gunnerId": "radio",
       "targetId": "fighter-4"
+    },
+    {
+      "type": "continueEnemyPhase"
+    },
+    {
+      "type": "activate",
+      "crewId": "navigator"
+    },
+    {
+      "type": "action",
+      "action": "rotateFighter",
+      "targetId": "fighter-5"
+    },
+    {
+      "type": "activate",
+      "crewId": "rightWaist"
+    },
+    {
+      "type": "action",
+      "action": "advancedFire",
+      "targetId": "fighter-5"
+    },
+    {
+      "type": "opportunityShot",
+      "gunnerId": "rightWaist",
+      "targetId": "fighter-6"
+    },
+    {
+      "type": "continueEnemyPhase"
+    },
+    {
+      "type": "activate",
+      "crewId": "bombardier"
+    },
+    {
+      "type": "action",
+      "action": "basicFire",
+      "targetId": "fighter-6"
+    },
+    {
+      "type": "opportunityShot",
+      "gunnerId": "radio",
+      "targetId": "fighter-5"
     },
     {
       "type": "continueEnemyPhase"
@@ -144,41 +213,7 @@
     {
       "type": "action",
       "action": "advancedFire",
-      "targetId": "fighter-4"
-    },
-    {
-      "type": "activate",
-      "crewId": "bombardier"
-    },
-    {
-      "type": "action",
-      "action": "fireControl",
-      "cells": [
-        "C5-3"
-      ],
-      "workCellId": "C5-4"
-    },
-    {
-      "type": "activate",
-      "crewId": "rightWaist"
-    },
-    {
-      "type": "action",
-      "action": "medical",
-      "targetId": "engineer",
-      "workCellId": "C2-2"
-    },
-    {
-      "type": "activate",
-      "crewId": "tail"
-    },
-    {
-      "type": "action",
-      "action": "fireControl",
-      "cells": [
-        "C2-4"
-      ],
-      "workCellId": "C2-2"
+      "targetId": "fighter-7"
     },
     {
       "type": "endRound"
@@ -205,21 +240,22 @@
     },
     {
       "type": "activate",
-      "crewId": "ball"
-    },
-    {
-      "type": "action",
-      "action": "wait"
-    },
-    {
-      "type": "activate",
       "crewId": "pilot"
     },
     {
       "type": "action",
       "action": "directFire",
       "gunnerId": "navigator",
-      "targetId": "fighter-10"
+      "targetId": "fighter-9"
+    },
+    {
+      "type": "activate",
+      "crewId": "rightWaist"
+    },
+    {
+      "type": "action",
+      "action": "advancedFire",
+      "targetId": "fighter-9"
     },
     {
       "type": "activate",
@@ -232,11 +268,29 @@
     },
     {
       "type": "activate",
-      "crewId": "leftWaist"
+      "crewId": "bombardier"
     },
     {
       "type": "action",
       "action": "wait"
+    },
+    {
+      "type": "activate",
+      "crewId": "leftWaist"
+    },
+    {
+      "type": "action",
+      "action": "basicFire",
+      "targetId": "fighter-9"
+    },
+    {
+      "type": "activate",
+      "crewId": "tail"
+    },
+    {
+      "type": "action",
+      "action": "advancedFire",
+      "targetId": "fighter-11"
     },
     {
       "type": "endRound"
@@ -258,35 +312,9 @@
     },
     {
       "type": "action",
-      "action": "fireControl",
-      "cells": [
-        "C2-1"
-      ],
-      "workCellId": "C2-2"
-    },
-    {
-      "type": "activate",
-      "crewId": "ball"
-    },
-    {
-      "type": "action",
-      "action": "repair",
-      "cells": [
-        "C2-4"
-      ],
-      "workCellId": "C2-2"
-    },
-    {
-      "type": "activate",
-      "crewId": "pilot"
-    },
-    {
-      "type": "action",
-      "action": "repair",
-      "cells": [
-        "D5-2"
-      ],
-      "workCellId": "D5-1"
+      "action": "medical",
+      "targetId": "navigator",
+      "workCellId": "D1-3"
     },
     {
       "type": "activate",
@@ -296,6 +324,46 @@
       "type": "action",
       "action": "convert",
       "to": "Enlisted"
+    },
+    {
+      "type": "activate",
+      "crewId": "ball"
+    },
+    {
+      "type": "action",
+      "action": "repair",
+      "cells": [
+        "D1-3"
+      ],
+      "workCellId": "C1-4"
+    },
+    {
+      "type": "activate",
+      "crewId": "pilot"
+    },
+    {
+      "type": "action",
+      "action": "repair",
+      "cells": [
+        "D3-4"
+      ],
+      "workCellId": "D3-3"
+    },
+    {
+      "type": "activate",
+      "crewId": "bombardier"
+    },
+    {
+      "type": "action",
+      "action": "wait"
+    },
+    {
+      "type": "activate",
+      "crewId": "leftWaist"
+    },
+    {
+      "type": "action",
+      "action": "wait"
     },
     {
       "type": "activate",
@@ -308,23 +376,7 @@
     },
     {
       "type": "activate",
-      "crewId": "navigator"
-    },
-    {
-      "type": "action",
-      "action": "wait"
-    },
-    {
-      "type": "activate",
-      "crewId": "bombardier"
-    },
-    {
-      "type": "action",
-      "action": "wait"
-    },
-    {
-      "type": "activate",
-      "crewId": "leftWaist"
+      "crewId": "tail"
     },
     {
       "type": "action",
@@ -332,124 +384,84 @@
       "targetId": "fighter-17"
     },
     {
-      "type": "opportunityShot",
-      "gunnerId": "leftWaist",
-      "targetId": "fighter-17"
+      "type": "endRound"
     },
     {
-      "type": "continueEnemyPhase"
+      "type": "startRound"
+    },
+    {
+      "type": "activate",
+      "crewId": "radio"
+    },
+    {
+      "type": "action",
+      "action": "escort"
+    },
+    {
+      "type": "activate",
+      "crewId": "bombardier"
+    },
+    {
+      "type": "action",
+      "action": "medical",
+      "targetId": "pilot",
+      "workCellId": "D3-3"
+    },
+    {
+      "type": "activate",
+      "crewId": "copilot"
+    },
+    {
+      "type": "action",
+      "action": "convert",
+      "to": "Enlisted"
+    },
+    {
+      "type": "activate",
+      "crewId": "leftWaist"
+    },
+    {
+      "type": "action",
+      "action": "wait"
+    },
+    {
+      "type": "activate",
+      "crewId": "rightWaist"
+    },
+    {
+      "type": "action",
+      "action": "wait"
     },
     {
       "type": "activate",
       "crewId": "tail"
+    },
+    {
+      "type": "action",
+      "action": "wait"
+    },
+    {
+      "type": "endRound"
+    },
+    {
+      "type": "startRound"
+    },
+    {
+      "type": "activate",
+      "crewId": "radio"
+    },
+    {
+      "type": "action",
+      "action": "escort"
+    },
+    {
+      "type": "activate",
+      "crewId": "rightWaist"
     },
     {
       "type": "action",
       "action": "basicFire",
-      "targetId": "fighter-17"
-    },
-    {
-      "type": "opportunityShot",
-      "gunnerId": "leftWaist",
-      "targetId": "fighter-18"
-    },
-    {
-      "type": "continueEnemyPhase"
-    },
-    {
-      "type": "endRound"
-    },
-    {
-      "type": "startRound"
-    },
-    {
-      "type": "activate",
-      "crewId": "radio"
-    },
-    {
-      "type": "action",
-      "action": "escort"
-    },
-    {
-      "type": "activate",
-      "crewId": "rightWaist"
-    },
-    {
-      "type": "action",
-      "action": "advancedFire",
-      "targetId": "fighter-19"
-    },
-    {
-      "type": "activate",
-      "crewId": "copilot"
-    },
-    {
-      "type": "action",
-      "action": "convert",
-      "to": "Enlisted"
-    },
-    {
-      "type": "activate",
-      "crewId": "navigator"
-    },
-    {
-      "type": "action",
-      "action": "wait"
-    },
-    {
-      "type": "activate",
-      "crewId": "bombardier"
-    },
-    {
-      "type": "action",
-      "action": "wait"
-    },
-    {
-      "type": "activate",
-      "crewId": "leftWaist"
-    },
-    {
-      "type": "action",
-      "action": "wait"
-    },
-    {
-      "type": "activate",
-      "crewId": "tail"
-    },
-    {
-      "type": "action",
-      "action": "wait"
-    },
-    {
-      "type": "endRound"
-    },
-    {
-      "type": "startRound"
-    },
-    {
-      "type": "activate",
-      "crewId": "radio"
-    },
-    {
-      "type": "action",
-      "action": "escort"
-    },
-    {
-      "type": "activate",
-      "crewId": "ball"
-    },
-    {
-      "type": "action",
-      "action": "advancedFire",
-      "targetId": "fighter-22"
-    },
-    {
-      "type": "opportunityShot",
-      "gunnerId": "ball",
-      "targetId": "fighter-22"
-    },
-    {
-      "type": "continueEnemyPhase"
+      "targetId": "fighter-21"
     },
     {
       "type": "activate",
@@ -457,135 +469,12 @@
     },
     {
       "type": "action",
-      "action": "advancedFire",
-      "targetId": "fighter-24"
-    },
-    {
-      "type": "activate",
-      "crewId": "pilot"
-    },
-    {
-      "type": "action",
       "action": "repair",
       "cells": [
-        "C2-1",
-        "C2-3"
+        "D3-3",
+        "D3-4"
       ],
-      "workCellId": "C2-2"
-    },
-    {
-      "type": "activate",
-      "crewId": "navigator"
-    },
-    {
-      "type": "action",
-      "action": "repair",
-      "cells": [
-        "C5-3"
-      ],
-      "workCellId": "C5-4"
-    },
-    {
-      "type": "activate",
-      "crewId": "copilot"
-    },
-    {
-      "type": "action",
-      "action": "convert",
-      "to": "Enlisted"
-    },
-    {
-      "type": "activate",
-      "crewId": "bombardier"
-    },
-    {
-      "type": "action",
-      "action": "wait"
-    },
-    {
-      "type": "opportunityShot",
-      "gunnerId": "radio",
-      "targetId": "fighter-27"
-    },
-    {
-      "type": "opportunityShot",
-      "gunnerId": "radio",
-      "targetId": "fighter-27"
-    },
-    {
-      "type": "continueEnemyPhase"
-    },
-    {
-      "type": "activate",
-      "crewId": "leftWaist"
-    },
-    {
-      "type": "action",
-      "action": "wait"
-    },
-    {
-      "type": "activate",
-      "crewId": "rightWaist"
-    },
-    {
-      "type": "action",
-      "action": "wait"
-    },
-    {
-      "type": "activate",
-      "crewId": "tail"
-    },
-    {
-      "type": "action",
-      "action": "wait"
-    },
-    {
-      "type": "endRound"
-    },
-    {
-      "type": "startRound"
-    },
-    {
-      "type": "activate",
-      "crewId": "radio"
-    },
-    {
-      "type": "action",
-      "action": "advancedFire",
-      "targetId": "fighter-28"
-    },
-    {
-      "type": "opportunityShot",
-      "gunnerId": "radio",
-      "targetId": "fighter-28"
-    },
-    {
-      "type": "continueEnemyPhase"
-    },
-    {
-      "type": "activate",
-      "crewId": "engineer"
-    },
-    {
-      "type": "action",
-      "action": "wait"
-    },
-    {
-      "type": "activate",
-      "crewId": "bombardier"
-    },
-    {
-      "type": "action",
-      "action": "advancedFire",
-      "targetId": "fighter-29"
-    },
-    {
-      "type": "opportunityShot",
-      "gunnerId": "bombardier",
-      "targetId": "fighter-29"
-    },
-    {
-      "type": "continueEnemyPhase"
+      "workCellId": "D3-1"
     },
     {
       "type": "activate",
@@ -595,87 +484,66 @@
       "type": "action",
       "action": "repair",
       "cells": [
-        "E3-3"
-      ],
-      "workCellId": "D3-3"
-    },
-    {
-      "type": "opportunityShot",
-      "gunnerId": "bombardier",
-      "targetId": "fighter-30"
-    },
-    {
-      "type": "continueEnemyPhase"
-    },
-    {
-      "type": "activate",
-      "crewId": "copilot"
-    },
-    {
-      "type": "action",
-      "action": "convert",
-      "to": "Enlisted"
-    },
-    {
-      "type": "opportunityShot",
-      "gunnerId": "engineer",
-      "targetId": "fighter-32"
-    },
-    {
-      "type": "continueEnemyPhase"
-    },
-    {
-      "type": "activate",
-      "crewId": "tail"
-    },
-    {
-      "type": "action",
-      "action": "advancedFire",
-      "targetId": "fighter-32"
-    },
-    {
-      "type": "activate",
-      "crewId": "leftWaist"
-    },
-    {
-      "type": "action",
-      "action": "wait"
-    },
-    {
-      "type": "activate",
-      "crewId": "rightWaist"
-    },
-    {
-      "type": "action",
-      "action": "fireControl",
-      "cells": [
-        "C5-4"
+        "D5-1",
+        "D5-2"
       ],
       "workCellId": "C5-2"
     },
     {
-      "type": "endRound"
-    },
-    {
-      "type": "startRound"
-    },
-    {
-      "type": "activate",
-      "crewId": "pilot"
-    },
-    {
-      "type": "action",
-      "action": "restartEngine",
-      "targetId": "E2"
-    },
-    {
       "type": "activate",
       "crewId": "copilot"
     },
     {
       "type": "action",
-      "action": "restartEngine",
-      "targetId": "E2"
+      "action": "convert",
+      "to": "Enlisted"
+    },
+    {
+      "type": "activate",
+      "crewId": "navigator"
+    },
+    {
+      "type": "action",
+      "action": "advancedFire",
+      "targetId": "fighter-25"
+    },
+    {
+      "type": "opportunityShot",
+      "gunnerId": "navigator",
+      "targetId": "fighter-25"
+    },
+    {
+      "type": "continueEnemyPhase"
+    },
+    {
+      "type": "activate",
+      "crewId": "leftWaist"
+    },
+    {
+      "type": "action",
+      "action": "wait"
+    },
+    {
+      "type": "opportunityShot",
+      "gunnerId": "rightWaist",
+      "targetId": "fighter-26"
+    },
+    {
+      "type": "continueEnemyPhase"
+    },
+    {
+      "type": "activate",
+      "crewId": "tail"
+    },
+    {
+      "type": "action",
+      "action": "wait"
+    },
+    {
+      "type": "endRound"
+    },
+    {
+      "type": "startRound"
     },
     {
       "type": "activate",
@@ -687,12 +555,22 @@
     },
     {
       "type": "activate",
-      "crewId": "bombardier"
+      "crewId": "pilot"
     },
     {
       "type": "action",
-      "action": "advancedFire",
-      "targetId": "fighter-37"
+      "action": "medical",
+      "targetId": "navigator",
+      "workCellId": "D1-3"
+    },
+    {
+      "type": "activate",
+      "crewId": "copilot"
+    },
+    {
+      "type": "action",
+      "action": "convert",
+      "to": "Enlisted"
     },
     {
       "type": "activate",
@@ -700,34 +578,29 @@
     },
     {
       "type": "action",
-      "action": "fireControl",
-      "cells": [
-        "E2-3",
-        "E3-1"
-      ],
-      "workCellId": "D2-3"
+      "action": "advancedFire",
+      "targetId": "fighter-31"
     },
     {
       "type": "activate",
-      "crewId": "engineer"
+      "crewId": "bombardier"
+    },
+    {
+      "type": "action",
+      "action": "fireControl",
+      "cells": [
+        "B5-4"
+      ],
+      "workCellId": "C5-2"
+    },
+    {
+      "type": "activate",
+      "crewId": "rightWaist"
     },
     {
       "type": "action",
       "action": "advancedFire",
-      "targetId": "fighter-35"
-    },
-    {
-      "type": "opportunityShot",
-      "gunnerId": "engineer",
-      "targetId": "fighter-35"
-    },
-    {
-      "type": "continueEnemyPhase"
-    },
-    {
-      "type": "opportunityShot",
-      "gunnerId": "bombardier",
-      "targetId": "fighter-38"
+      "targetId": "fighter-34"
     },
     {
       "type": "activate",
@@ -735,8 +608,7 @@
     },
     {
       "type": "action",
-      "action": "advancedFire",
-      "targetId": "fighter-40"
+      "action": "wait"
     },
     {
       "type": "endRound"
@@ -746,12 +618,33 @@
     },
     {
       "type": "activate",
-      "crewId": "pilot"
+      "crewId": "radio"
     },
     {
       "type": "action",
-      "action": "restartEngine",
-      "targetId": "E2"
+      "action": "escort"
+    },
+    {
+      "type": "activate",
+      "crewId": "engineer"
+    },
+    {
+      "type": "action",
+      "action": "advancedFire",
+      "targetId": "fighter-36"
+    },
+    {
+      "type": "activate",
+      "crewId": "ball"
+    },
+    {
+      "type": "action",
+      "action": "repair",
+      "cells": [
+        "F3-3",
+        "F3-4"
+      ],
+      "workCellId": "D3-3"
     },
     {
       "type": "activate",
@@ -759,12 +652,80 @@
     },
     {
       "type": "action",
-      "action": "restartEngine",
-      "targetId": "E2"
+      "action": "convert",
+      "to": "Enlisted"
+    },
+    {
+      "type": "opportunityShot",
+      "gunnerId": "radio",
+      "targetId": "fighter-38"
+    },
+    {
+      "type": "continueEnemyPhase"
     },
     {
       "type": "activate",
-      "crewId": "bombardier"
+      "crewId": "leftWaist"
+    },
+    {
+      "type": "action",
+      "action": "wait"
+    },
+    {
+      "type": "activate",
+      "crewId": "rightWaist"
+    },
+    {
+      "type": "action",
+      "action": "wait"
+    },
+    {
+      "type": "activate",
+      "crewId": "tail"
+    },
+    {
+      "type": "action",
+      "action": "wait"
+    },
+    {
+      "type": "endRound"
+    },
+    {
+      "type": "startRound"
+    },
+    {
+      "type": "activate",
+      "crewId": "radio"
+    },
+    {
+      "type": "action",
+      "action": "escort"
+    },
+    {
+      "type": "activate",
+      "crewId": "engineer"
+    },
+    {
+      "type": "action",
+      "action": "repair",
+      "cells": [
+        "D1-3"
+      ],
+      "workCellId": "C1-4"
+    },
+    {
+      "type": "activate",
+      "crewId": "pilot"
+    },
+    {
+      "type": "action",
+      "action": "directFire",
+      "gunnerId": "radio",
+      "targetId": "fighter-42"
+    },
+    {
+      "type": "activate",
+      "crewId": "navigator"
     },
     {
       "type": "action",
@@ -773,34 +734,15 @@
     },
     {
       "type": "activate",
-      "crewId": "radio"
-    },
-    {
-      "type": "action",
-      "action": "medical",
-      "targetId": "navigator",
-      "workCellId": "C5-4"
-    },
-    {
-      "type": "activate",
-      "crewId": "engineer"
+      "crewId": "copilot"
     },
     {
       "type": "action",
       "action": "repair",
       "cells": [
-        "C5-3",
-        "C5-4"
+        "D3-2"
       ],
-      "workCellId": "C5-2"
-    },
-    {
-      "type": "activate",
-      "crewId": "ball"
-    },
-    {
-      "type": "action",
-      "action": "wait"
+      "workCellId": "D3-1"
     },
     {
       "type": "activate",
@@ -808,73 +750,16 @@
     },
     {
       "type": "action",
-      "action": "wait"
-    },
-    {
-      "type": "activate",
-      "crewId": "tail"
-    },
-    {
-      "type": "action",
       "action": "advancedFire",
+      "targetId": "fighter-43"
+    },
+    {
+      "type": "opportunityShot",
+      "gunnerId": "radio",
       "targetId": "fighter-45"
     },
     {
-      "type": "endRound"
-    },
-    {
-      "type": "startRound"
-    },
-    {
-      "type": "activate",
-      "crewId": "ball"
-    },
-    {
-      "type": "action",
-      "action": "advancedFire",
-      "targetId": "fighter-47"
-    },
-    {
-      "type": "activate",
-      "crewId": "pilot"
-    },
-    {
-      "type": "action",
-      "action": "repair",
-      "cells": [
-        "E2-3",
-        "E3-1"
-      ],
-      "workCellId": "D2-3"
-    },
-    {
-      "type": "opportunityShot",
-      "gunnerId": "ball",
-      "targetId": "fighter-48"
-    },
-    {
-      "type": "opportunityShot",
-      "gunnerId": "ball",
-      "targetId": "fighter-48"
-    },
-    {
-      "type": "activate",
-      "crewId": "copilot"
-    },
-    {
-      "type": "action",
-      "action": "convert",
-      "to": "Enlisted"
-    },
-    {
-      "type": "opportunityShot",
-      "gunnerId": "ball",
-      "targetId": "fighter-50"
-    },
-    {
-      "type": "opportunityShot",
-      "gunnerId": "ball",
-      "targetId": "fighter-50"
+      "type": "continueEnemyPhase"
     },
     {
       "type": "activate",
@@ -891,60 +776,6 @@
     {
       "type": "action",
       "action": "wait"
-    },
-    {
-      "type": "activate",
-      "crewId": "rightWaist"
-    },
-    {
-      "type": "action",
-      "action": "advancedFire",
-      "targetId": "fighter-51"
-    },
-    {
-      "type": "continueEnemyPhase"
-    },
-    {
-      "type": "activate",
-      "crewId": "tail"
-    },
-    {
-      "type": "action",
-      "action": "wait"
-    },
-    {
-      "type": "continueEnemyPhase"
-    },
-    {
-      "type": "endRound"
-    },
-    {
-      "type": "startRound"
-    },
-    {
-      "type": "activate",
-      "crewId": "radio"
-    },
-    {
-      "type": "action",
-      "action": "escort"
-    },
-    {
-      "type": "activate",
-      "crewId": "bombardier"
-    },
-    {
-      "type": "action",
-      "action": "advancedFire",
-      "targetId": "fighter-54"
-    },
-    {
-      "type": "opportunityShot",
-      "gunnerId": "radio",
-      "targetId": "fighter-56"
-    },
-    {
-      "type": "continueEnemyPhase"
     },
     {
       "type": "activate",
@@ -953,81 +784,15 @@
     {
       "type": "action",
       "action": "basicFire",
-      "targetId": "fighter-56"
-    },
-    {
-      "type": "activate",
-      "crewId": "ball"
-    },
-    {
-      "type": "action",
-      "action": "advancedFire",
-      "targetId": "fighter-54"
+      "targetId": "fighter-43"
     },
     {
       "type": "opportunityShot",
-      "gunnerId": "ball",
-      "targetId": "fighter-56"
+      "gunnerId": "radio",
+      "targetId": "fighter-45"
     },
     {
       "type": "continueEnemyPhase"
-    },
-    {
-      "type": "activate",
-      "crewId": "engineer"
-    },
-    {
-      "type": "action",
-      "action": "fireControl",
-      "cells": [
-        "C5-3"
-      ],
-      "workCellId": "C5-4"
-    },
-    {
-      "type": "opportunityShot",
-      "gunnerId": "bombardier",
-      "targetId": "fighter-57"
-    },
-    {
-      "type": "continueEnemyPhase"
-    },
-    {
-      "type": "activate",
-      "crewId": "navigator"
-    },
-    {
-      "type": "action",
-      "action": "repair",
-      "cells": [
-        "D4-1"
-      ],
-      "workCellId": "C4-2"
-    },
-    {
-      "type": "activate",
-      "crewId": "copilot"
-    },
-    {
-      "type": "action",
-      "action": "convert",
-      "to": "Enlisted"
-    },
-    {
-      "type": "activate",
-      "crewId": "leftWaist"
-    },
-    {
-      "type": "action",
-      "action": "wait"
-    },
-    {
-      "type": "activate",
-      "crewId": "rightWaist"
-    },
-    {
-      "type": "action",
-      "action": "wait"
     },
     {
       "type": "endRound"
@@ -1045,12 +810,156 @@
     },
     {
       "type": "activate",
+      "crewId": "ball"
+    },
+    {
+      "type": "action",
+      "action": "advancedFire",
+      "targetId": "fighter-50"
+    },
+    {
+      "type": "opportunityShot",
+      "gunnerId": "ball",
+      "targetId": "fighter-48"
+    },
+    {
+      "type": "continueEnemyPhase"
+    },
+    {
+      "type": "activate",
+      "crewId": "tail"
+    },
+    {
+      "type": "action",
+      "action": "advancedFire",
+      "targetId": "fighter-48"
+    },
+    {
+      "type": "activate",
+      "crewId": "navigator"
+    },
+    {
+      "type": "action",
+      "action": "rotateFighter",
+      "targetId": "fighter-48"
+    },
+    {
+      "type": "activate",
+      "crewId": "leftWaist"
+    },
+    {
+      "type": "action",
+      "action": "advancedFire",
+      "targetId": "fighter-51"
+    },
+    {
+      "type": "opportunityShot",
+      "gunnerId": "radio",
+      "targetId": "fighter-48"
+    },
+    {
+      "type": "continueEnemyPhase"
+    },
+    {
+      "type": "activate",
+      "crewId": "bombardier"
+    },
+    {
+      "type": "action",
+      "action": "basicFire",
+      "targetId": "fighter-48"
+    },
+    {
+      "type": "activate",
+      "crewId": "rightWaist"
+    },
+    {
+      "type": "action",
+      "action": "medical",
+      "targetId": "tail",
+      "workCellId": "C6-2"
+    },
+    {
+      "type": "opportunityShot",
+      "gunnerId": "leftWaist",
+      "targetId": "fighter-52"
+    },
+    {
+      "type": "continueEnemyPhase"
+    },
+    {
+      "type": "activate",
       "crewId": "pilot"
     },
     {
       "type": "action",
-      "action": "restartEngine",
-      "targetId": "E4"
+      "action": "directFire",
+      "gunnerId": "ball",
+      "targetId": "fighter-52"
+    },
+    {
+      "type": "endRound"
+    },
+    {
+      "type": "startRound"
+    },
+    {
+      "type": "activate",
+      "crewId": "radio"
+    },
+    {
+      "type": "action",
+      "action": "escort"
+    },
+    {
+      "type": "activate",
+      "crewId": "engineer"
+    },
+    {
+      "type": "action",
+      "action": "repair",
+      "cells": [
+        "D6-1"
+      ],
+      "workCellId": "C6-2"
+    },
+    {
+      "type": "activate",
+      "crewId": "ball"
+    },
+    {
+      "type": "action",
+      "action": "repair",
+      "cells": [
+        "D3-2"
+      ],
+      "workCellId": "D3-1"
+    },
+    {
+      "type": "activate",
+      "crewId": "pilot"
+    },
+    {
+      "type": "action",
+      "action": "wait"
+    },
+    {
+      "type": "activate",
+      "crewId": "leftWaist"
+    },
+    {
+      "type": "action",
+      "action": "basicFire",
+      "targetId": "fighter-59"
+    },
+    {
+      "type": "activate",
+      "crewId": "navigator"
+    },
+    {
+      "type": "action",
+      "action": "rotateFighter",
+      "targetId": "fighter-59"
     },
     {
       "type": "activate",
@@ -1058,8 +967,8 @@
     },
     {
       "type": "action",
-      "action": "restartEngine",
-      "targetId": "E4"
+      "action": "convert",
+      "to": "Enlisted"
     },
     {
       "type": "activate",
@@ -1071,21 +980,43 @@
       "targetId": "fighter-61"
     },
     {
+      "type": "continueEnemyPhase"
+    },
+    {
+      "type": "endRound"
+    },
+    {
+      "type": "startRound"
+    },
+    {
       "type": "activate",
-      "crewId": "ball"
+      "crewId": "radio"
     },
     {
       "type": "action",
-      "action": "advancedFire",
-      "targetId": "fighter-62"
+      "action": "escort"
     },
     {
-      "type": "opportunityShot",
-      "gunnerId": "ball",
-      "targetId": "fighter-62"
+      "type": "activate",
+      "crewId": "pilot"
     },
     {
-      "type": "continueEnemyPhase"
+      "type": "action",
+      "action": "fireControl",
+      "cells": [
+        "D2-2",
+        "D2-4"
+      ],
+      "workCellId": "D2-1"
+    },
+    {
+      "type": "activate",
+      "crewId": "copilot"
+    },
+    {
+      "type": "action",
+      "action": "convert",
+      "to": "Enlisted"
     },
     {
       "type": "activate",
@@ -1093,20 +1024,46 @@
     },
     {
       "type": "action",
-      "action": "repair",
-      "cells": [
-        "B2-4"
-      ],
-      "workCellId": "C2-4"
+      "action": "advancedFire",
+      "targetId": "fighter-65"
     },
     {
       "type": "activate",
-      "crewId": "tail"
+      "crewId": "navigator"
     },
     {
       "type": "action",
-      "action": "advancedFire",
-      "targetId": "fighter-63"
+      "action": "rotateFighter",
+      "targetId": "fighter-66"
+    },
+    {
+      "type": "continueEnemyPhase"
+    },
+    {
+      "type": "opportunityShot",
+      "gunnerId": "leftWaist",
+      "targetId": "fighter-66"
+    },
+    {
+      "type": "opportunityShot",
+      "gunnerId": "leftWaist",
+      "targetId": "fighter-66"
+    },
+    {
+      "type": "activate",
+      "crewId": "bombardier"
+    },
+    {
+      "type": "action",
+      "action": "wait"
+    },
+    {
+      "type": "opportunityShot",
+      "gunnerId": "radio",
+      "targetId": "fighter-67"
+    },
+    {
+      "type": "continueEnemyPhase"
     },
     {
       "type": "activate",
@@ -1115,6 +1072,132 @@
     {
       "type": "action",
       "action": "wait"
+    },
+    {
+      "type": "activate",
+      "crewId": "tail"
+    },
+    {
+      "type": "action",
+      "action": "wait"
+    },
+    {
+      "type": "endRound"
+    },
+    {
+      "type": "startRound"
+    },
+    {
+      "type": "activate",
+      "crewId": "radio"
+    },
+    {
+      "type": "action",
+      "action": "escort"
+    },
+    {
+      "type": "activate",
+      "crewId": "navigator"
+    },
+    {
+      "type": "action",
+      "action": "manCockpit",
+      "stationId": "pilot"
+    },
+    {
+      "type": "activate",
+      "crewId": "leftWaist"
+    },
+    {
+      "type": "action",
+      "action": "fireControl",
+      "cells": [
+        "D2-2",
+        "D2-4"
+      ],
+      "workCellId": "C2-2"
+    },
+    {
+      "type": "activate",
+      "crewId": "engineer"
+    },
+    {
+      "type": "action",
+      "action": "advancedFire",
+      "targetId": "fighter-72"
+    },
+    {
+      "type": "activate",
+      "crewId": "ball"
+    },
+    {
+      "type": "action",
+      "action": "advancedFire",
+      "targetId": "fighter-70"
+    },
+    {
+      "type": "activate",
+      "crewId": "tail"
+    },
+    {
+      "type": "action",
+      "action": "basicFire",
+      "targetId": "fighter-72"
+    },
+    {
+      "type": "activate",
+      "crewId": "bombardier"
+    },
+    {
+      "type": "action",
+      "action": "medical",
+      "targetId": "pilot",
+      "workCellId": "D2-1"
+    },
+    {
+      "type": "endRound"
+    },
+    {
+      "type": "startRound"
+    },
+    {
+      "type": "activate",
+      "crewId": "radio"
+    },
+    {
+      "type": "action",
+      "action": "escort"
+    },
+    {
+      "type": "activate",
+      "crewId": "engineer"
+    },
+    {
+      "type": "action",
+      "action": "advancedFire",
+      "targetId": "fighter-77"
+    },
+    {
+      "type": "activate",
+      "crewId": "ball"
+    },
+    {
+      "type": "action",
+      "action": "advancedFire",
+      "targetId": "fighter-79"
+    },
+    {
+      "type": "activate",
+      "crewId": "tail"
+    },
+    {
+      "type": "action",
+      "action": "fireControl",
+      "cells": [
+        "D2-2",
+        "D2-4"
+      ],
+      "workCellId": "D2-3"
     },
     {
       "type": "endRound"
@@ -1147,234 +1230,42 @@
     {
       "type": "action",
       "action": "advancedFire",
-      "targetId": "fighter-68"
+      "targetId": "fighter-83"
+    },
+    {
+      "type": "opportunityShot",
+      "gunnerId": "ball",
+      "targetId": "fighter-83"
+    },
+    {
+      "type": "opportunityShot",
+      "gunnerId": "ball",
+      "targetId": "fighter-83"
+    },
+    {
+      "type": "continueEnemyPhase"
     },
     {
       "type": "activate",
-      "crewId": "navigator"
+      "crewId": "pilot"
     },
     {
       "type": "action",
       "action": "fireControl",
       "cells": [
-        "B3-4",
-        "C3-3"
+        "A3-3",
+        "A3-4",
+        "B3-3"
       ],
       "workCellId": "C3-4"
     },
     {
-      "type": "opportunityShot",
-      "gunnerId": "ball",
-      "targetId": "fighter-70"
-    },
-    {
-      "type": "continueEnemyPhase"
-    },
-    {
       "type": "activate",
       "crewId": "bombardier"
     },
     {
       "type": "action",
-      "action": "advancedFire",
-      "targetId": "fighter-72"
-    },
-    {
-      "type": "activate",
-      "crewId": "tail"
-    },
-    {
-      "type": "action",
-      "action": "basicFire",
-      "targetId": "fighter-72"
-    },
-    {
-      "type": "activate",
-      "crewId": "rightWaist"
-    },
-    {
-      "type": "action",
-      "action": "advancedFire",
-      "targetId": "fighter-73"
-    },
-    {
-      "type": "activate",
-      "crewId": "pilot"
-    },
-    {
-      "type": "action",
-      "action": "directFire",
-      "gunnerId": "ball",
-      "targetId": "fighter-72"
-    },
-    {
-      "type": "endRound"
-    },
-    {
-      "type": "startRound"
-    },
-    {
-      "type": "activate",
-      "crewId": "radio"
-    },
-    {
-      "type": "action",
-      "action": "escort"
-    },
-    {
-      "type": "activate",
-      "crewId": "ball"
-    },
-    {
-      "type": "action",
-      "action": "advancedFire",
-      "targetId": "fighter-77"
-    },
-    {
-      "type": "activate",
-      "crewId": "bombardier"
-    },
-    {
-      "type": "action",
-      "action": "fireControl",
-      "cells": [
-        "A3-1"
-      ],
-      "workCellId": "C3-2"
-    },
-    {
-      "type": "activate",
-      "crewId": "leftWaist"
-    },
-    {
-      "type": "action",
-      "action": "advancedFire",
-      "targetId": "fighter-77"
-    },
-    {
-      "type": "activate",
-      "crewId": "pilot"
-    },
-    {
-      "type": "action",
-      "action": "directFire",
-      "gunnerId": "ball",
-      "targetId": "fighter-77"
-    },
-    {
-      "type": "activate",
-      "crewId": "rightWaist"
-    },
-    {
-      "type": "action",
-      "action": "fireControl",
-      "cells": [
-        "D5-4",
-        "E5-3"
-      ],
-      "workCellId": "D5-3"
-    },
-    {
-      "type": "activate",
-      "crewId": "tail"
-    },
-    {
-      "type": "action",
-      "action": "fireControl",
-      "cells": [
-        "C3-1"
-      ],
-      "workCellId": "C3-2"
-    },
-    {
-      "type": "endRound"
-    },
-    {
-      "type": "startRound"
-    },
-    {
-      "type": "activate",
-      "crewId": "radio"
-    },
-    {
-      "type": "action",
-      "action": "escort"
-    },
-    {
-      "type": "activate",
-      "crewId": "copilot"
-    },
-    {
-      "type": "action",
-      "action": "convert",
-      "to": "Enlisted"
-    },
-    {
-      "type": "activate",
-      "crewId": "ball"
-    },
-    {
-      "type": "action",
-      "action": "advancedFire",
-      "targetId": "fighter-84"
-    },
-    {
-      "type": "opportunityShot",
-      "gunnerId": "ball",
-      "targetId": "fighter-84"
-    },
-    {
-      "type": "continueEnemyPhase"
-    },
-    {
-      "type": "activate",
-      "crewId": "navigator"
-    },
-    {
-      "type": "action",
-      "action": "rotateFighter",
-      "targetId": "fighter-84"
-    },
-    {
-      "type": "activate",
-      "crewId": "engineer"
-    },
-    {
-      "type": "action",
-      "action": "advancedFire",
-      "targetId": "fighter-86"
-    },
-    {
-      "type": "activate",
-      "crewId": "leftWaist"
-    },
-    {
-      "type": "action",
-      "action": "advancedFire",
-      "targetId": "fighter-86"
-    },
-    {
-      "type": "opportunityShot",
-      "gunnerId": "radio",
-      "targetId": "fighter-84"
-    },
-    {
-      "type": "opportunityShot",
-      "gunnerId": "navigator",
-      "targetId": "fighter-87"
-    },
-    {
-      "type": "continueEnemyPhase"
-    },
-    {
-      "type": "activate",
-      "crewId": "pilot"
-    },
-    {
-      "type": "action",
-      "action": "directFire",
-      "gunnerId": "engineer",
-      "targetId": "fighter-87"
+      "action": "wait"
     },
     {
       "type": "endRound"
@@ -1387,62 +1278,23 @@
     },
     {
       "type": "activate",
-      "crewId": "radio"
-    },
-    {
-      "type": "action",
-      "action": "escort"
-    },
-    {
-      "type": "activate",
-      "crewId": "copilot"
-    },
-    {
-      "type": "action",
-      "action": "convert",
-      "to": "Enlisted"
-    },
-    {
-      "type": "activate",
       "crewId": "ball"
     },
     {
       "type": "action",
-      "action": "basicFire",
-      "targetId": "fighter-92"
+      "action": "medical",
+      "targetId": "radio",
+      "workCellId": "C3-2"
     },
     {
       "type": "activate",
-      "crewId": "engineer"
+      "crewId": "tail"
     },
     {
       "type": "action",
-      "action": "basicFire",
-      "targetId": "fighter-92"
-    },
-    {
-      "type": "continueEnemyPhase"
-    },
-    {
-      "type": "activate",
-      "crewId": "navigator"
-    },
-    {
-      "type": "action",
-      "action": "advancedFire",
-      "targetId": "fighter-90"
-    },
-    {
-      "type": "activate",
-      "crewId": "pilot"
-    },
-    {
-      "type": "action",
-      "action": "fireControl",
-      "cells": [
-        "D5-2"
-      ],
-      "workCellId": "D5-1"
+      "action": "medical",
+      "targetId": "navigator",
+      "workCellId": "C2-2"
     },
     {
       "type": "activate",
@@ -1450,94 +1302,9 @@
     },
     {
       "type": "action",
-      "action": "repair",
-      "cells": [
-        "B3-4",
-        "B3-2",
-        "C3-3"
-      ],
-      "workCellId": "C3-4"
-    },
-    {
-      "type": "activate",
-      "crewId": "rightWaist"
-    },
-    {
-      "type": "action",
       "action": "medical",
       "targetId": "leftWaist",
-      "workCellId": "C4-2"
-    },
-    {
-      "type": "activate",
-      "crewId": "tail"
-    },
-    {
-      "type": "action",
-      "action": "repair",
-      "cells": [
-        "C5-1",
-        "C5-3",
-        "B5-4"
-      ],
-      "workCellId": "C5-2"
-    },
-    {
-      "type": "endRound"
-    },
-    {
-      "type": "startRound"
-    },
-    {
-      "type": "activate",
-      "crewId": "radio"
-    },
-    {
-      "type": "action",
-      "action": "escort"
-    },
-    {
-      "type": "activate",
-      "crewId": "ball"
-    },
-    {
-      "type": "action",
-      "action": "advancedFire",
-      "targetId": "fighter-98"
-    },
-    {
-      "type": "activate",
-      "crewId": "copilot"
-    },
-    {
-      "type": "action",
-      "action": "convert",
-      "to": "Enlisted"
-    },
-    {
-      "type": "activate",
-      "crewId": "engineer"
-    },
-    {
-      "type": "action",
-      "action": "wait"
-    },
-    {
-      "type": "activate",
-      "crewId": "navigator"
-    },
-    {
-      "type": "action",
-      "action": "rotateFighter",
-      "targetId": "fighter-100"
-    },
-    {
-      "type": "opportunityShot",
-      "gunnerId": "engineer",
-      "targetId": "fighter-100"
-    },
-    {
-      "type": "continueEnemyPhase"
+      "workCellId": "C2-2"
     },
     {
       "type": "endRound"
@@ -1548,69 +1315,21 @@
     {
       "type": "activate",
       "crewId": "engineer"
-    },
-    {
-      "type": "action",
-      "action": "medical",
-      "targetId": "ball",
-      "workCellId": "C3-4"
-    },
-    {
-      "type": "activate",
-      "crewId": "radio"
-    },
-    {
-      "type": "action",
-      "action": "escort"
-    },
-    {
-      "type": "activate",
-      "crewId": "pilot"
-    },
-    {
-      "type": "action",
-      "action": "repair",
-      "cells": [
-        "C3-1",
-        "B3-2",
-        "C3-3"
-      ],
-      "workCellId": "C3-2"
-    },
-    {
-      "type": "activate",
-      "crewId": "navigator"
     },
     {
       "type": "action",
       "action": "fireControl",
       "cells": [
-        "D3-4"
+        "C5-2",
+        "D5-1",
+        "C5-4",
+        "D5-3"
       ],
-      "workCellId": "D3-3"
+      "workCellId": "C4-4"
     },
     {
       "type": "activate",
-      "crewId": "leftWaist"
-    },
-    {
-      "type": "action",
-      "action": "medical",
-      "targetId": "bombardier",
-      "workCellId": "C3-4"
-    },
-    {
-      "type": "activate",
-      "crewId": "copilot"
-    },
-    {
-      "type": "action",
-      "action": "convert",
-      "to": "Enlisted"
-    },
-    {
-      "type": "activate",
-      "crewId": "tail"
+      "crewId": "pilot"
     },
     {
       "type": "action",
@@ -1619,6 +1338,103 @@
       "workCellId": "D4-1"
     },
     {
+      "type": "activate",
+      "crewId": "copilot"
+    },
+    {
+      "type": "action",
+      "action": "wait"
+    },
+    {
+      "type": "endRound"
+    },
+    {
+      "type": "startRound"
+    },
+    {
+      "type": "activate",
+      "crewId": "radio"
+    },
+    {
+      "type": "action",
+      "action": "escort"
+    },
+    {
+      "type": "activate",
+      "crewId": "bombardier"
+    },
+    {
+      "type": "action",
+      "action": "advancedFire",
+      "targetId": "fighter-98"
+    },
+    {
+      "type": "opportunityShot",
+      "gunnerId": "bombardier",
+      "targetId": "fighter-98"
+    },
+    {
+      "type": "continueEnemyPhase"
+    },
+    {
+      "type": "activate",
+      "crewId": "copilot"
+    },
+    {
+      "type": "action",
+      "action": "convert",
+      "to": "Enlisted"
+    },
+    {
+      "type": "activate",
+      "crewId": "ball"
+    },
+    {
+      "type": "action",
+      "action": "basicFire",
+      "targetId": "fighter-98"
+    },
+    {
+      "type": "activate",
+      "crewId": "navigator"
+    },
+    {
+      "type": "action",
+      "action": "fireControl",
+      "cells": [
+        "A3-2"
+      ],
+      "workCellId": "D3-1"
+    },
+    {
+      "type": "activate",
+      "crewId": "leftWaist"
+    },
+    {
+      "type": "action",
+      "action": "repair",
+      "cells": [
+        "D5-2",
+        "D5-4",
+        "E5-3"
+      ],
+      "workCellId": "D4-3"
+    },
+    {
+      "type": "activate",
+      "crewId": "tail"
+    },
+    {
+      "type": "action",
+      "action": "repair",
+      "cells": [
+        "D2-2",
+        "D2-1",
+        "D2-4"
+      ],
+      "workCellId": "D2-3"
+    },
+    {
       "type": "endRound"
     },
     {
@@ -1642,10 +1458,13 @@
       "to": "Enlisted"
     },
     {
-      "type": "endRound"
+      "type": "activate",
+      "crewId": "bombardier"
     },
     {
-      "type": "startRound"
+      "type": "action",
+      "action": "advancedFire",
+      "targetId": "fighter-106"
     },
     {
       "type": "activate",
@@ -1655,12 +1474,59 @@
       "type": "action",
       "action": "fireControl",
       "cells": [
-        "B3-1",
-        "B3-2",
-        "B3-3",
-        "B3-4"
+        "B5-4"
       ],
-      "workCellId": "C3-2"
+      "workCellId": "C5-4"
+    },
+    {
+      "type": "opportunityShot",
+      "gunnerId": "bombardier",
+      "targetId": "fighter-107"
+    },
+    {
+      "type": "continueEnemyPhase"
+    },
+    {
+      "type": "activate",
+      "crewId": "ball"
+    },
+    {
+      "type": "action",
+      "action": "advancedFire",
+      "targetId": "fighter-109"
+    },
+    {
+      "type": "activate",
+      "crewId": "pilot"
+    },
+    {
+      "type": "action",
+      "action": "directFire",
+      "gunnerId": "radio",
+      "targetId": "fighter-109"
+    },
+    {
+      "type": "activate",
+      "crewId": "rightWaist"
+    },
+    {
+      "type": "action",
+      "action": "advancedFire",
+      "targetId": "fighter-110"
+    },
+    {
+      "type": "opportunityShot",
+      "gunnerId": "radio",
+      "targetId": "fighter-109"
+    },
+    {
+      "type": "continueEnemyPhase"
+    },
+    {
+      "type": "endRound"
+    },
+    {
+      "type": "startRound"
     },
     {
       "type": "activate",
@@ -1676,46 +1542,20 @@
     },
     {
       "type": "action",
-      "action": "medical",
-      "targetId": "pilot",
-      "workCellId": "C2-2"
+      "action": "fireControl",
+      "cells": [
+        "B3-3"
+      ],
+      "workCellId": "C3-4"
     },
     {
       "type": "activate",
-      "crewId": "navigator"
+      "crewId": "pilot"
     },
     {
       "type": "action",
-      "action": "fireControl",
-      "cells": [
-        "F3-2",
-        "F3-4"
-      ],
-      "workCellId": "D3-1"
-    },
-    {
-      "type": "activate",
-      "crewId": "bombardier"
-    },
-    {
-      "type": "action",
-      "action": "fireControl",
-      "cells": [
-        "C2-4"
-      ],
-      "workCellId": "C2-2"
-    },
-    {
-      "type": "activate",
-      "crewId": "leftWaist"
-    },
-    {
-      "type": "action",
-      "action": "fireControl",
-      "cells": [
-        "D5-3"
-      ],
-      "workCellId": "D5-1"
+      "action": "restartEngine",
+      "targetId": "E3"
     },
     {
       "type": "activate",
@@ -1723,9 +1563,26 @@
     },
     {
       "type": "action",
-      "action": "medical",
-      "targetId": "tail",
-      "workCellId": "C6-2"
+      "action": "advancedFire",
+      "targetId": "fighter-114"
+    },
+    {
+      "type": "activate",
+      "crewId": "navigator"
+    },
+    {
+      "type": "action",
+      "action": "advancedFire",
+      "targetId": "fighter-114"
+    },
+    {
+      "type": "activate",
+      "crewId": "bombardier"
+    },
+    {
+      "type": "action",
+      "action": "basicFire",
+      "targetId": "fighter-114"
     },
     {
       "type": "activate",
@@ -1735,6 +1592,35 @@
       "type": "action",
       "action": "convert",
       "to": "Enlisted"
+    },
+    {
+      "type": "activate",
+      "crewId": "leftWaist"
+    },
+    {
+      "type": "action",
+      "action": "advancedFire",
+      "targetId": "fighter-115"
+    },
+    {
+      "type": "continueEnemyPhase"
+    },
+    {
+      "type": "activate",
+      "crewId": "tail"
+    },
+    {
+      "type": "action",
+      "action": "repair",
+      "cells": [
+        "A3-2",
+        "B3-1",
+        "A3-4"
+      ],
+      "workCellId": "D3-1"
+    },
+    {
+      "type": "continueEnemyPhase"
     },
     {
       "type": "endRound"
@@ -1744,44 +1630,44 @@
     "outcome": "success",
     "round": 19,
     "position": 19,
-    "altitude": 5,
+    "altitude": 1,
     "bombingResult": "hit",
-    "rng": 798974276,
-    "opportunity": 2,
-    "livingCrew": 9,
+    "rng": 375781298,
+    "opportunity": 1,
+    "livingCrew": 10,
     "stats": {
       "rounds": 19,
       "missionDraws": 190,
-      "fightersSpawned": 72,
-      "fightersKilled": 36,
+      "fightersSpawned": 66,
+      "fightersKilled": 27,
       "flakAttacks": 18,
-      "enemyAttacks": 145,
-      "enemyHits": 119,
-      "enemyCrits": 27,
-      "aircraftHits": 41,
-      "firesStarted": 23,
-      "repairs": 15,
-      "enginesDisabled": 3,
-      "enginesRestarted": 2,
-      "compromisedSections": 4,
+      "enemyAttacks": 151,
+      "enemyHits": 123,
+      "enemyCrits": 17,
+      "aircraftHits": 37,
+      "firesStarted": 13,
+      "repairs": 19,
+      "enginesDisabled": 1,
+      "enginesRestarted": 1,
+      "compromisedSections": 1,
       "altitudeLostByCause": {
-        "control": 0,
+        "control": 4,
         "structure": 0,
         "engines": 0
       },
-      "crewInjured": 9,
-      "crewKilled": 1,
-      "OfficerGained": 34,
-      "OfficerSpent": 33,
-      "EnlistedGained": 76,
-      "EnlistedSpent": 72,
-      "opportunityGained": 28,
-      "opportunitySpent": 27
+      "crewInjured": 10,
+      "crewKilled": 0,
+      "OfficerGained": 27,
+      "OfficerSpent": 28,
+      "EnlistedGained": 66,
+      "EnlistedSpent": 69,
+      "opportunityGained": 19,
+      "opportunitySpent": 19
     },
     "combatPulls": {
-      "Hit": 51,
-      "Burst": 16,
-      "Miss": 37
+      "Hit": 52,
+      "Burst": 8,
+      "Miss": 38
     },
     "eventCounts": {
       "ROUND_STARTED": 19,
@@ -1789,87 +1675,85 @@
       "COMBAT_BAG_REFILLED": 19,
       "CREW_READIED": 19,
       "FIRE_PHASE_STARTED": 19,
-      "CREW_SELECTION_READY": 143,
-      "CREW_ACTIVATED": 143,
+      "CREW_SELECTION_READY": 133,
+      "CREW_ACTIVATED": 133,
       "MISSION_TOKEN_DRAWN": 190,
-      "ENEMY_CARD_DRAWN": 84,
-      "FIGHTER_SPAWNED": 72,
-      "CREW_ACTION_READY": 143,
-      "CREW_ACTION": 143,
-      "RESOURCE_SPENT": 91,
-      "ESCORT_SUMMONED": 16,
-      "ACTIVATION_COMPLETED": 143,
-      "OPPORTUNITY_UNAVAILABLE": 69,
+      "RESOURCE_GAINED": 69,
+      "CREW_ACTION_READY": 133,
+      "CREW_ACTION": 133,
+      "RESOURCE_SPENT": 85,
+      "ESCORT_SUMMONED": 17,
+      "ACTIVATION_COMPLETED": 133,
+      "OPPORTUNITY_UNAVAILABLE": 36,
       "ENEMY_PHASE_STARTED": 190,
-      "ENEMY_ATTACK": 145,
-      "ENEMY_ATTACK_ROLL": 145,
-      "FIGHTER_MOVED": 122,
-      "FIGHTER_ROTATED": 196,
-      "GUNNER_FIRE_STARTED": 70,
-      "GUNNER_SHOT_ROLL": 104,
-      "ADVANCED_FIRE_RETRY": 12,
-      "FIGHTER_DAMAGED": 97,
-      "FIGHTER_DESTROYED": 36,
-      "OPPORTUNITY_GAINED": 28,
-      "GUNNER_FIRE_ENDED": 70,
-      "ENEMY_HIT_LOCATION": 119,
-      "ATTACK_EMPTY_SPACE": 78,
-      "RESOURCE_GAINED": 82,
-      "FIGHTER_DISRUPTED": 35,
-      "OPPORTUNITY_WINDOW_OPENED": 22,
-      "OPPORTUNITY_SPENT": 27,
-      "RESOURCES_CONVERTED": 14,
-      "CREW_HELD_POSITION": 24,
-      "PILOT_DIRECT_FIRE": 5,
+      "RESOURCES_CONVERTED": 12,
+      "ENEMY_CARD_DRAWN": 77,
       "FLAK_STARTED": 18,
-      "AIRCRAFT_SQUARE_DAMAGED": 34,
-      "FIRE_STARTED": 23,
+      "ENEMY_ATTACK": 151,
+      "ENEMY_ATTACK_ROLL": 151,
+      "ENEMY_HIT_LOCATION": 123,
+      "AIRCRAFT_SQUARE_DAMAGED": 31,
       "FLAK_ENDED": 18,
-      "DISRUPT_CLEARED": 7,
-      "CREW_RELOCATED": 37,
-      "WORK_STARTED": 37,
-      "CREW_INJURED": 9,
+      "CREW_RELOCATED": 33,
+      "WORK_STARTED": 33,
+      "FIGHTER_SPAWNED": 66,
+      "PILOT_DIRECT_FIRE": 5,
+      "GUNNER_FIRE_STARTED": 63,
+      "GUNNER_SHOT_ROLL": 98,
+      "GUNNER_FIRE_ENDED": 63,
+      "ATTACK_EMPTY_SPACE": 86,
+      "FIGHTER_MOVED": 132,
+      "FIGHTER_ROTATED": 222,
+      "FIGHTER_DAMAGED": 85,
+      "FIGHTER_DISRUPTED": 35,
+      "OPPORTUNITY_WINDOW_OPENED": 20,
+      "OPPORTUNITY_SPENT": 19,
+      "FIGHTER_DESTROYED": 27,
+      "OPPORTUNITY_GAINED": 19,
+      "ADVANCED_FIRE_RETRY": 8,
+      "ATTACK_DISRUPTED": 17,
+      "ESCORT_INTERCEPT": 25,
       "ROUND_ACTIONS_COMPLETE": 19,
       "ROUND_END_STARTED": 19,
-      "FIGHTERS_CLEARED": 17,
-      "ESCORTS_EXPIRED": 16,
+      "FIGHTERS_CLEARED": 18,
+      "ESCORTS_EXPIRED": 17,
       "ALTITUDE_CHECK": 57,
-      "ALTITUDE_MAINTAINED": 57,
+      "ALTITUDE_MAINTAINED": 53,
       "MISSION_ADVANCED": 19,
       "NEXT_ROUND_READY": 18,
-      "ATTACK_DISRUPTED": 13,
-      "UNAVAILABLE_CREW_SLOT": 47,
-      "ESCORT_INTERCEPT": 30,
-      "RESOURCE_WASTED": 18,
-      "WORK_COMPLETING": 29,
-      "FIRE_EXTINGUISHED": 15,
-      "CREW_HEALED": 7,
-      "CREW_RETURNED": 26,
-      "FIRE_SPREAD_ROLL": 15,
-      "AIRCRAFT_SQUARE_REPAIRED": 15,
-      "ENGINE_DISABLED": 3,
-      "WORK_CANCELLED": 2,
-      "ENGINE_REPAIR_READY": 2,
-      "FIRE_SPREAD_TARGET": 7,
-      "ENGINE_RESTART_ROLL": 6,
-      "ENGINE_RESTART_FAILED": 4,
-      "ALTITUDE_ROLL": 5,
-      "ENEMY_DECK_SHUFFLED": 2,
-      "ENGINE_RESTARTED": 2,
-      "WORK_TARGET_CHANGED": 2,
+      "DISRUPT_CLEARED": 5,
+      "CREW_HELD_POSITION": 20,
+      "UNAVAILABLE_CREW_SLOT": 57,
+      "RESOURCE_WASTED": 37,
+      "CREW_INJURED": 10,
+      "WORK_COMPLETING": 27,
+      "AIRCRAFT_SQUARE_REPAIRED": 19,
+      "WORK_COMPLETED": 27,
+      "CREW_RETURNED": 24,
+      "WORK_CANCELLED": 3,
+      "CREW_HEALED": 10,
       "CREW_DISPLACED": 3,
+      "FIRE_STARTED": 13,
+      "FIRE_EXTINGUISHED": 11,
+      "ENEMY_DECK_SHUFFLED": 2,
+      "FIRE_SPREAD_ROLL": 7,
+      "FIRE_SPREAD_TARGET": 5,
+      "ENGINE_DISABLED": 1,
+      "COCKPIT_MANNED": 1,
+      "ALTITUDE_ROLL": 1,
+      "ALTITUDE_LOST": 4,
       "AIRCRAFT_HIT_BURNING": 3,
-      "FIRE_SPREAD_BLOCKED": 3,
-      "SECTION_COMPROMISED": 4,
       "BOMBING_READY": 1,
       "BOMBING_STARTED": 1,
       "BOMBING_ROLL": 1,
       "BOMBING_RESOLVED": 1,
-      "SECTION_RESTORED": 2,
-      "FIRE_STOPPED_BY_CREW": 2,
-      "CREW_KILLED": 1,
-      "MISSION_ENDED": 1,
-      "WORK_COMPLETED": 29
+      "SECTION_COMPROMISED": 1,
+      "FIRE_SPREAD_BLOCKED": 3,
+      "SECTION_RESTORED": 1,
+      "ENGINE_REPAIR_READY": 1,
+      "ENGINE_RESTART_ROLL": 1,
+      "ENGINE_RESTARTED": 1,
+      "MISSION_ENDED": 1
     }
   }
 }

@@ -3,6 +3,9 @@
 import { refillBag } from './random.mjs';
 import { missionLengths } from './rulesets.mjs';
 import { observe } from './telemetry.mjs';
+import { effectiveTimeThreshold } from './crew-position.mjs';
+import { recordSortieEnd } from './results.mjs';
+import { beginBombRun, bombRunTargetWarning } from './bombing.mjs';
 
 const record = (emit, type, message, extra = {}) => emit({ type, message, ...extra });
 
@@ -26,39 +29,53 @@ export function spendEngagement(state, target, attackPass, emit) {
   }
 }
 
-export function gainTime(state, emit, completeJobs) {
-  state.timeTokens.push('Time');
-  state.time++;
+export function refreshTimeRequirement(state) {
+  const reached = state.time >= effectiveTimeThreshold(state);
+  state.pendingProgress = state.config.v2NavigatorUnmannedTimePenalty ? reached : state.pendingProgress || reached;
+}
+
+export function gainTime(state, emit, completeJobs, { overflow = false, source = null } = {}) {
+  state.overflowTimeTokens ??= [];
+  if (overflow) state.overflowTimeTokens.push('Time');
+  else { state.timeTokens.push('Time'); state.time++; }
+  if (source) {
+    const prefix = source === 'crew-cycle' ? 'CREW_CYCLE_TIME' : 'FIGHTER_KILL_TIME';
+    record(emit, `${prefix}_TAKEN`, `${source === 'crew-cycle' ? 'Crew Cycle refresh' : 'B-17 gunfire'} pulls 1 Time token from the mission bag.`, { source, token: 'Time', overflow });
+  }
   observe(state, 'timeTokensDrawn');
-  observe(state, state.mission.bombed ? 'returnTime' : 'outboundTime');
-  record(emit, 'TIME_GAINED', `TIME ${state.time}/${state.config.v2TimePerProgress}. Active work advances by one Time.`, { token: 'Time' });
+  observe(state, state.mission.bombed || state.mission.aborted ? 'returnTime' : 'outboundTime');
+  const threshold = effectiveTimeThreshold(state);
+  record(emit, overflow ? 'BONUS_TIME_BANKED' : 'TIME_GAINED', overflow ? 'BONUS TIME BANKED — carries into next Progress. Active work advances now.' : `TIME ${Math.min(state.time, threshold)}/${threshold}. Active work advances by one Time.`, { token: 'Time', overflow });
   for (const job of state.jobs) {
     job.remainingTime = Math.max(0, job.remainingTime - 1);
     record(emit, 'WORK_TIME_ADVANCED', `${job.kind === 'fireControl' ? 'Fire Control' : job.kind}: ${job.remainingTime} Time remaining.`, { jobId: job.id, crewId: job.crewId, ...(job.assistantId ? { assistantId: job.assistantId } : {}), kind: job.kind, remainingTime: job.remainingTime });
   }
   completeJobs(state.jobs.filter(job => job.remainingTime === 0));
-  if (state.time >= state.config.v2TimePerProgress) {
-    state.pendingProgress = true;
-    record(emit, 'PROGRESS_PENDING', `TIME ${state.time}/${state.config.v2TimePerProgress} — PROGRESS CHECKPOINT AFTER THIS TURN`);
+  refreshTimeRequirement(state);
+  if (state.pendingProgress) {
+    record(emit, 'PROGRESS_PENDING', `TIME ${Math.min(state.time, effectiveTimeThreshold(state))}/${effectiveTimeThreshold(state)} — PROGRESS CHECKPOINT AFTER THIS TURN`);
   }
 }
 
 /** Fighter kills can claim a real Time token already in the mission bag. */
-export function gainFighterKillTime(state, emit, completeJobs) {
-  if (state.pendingProgress || state.time >= state.config.v2TimePerProgress) {
-    record(emit, 'FIGHTER_KILL_TIME_FULL', 'Time track already full; no additional Time gained.');
+export function gainBonusTime(state, emit, completeJobs, source = 'fighter-kill') {
+  const prefix = source === 'crew-cycle' ? 'CREW_CYCLE_TIME' : 'FIGHTER_KILL_TIME';
+  const overflow = state.pendingProgress || state.time >= effectiveTimeThreshold(state);
+  if (overflow && state.overflowTimeTokens?.length) {
+    record(emit, `${prefix}_FULL`, 'Bonus Time is already banked; no additional Time gained.', { source });
     return false;
   }
   const index = state.bags.mission.tokens.indexOf('Time');
   if (index < 0) {
-    record(emit, 'FIGHTER_KILL_TIME_UNAVAILABLE', 'B-17 gunfire destroyed a fighter, but no Time token remains in the mission bag.');
+    record(emit, `${prefix}_UNAVAILABLE`, 'No Time token remains in the mission bag; no bonus Time is created.', { source });
     return false;
   }
   state.bags.mission.tokens.splice(index, 1);
-  record(emit, 'FIGHTER_KILL_TIME_TAKEN', 'B-17 gunfire pulls 1 Time token from the mission bag.');
-  gainTime(state, emit, completeJobs);
+  gainTime(state, emit, completeJobs, { overflow, source });
   return true;
 }
+
+export const gainFighterKillTime = (state, emit, completeJobs) => gainBonusTime(state, emit, completeJobs, 'fighter-kill');
 
 function progressCheckpoint(state, emit, shared) {
   observe(state, 'progressCheckpoints');
@@ -72,26 +89,37 @@ function progressCheckpoint(state, emit, shared) {
   if (state.outcome) {
     state.phase = 'ended';
     state.endedAt = Date.now();
-    record(emit, 'MISSION_ENDED', 'The sortie ends with the loss of the aircraft.');
+    recordSortieEnd(state, emit);
   } else {
     const { outboundLength, returnLength } = missionLengths(state);
     const home = outboundLength + returnLength;
     state.mission.position++;
     record(emit, 'MISSION_ADVANCED', `The B-17 advances one Progress to mission space ${state.mission.position}/${home}.`);
-    if (state.mission.position >= home && state.mission.bombed) {
+    if (state.mission.position >= home && (state.mission.bombed || state.mission.aborted)) {
       state.phase = 'ended';
       state.outcome = 'success';
+      state.endReason = { cause: 'home' };
       state.endedAt = Date.now();
-      record(emit, 'MISSION_ENDED', 'HOME. The B-17 completes its sortie.', { outcome: 'success' });
-    } else if (state.mission.position >= outboundLength && !state.mission.bombed) {
+      recordSortieEnd(state, emit);
+    } else if (state.mission.position >= outboundLength && !state.mission.bombed && !state.mission.aborted) {
       state.phase = 'bombing';
-      record(emit, 'BOMBING_READY', 'TARGET reached. Resolve the provisional bombing step.');
+      record(emit, 'BOMBING_READY', 'TARGET reached. Begin the four-die Bomb Run.');
+      beginBombRun(state, emit);
     }
+    const warning = bombRunTargetWarning(state);
+    if (warning) record(emit, 'BOMBARDIER_TARGET_WARNING', warning);
   }
   state.time = 0;
   state.pendingProgress = false;
   const returnedTime = state.timeTokens.length;
   state.bags.mission.tokens.push(...state.timeTokens.splice(0));
+  // This token advanced jobs at acquisition. Transferring it never does so again.
+  if (state.overflowTimeTokens?.length) {
+    state.timeTokens.push(...state.overflowTimeTokens.splice(0));
+    state.time = state.timeTokens.length;
+    refreshTimeRequirement(state);
+    record(emit, 'BONUS_TIME_CARRIED', `Banked Time carries into the next Progress: TIME ${state.time}/${effectiveTimeThreshold(state)}.`, { token: 'Time' });
+  }
   const refilled = { mission: 0, combat: 0 };
   for (const name of state.config.v2RefillAtProgress === false ? [] : ['mission', 'combat']) {
     const count = refillBag(state.bags[name]);
@@ -117,6 +145,9 @@ export function completeBetweenTurnProgress(state, emit, shared) {
 function finishTurn(state, emit, shared) {
   state.activeCrew = null;
   state.phase = 'select';
+  refreshTimeRequirement(state);
+  const cycleCompleted = state.crew.every(crew => crew.cycleSlotConsumed) && state.crewCycle.turn + 1 >= state.config.v2CrewCycleTurns;
+  if (cycleCompleted && state.config.v2CrewCycleRefreshGrantsTime && !state.outcome) gainBonusTime(state, emit, shared.completeJobs, 'crew-cycle');
   if (state.pendingProgress) progressCheckpoint(state, emit, shared);
   state.crewCycle.turn++;
   state.stats.turns = (state.stats.turns || 0) + 1;
@@ -138,19 +169,27 @@ function finishTurn(state, emit, shared) {
  * release an unconsumed worker, who must get their decision before more draws. */
 export function continueCycle(state, emit, shared) {
   const startingCycle = state.crewCycle.number;
-  while (state.phase === 'select' && !shared.availableCrew(state).length) {
+  const mode = state.config.v2UnavailableCrewPressure ?? 'full';
+  let deferredSlots = 0;
+  while (state.phase === 'select' && !state.pendingProgress && !shared.availableCrew(state).length) {
     const crew = state.crew.find(item => !item.cycleSlotConsumed);
     if (!crew) throw new Error('A V2 Crew Cycle must refresh after its ten completed slots.');
     crew.cycleSlotConsumed = true;
     crew.used = true;
     crew.activationCompleted = false;
     state.slot++;
-    record(emit, 'UNAVAILABLE_CREW_SLOT', `Crew Cycle slot ${state.slot}/${state.crew.length}: ${shared.nameOf(crew.id)} is unavailable; no crew action.`, { crewId: crew.id });
+    record(emit, 'UNAVAILABLE_CREW_SLOT', `Crew Cycle slot ${state.slot}/${state.crew.length}: ${shared.nameOf(crew.id)} is unavailable; no crew action.`, { crewId: crew.id, pressureMode: mode });
     if (state.config.unavailableDraws) shared.missionDraw(state, crew, emit, { unavailable: true });
     else record(emit, 'UNAVAILABLE_DRAW_SKIPPED', 'Developer rule: unavailable crew skip the mission draw.');
-    shared.enemyPhase(state, emit);
+    if (mode === 'full') shared.enemyPhase(state, emit);
+    else if (mode === 'compressed') deferredSlots++;
+    else record(emit, 'UNAVAILABLE_ENEMY_PHASE_SKIPPED', 'Draw Only: no ordinary fighter enemy phase for this unavailable slot.', { pressureMode: mode, crewId: crew.id });
     finishTurn(state, emit, shared);
     if (state.crewCycle.number !== startingCycle) break;
+  }
+  if (deferredSlots && !state.outcome) {
+    record(emit, 'UNAVAILABLE_PRESSURE_COMBINED', `${deferredSlots} consecutive unavailable slots: resolve one combined fighter enemy phase.`, { pressureMode: mode, slots: deferredSlots });
+    shared.enemyPhase(state, emit);
   }
   if (state.phase === 'select') record(emit, 'CREW_SELECTION_READY', shared.availableCrew(state).length ? 'Choose the next available crew member.' : 'No crew can act. Continue unavailable crew Turns.');
 }

@@ -97,6 +97,12 @@ export class ResolutionQueue {
     if (!this.paused && this.busy) this.schedule();
     this.changed();
   }
+  play() {
+    // A local Play button also leaves Step mode so playback really resumes.
+    this.paused = false;
+    if (this.speed === 'manual') this.speed = 'normal';
+    this.next();
+  }
   step() {
     // Manual mode already owns the wait. Avoid leaving an invisible pause behind
     // when the player switches a manually stepped sequence back to Normal/Fast.

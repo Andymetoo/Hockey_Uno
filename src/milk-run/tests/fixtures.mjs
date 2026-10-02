@@ -7,6 +7,24 @@ export function fresh(overrides = {}, seed = 'rules-regression') {
   return createGame({ missionEnemy: 0, missionResource: 100, ...overrides }, seed);
 }
 export function apply(state, command) { return dispatch(state, command); }
+/** A deterministic legal placement policy for lifecycle regression witnesses. */
+export function nextBombRunCommand(state) {
+  const run = state.mission.bombRun;
+  if (!run) return { type: 'bomb' };
+  const slots = ['course','drift','release'];
+  const slot = slots.find(id => run.placement[id] === null);
+  if (!slot) return { type: 'commitBombRun' };
+  const used = Object.values(run.placement);
+  return { type: 'placeBombDie', slot, dieIndex: [0,1,2,3].find(index => !used.includes(index)) };
+}
+export function commitTestBombRun(state) {
+  const events = [];
+  while (state.phase === 'bombing') {
+    const result = dispatch(state, nextBombRunCommand(state));
+    state = result.state; events.push(...result.events);
+  }
+  return { state, events };
+}
 export function activated(crewId = 'engineer', overrides = {}) {
   let state = dispatch(fresh(overrides), { type: 'startRound' }).state;
   state = dispatch(state, { type: 'activate', crewId }).state;

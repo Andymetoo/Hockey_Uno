@@ -16,11 +16,12 @@ try {
 
   for(const width of [320,360,390]) {
     await viewport(width,800);await inject(v2);
-    const initial=await evaluate(`(()=>{const m=document.querySelector('[data-fighter="status-fighter"]'),svg=m.ownerSVGElement,ring=m.querySelectorAll('.fighter-status-segment'),filled=getComputedStyle(m.querySelector('.hp.filled')),empty=[...m.querySelectorAll('.depleted')].map(e=>getComputedStyle(e).stroke);return {aria:m.getAttribute('aria-label'),hp:m.querySelectorAll('.hp.filled').length,eng:m.querySelectorAll('.engagement.filled').length,stroke:parseFloat(filled.strokeWidth)*svg.getBoundingClientRect().width/620,color:filled.stroke,empty,segments:ring.length,scroll:document.documentElement.scrollWidth<=innerWidth+1};})()`);
+    const initial=await evaluate(`(()=>{const m=document.querySelector('[data-fighter="status-fighter"]'),svg=m.ownerSVGElement,ring=m.querySelectorAll('.fighter-status-segment'),filled=getComputedStyle(m.querySelector('.hp.filled')),empty=[...m.querySelectorAll('.depleted')].map(e=>getComputedStyle(e).stroke),gradient=svg.querySelector('#fighter-hp-gradient');return {aria:m.getAttribute('aria-label'),hp:m.querySelectorAll('.hp.filled').length,eng:m.querySelectorAll('.engagement.filled').length,stroke:parseFloat(filled.strokeWidth)*svg.getBoundingClientRect().width/620,color:filled.stroke,gradient:{kind:gradient.tagName,units:gradient.getAttribute('gradientUnits'),stops:[...gradient.querySelectorAll('stop')].map(stop=>({offset:stop.getAttribute('offset')??'0',color:getComputedStyle(stop).stopColor}))},empty,segments:ring.length,scroll:document.documentElement.scrollWidth<=innerWidth+1};})()`);
     assert.match(initial.aria,/HP 2\/3/);assert.match(initial.aria,/Engagement 5\/5/);
     assert.equal(initial.hp,2);assert.equal(initial.eng,5);assert.equal(initial.segments,8);
     assert.ok(initial.stroke>=1.25,`${width}px filled ring stroke stays bold enough to read`);
-    assert.equal(initial.color,'rgb(18, 59, 104)','HP uses high-contrast midnight blue');
+    assert.equal(initial.color,'url("#fighter-hp-gradient")','HP uses its dedicated blue gradient');
+    assert.deepEqual(initial.gradient,{kind:'linearGradient',units:'userSpaceOnUse',stops:[{offset:'0',color:'rgb(82, 167, 220)'},{offset:'1',color:'rgb(18, 59, 104)'}]},'HP preserves the authored blue-to-midnight gradient');
     assert.ok(initial.empty.every(stroke=>stroke==='none'),'depleted segments are completely blank');
     assert.equal(initial.scroll,true,`${width}px no horizontal overflow`);
     await screenshot(`fighter-rings-${width}`);

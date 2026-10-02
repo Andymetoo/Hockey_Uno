@@ -18,15 +18,15 @@ test('normal hits progress healthy → damaged → fire; later burning hits add 
   assert.equal(events.filter(e => e.type === 'FIRE_STARTED').length, 1);
 });
 
-test('a critical applies two structural damage steps but injures overlapping crew only once', () => {
+test('a direct critical applies two structural and crew damage steps, killing healthy occupants', () => {
   const state = fresh();
   const id = STATIONS.pilot.cells[0];
   const { events, emit } = collect();
   resolveAttack(state, emit, { source: 'BF-109', roll: 6, cellId: id });
   assert.equal(state.cells[id], 'fire');
-  assert.equal(state.crew.find(c => c.id === 'pilot').health, 'injured');
+  assert.equal(state.crew.find(c => c.id === 'pilot').health, 'dead');
   assert.equal(events.filter(e => e.type === 'CREW_INJURED').length, 1);
-  assert.equal(events.filter(e => e.type === 'CREW_KILLED').length, 0);
+  assert.equal(events.filter(e => e.type === 'CREW_KILLED').length, 1);
   assert.equal(state.stats.enemyCrits, 1);
   assert.ok(events.findIndex(e => e.type === 'ENEMY_ATTACK_ROLL') < events.findIndex(e => e.type === 'AIRCRAFT_SQUARE_DAMAGED'));
   resolveAttack(state, emit, { source: 'BF-109', roll: 2, cellId: id });
@@ -40,8 +40,8 @@ test('either square of every straddling crew footprint can injure, then kill the
   for (const [crewId, station] of dualStations) for (const cells of [station.cells, [...station.cells].reverse()]) {
     const state = fresh();
     const { events, emit } = collect();
-    resolveAttack(state, emit, { source: 'BF-109', roll: 6, cellId: cells[0] });
-    assert.equal(state.crew.find(c => c.id === crewId).health, 'injured', `${crewId} critical at ${cells[0]} injures once`);
+    resolveAttack(state, emit, { source: 'BF-109', roll: 2, cellId: cells[0] });
+    assert.equal(state.crew.find(c => c.id === crewId).health, 'injured', `${crewId} normal hit at ${cells[0]} injures once`);
     assert.equal(events.filter(e => e.type === 'CREW_INJURED').length, 1);
     resolveAttack(state, emit, { source: 'BF-109', roll: 2, cellId: cells[1] });
     assert.equal(state.crew.find(c => c.id === crewId).health, 'dead', `${crewId} hit at other footprint ${cells[1]}`);

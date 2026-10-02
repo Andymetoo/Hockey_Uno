@@ -132,7 +132,11 @@ for (let index = first; index < first + attempts; index++) {
     state = result.state;
   }
   best = Math.max(best, state.mission.position);
-  if (state.outcome === 'success') {
+  const witnessedActions = new Set(commands.map(command => command.action).filter(Boolean));
+  const requiredActions = ['directFire', 'advancedFire', 'convert', 'repair', 'fireControl', 'medical', 'restartEngine'];
+  // A HOME result alone is insufficient: the regression fixture promises all
+  // these combat/economy/crisis interactions under the current damage rules.
+  if (state.outcome === 'success' && requiredActions.every(action => witnessedActions.has(action))) {
     const witness = { seed, note: 'Successful deterministic legal-command witness under exact current defaults; not a balance or win-rate claim.', config: { ...DEFAULT_CONFIG }, commands,
       metrics: { outcome: state.outcome, round: state.round, position: state.mission.position, altitude: state.altitude, bombingResult: state.mission.bombingResult, rng: state.rng, opportunity: state.opportunity, livingCrew: state.crew.filter(crew => crew.health !== 'dead').length, stats: state.stats, combatPulls, eventCounts: events } };
     const destination = new URL('./fixtures/combat-economy-home-witness.json', import.meta.url);

@@ -9,6 +9,7 @@ const compact = new Set([
   'GUNNER_FIRE_ENDED', 'FLAK_ENDED', 'WORK_TARGET_CHANGED', 'MEDICAL_NO_EFFECT',
   'UNAVAILABLE_DRAW_SKIPPED', 'AIRCRAFT_HIT_BURNING', 'CREW_HELD_POSITION',
   'ACTIVATION_COMPLETED', 'OPPORTUNITY_WINDOW_OPENED', 'CREW_CYCLE_REFRESHED', 'TURN_COMPLETE', 'ENGAGEMENT_SPENT', 'FIGHTER_DISENGAGED',
+  'BOMB_DIE_PLACED',
 ]);
 const categoryIcons = { crew: '●', resource: '+', gunfire: '⌖', enemy: '✈', damage: '◆', injury: '✚', repair: '⚒', altitude: '↕', time: '◷', departure: '↗' };
 
@@ -55,12 +56,12 @@ export function describeEvent(event = {}) {
     const value = upper(event.token);
     Object.assign(description, { kind: 'token', token: event.token, tokenBack: false,
       title: value === 'BURST' ? 'BURST ×2' : value,
-      tone: value === 'ENEMY' ? 'enemy' : value === 'RESOURCE' ? 'resource' : value === 'TIME' ? 'time' : value === 'MISS' ? 'miss' : 'hit' });
+      tone: value === 'ENEMY' ? 'enemy' : value === 'RESOURCE' ? 'resource' : value === 'TIME' ? 'time' : value === 'MISS' ? 'miss' : value === 'BURST' ? 'burst' : 'hit' });
   }
   if (type === 'ENEMY_ATTACK') description.title = `${event.source || event.message?.replace(/ attacks\.$/, '') || 'Enemy'} attacks`;
   if (type === 'ENEMY_ATTACK_ROLL') Object.assign(description, {
     kind: 'die', title: event.result === 'off-target' ? 'OFF TARGET' : event.result === 'miss' ? 'MISS' : event.result === 'critical' ? 'CRITICAL HIT' : 'HIT',
-    tone: ['off-target', 'miss'].includes(event.result) ? 'miss' : 'enemy', roll: event.roll,
+    tone: ['off-target', 'miss'].includes(event.result) ? 'miss' : event.result === 'critical' ? 'critical' : 'enemy', roll: event.roll,
   });
   if (type === 'ENEMY_HIT_LOCATION' || type === 'ENEMY_LOCATION_FOCUS') Object.assign(description, {
     kind: 'location', title: event.cellId ?? 'Hit location', tone: 'enemy',
@@ -92,6 +93,15 @@ export function describeEvent(event = {}) {
   if (type === 'OPPORTUNITY_CAPPED') description.title = 'OPPORTUNITY AT CAP';
   if (type === 'ACTIVATION_COMPLETED') description.title = 'Crew action complete';
   if (type === 'TIME_GAINED') description.title = '+1 TIME';
+  if (type === 'BONUS_TIME_BANKED') description.title = 'BONUS TIME BANKED — carries into next Progress';
+  if (type === 'WORK_ASSISTED') description.title = 'ASSIST WORK · TWO WORKERS';
+  if (type === 'BOMB_RUN_ROLLED') description.title = 'BOMB RUN · 4d6';
+  if (type === 'BOMB_DIE_REROLLED') Object.assign(description,{kind:'die',roll:event.roll,title:'BOMB RUN · REROLL'});
+  if (type === 'BOMBING_NO_DROP') description.title = 'NO DROP · BOMBARDIER FUNCTION UNMANNED';
+  if (type === 'BOMBING_RESOLVED' && continuous) description.title = `BOMB RUN · ${event.score??'—'}/9 · ${upper(event.outcome)}`;
+  if (type === 'BOMBARDIER_WARNING') description.title = 'BOMBARDIER STATION UNMANNED — NO DROP POSSIBLE AT TARGET';
+  if (type === 'MISSION_ABORTED') description.title = 'MISSION ABORTED — RETURNING HOME';
+  if (type === 'MISSION_ENDED') description.title = event.title ?? event.result?.title ?? (event.outcome === 'success' ? 'RETURNED HOME' : 'AIRCRAFT LOST');
   if (type === 'FIGHTER_KILL_TIME_TAKEN') description.title = 'FIGHTER KILL · TIME CLAIMED';
   if (type === 'FIGHTER_KILL_TIME_UNAVAILABLE') description.title = 'FIGHTER KILL · NO TIME IN BAG';
   if (type === 'FIGHTER_KILL_TIME_FULL') description.title = 'TIME TRACK FULL · NO ADDITIONAL TIME';
@@ -250,7 +260,7 @@ export function advanceVisual(previous = {}, event = {}, view) {
   return visual;
 }
 
-const groupStarts = new Set(['ROUND_STARTED', 'CREW_ACTIVATED', 'UNAVAILABLE_CREW_SLOT', 'CREW_ACTION', 'OPPORTUNITY_SPENT', 'GUNNER_FIRE_STARTED', 'ENEMY_PHASE_STARTED', 'ENEMY_ATTACK', 'ATTACK_DISRUPTED', 'FLAK_STARTED', 'ROUND_END_STARTED', 'ALTITUDE_CHECK', 'MISSION_ADVANCED', 'BOMBING_ROLL', 'WORK_COMPLETING', 'WORK_CANCELLED', 'FIRE_PHASE_STARTED', 'PROGRESS_STARTED', 'CHECKPOINT_JOBS_COMPLETED', 'AIRCRAFT_CONDITION_CHECKED', 'PROGRESS_BAGS_REFILLED', 'WORK_TIME_ADVANCED', 'ENGAGEMENT_SPENT', 'FIGHTER_BREAKING_OFF']);
+const groupStarts = new Set(['MISSION_ENDED', 'MISSION_ABORTED', 'BOMB_RUN_STARTED', 'BOMB_RUN_COMMITTED', 'ROUND_STARTED', 'CREW_ACTIVATED', 'UNAVAILABLE_CREW_SLOT', 'CREW_ACTION', 'OPPORTUNITY_SPENT', 'GUNNER_FIRE_STARTED', 'ENEMY_PHASE_STARTED', 'ENEMY_ATTACK', 'ATTACK_DISRUPTED', 'FLAK_STARTED', 'ROUND_END_STARTED', 'ALTITUDE_CHECK', 'MISSION_ADVANCED', 'BOMBING_ROLL', 'WORK_COMPLETING', 'WORK_CANCELLED', 'FIRE_PHASE_STARTED', 'PROGRESS_STARTED', 'CHECKPOINT_JOBS_COMPLETED', 'AIRCRAFT_CONDITION_CHECKED', 'PROGRESS_BAGS_REFILLED', 'WORK_TIME_ADVANCED', 'ENGAGEMENT_SPENT', 'FIGHTER_BREAKING_OFF']);
 
 const stationNames = {
   pilot: 'Pilot seat', copilot: 'Copilot seat', navigator: 'Navigator / nose gun', bombardier: 'Bombardier / nose gun',
@@ -266,6 +276,8 @@ const crewName = id => crewNames[id] ?? id ?? 'Crew';
 function outcomeSummary(events) {
   const find = type => events.find(event => event.type === type);
   const all = type => events.filter(event => event.type === type);
+  const ending = find('MISSION_ENDED');
+  if (ending) return ending.message;
   const work = find('WORK_COMPLETED');
   if (work) {
     const cells = work.cells ?? [];

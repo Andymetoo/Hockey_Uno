@@ -4,21 +4,24 @@ import { fighterHeading } from './spatial.mjs';
 import { targetOptions } from './targeting.mjs';
 import { describeEvent, groupEvents } from './presentation.mjs';
 import { isV2, missionLengths } from './rulesets.mjs';
+import { effectiveTimeThreshold } from './crew-position.mjs';
 
 const esc = value => String(value ?? '').replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]));
 const classes = values => values.filter(Boolean).join(' ');
 const targetingFighters = interaction => interaction && ['basicFire', 'advancedFire', 'opportunityShot', 'rotateFighter'].includes(interaction.action);
 
 export function continuousHudMarkup(state) {
+  const threshold=effectiveTimeThreshold(state), navigationPenalty=threshold>state.config.v2TimePerProgress;
   const {outboundLength,returnLength}=missionLengths(state);
-  const returning=state.mission.bombed||state.mission.position>outboundLength;
+  const returning=state.mission.bombed||state.mission.aborted||state.mission.position>outboundLength;
   const progress=returning?Math.max(0,state.mission.position-outboundLength):state.mission.position;
   const length=returning?returnLength:outboundLength;
   const leg=state.mission.position>=outboundLength+returnLength?'HOME':state.phase==='bombing'?'TARGET':returning?'RETURN':'OUTBOUND';
   const consumed=state.crew.filter(crew=>crew.cycleSlotConsumed).length;
-  const timeGraphic=state.config.v2TimePerProgress<=8?`<span class="time-pips" aria-hidden="true">${Array.from({length:state.config.v2TimePerProgress},(_,index)=>`<i class="${index<state.time?'filled':''}"></i>`).join('')}</span>`:`<progress class="hud-time-progress" aria-hidden="true" max="${state.config.v2TimePerProgress}" value="${state.time}"></progress>`;
+  const shownTime=Math.min(state.time,threshold);
+  const timeGraphic=threshold<=8?`<span class="time-pips" aria-hidden="true">${Array.from({length:threshold},(_,index)=>`<i class="${index<shownTime?'filled':''}"></i>`).join('')}</span>`:`<progress class="hud-time-progress" aria-hidden="true" max="${threshold}" value="${shownTime}"></progress>`;
   return `<button class="hud-metric" data-status-metric="cycle" data-hud="cycle" aria-label="Crew Cycle ${state.crewCycle.number}, ${consumed} of 10 slots consumed"><span>CREW CYCLE</span><strong>${consumed}<small>/10</small></strong><small>Cycle ${state.crewCycle.number}</small></button>
-    <button class="hud-metric hud-time ${state.pendingProgress?'pending':''}" data-status-metric="time" data-hud="time" aria-label="Time ${state.time} of ${state.config.v2TimePerProgress}${state.pendingProgress?', Progress checkpoint after this Turn':''}"><span>TIME</span><strong>${state.time}<small>/${state.config.v2TimePerProgress}</small></strong>${timeGraphic}</button>
+    <button class="hud-metric hud-time ${state.pendingProgress?'pending':''}" data-status-metric="time" data-hud="time" aria-label="Time ${shownTime} of ${threshold}${navigationPenalty?', Navigation unmanned':''}${state.pendingProgress?', Progress checkpoint after this Turn':''}"><span>TIME</span><strong>${shownTime}<small>/${threshold}</small></strong>${timeGraphic}${navigationPenalty?'<small class="navigation-warning">NAVIGATION UNMANNED</small>':''}${state.overflowTimeTokens?.length?'<small class="time-bank">+1 BANKED</small>':''}</button>
     <button class="hud-metric" data-status-metric="progress" data-hud="progress" aria-label="${leg} Progress ${progress} of ${length}"><span>PROGRESS</span><strong>${progress}<small>/${length}</small></strong><small>${leg}</small></button>
     <button class="hud-metric" data-status-metric="altitude" data-hud="altitude" aria-label="Altitude ${state.altitude} of ${state.config.startingAltitude}"><span>ALTITUDE</span><strong class="${state.altitude<=1?'danger-text':''}">${state.altitude}</strong><small>Levels</small></button>
     <button class="hud-metric" data-status-metric="resources" data-hud="resources" aria-label="Resources ${state.resources.Officer} Officer and ${state.resources.Enlisted} Enlisted"><span>RESOURCES</span><strong><b class="officer">${state.resources.Officer}</b><small> O</small> <b class="enlisted">${state.resources.Enlisted}</b><small> E</small></strong><small>Held outside bag</small></button>
@@ -28,7 +31,7 @@ export function continuousHudMarkup(state) {
 export const jobKindLabel=kind=>({repair:'REPAIR',fireControl:'FIRE CONTROL',medical:'MEDICAL'})[kind]??kind.toUpperCase();
 export function activeJobsMarkup(state,visual={}) {
   if(!isV2(state)||!state.jobs.length)return '';
-  return `<div class="active-jobs-heading">ACTIVE JOBS <small>Tap for workers and targets</small></div>${state.jobs.map(job=>`<button class="active-job ${visual.jobCountdown?.jobId===job.id?'counting-down':''}" data-job="${esc(job.id)}" data-job-id="${esc(job.id)}"><strong>${esc(jobKindLabel(job.kind))} — <span>${job.remainingTime} TIME REMAINING</span></strong><small>${[job.crewId,job.assistantId].filter(Boolean).map(id=>esc(crewDefinition(id)?.name??id)).join(' + ')}${job.targetId?` · Patient: ${esc(crewDefinition(job.targetId)?.name??job.targetId)}`:''}</small></button>`).join('')}`;
+  return `<div class="active-jobs-heading">ACTIVE JOBS <small>Tap for workers, targets and Assist Work</small></div>${state.jobs.map(job=>`<button class="active-job ${visual.jobCountdown?.jobId===job.id?'counting-down':''}" data-job="${esc(job.id)}" data-job-id="${esc(job.id)}"><strong>${esc(jobKindLabel(job.kind))} — <span>${job.remainingTime} TIME REMAINING</span></strong><small>${[job.crewId,job.assistantId].filter(Boolean).map(id=>esc(crewDefinition(id)?.name??id)).join(' + ')}${job.targetId?` · Patient: ${esc(crewDefinition(job.targetId)?.name??job.targetId)}`:''}</small>${!job.assistantId?'<span class="job-assist-note">+ Assist Work · uses an available crew action</span>':''}</button>`).join('')}`;
 }
 
 export function crewMarkup(state, selectedCrew, interaction = null) {
@@ -45,7 +48,7 @@ export function crewMarkup(state, selectedCrew, interaction = null) {
     const until = status.job ? isV2(state) ? `${status.job.remainingTime} Time remaining${status.job.assistantId ? ' · assisted' : ''}` : `Until Round ${status.job.completeRound} start` : '';
     const location = station.displaced ? crew.job ? 'WORKING' : 'DISPLACED' : station.currentId === station.homeId ? 'HOME' : `AT ${({engineer:'TOP TURRET',radio:'DORSAL',navigator:'NOSE',bombardier:'NOSE',pilot:'PILOT',copilot:'COPILOT',ball:'BALL',leftWaist:'PORT',rightWaist:'STBD',tail:'TAIL'})[station.currentId]}`;
     const detail = `${definition.name}, ${status.label}. Home Station: ${station.homeName}. Current Station: ${station.currentName}${station.displaced ? ' — Displaced' : ''}. ${station.label}. Position ${station.position}.${until ? ` ${until}.` : ''}`;
-    return `<button type="button" class="${classes(['crew-card', `status-${status.id}`, selected && 'selected', legal && 'target-legal', choosingCrew && !legal && 'target-dim', chosen && 'target-chosen'])}" data-crew="${esc(crew.id)}" aria-pressed="${Boolean(selected || chosen)}" aria-label="${esc(detail)}" title="${esc(detail)}">
+    return `<button type="button" class="${classes(['crew-card', `status-${status.id}`, station.displaced && !crew.job && 'is-displaced', selected && 'selected', legal && 'target-legal', choosingCrew && !legal && 'target-dim', chosen && 'target-chosen'])}" data-crew="${esc(crew.id)}" aria-pressed="${Boolean(selected || chosen)}" aria-label="${esc(detail)}" title="${esc(detail)}">
       <span class="crew-number">${definition.number}</span>
       <span class="crew-copy"><strong><span class="full-name">${esc(definition.name)}</span><span class="short-name">${esc(SHORT_NAMES[crew.id] || definition.name)}</span></strong><small class="crew-role">${esc(definition.rank)} · ${esc(definition.role || definition.tags.join(' / '))}</small><small class="crew-location">${esc(location)}</small></span>
       <span class="crew-status"><span class="status-icon" aria-hidden="true">${esc(status.icon)}</span><span class="full-status">${esc(status.label)}</span><span class="short-status">${esc(status.short)}</span>${until ? `<small class="work-until">${isV2(state)?`${status.job.remainingTime} Time`:`R${status.job.completeRound}`}</small>` : ''}${isV2(state)?`<small class="cycle-slot">${crew.cycleSlotConsumed?'SLOT USED':'SLOT OPEN'}</small>`:''}</span>
@@ -81,9 +84,10 @@ export function enemyMarkup(state, { selectedCrew = null, interaction = null, vi
 function tokenGraphic(token, animate = false) {
   const back = Boolean(token.back ?? token.tokenBack);
   const value = token.value ?? token.token;
-  const label = back ? '?' : token.label || (String(value).toUpperCase() === 'BURST' ? 'BURST ×2' : String(value).toUpperCase());
+  const combatLabel={HIT:'HIT',BURST:'×2',MISS:'MISS'}[String(value).toUpperCase()];
+  const label = back ? '?' : combatLabel || token.label || String(value).toUpperCase();
   const symbol = back ? '●' : String(value).toUpperCase() === 'ENEMY' ? '✈' : String(value).toUpperCase() === 'RESOURCE' ? '+' : String(value).toUpperCase() === 'TIME' ? '◷' : String(value).toUpperCase() === 'MISS' ? '×' : '⌖';
-  return `<span class="draw-token tone-${esc(token.tone || 'neutral')} ${animate ? back ? 'token-back' : 'token-reveal' : 'token-held'}" data-token="${esc(back ? 'back' : value)}" aria-label="${esc(back ? 'Token face down' : label)}"><span class="token-symbol" aria-hidden="true">${symbol}</span><strong>${esc(label)}</strong>${token.bag ? `<small>${esc(token.bag.toUpperCase())}</small>` : ''}</span>`;
+  return `<span class="draw-token tone-${esc(token.tone || 'neutral')} ${animate ? back ? 'token-back' : 'token-reveal' : 'token-held'}" data-token="${esc(back ? 'back' : value)}" aria-label="${esc(back ? 'Token face down' : String(value).toUpperCase()==='BURST'?'BURST ×2':label)}"><span class="token-symbol" aria-hidden="true">${symbol}</span><strong>${esc(label)}</strong>${token.bag ? `<small>${esc(token.bag.toUpperCase())}</small>` : ''}</span>`;
 }
 
 export function eventMarkup(event, visual = {}) {
@@ -104,7 +108,7 @@ export function logMarkup(log = []) {
   return groupEvents(log).reverse().map(group => {
     const first = group.events[0];
     const last = group.events.at(-1);
-    return `<li class="log-group category-${esc(group.category)}"><details data-log-group="${esc(group.id)}"><summary><span class="log-icon" aria-hidden="true">${esc(group.icon)}</span><span class="log-group-title">${esc(group.title)}</span><span class="log-index">${first.ruleset==='v2-continuous'?`C${esc(first.crewCycle??'—')} T${esc((first.cycleTurn??0)+1)}`:`R${esc(group.round ?? '—')}`} · ${esc(first.sequence ?? '')}${last.sequence !== first.sequence ? `–${esc(last.sequence ?? '')}` : ''}</span></summary><ol class="log-events">${group.events.map(event => {
+    return `<li class="log-group category-${esc(group.category)} ${group.events.some(e=>e.type==='MISSION_ENDED')?'sortie-ending':''}"><details data-log-group="${esc(group.id)}"><summary><span class="log-icon" aria-hidden="true">${esc(group.icon)}</span><span class="log-group-title">${esc(group.title)}</span><span class="log-index">${first.ruleset==='v2-continuous'?`C${esc(first.crewCycle??'—')} T${esc((first.cycleTurn??0)+1)}`:`R${esc(group.round ?? '—')}`} · ${esc(first.sequence ?? '')}${last.sequence !== first.sequence ? `–${esc(last.sequence ?? '')}` : ''}</span></summary><ol class="log-events">${group.events.map(event => {
       const description = describeEvent(event);
       return `<li class="category-${esc(description.category)}"><span class="log-event-message"><b>${esc(description.title)}</b>${esc(event.message)}</span><details class="log-raw"><summary>Raw event ${esc(event.sequence ?? '')}</summary><pre>${esc(JSON.stringify(event, null, 2))}</pre></details></li>`;
     }).join('')}</ol></details></li>`;
