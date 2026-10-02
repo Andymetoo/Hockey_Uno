@@ -43,6 +43,89 @@
 @media(max-width:650px){.status-strip.continuous-hud{grid-template-columns:repeat(3,minmax(0,1fr));padding:4px 6px;gap:3px 0}.continuous-hud .hud-metric{min-height:57px;padding:3px 7px;gap:3px}.continuous-hud .hud-metric:nth-child(3n){border-right:0}.continuous-hud .hud-metric:nth-child(n+4){border-top:1px solid #d3d9c5;padding-top:5px}.continuous-hud .hud-metric>span:first-child{font-size:8px;letter-spacing:.5px;white-space:nowrap}.continuous-hud .hud-metric strong,.continuous-hud .hud-metric>.opportunity-count{font-size:20px}.continuous-hud .hud-metric strong small{font-size:11px}.continuous-hud .hud-metric small{font-size:8px}.continuous-hud .hud-metric .time-pips{gap:3px}.time-pips i{width:9px;height:4px}.time-status{padding:6px 8px;margin:6px;gap:3px 7px}.time-status strong{font-size:10px}.time-status span{font-size:9px;letter-spacing:.2px}.active-jobs{padding:8px;gap:5px;grid-template-columns:1fr}.active-job{padding:7px 8px;min-height:46px}.active-job strong{font-size:11px}.active-job small{font-size:10px}.config-scope>summary{font-size:11px;padding:12px;line-height:1.5}.config-section{padding:10px 12px 14px}.experimental-badge{margin-left:0;display:block;margin-top:3px}.dev-footer{padding:10px 14px;gap:8px}.reset-controls{width:100%;justify-content:space-between}.dev-footer>.primary{width:100%}.config-field .next-sortie-note{font-size:9px}.board-stage{scroll-margin-top:142px}}
 @media(max-width:650px){.topbar{padding-top:3px;padding-bottom:3px;row-gap:2px}.continuous-hud .hud-metric{min-height:46px;padding:2px 7px;gap:2px}.continuous-hud .hud-metric:nth-child(n+4){padding-top:3px}.continuous-hud .hud-metric strong,.continuous-hud .hud-metric>.opportunity-count{font-size:18px}.continuous-hud .hud-metric>span:first-child{line-height:1.1}.continuous-hud .hud-metric>small{line-height:1.1}}
 @media(max-width:650px){.topbar{column-gap:4px}.topbar .desktop-label{display:none}.topbar .mobile-label{display:inline}.topbar .quiet{min-width:44px;min-height:44px;padding:5px 4px;font-size:9px}.topbar .wordmark{width:125px;min-width:125px}.wordmark #ruleset-label{max-width:125px;font-size:6px}.topbar .home-link{width:20px;min-width:20px}}
+/* USAAF field-table finish: olive, canvas, carbon ink and signal red. */
+:root{color:#293126;background:#252a24;--ink:#293126;--paper:#d8d2bb;--line:#777663;--olive:#4b563b;--orange:#853c2e;--gold:#c6a65f}
+body{background-color:#252a24;background-image:repeating-linear-gradient(0deg,#e8dfc20a 0 1px,transparent 1px 4px),radial-gradient(ellipse at 12% 0%,#48503e 0,transparent 48%),linear-gradient(145deg,#252a24,#30362e 58%,#202520)}
+.topbar{background:linear-gradient(100deg,#18211e,#283127 72%,#202822);border-bottom:3px solid #596043;color:#e6dec1}
+.wordmark{font-family:"Arial Narrow","Franklin Gothic Medium",Impact,sans-serif;letter-spacing:3px;color:#eee5c8}
+.wordmark span{font-family:"Courier New",monospace;color:#b4b294}
+.home-link{color:#c6c1a6}
+.topbar .quiet{border-color:#69705b;color:#e4dcc0}
+.status-strip{background:#3b4439;color:#e8e0c5;border-bottom:1px solid #73745e}
+.status-strip>div{border-color:#596252}
+.status-strip span{color:#b9bea2}
+.officer{color:#e0bd70}.enlisted{color:#a6bd8c}
+.tabletop{color:#293126}
+.panel{background-color:#d8d2bb;background-image:repeating-linear-gradient(0deg,#665d4710 0 1px,transparent 1px 5px);border-color:#77725e;border-radius:3px;box-shadow:0 3px 0 #11170f66,0 9px 20px #11170f26}
+.panel-label{border-color:#aaa48a;color:#30372a;font-family:"Courier New",monospace;letter-spacing:1.1px}
+.panel-label>span{color:#656650}
+button,input,select{border-radius:2px}
+button{border-color:#88836b;background:#e2dcc6;box-shadow:inset 0 1px #fff8e7;color:#293126}
+button:hover:not(:disabled){background:#d0c8ad;border-color:#596146}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline-color:#d39b44}
+.primary{background:#853c2e;border-color:#672f26;box-shadow:inset 0 1px #ffffff24;color:#f4e9cc}
+.primary:hover:not(:disabled){background:#6e3027;border-color:#53251e;color:#fff0d2}
+.quiet{background:transparent;box-shadow:none}
+.tabletop .panel-label,.eyebrow,.panel-label>span,.mission-track small,.board-key,.section-key,.engine-status span{font-family:"Courier New",monospace}
+.mission-track{scrollbar-color:#77745d #c7c0a8}
+.track-space:before{background:#8c886f}
+.track-space>span{background:#cbc4a9;border-color:#8b876e;color:#565c48}
+.track-space.current>span{background:#4b563b;border-color:#4b563b;box-shadow:0 0 0 3px #9a9878;color:#f0e5c4}
+.track-space.current small{color:#3e4a32}.track-space.target>span{border-color:#9a5439}.track-space.passed>span{background:#aeb399}
+.crew-card{background:#c9c5ab;border-color:#88846b;border-left-color:#596247;color:#30372b}
+.crew-card.selected{background:#e0d3a8;border-color:#a47b3b;outline-color:#9c7439}
+.crew-card.selected .crew-number{background:#4b563b;color:#f3e9ca}
+.crew-card.status-used{background:#555b4c;border-color:#3b4035;color:#ece4c9}
+.crew-card.status-used .crew-status,.crew-card.status-used .crew-copy small{color:#d4d0b6}
+.crew-card.status-injured{background:#b97d68;border-color:#844338;color:#29251f}
+.crew-card.status-dead{background:#373b34;border-color:#20241f;color:#e6ddc4}
+.crew-card.status-repair,.crew-card.status-medical{background:#c4bd9e;border-color:#77734f}
+.crew-card.status-fire{background:#c37a4b;border-color:#8c4329;color:#2e241c}
+.crew-card.status-treated{background:#a8b5ae;border-color:#526b69;color:#25302d}
+.crew-card.status-active{background:#e0cf91;border-color:#92753a;color:#302d21}
+.crew-card.status-used .station-indicator{color:#e7dfc4}
+.crew-note{color:#5c5d4c}
+.board-heading h1{font-family:"Arial Narrow","Franklin Gothic Medium",Impact,sans-serif;font-weight:700;letter-spacing:.2px;text-transform:uppercase;color:#33392d}
+.eyebrow{color:#61674c;letter-spacing:1.2px}
+.board-badge{border-color:#858064;color:#625d47;background:#d2ccb3;transform:none}
+.board-stage{background:#ccc4a8;border-color:#77745d;border-radius:2px;color:#30362b;box-shadow:inset 0 0 0 2px #eee5cc55}
+.board-stage.category-enemy{background:#c8a38a;border-color:#8e5a43}
+.board-stage.category-resource{background:#b8c0a3;border-color:#6d7957}
+.board-stage.category-injury,.board-stage.category-damage{background:#c79677;border-color:#98543a}
+.board-stage.category-altitude{background:#aab8b2;border-color:#5d7472}
+.stage-title,.board-stage strong{font-family:"Courier New",monospace;font-weight:700;color:#30362b}
+.stage-icon,.beat-icon{color:#4c583b}
+.draw-token{outline-color:#29382c;background:#425944;box-shadow:0 3px 0 #10160f66}
+.draw-token.tone-enemy{background:#873b2e;outline-color:#6c2d25}
+.draw-token.tone-miss{background:#455d65;outline-color:#34484f}
+.draw-token.tone-hit{background:#987333;outline-color:#765925}
+.die-face{background:#e3dcc4;color:#293126;border-color:#6d7056}
+.board-wrap svg{border:1px solid #77735e;box-shadow:0 2px 0 #11170f33}
+.fighter-card{background:#cbb9a3;border-color:#8b735e;border-radius:2px;color:#302c25;box-shadow:none}
+.fighter-card.target-legal{border-color:#536b43;box-shadow:inset 3px 0 #536b43}
+.fighter-card.target-chosen{background:#dfc991;outline-color:#9a6231}
+.fighter-card.resolving{background:#d4a783;outline-color:#8a3e2e}
+.fighter-hp{color:#5d3f30}.fighter-sector{color:#5e5647}
+.action-dock{background:#333b32f5;border-color:#60654f;color:#eee5c9;box-shadow:0 -4px 0 #171d18,0 -10px 24px #11170f66}
+.action-dock small{color:#c0bea3}
+.action-dock .quiet{color:#e8dfc3;border-color:#70735d}
+.action-dock .quiet:hover{background:#4b5446;color:#fff0d1}
+dialog{background-color:#d8d2bb;background-image:repeating-linear-gradient(0deg,#665d4710 0 1px,transparent 1px 5px);border-color:#77725e;border-radius:3px;box-shadow:0 18px 55px #090d09aa}
+.dialog-heading,.dialog-footer{border-color:#aaa48a}
+.dialog-heading h2,.summary-panel h2{font-family:"Arial Narrow","Franklin Gothic Medium",Impact,sans-serif;text-transform:uppercase;letter-spacing:.3px;color:#30372b}
+.dialog-content input:not([type=checkbox]),.dialog-content select,.playback select{background:#e9e2ca;border-color:#8b866d;color:#293126}
+.config-group,.active-job,.telemetry>div{border-radius:2px}
+.config-group{border-color:#89846b;background:#d1cbb2}
+.active-job{background:#c9c3a9;border-color:#89846b;color:#30362b}
+.telemetry>div{background:#c8c3a9;border:1px solid #8c876e}
+#notice{background:#542f27;border:1px solid #a56b46;border-radius:2px;color:#f1e5c6}
+.crew-detail{background:#c9c4aa;border-left-color:#586146}
+.crew-detail.status-injured,.crew-detail.status-dead{color:#302d26}
+.status-strip.continuous-hud .hud-metric{color:#eee5c9}
+.status-strip.continuous-hud .hud-metric>span:first-child,.status-strip.continuous-hud .hud-metric>small{color:#c3c2a8}
+.status-strip.continuous-hud .hud-metric{border-color:#596252}
+.status-strip.continuous-hud .hud-metric:hover:not(:disabled){background:#4a5345}
+@media(max-width:650px){.action-dock{background:#333b32f7}.board-wrap svg{box-shadow:0 1px 0 #11170f33}}
 /* Small card tilts distinguish unavailable crew; selection and ready states stay level. */
 .crew-card{transition:transform 120ms ease}
 .crew-card.status-used,.crew-card.status-working,.crew-card.status-repair,.crew-card.status-medical{transform:rotate(-2.5deg)}
@@ -50,9 +133,9 @@
 .crew-card.selected:not(.status-used):not(.status-working):not(.status-repair):not(.status-fire):not(.status-medical):not(.status-treated):not(.status-injured):not(.status-dead),.crew-card.target-chosen:not(.status-used):not(.status-working):not(.status-repair):not(.status-fire):not(.status-medical):not(.status-treated):not(.status-injured):not(.status-dead){transform:rotate(0)}
 .fighter-status-indicators{pointer-events:none}
 .fighter-status-segment{fill:none;stroke-linecap:round;stroke-width:4.2}
-.fighter-status-segment.hp.filled{stroke:#123b68}
+.fighter-status-segment.hp.filled{stroke:url(#fighter-hp-gradient)}
 .fighter-status-segment.hp.depleted{stroke:none}
-.fighter-status-segment.engagement.filled{stroke:#8a2545}
+.fighter-status-segment.engagement.filled{stroke:url(#fighter-engagement-gradient)}
 .fighter-status-segment.engagement.depleted{stroke:none}
 .crew-marker>.crew-body{fill:#234c3d}
 .crew-marker.status-dead>.crew-body{fill:#332c2a}

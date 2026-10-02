@@ -81,7 +81,7 @@ export const sectorPoint=(q,a)=>{const i=ALTITUDES.indexOf(a);return q==='Fore'?
 const engagementConfigKey={'BF-109':'v2Bf109Engagement','BF-110':'v2Bf110Engagement','FW-190':'v2Fw190Engagement','Me-262':'v2Me262Engagement'};
 function fighterSegments(value,maximum,radius,kind) {
   if(!Number.isFinite(maximum)||maximum<=0)return '';
-  const gap=Math.min(8,180/maximum),span=360/maximum-gap;
+  const gap=Math.min(22,180/maximum),span=360/maximum-gap;
   return Array.from({length:maximum},(_,index)=>{
     const start=(-90+index*360/maximum+gap/2)*Math.PI/180,end=(-90+index*360/maximum+360/maximum-gap/2)*Math.PI/180;
     const x1=radius*Math.cos(start),y1=radius*Math.sin(start),x2=radius*Math.cos(end),y2=radius*Math.sin(end);
@@ -100,7 +100,7 @@ export function boardMarkup(s,{selectedCrew,interaction:t,visual={},current,prev
   const aimed=t&&['basicFire','advancedFire','opportunityShot','directFire','rotateFighter'].includes(t.action)&&t.stage!=='gunner';
   const worked=new Set(s.jobs.flatMap(j=>j.cells??[]));
   const focus=visual.focusCell??(current?.type==='ENEMY_HIT_LOCATION'?null:current?.cellId);
-  let svg=`<svg viewBox="0 0 620 620" aria-label="B-17 damage board, columns A to F, rows 1 to 6" role="group"><defs><pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse"><path d="M0 6L6 0" stroke="#653c21" stroke-width="1.3" opacity=".5"/></pattern></defs><rect width="620" height="620" fill="#e8e8d8" rx="12"/><text x="310" y="21" class="compass-label" text-anchor="middle">FORE</text><text x="310" y="611" class="compass-label" text-anchor="middle">AFT</text><text x="20" y="309" transform="rotate(-90 20 309)" class="compass-label" text-anchor="middle">PORT</text><text x="607" y="309" transform="rotate(90 607 309)" class="compass-label" text-anchor="middle">STARBOARD</text>`;
+  let svg=`<svg viewBox="0 0 620 620" aria-label="B-17 damage board, columns A to F, rows 1 to 6" role="group"><defs><pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse"><path d="M0 6L6 0" stroke="#653c21" stroke-width="1.3" opacity=".5"/></pattern><linearGradient id="fighter-hp-gradient" x1="-40" y1="-40" x2="40" y2="40" gradientUnits="userSpaceOnUse"><stop stop-color="#52a7dc"/><stop offset="1" stop-color="#123b68"/></linearGradient><linearGradient id="fighter-engagement-gradient" x1="-40" y1="-40" x2="40" y2="40" gradientUnits="userSpaceOnUse"><stop stop-color="#dc9b57"/><stop offset="1" stop-color="#8a2545"/></linearGradient></defs><rect width="620" height="620" fill="#e8e8d8" rx="12"/><text x="310" y="21" class="compass-label" text-anchor="middle">FORE</text><text x="310" y="611" class="compass-label" text-anchor="middle">AFT</text><text x="20" y="309" transform="rotate(-90 20 309)" class="compass-label" text-anchor="middle">PORT</text><text x="607" y="309" transform="rotate(90 607 309)" class="compass-label" text-anchor="middle">STARBOARD</text>`;
   for(let i=0;i<6;i++)svg+=`<text x="${bx+i*72+36}" y="78" class="grid-label" text-anchor="middle">${'ABCDEF'[i]}</text><text x="77" y="${by+i*72+41}" class="grid-label" text-anchor="middle">${i+1}</text>`;
   for(const c of BOARD) {
     const x=bx+c.x*step,y=by+c.y*step,state=s.cells[c.id],indicator=c.engineIndicator?s.engines.find(e=>e.id===c.engineIndicator):null;
