@@ -49,11 +49,11 @@
 .crew-card.status-fire,.crew-card.status-treated,.crew-card.status-injured,.crew-card.status-dead{transform:rotate(2.5deg)}
 .crew-card.selected:not(.status-used):not(.status-working):not(.status-repair):not(.status-fire):not(.status-medical):not(.status-treated):not(.status-injured):not(.status-dead),.crew-card.target-chosen:not(.status-used):not(.status-working):not(.status-repair):not(.status-fire):not(.status-medical):not(.status-treated):not(.status-injured):not(.status-dead){transform:rotate(0)}
 .fighter-status-indicators{pointer-events:none}
-.fighter-status-segment{fill:none;stroke-linecap:round;stroke-width:3.2}
-.fighter-status-segment.hp.filled{stroke:#234c3d}
-.fighter-status-segment.hp.depleted{stroke:#84917a;stroke-width:2.3}
-.fighter-status-segment.engagement.filled{stroke:#a94332}
-.fighter-status-segment.engagement.depleted{stroke:#9b7966;stroke-width:2.3}
+.fighter-status-segment{fill:none;stroke-linecap:round;stroke-width:4.2}
+.fighter-status-segment.hp.filled{stroke:#123b68}
+.fighter-status-segment.hp.depleted{stroke:none}
+.fighter-status-segment.engagement.filled{stroke:#8a2545}
+.fighter-status-segment.engagement.depleted{stroke:none}
 .crew-marker>.crew-body{fill:#234c3d}
 .crew-marker.status-dead>.crew-body{fill:#332c2a}
 .crew-marker.target-legal>.crew-body{stroke:#2777b7;stroke-width:4}
