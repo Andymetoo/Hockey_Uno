@@ -8,10 +8,10 @@ import { sortieResult } from './results.mjs';
 import { bombRunTargetWarning, DEFAULT_BOMBING_TARGET, getBombingTarget, bombingOutcomeLabel } from './bombing.mjs';
 import { bombRunMarkup, targetChoiceMarkup } from './bomb-run-view.mjs';
 import { mountBombRunTest } from './bomb-run-test-view.mjs';
-import { canTurnBack } from './turn-back.mjs';
+import { canTurnBack, emergencyReturnDistance } from './turn-back.mjs';
 import { createCampaignStore, loadCampaignStore, saveCampaignStore, createCampaign, commissionAircraft, selectCampaign, renameAircraft, renameCrew, prepareCampaignSortie, finalizeCampaignSortie } from './campaign.mjs';
 import { campaignMarkup } from './campaign-view.mjs';
-import { campaignBackup, parseCampaignBackup, storeCampaignBackup } from './campaign-session.mjs';
+import { campaignBackup, parseCampaignBackup, storeCampaignBackup, discardActiveCampaignSession } from './campaign-session.mjs';
 import { ResolutionQueue } from './queue.mjs';
 import { boardMarkup, fighterPositions } from './board-view.mjs';
 import { crewStatus, stationStatus, availableCount, actionGroup, actionIconMarkup } from './ui-model.mjs';
@@ -37,6 +37,7 @@ let hitMapEnabled = false, hitMapStructure = true, hitMapEmpty = true;
 let devPreferences = loadDevPreferences();
 let selectedBombDie = null, campaignStore, campaignStoreError = '', pendingCampaignImport = null;
 let resultPresented = false;
+let autosaveEnabled = true, pendingDiscard = null;
 try {campaignStore=loadCampaignStore();}catch(error){campaignStore=createCampaignStore();campaignStoreError=error.message;}
 
 $('#app').innerHTML = `
@@ -94,11 +95,16 @@ const bombTestButton = document.createElement('button');
 bombTestButton.type = 'button'; bombTestButton.dataset.ui = 'test-bomb-run';
 bombTestButton.textContent = 'Test Bomb Run';
 $('#dev-dialog .dialog-content').prepend(bombTestButton);
+const discardButton = document.createElement('button');
+discardButton.type = 'button'; discardButton.dataset.ui = 'discard-campaign';
+discardButton.textContent = 'Discard Active Campaign Sortie (DEV)';
+$('#dev-dialog .dialog-content').prepend(discardButton);
 
-function initialize(config = devPreferences, seed = 'MILK-RUN', saved = null, ruleset = config.preferredRuleset ?? 'v1', targetId=DEFAULT_BOMBING_TARGET) {
+function initialize(config = devPreferences, seed = 'MILK-RUN', saved = null, ruleset = config.preferredRuleset ?? 'v1', targetId=DEFAULT_BOMBING_TARGET, persist = true) {
   const state=saved?.state??createGame(config,seed,ruleset);
   if(!saved&&isV2(state))state.mission.targetId=getBombingTarget(targetId).id;
   queue?.dispose();
+  autosaveEnabled = persist;
   queue = new ResolutionQueue({ state, dispatch, saved, onChange: render });
   selectedCrew = null; interaction = null; previousFighters = new Map(); previousBeat = null; interceptRequested = false;
   hitMapEnabled = false; hitMapStructure = true; hitMapEmpty = true;
@@ -117,7 +123,7 @@ function missionName(s) {
 }
 function render() {
   const s = queue.view;
-  saveWarning = !saveSession(queue.export());
+  saveWarning = autosaveEnabled && !saveSession(queue.export());
   finalizeCampaignIfReady();
   $('[data-ui="turn-back"]').hidden=queue.busy||Boolean(interaction)||!canTurnBack(s);
   $('#campaign-sortie-label').hidden=!s.campaign;
@@ -157,7 +163,7 @@ function render() {
 }
 function renderTrack(s) {
   const { outbound, back } = missionLengths(s), total = outbound + back;
-  $('#mission-label').textContent = `${isV2(s)?'PROGRESS · ':''}SEED ${s.seed}`;
+  $('#mission-label').textContent = s.mission.aborted ? `ABORTED — ${Math.max(0,total-s.mission.position)} PROGRESS TO HOME · EMERGENCY ROUTE` : `${isV2(s)?'PROGRESS · ':''}SEED ${s.seed}`;
   $('#mission-track').innerHTML = Array.from({length:total + 1}, (_, i) => `<div class="track-space ${i === s.mission.position ? 'current' : ''} ${i < s.mission.position ? 'passed' : ''} ${i === outbound ? 'target' : ''}"><span>${i === s.mission.position ? '✈' : i < s.mission.position ? '·' : i === outbound ? '◎' : '—'}</span><small>${i === 0 ? 'START' : i === total ? 'HOME' : i === outbound ? s.mission.aborted?'TURN BACK':'TARGET' : String(i).padStart(2,'0')}</small></div>`).join('');
   const track = $('#mission-track'), current = $('#mission-track .current');
   if (current) track.scrollLeft = Math.max(0, current.offsetLeft - track.offsetLeft - track.clientWidth / 2 + current.clientWidth / 2);
@@ -276,6 +282,7 @@ function notice(message) {
 }
 function send(command) {
   const prior=interaction;interaction=null;
+  autosaveEnabled = true;
   try {queue.send(command);if(command.type==='activate')interceptRequested=false;closeDialog();if(queue.busy)$('#board-stage').scrollIntoView({block:'start',behavior:'instant'});return true;}
   catch(e){interaction=prior;render();notice(e.message);return false;}
 }
@@ -370,6 +377,7 @@ function openDev() {
   configForm(devPreferences,queue.state.seed);
   const scopes=modifiedConfigScopes(devPreferences);
   $('#dev-prefs-status').textContent=scopes.length?`Saved next-sortie overrides: ${scopes.map(scope=>scope.toUpperCase()).join(', ')}.`:'Canonical defaults · applies to next sortie.';
+  discardButton.disabled = !discardTarget();
   openDialog('#dev-dialog');
 }
 function resetScope(scope) {
@@ -405,7 +413,7 @@ function inspectHud(metric) {
   const details={
     cycle:['Crew Cycle',`<p><b>Cycle ${s.crewCycle.number} · ${slots}/10 crew slots consumed</b></p><p>Each crewmate has one slot in this fixed ten-Turn Cycle. When all ten finish, eligible crew refresh. Busy, injured and dead crew still account for their normal slots.</p>`],
     time:['Time',`<p><b>TIME ${Math.min(s.time,effectiveTimeThreshold(s))}/${effectiveTimeThreshold(s)}</b></p><p>Each Time token advances existing jobs by one Time. At the threshold, finish the current crew action, Opportunity window and enemy queue before the Progress checkpoint.</p><p>${s.pendingProgress?'PROGRESS CHECKPOINT AFTER THIS TURN':'Time tokens remain outside the bag until Progress.'}</p>`],
-    progress:['Progress',`<p><b>${missionName(s)} · mission space ${s.mission.position}</b></p><p>${s.config.v2OutboundLength} outbound Progress to target; ${s.config.v2ReturnLength} return Progress to HOME.</p><p>A checkpoint completes zero-Time jobs, spreads unsuppressed fire, checks altitude and advances one space if the aircraft survives. Crew and fighters keep their independent clocks.</p>`],
+    progress:['Progress',`<p><b>${missionName(s)} · mission space ${s.mission.position}</b></p><p>${s.mission.aborted?`ABORTED — emergency route: ${missionLengths(s).back} Progress total; ${Math.max(0,missionLengths(s).outbound+missionLengths(s).back-s.mission.position)} Progress to HOME. The outbound flight plan was replaced when you turned back.`:`${s.config.v2OutboundLength} outbound Progress to target; ${s.config.v2ReturnLength} return Progress to HOME.`}</p><p>A checkpoint completes zero-Time jobs, spreads unsuppressed fire, checks altitude and advances one space if the aircraft survives. Crew and fighters keep their independent clocks.</p>`],
     altitude:['Altitude',`<p><b>${s.altitude} levels remaining</b></p><p>At Progress, Control, Structure and Engines are checked independently. Each failed check can cost altitude. Ground is zero.</p>`],
     resources:['Held resources',`<p><b>${s.resources.Officer} Officer · ${s.resources.Enlisted} Enlisted</b></p><p>Resource denomination comes from the activating crew member. Held physical Resource tokens remain outside the mission bag; spending sends them to discard.</p>`],
   };
@@ -484,9 +492,40 @@ function downloadJSON(data,name) {
 }
 function confirmTurnBack() {
   if(queue.busy||interaction||!canTurnBack(queue.state))return;
-  closeDialog();$('#info-title').textContent='Turn back for HOME?';
-  $('#info-content').innerHTML=`<p>This marks the mission objective <b>ABORTED</b>. Fly ${queue.state.mission.position} Progress home with the current fighters, damage, fires, jobs and supplies.</p><p>No crew action or resource is spent.</p><button class="quiet" data-ui="close">Keep flying outbound</button> <button class="primary" data-ui="confirm-turn-back">Confirm TURN BACK</button>`;
+  closeDialog();$('#info-title').textContent='TURN BACK?';
+  $('#info-content').innerHTML=`<p>Mission will be recorded as <b>ABORTED</b>.</p><p><b>Emergency return: ${emergencyReturnDistance(queue.state)} Progress</b></p><p>Current aircraft, crew and damage state will be preserved. Fighters, fires, jobs, Time and supplies remain in play. The flight plan will change to the shortest emergency route home.</p><p>No crew action or resource is spent.</p><button class="quiet" data-ui="close">Keep flying outbound</button> <button class="primary" data-ui="confirm-turn-back">Confirm TURN BACK</button>`;
   openDialog('#info-dialog');
+}
+
+function discardTarget() {
+  const assignment = queue.state.campaign;
+  const campaign = campaignStore.campaigns.find(c => c.id === (assignment?.campaignId ?? campaignStore.activeCampaignId));
+  const active = campaign?.activeSortie;
+  if (!active || campaign.sorties.some(sortie => sortie.id === active.sortieId)) return null;
+  if (assignment?.sortieId === active.sortieId && (queue.state.outcome || queue.state.phase === 'ended')) return null;
+  return active;
+}
+function confirmDiscard() {
+  const target = discardTarget(); if (!target) return;
+  pendingDiscard = { campaignId: target.campaignId, sortieId: target.sortieId };
+  closeDialog(); $('#info-title').textContent = 'Discard unfinished campaign sortie?';
+  $('#info-content').innerHTML = '<p>This flight will be removed and will not be added to Campaign history.</p><p>The aircraft and crew will return to their pre-sortie Campaign availability.</p><p><b>This cannot be undone.</b></p><button class="quiet" data-ui="cancel-discard">Cancel</button> <button class="primary" data-ui="confirm-discard">Discard Sortie</button>';
+  openDialog('#info-dialog');
+}
+function performDiscard() {
+  if (!pendingDiscard) return;
+  const { campaignId, sortieId } = pendingDiscard;
+  try {
+    const target = discardTarget();
+    if (!target || target.campaignId !== campaignId || target.sortieId !== sortieId) throw new Error('The active sortie changed. Open Playtest settings again.');
+    const result = discardActiveCampaignSession(campaignStore, campaignId, sortieId, true);
+    campaignStore = result.store; campaignStoreError = ''; pendingDiscard = null;
+    if (queue.state.campaign?.sortieId === sortieId) {
+      // Dispose every pending beat before it can save/finalize the removed flight.
+      initialize(devPreferences, 'MILK-RUN', null, 'v2-continuous', DEFAULT_BOMBING_TARGET, false);
+    }
+    openCampaign();
+  } catch (error) { notice(error.message); }
 }
 
 document.addEventListener('click', e=>{
@@ -532,6 +571,9 @@ document.addEventListener('click', e=>{
     case 'enemies':$('.enemy-panel').scrollIntoView({block:'center',behavior:'smooth'});break;
     case 'dev':openDev();break;
     case 'test-bomb-run':bombTest.open();break;
+    case 'discard-campaign':confirmDiscard();break;
+    case 'cancel-discard':pendingDiscard=null;closeDialog();openDev();break;
+    case 'confirm-discard':performDiscard();break;
     case 'new-sortie':openNewSortie();break;
     case 'reset-v1':resetScope('v1');break;
     case 'reset-v2':resetScope('v2');break;

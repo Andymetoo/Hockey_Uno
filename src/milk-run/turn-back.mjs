@@ -1,6 +1,11 @@
 /** Campaign strategy only. Reversal changes the route, never the combat clocks. */
 import { isV2 } from './rulesets.mjs';
 
+export function emergencyReturnDistance(state) {
+  // Position counts completed physical Progress, including the TARGET space.
+  return Math.max(1, Math.min(state.config.v2ReturnLength, Math.floor(state.mission.position / 2)));
+}
+
 export function canTurnBack(state) {
   return isV2(state) && Boolean(state.campaign?.campaignId && state.campaign?.sortieId) &&
     !state.outcome && !state.mission.aborted && !state.mission.bombed &&
@@ -13,17 +18,10 @@ export function turnBack(state, emit, confirmed = false) {
   if (confirmed !== true) throw new Error('Confirm Turn Back before abandoning the mission objective.');
   state.mission.aborted = true;
   state.mission.abortProgress = state.mission.position;
+  state.mission.emergencyReturnLength = emergencyReturnDistance(state);
   state.mission.bombingResult = 'aborted';
   state.phase = 'select';
   state.activeCrew = null;
-  emit({ type: 'MISSION_ABORTED', abortProgress: state.mission.abortProgress,
-    message: `MISSION ABORTED — RETURNING HOME. ${state.mission.abortProgress} Progress required to HOME. Fighters, work and supplies remain in play.` });
-  if (state.mission.abortProgress === 0) {
-    state.phase = 'ended';
-    state.outcome = 'success';
-    state.endReason = { cause: 'home', detail: 'Mission aborted at HOME before outbound travel.' };
-    state.endedAt = Date.now();
-    emit({ type: 'MISSION_ENDED', outcome: 'success', title: 'ABORTED — AIRCRAFT RETURNED',
-      message: 'ABORTED — AIRCRAFT RETURNED. Mission aborted at HOME before outbound travel.' });
-  }
+  emit({ type: 'MISSION_ABORTED', abortProgress: state.mission.abortProgress, emergencyReturnLength: state.mission.emergencyReturnLength,
+    message: `MISSION ABORTED — RETURNING HOME. Emergency route replaces the outbound flight plan: ${state.mission.emergencyReturnLength} Progress to HOME. Current aircraft, crew, fighters, damage, fires, work and supplies remain in play.` });
 }

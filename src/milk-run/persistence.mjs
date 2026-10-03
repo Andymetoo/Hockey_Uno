@@ -170,6 +170,7 @@ function validContinuousSnapshot(snapshot) {
   // Presentation snapshots may show a timer at zero just before completion or
   // departure. Validate stored clocks, but never reconstruct or advance them.
   return snapshot.rulesVersion === 4 &&
+    (snapshot.mission?.emergencyReturnLength === undefined || snapshot.mission.aborted === true && whole(snapshot.mission.abortProgress) && whole(snapshot.mission.emergencyReturnLength, 1)) &&
     validateBombRunSnapshot(snapshot) &&
     [1, V2_CONFIG_VERSION].includes(snapshot.v2ConfigVersion ?? 1) &&
     snapshot.config.v2CrewCycleTurns === 10 &&

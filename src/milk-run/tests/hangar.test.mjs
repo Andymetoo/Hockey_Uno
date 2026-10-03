@@ -188,6 +188,7 @@ test('version-1 lineage migration preserves all identities, auto-created replace
   assert.equal(validateCampaignStore(migrated.store), true);
   assert.deepEqual(importCampaignStore(migrated.store), migrated.store);
   const ended = dispatch(migrated.activeSession.state, { type: 'turnBack', confirmed: true }).state;
+  ended.phase = 'ended'; ended.outcome = 'success'; ended.mission.position = 1;
   assert.equal(finalizeCampaignSortie(migrated.store, ended).store.campaigns[0].aircraft[1].missionsFlown, 1);
 });
 

@@ -195,6 +195,23 @@ function uniqueEvents(events) {
   });
 }
 
+/** DEV only: history is written only at finalization, so release the reservation.
+ * Keep all identities, including replacements commissioned for earlier finalized KIA.
+ * Live health/damage never entered this store and must not be copied back into it.
+ */
+export function discardCampaignSortie(store, campaignId, sortieId, confirmed = false) {
+  validateCampaignStore(store);
+  const original = findCampaign(store, campaignId);
+  check(!original.sorties.some(sortie => sortie.id === sortieId), 'a finalized sortie cannot be discarded.');
+  if (!original.activeSortie) return { store, discarded: false };
+  check(original.activeSortie.sortieId === sortieId, 'only the current active sortie can be discarded.');
+  check(confirmed === true, 'confirm discarding the unfinished campaign sortie.');
+  const updated = clone(store), campaign = findCampaign(updated, campaignId);
+  campaign.activeSortie = null;
+  validateCampaignStore(updated);
+  return { store: updated, discarded: true };
+}
+
 function bombingSnapshot(state, aborted) {
   const run = state.mission.bombRun;
   if (!run) return { target: state.mission.targetId ?? null, status: aborted ? 'aborted' : 'not-dropped',

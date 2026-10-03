@@ -86,6 +86,14 @@ try {
   assert.equal((await campaign()).aircraft.length, 3);
   await touch('[data-ui=campaign-resume]');
   await click('[data-ui=turn-back]'); await click('[data-ui=confirm-turn-back]'); await flush();
+  const returning = await getState();
+  assert.equal(returning.outcome, null); assert.equal(returning.mission.emergencyReturnLength, 1);
+  returning.time = returning.config.v2TimePerProgress; returning.pendingProgress = true;
+  returning.timeTokens = Array(returning.time).fill('Time');
+  for (let i = 0; i < returning.time; i++) returning.bags.mission.tokens.splice(returning.bags.mission.tokens.indexOf('Time'), 1);
+  await inject(returning);
+  assert.equal(await evaluate("window.milkRun.send({type:'continueProgress'})"), true); await flush();
+  assert.equal((await getState()).outcome, 'success'); assert.equal((await getState()).mission.position, 1);
   await open(); await launch(third);
   note('B flies again after A is lost; KIA receives a new identity; commissioning C during B’s flight preserves B’s active assignment');
 

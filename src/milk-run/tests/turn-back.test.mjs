@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createGame } from '../state.mjs';
 import { dispatch, availableCrew } from '../rules.mjs';
 import { missionLengths } from '../rulesets.mjs';
-import { canTurnBack } from '../turn-back.mjs';
+import { canTurnBack, emergencyReturnDistance } from '../turn-back.mjs';
 import { SAVE_KEY, loadSession } from '../persistence.mjs';
 import { createCampaignStore, createCampaign, prepareCampaignSortie, finalizeCampaignSortie } from '../campaign.mjs';
 import { fighter } from './fixtures.mjs';
@@ -17,23 +17,23 @@ function setup(position = 2) {
   return prepared;
 }
 
-for (const distance of [2, 5, 7]) test(`Turn Back at outbound ${distance} requires exactly ${distance} more Progress to HOME`, () => {
+for (const [distance, home] of [[0,1],[1,1],[2,1],[3,1],[4,2],[5,2],[6,3],[7,3]]) test(`Turn Back at outbound ${distance} requires exactly ${home} more Progress to HOME`, () => {
   const { state, store } = setup(distance); assert.equal(canTurnBack(state), true);
   let result = dispatch(state, { type: 'turnBack', confirmed: true }), current = result.state;
   const events = [...result.events];
   assert.equal(current.mission.position, distance); assert.equal(current.mission.aborted, true);
-  assert.deepEqual(missionLengths(current), { outboundLength: distance, returnLength: distance });
+  assert.deepEqual(missionLengths(current), { outboundLength: distance, returnLength: home });
   let progress = 0;
   for (let guard = 0; guard < 200 && current.phase !== 'ended'; guard++) {
     const command = current.phase === 'select' ? { type: 'activate', crewId: availableCrew(current)[0].id } : { type: 'action', action: 'wait' };
     result = dispatch(current, command); current = result.state; events.push(...result.events);
     progress += result.events.filter(event => event.type === 'MISSION_ADVANCED').length;
   }
-  assert.equal(current.outcome, 'success'); assert.equal(current.mission.position, distance * 2);
-  assert.equal(progress, distance); assert.equal(current.stats.turns, ({ 2: 8, 5: 19, 7: 26 })[distance]);
+  assert.equal(current.outcome, 'success'); assert.equal(current.mission.position, distance + home);
+  assert.equal(progress, home); assert.equal(current.mission.emergencyReturnLength, home);
   assert.ok(!events.some(event => /^BOMBING_|^BOMB_RUN_/.test(event.type)));
   const finished = finalizeCampaignSortie(store, current, events);
-  assert.equal(finished.record.result, 'ABORTED — AIRCRAFT RETURNED'); assert.equal(finished.record.missionLength, distance * 2);
+  assert.equal(finished.record.result, 'ABORTED — AIRCRAFT RETURNED'); assert.equal(finished.record.missionLength, distance + home);
   assert.equal(finished.store.campaigns[0].stats.cumulativeBombingScore, 0); assert.equal(finished.store.campaigns[0].stats.completedMissions, 0);
 });
 
@@ -43,7 +43,9 @@ test('Turn Back is free and preserves fighters, positions, damage, fires, work, 
   state.jobs = [{ id: 'ongoing-repair', kind: 'repair', crewId: 'engineer', remainingTime: 3, cells: ['D3-1'], workCellId: 'C3-2' }];
   Object.assign(state.crew.find(member => member.id === 'engineer'), { job: 'ongoing-repair', position: ['C3-2'], station: null });
   state.escorts = [{ id: 'escort', quadrant: 'Fore' }]; state.altitude = 3; state.time = 2; state.timeTokens = ['Time', 'Time'];
-  state.bags.mission.tokens.splice(0, 2); state.resources.Officer = 2;
+  state.overflowTimeTokens = ['Time']; state.bags.mission.tokens.splice(0, 3); state.resources.Officer = 2;
+  Object.assign(state.crew.find(member => member.id === 'pilot'), { used: true, cycleSlotConsumed: true });
+  state.crew.find(member => member.id === 'tail').health = 'injured';
   const before = structuredClone(state), result = dispatch(state, { type: 'turnBack', confirmed: true });
   for (const key of ['fighters', 'cells', 'jobs', 'crew', 'engines', 'altitude', 'resources', 'bags', 'deck', 'time', 'timeTokens', 'overflowTimeTokens', 'escorts', 'rng', 'crewCycle', 'stats', 'opportunity'])
     assert.deepEqual(result.state[key], before[key], key);
@@ -77,7 +79,7 @@ test('campaign may turn back at TARGET before committing a Bomb Run and receives
   const result = dispatch(state, { type: 'turnBack', confirmed: true });
   assert.equal(result.state.phase, 'select'); assert.equal(result.state.mission.abortProgress, 8);
   assert.deepEqual(result.state.mission.bombRun.dice, [3, 4, 5, 6]);
-  result.state.phase = 'ended'; result.state.outcome = 'success'; result.state.mission.position = 16;
+  result.state.phase = 'ended'; result.state.outcome = 'success'; result.state.mission.position = 11;
   const finished = finalizeCampaignSortie(store, result.state);
   assert.equal(finished.record.bombing.status, 'aborted'); assert.equal(finished.record.bombing.score, null);
   assert.deepEqual(finished.store.campaigns[0].stats.bombingOutcomes, {});
@@ -98,8 +100,14 @@ test('destruction on the return after abort records aircraft loss, kills and KIA
   assert.equal(finalized.store.campaigns[0].stats.fightersDestroyed, 1); assert.equal(finalized.store.campaigns[0].stats.completedMissions, 0);
 });
 
-test('abort at HOME records an immediate survived abort without consuming a crew turn', () => {
-  const { state, store } = setup(0), result = dispatch(state, { type: 'turnBack', confirmed: true });
-  assert.equal(result.state.outcome, 'success'); assert.equal(result.state.phase, 'ended'); assert.equal(result.state.stats.turns, 0);
-  assert.equal(finalizeCampaignSortie(store, result.state).record.missionLength, 0);
+test('emergency return caps at configured normal return length and keeps minimum one', () => {
+  for (const [position, cap, expected] of [[7,2,2],[7,1,1],[7,5,3],[0,3,1],[1,3,1]]) {
+    const { state } = setup(position); state.config.v2ReturnLength = cap;
+    assert.equal(emergencyReturnDistance(state), expected);
+    assert.equal(dispatch(state, { type: 'turnBack', confirmed: true }).state.mission.emergencyReturnLength, expected);
+  }
+});
+test('older already-aborted saves keep their original return route', () => {
+  const { state } = setup(5); state.mission.aborted = true; state.mission.abortProgress = 5;
+  assert.deepEqual(missionLengths(state), { outboundLength: 5, returnLength: 5 });
 });

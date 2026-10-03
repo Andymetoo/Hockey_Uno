@@ -1,5 +1,5 @@
 /** A portable backup may include the one active sortie, never one full log per history record. */
-import { importCampaignStore, CAMPAIGN_STORE_KEY } from './campaign.mjs';
+import { importCampaignStore, discardCampaignSortie, CAMPAIGN_STORE_KEY } from './campaign.mjs';
 import { loadSession, SAVE_KEY } from './persistence.mjs';
 
 export function campaignBackup(store, session = null) {
@@ -43,4 +43,42 @@ export function storeCampaignBackup(input, storage=globalThis.localStorage) {
     throw error;
   }
   return backup;
+}
+
+/** DEV discard validates before writes and restores both keys if either write fails.
+ * An orphan reservation is safe to release: the validated store still owns all
+ * living identities. An unreadable/ambiguous autosave fails closed instead.
+ */
+export function discardActiveCampaignSession(store, campaignId, sortieId, confirmed = false, storage = globalThis.localStorage) {
+  const result = discardCampaignSortie(store, campaignId, sortieId, confirmed);
+  if (!result.discarded) return result;
+  const previousStore = storage.getItem(CAMPAIGN_STORE_KEY), previousSave = storage.getItem(SAVE_KEY);
+  if (previousStore !== null && JSON.stringify(importCampaignStore(previousStore)) !== JSON.stringify(store))
+    throw new Error('Campaign history changed in storage. Reload before discarding.');
+  let removeSave = false;
+  if (previousSave !== null) {
+    let saved;
+    try { saved = JSON.parse(previousSave); } catch { throw new Error('Cannot safely identify the active autosave. Discard cancelled.'); }
+    if (!saved?.state || !saved.view || !Array.isArray(saved.pending)) throw new Error('Cannot safely identify the active autosave. Discard cancelled.');
+    const snapshots = [saved.state, saved.view, ...saved.pending.map(event => event.state)];
+    const belongs = snapshot => snapshot?.campaign?.campaignId === campaignId && snapshot.campaign.sortieId === sortieId;
+    if (snapshots.some(snapshot => snapshot?.campaign?.campaignId === campaignId || snapshot?.campaign?.sortieId === sortieId)) {
+      const assignment = store.campaigns.find(c => c.id === campaignId).activeSortie;
+      const matches = snapshot => belongs(snapshot) && ['aircraftId', 'sortieNumber', 'startedAt'].every(key => snapshot.campaign[key] === assignment[key]) &&
+        Object.entries(assignment.crewIds).every(([role, id]) => snapshot.campaign.crewIds?.[role] === id);
+      if (!snapshots.every(matches)) throw new Error('Autosave identity does not match the active reservation. Discard cancelled.');
+      if (saved.state.outcome || saved.state.phase === 'ended') throw new Error('An ended sortie cannot be discarded; finish its Campaign finalization.');
+      removeSave = true;
+    }
+  }
+  try {
+    storage.setItem(CAMPAIGN_STORE_KEY, JSON.stringify(result.store));
+    if (removeSave) storage.removeItem(SAVE_KEY);
+  } catch (error) {
+    for (const [key, value] of [[CAMPAIGN_STORE_KEY, previousStore], [SAVE_KEY, previousSave]]) {
+      try { if (value === null) storage.removeItem(key); else storage.setItem(key, value); } catch { /* Surface original storage error. */ }
+    }
+    throw error;
+  }
+  return { ...result, removedAutosave: removeSave };
 }

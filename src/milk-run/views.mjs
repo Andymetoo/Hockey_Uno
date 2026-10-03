@@ -16,7 +16,7 @@ export function continuousHudMarkup(state, expanded = false) {
   const returning=state.mission.bombed||state.mission.aborted||state.mission.position>outboundLength;
   const progress=returning?Math.max(0,state.mission.position-outboundLength):state.mission.position;
   const length=returning?returnLength:outboundLength;
-  const leg=state.mission.position>=outboundLength+returnLength?'HOME':state.phase==='bombing'?'TARGET':returning?'RETURN':'OUTBOUND';
+  const leg=state.mission.position>=outboundLength+returnLength?'HOME':state.phase==='bombing'?'TARGET':state.mission.aborted?'ABORTED · RETURN':returning?'RETURN':'OUTBOUND';
   const consumed=state.crew.filter(crew=>crew.cycleSlotConsumed).length;
   const shownTime=Math.min(state.time,threshold);
   const timeGraphic=threshold<=8?`<span class="time-pips" aria-hidden="true">${Array.from({length:threshold},(_,index)=>`<i class="${index<shownTime?'filled':''}"></i>`).join('')}</span>`:`<progress class="hud-time-progress" aria-hidden="true" max="${threshold}" value="${shownTime}"></progress>`;

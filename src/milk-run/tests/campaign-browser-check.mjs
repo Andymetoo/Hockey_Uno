@@ -74,23 +74,24 @@ try {
   note('Continue Campaign launches a chosen target with stable assignments; real crew actions travel outbound and reload resumes the exact active sortie');
 
   await click('[data-ui="turn-back"]');
-  assert.match(await evaluate("document.querySelector('#info-content').textContent"), /Fly 2 Progress home/);
+  assert.match(await evaluate("document.querySelector('#info-content').textContent"), /Emergency return: 1 Progress/);
   assert.deepEqual(await getState(), state, 'opening the required confirmation has no rule effect');
   await click('#info-dialog [data-ui="close"]'); assert.deepEqual(await getState(), state);
   await confirmAbort(); const aborted = await getState();
   assert.equal(aborted.mission.aborted, true); assert.equal(aborted.mission.abortProgress, 2);
   for (const key of ['crew', 'fighters', 'cells', 'jobs', 'resources', 'escorts', 'time', 'timeTokens', 'bags', 'crewCycle', 'stats']) assert.deepEqual(aborted[key], state[key], `Turn Back preserves ${key}`);
   assert.equal(await evaluate("document.querySelector('[data-ui=turn-back]').hidden"), true);
-  await turn(); assert.equal((await getState()).outcome, null);
+  assert.match(await evaluate("document.querySelector('#mission-label').textContent"), /ABORTED.*1 PROGRESS TO HOME.*EMERGENCY ROUTE/);
+  await reload(); assert.deepEqual(await getState(), aborted);
   await turn(); const returned = await getState();
-  assert.equal(returned.outcome, 'success'); assert.equal(returned.mission.position, 4);
+  assert.equal(returned.outcome, 'success'); assert.equal(returned.mission.position, 3);
   assert.match(await evaluate("document.querySelector('#summary').textContent"), /ABORTED.*AIRCRAFT RETURNED/);
   await openCampaign(); campaign = currentCampaign(await getStore());
   assert.equal(campaign.sorties.length, 1); assert.equal(campaign.stats.abortedMissions, 1);
   assert.equal(campaign.sorties[0].bombing.score, null); assert.equal(campaign.sorties[0].bombing.outcome, null);
   assert.equal(campaign.aircraft[0].missionsSurvived, 1);
   await screenshot('aborted-return-service-record');
-  note('TURN BACK requires confirmation, preserves combat state, and outbound2 takes exactly2 further Progress to record ABORTED — AIRCRAFT RETURNED with no bombing credit');
+  note('TURN BACK confirms 1 Progress, labels the emergency route, preserves state across reload, and outbound 2 takes exactly 1 further Progress for ABORTED — AIRCRAFT RETURNED');
 
   const finalized = await getStore(); await closeCampaign(); await reload(); await openCampaign();
   assert.deepEqual(await getStore(), finalized);
@@ -156,7 +157,7 @@ try {
   await reload(); assert.deepEqual(await getStore(), backup.store); assert.deepEqual(await getState(), backup.activeSession.state);
   note('Real Export JSON captures versioned campaign plus active flight; file input Import and confirmation restore exact history and sortie without duplicating stats');
 
-  await confirmAbort(); assert.equal((await getState()).outcome, 'success');
+  await confirmAbort(); assert.equal((await getState()).outcome, null); await turn(); assert.equal((await getState()).outcome, 'success');
   const beforeStandalone = await getStore();
   await click('[data-ui="new-sortie"]'); await click('#sortie-form input[value="v1"]'); await click('#sortie-form button[type="submit"]');
   assert.equal((await getState()).ruleset, 'v1'); assert.equal((await getState()).campaign, undefined);
