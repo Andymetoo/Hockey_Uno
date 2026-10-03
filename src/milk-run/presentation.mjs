@@ -15,7 +15,7 @@ const categoryIcons = { crew: '●', resource: '+', gunfire: '⌖', enemy: '✈'
 
 export function eventCategory(event) {
   const type = event?.type ?? '';
-  if (/^FIGHTER_KILL_TIME_/.test(type)) return 'time';
+  if (/^(FIGHTER_KILL_TIME_|CREW_CYCLE_TIME_)/.test(type)) return 'time';
   if (type === 'FIGHTER_BREAKING_OFF' || type === 'FIGHTER_DISENGAGED') return 'departure';
   if (/^(TIME_|PROGRESS_|CHECKPOINT_)/.test(type) || type === 'MISSION_TOKEN_DRAWN' && event.token === 'Time') return 'time';
   if (type === 'ENGAGEMENT_SPENT') return 'enemy';
@@ -103,6 +103,7 @@ export function describeEvent(event = {}) {
   if (type === 'MISSION_ABORTED') description.title = 'MISSION ABORTED — RETURNING HOME';
   if (type === 'MISSION_ENDED') description.title = event.title ?? event.result?.title ?? (event.outcome === 'success' ? 'RETURNED HOME' : 'AIRCRAFT LOST');
   if (type === 'FIGHTER_KILL_TIME_TAKEN') description.title = 'FIGHTER KILL · TIME CLAIMED';
+  if (type === 'CREW_CYCLE_TIME_TAKEN') description.title = event.overflow ? 'CREW CYCLE COMPLETE · +1 TIME BANKED' : 'CREW CYCLE COMPLETE · +1 TIME';
   if (type === 'FIGHTER_KILL_TIME_UNAVAILABLE') description.title = 'FIGHTER KILL · NO TIME IN BAG';
   if (type === 'FIGHTER_KILL_TIME_FULL') description.title = 'TIME TRACK FULL · NO ADDITIONAL TIME';
   if (type === 'PROGRESS_PENDING') description.title = 'PROGRESS CHECKPOINT AFTER THIS TURN';

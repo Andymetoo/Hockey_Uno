@@ -7,6 +7,7 @@ import { effectiveTimeThreshold } from './crew-position.mjs';
 import { sortieResult } from './results.mjs';
 import { bombRunTargetWarning, DEFAULT_BOMBING_TARGET, getBombingTarget, bombingOutcomeLabel } from './bombing.mjs';
 import { bombRunMarkup, targetChoiceMarkup } from './bomb-run-view.mjs';
+import { mountBombRunTest } from './bomb-run-test-view.mjs';
 import { canTurnBack } from './turn-back.mjs';
 import { createCampaignStore, loadCampaignStore, saveCampaignStore, createCampaign, commissionAircraft, selectCampaign, renameAircraft, renameCrew, prepareCampaignSortie, finalizeCampaignSortie } from './campaign.mjs';
 import { campaignMarkup } from './campaign-view.mjs';
@@ -78,6 +79,21 @@ $('#app').innerHTML = `
   <dialog id="campaign-dialog" class="sheet wide"><div class="dialog-heading"><div><div class="eyebrow">HISTORY / V2 CAMPAIGN</div><h2>Campaign Hangar</h2></div><button data-ui="close" class="close" aria-label="Close campaign">×</button></div><div id="campaign-content" class="dialog-content"></div></dialog>
   <dialog id="sortie-dialog" class="sheet"><div class="dialog-heading"><div><div class="eyebrow">NEW SORTIE</div><h2>Choose your ruleset</h2></div><button data-ui="close" class="close" aria-label="Close new sortie">×</button></div><form id="sortie-form"><div class="dialog-content"><p>Launch a clean sortie with your saved playtest settings. This replaces the current autosaved sortie.</p><fieldset class="ruleset-options"><legend>Ruleset for this sortie</legend><label class="ruleset-choice"><input type="radio" name="ruleset" value="v1" required><span><strong>V1 — Round-Based</strong><small>Current/classic Milk Run rules.</small></span></label><label class="ruleset-choice experimental"><input type="radio" name="ruleset" value="v2-continuous"><span><strong>V2 — Continuous Time <b>EXPERIMENTAL</b></strong><small>Crew readiness, aircraft progress and fighter lifespan use independent clocks.</small></span></label></fieldset><label class="seed-field">RNG seed<input name="seed" value="MILK-RUN" maxlength="100" required></label><p class="small muted">Changing your preferred ruleset affects only a new sortie. Resume always keeps the saved ruleset and timers.</p></div><footer class="dialog-footer"><button type="button" class="quiet" data-ui="close">Cancel</button><button type="submit" class="primary">Launch new sortie →</button></footer></form></dialog>
 `;
+
+const bombTestDialog = document.createElement('dialog');
+bombTestDialog.id = 'bomb-run-test-dialog';
+bombTestDialog.className = 'sheet wide bomb-test-dialog';
+bombTestDialog.setAttribute('aria-label', 'Bomb Run test — results are not saved');
+$('#app').append(bombTestDialog);
+const bombTest = mountBombRunTest(bombTestDialog, () => {
+  const suspendedQueue = queue, hadTimer = queue.timer !== null;
+  queue.dispose(); // Timer only: do not change/export any gameplay or queue flags.
+  return () => { if (queue === suspendedQueue && hadTimer && queue.busy && !queue.paused) queue.schedule(); };
+});
+const bombTestButton = document.createElement('button');
+bombTestButton.type = 'button'; bombTestButton.dataset.ui = 'test-bomb-run';
+bombTestButton.textContent = 'Test Bomb Run';
+$('#dev-dialog .dialog-content').prepend(bombTestButton);
 
 function initialize(config = devPreferences, seed = 'MILK-RUN', saved = null, ruleset = config.preferredRuleset ?? 'v1', targetId=DEFAULT_BOMBING_TARGET) {
   const state=saved?.state??createGame(config,seed,ruleset);
@@ -515,6 +531,7 @@ document.addEventListener('click', e=>{
     case 'help':help();break;
     case 'enemies':$('.enemy-panel').scrollIntoView({block:'center',behavior:'smooth'});break;
     case 'dev':openDev();break;
+    case 'test-bomb-run':bombTest.open();break;
     case 'new-sortie':openNewSortie();break;
     case 'reset-v1':resetScope('v1');break;
     case 'reset-v2':resetScope('v2');break;
@@ -560,4 +577,4 @@ const legacyBoardSave=!savedSession&&hasLegacyBoardSave();
 initialize(savedSession?.state.config??DEFAULT_CONFIG,'MILK-RUN',savedSession);
 if(!savedSession)openNewSortie('MILK-RUN');
 if(legacyBoardSave)notice('The board geometry has been corrected. Start a new sortie on this map; your previous-board save has been kept separately.');
-window.milkRun={ getState:()=>structuredClone(queue.state),getView:()=>structuredClone(queue.view),getQueue:()=>queue.pending.map(({state,...e})=>e),getInteraction:()=>structuredClone(interaction),send,restart:(config,seed,ruleset)=>{closeDialog();initialize(config??devPreferences,seed,null,ruleset??config?.preferredRuleset??devPreferences.preferredRuleset);},getPreferences:()=>({...devPreferences}),setSpeed:s=>queue.setSpeed(s),flush:()=>queue.flush(),exportSession:()=>queue.export() };
+window.milkRun={ getState:()=>structuredClone(queue.state),getView:()=>structuredClone(queue.view),getQueue:()=>queue.pending.map(({state,...e})=>e),getInteraction:()=>structuredClone(interaction),getBombRunTest:()=>bombTest.snapshot(),getCampaignStore:()=>structuredClone(campaignStore),send,restart:(config,seed,ruleset)=>{closeDialog();initialize(config??devPreferences,seed,null,ruleset??config?.preferredRuleset??devPreferences.preferredRuleset);},getPreferences:()=>({...devPreferences}),setSpeed:s=>queue.setSpeed(s),flush:()=>queue.flush(),exportSession:()=>queue.export() };

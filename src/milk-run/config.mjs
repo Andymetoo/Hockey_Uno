@@ -19,7 +19,7 @@ export const DEFAULT_CONFIG = Object.freeze({
   v2CrewCycleTurns: 10,
   v2MissionEnemy: 20, v2MissionResource: 12, v2MissionTime: 10,
   v2TimePerProgress: 4, v2OutboundLength: 8, v2ReturnLength: 3,
-  v2NavigatorUnmannedTimePenalty: 0, v2CrewCycleRefreshGrantsTime: false, v2UnavailableCrewPressure: 'full',
+  v2NavigatorUnmannedTimePenalty: 0, v2CrewCycleRefreshGrantsTime: true, v2UnavailableCrewPressure: 'full',
   v2RepairTime: 4, v2FireTime: 4, v2MedicalTime: 4,
   v2AssistedRepairTime: 2, v2AssistedFireTime: 2, v2AssistedMedicalTime: 2,
   v2FighterKillGrantsTime: true, v2DisruptEnabled: true, v2DisruptEffect: 'accuracy-penalty', v2MaxEscorts: 1,

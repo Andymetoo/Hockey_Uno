@@ -422,7 +422,8 @@ test('V2 Escorts persist through Crew Cycle refresh and depart after the next Pr
   for (let index = 0; index < 10; index++) state = turn(state).state;
   assert.equal(state.crewCycle.number, 2);
   assert.equal(state.escorts.length, 1);
-  for (let index = 0; index < 3; index++) state = turn(state, 'Time').state;
+  assert.equal(state.time, 1, 'completed cycle has claimed one physical Time');
+  for (let index = 0; index < 2; index++) state = turn(state, 'Time').state;
   assert.equal(state.escorts.length, 1);
   const fourth = activate(state, 'Time');
   assert.equal(fourth.state.escorts.length, 1, 'Escort is available for the triggering Turn enemy phase');
@@ -547,9 +548,9 @@ test('V2 fourth Enemy draw at the three-fighter cap is immediate Flak without an
 test('V2 8 outbound / 3 return mission reaches TARGET, resumes selection after bombing, and completes at HOME', () => {
   let state = fresh();
   const events = [];
-  for (let index = 0; index < 44; index++) {
+  for (let index = 0; index < 40; index++) {
     const result = turn(state, 'Time'); state = result.state; events.push(...result.events);
-    if (index === 31) {
+    if (state.phase === 'bombing') {
       assert.equal(state.mission.position, 8);
       assert.equal(state.phase, 'bombing');
       const bombing = commitTestBombRun(state); state = bombing.state; events.push(...bombing.events);
@@ -560,7 +561,7 @@ test('V2 8 outbound / 3 return mission reaches TARGET, resumes selection after b
   assert.equal(state.phase, 'ended');
   assert.equal(state.outcome, 'success');
   assert.equal(state.mission.position, 11);
-  assert.equal(state.stats.missionDraws, 44);
+  assert.equal(state.stats.missionDraws, 40);
   assert.equal(state.time, 0);
   assert.deepEqual(state.timeTokens, []);
   assert.equal(state.pendingProgress, false);

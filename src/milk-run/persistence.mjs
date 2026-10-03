@@ -204,7 +204,9 @@ function migrateV2Config(snapshot) {
   const legacy = { v2FighterKillGrantsTime: false, v2DisruptEnabled: config.disruptOnHit === true,
     v2DisruptEffect: 'auto-miss', v2MaxEscorts: null };
   for (const key of COMPAT_V2_CONFIG_KEYS) if (config[key] === undefined) config[key] = legacy[key];
-  for (const key of PLAYTEST_V2_CONFIG_KEYS) if (config[key] === undefined) config[key] = DEFAULT_CONFIG[key];
+  // An absent cycle reward predates its ON default; retain that flight's OFF rule.
+  const playtestLegacy = { v2NavigatorUnmannedTimePenalty: 0, v2CrewCycleRefreshGrantsTime: false, v2UnavailableCrewPressure: 'full' };
+  for (const key of PLAYTEST_V2_CONFIG_KEYS) if (config[key] === undefined) config[key] = playtestLegacy[key];
   return { ...snapshot, config, overflowTimeTokens: snapshot.overflowTimeTokens ?? [], v2ConfigVersion: V2_CONFIG_VERSION };
 }
 

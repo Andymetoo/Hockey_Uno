@@ -323,7 +323,7 @@ try {
         assert.ok(crew,'select phase offers usable crew');
         await click(`[data-crew="${crew.id}"]`);await click('[data-ui="activate"]');
       } else {
-        await click('[data-ui="choose"]');await click('[data-action="wait"]');await click('#choice-form button[type="submit"]');
+        await click('[data-ui="choose"]');await click('#action-dialog button[data-action="wait"]');await click('#choice-form button[type="submit"]');
       }
       await flush();commands++;current=await getState();
       if(commands===60){const before=current;await reload();assert.deepEqual(await getState(),before,'mid-sortie autosave resumes without changing state');}

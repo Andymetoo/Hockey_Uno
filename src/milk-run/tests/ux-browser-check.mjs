@@ -251,6 +251,7 @@ try {
   assert.ok(await evaluate("document.querySelector('#crew-list [data-crew=\"pilot\"]').classList.contains('status-medical')"));
   assert.ok(await evaluate("document.querySelector('#crew-list [data-crew=\"radio\"]').classList.contains('status-treated')"));
   await touch('#crew-list [data-crew="pilot"]');
+  await click('#action-dialog .crew-detail > summary');
   assert.match(await evaluate("document.querySelector('dialog[open]').innerText"), /UNCONTROLLED/);
   await screenshot('pilot-medical-uncontrolled'); await closeSheet();
   note('Medical selects an injured crew card, distinguishes medic/patient states, and explains the uncontrolled pilot seat');

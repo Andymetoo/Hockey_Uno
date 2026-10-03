@@ -91,8 +91,9 @@ try {
       overflow:document.documentElement.scrollWidth>innerWidth+1,
       labels:[...hud.querySelectorAll('.hud-metric')].map(e=>e.getAttribute('aria-label')),
     }})()`);
-    assert.equal(layout.count, 6); assert.equal(layout.overflow, false);
-    await screenshot(`six-clocks-${width}`);
+    assert.equal(layout.count, 5); assert.equal(layout.overflow, false);
+    assert.match(await evaluate("document.querySelector('#opportunity-control').textContent"), /0\s*\/\s*3/);
+    await screenshot(`flight-clocks-${width}`);
     if (width < 768) assert.ok(layout.height + layout.header <= 220, `${width}px compact header: ${layout.height + layout.header}`);
     assert.match(layout.labels.join(' '), /3 of 4/);
     assert.match(layout.labels.join(' '), /6.*10/);
@@ -102,7 +103,7 @@ try {
     await click('#info-dialog [data-ui=close]');
     assert.deepEqual(await getState(), state, 'inspecting clocks never mutates state');
   }
-  note('Six inspectable HUD values fit desktop/tablet and 320/360/390px without page overflow or oversized header');
+  note('Five inspectable HUD values plus separate Opportunity fit desktop/tablet and 320/360/390px without page overflow or oversized header');
 
   await viewport(320, 844);
   const longClock = fresh({ v2TimePerProgress: 40, v2MissionTime: 40 });
@@ -165,10 +166,10 @@ try {
   } throw Error('Diagnostic flight exceeded command bound');})()`);
   const home = await getState(); assert.equal(home.outcome, 'success'); assert.equal(home.mission.position, 11);
   assert.equal(home.telemetry.outboundTime, 32); assert.equal(home.telemetry.returnTime, 12);
-  assert.equal(home.stats.turns, 44);
+  assert.equal(home.stats.turns, 41);
   assert.match(await evaluate("document.querySelector('#summary').textContent"), /Playtest telemetry/i);
   await screenshot('home-telemetry');
-  note('Full V2 reaches TARGET and HOME in 44 Time-only diagnostic Turns and renders its playtest report');
+  note('Full V2 reaches TARGET and HOME in 41 Time-only diagnostic Turns with cycle Time ON and renders its playtest report');
 
   await click('[data-ui=dev]'); await click('[data-ui=reset-defaults]');
   assert.deepEqual(await evaluate('window.milkRun.getPreferences()'), DEFAULT_CONFIG);

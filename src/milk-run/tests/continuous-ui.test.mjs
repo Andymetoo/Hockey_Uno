@@ -15,9 +15,9 @@ test('V2 HUD independently shows consumed slots, Time pips and outbound or retur
   assert.match(markup,/Time 3 of 4/);
   assert.match(markup,/OUTBOUND Progress 2 of 8/);
   assert.equal((markup.match(/<i class="filled">/g)??[]).length,3);
-  assert.equal((markup.match(/data-status-metric=/g)??[]).length,6);
+  assert.equal((markup.match(/data-status-metric=/g)??[]).length,5);
   assert.match(markup,/Resources 3 Officer and 5 Enlisted/);
-  assert.match(markup,/Opportunity 1 of 3/);
+  assert.doesNotMatch(markup,/data-status-metric="opportunity"/, 'Opportunity is presented separately beside the board and action dock');
   assert.deepEqual(state,before,'HUD cannot advance a clock');
   state.mission.bombed=true;state.mission.position=9;
   assert.match(continuousHudMarkup(state),/RETURN Progress 1 of 3/);

@@ -30,7 +30,7 @@ for (const distance of [2, 5, 7]) test(`Turn Back at outbound ${distance} requir
     progress += result.events.filter(event => event.type === 'MISSION_ADVANCED').length;
   }
   assert.equal(current.outcome, 'success'); assert.equal(current.mission.position, distance * 2);
-  assert.equal(progress, distance); assert.equal(current.stats.turns, distance * 4);
+  assert.equal(progress, distance); assert.equal(current.stats.turns, ({ 2: 8, 5: 19, 7: 26 })[distance]);
   assert.ok(!events.some(event => /^BOMBING_|^BOMB_RUN_/.test(event.type)));
   const finished = finalizeCampaignSortie(store, current, events);
   assert.equal(finished.record.result, 'ABORTED — AIRCRAFT RETURNED'); assert.equal(finished.record.missionLength, distance * 2);

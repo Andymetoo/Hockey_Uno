@@ -23,7 +23,7 @@ test('V2 full 8/3 mission records Turns, cycles, Time by leg, checkpoints and av
     state = state.phase === 'bombing' ? commitTestBombRun(state).state : step(state);
   }
   assert.equal(state.outcome, 'success');
-  assert.equal(state.stats.turns, 44);
+  assert.equal(state.stats.turns, 41);
   assert.equal(state.crewCycle.number - 1, 4);
   assert.equal(state.telemetry.timeTokensDrawn, 44);
   assert.equal(state.telemetry.outboundTime, 32);
@@ -31,7 +31,7 @@ test('V2 full 8/3 mission records Turns, cycles, Time by leg, checkpoints and av
   assert.equal(state.telemetry.progressCheckpoints, 11);
   assert.equal(state.telemetry.completeHistory, true);
   const rows = Object.fromEntries(v2TelemetryRows(state).map(row => [row.label, row.value]));
-  assert.equal(rows['Average Turns per Progress'], '4.00');
+  assert.equal(rows['Average Turns per Progress'], '3.73');
   assert.equal(rows['Altitude lost'], 0);
   assert.equal(rows['Average fighter actions completed'], '—');
 });

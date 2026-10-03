@@ -270,7 +270,7 @@ test('two full V2 diagnostics are deterministic, conserve physical tokens, and r
       assert.ok(trace.length < 100);
     }
     assert.equal(s.outcome, 'success'); assert.equal(s.mission.position, 11);
-    assert.equal(s.stats.turns, 44); assert.equal(s.altitude, 5);
+    assert.equal(s.stats.turns, 40); assert.equal(s.altitude, 5);
     return trace;
   }
   assert.deepEqual(flight(), flight());

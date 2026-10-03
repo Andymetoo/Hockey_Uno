@@ -23,7 +23,7 @@ async function turn() {
   assert.ok(member);
   await touch(`#crew-list [data-crew="${member.id}"]`);
   await click('#action-content [data-ui="activate"]'); await flush();
-  await click('[data-ui="choose"]'); await click('[data-action="wait"]');
+  await click('[data-ui="choose"]'); await click('#action-dialog button[data-action="wait"]');
   await click('#choice-form button[type="submit"]'); await flush();
 }
 async function confirmAbort() {
@@ -80,7 +80,7 @@ try {
   await confirmAbort(); const aborted = await getState();
   assert.equal(aborted.mission.aborted, true); assert.equal(aborted.mission.abortProgress, 2);
   for (const key of ['crew', 'fighters', 'cells', 'jobs', 'resources', 'escorts', 'time', 'timeTokens', 'bags', 'crewCycle', 'stats']) assert.deepEqual(aborted[key], state[key], `Turn Back preserves ${key}`);
-  assert.equal(await evaluate("!!document.querySelector('[data-ui=turn-back]')"), false);
+  assert.equal(await evaluate("document.querySelector('[data-ui=turn-back]').hidden"), true);
   await turn(); assert.equal((await getState()).outcome, null);
   await turn(); const returned = await getState();
   assert.equal(returned.outcome, 'success'); assert.equal(returned.mission.position, 4);

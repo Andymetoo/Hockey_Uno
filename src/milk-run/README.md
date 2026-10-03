@@ -4,13 +4,13 @@ New sorties offer **V1 — Round-Based** (the current/classic rules) or **V2 —
 
 ## V2 continuous-time playtest
 
-The UI/dev-tools pass keeps the active ruleset visible and shows six compact V2 status values: Crew Cycle slots, Time pips/count, outbound/return Progress, altitude, resources and Opportunity. Active jobs identify their countdown and both workers when assisted. Enemy queue cards show Engagement; a separate **BREAKS OFF** beat holds the zero-Engagement fighter on screen before departure, with no destruction styling or kill reward.
+The UI/dev-tools pass keeps the active ruleset visible and shows five compact V2 metrics: Crew Cycle slots, Time pips/count, outbound/return Progress, altitude and resources, with Opportunity presented separately beside the board and action dock. Active jobs identify their countdown and both workers when assisted. Enemy queue cards show Engagement; a separate **BREAKS OFF** beat holds the zero-Engagement fighter on screen before departure, with no destruction styling or kill reward.
 
 Progress uses the existing resolution queue for work-completion acknowledgement, Fire Spread, aircraft condition, independent altitude checks, movement and bag refill. Completed jobs still resolve on the triggering Time draw before the crew action; the checkpoint acknowledges that work before hazards rather than completing it twice. Manual playback can inspect every checkpoint stage, including an undamaged aircraft's safe checks.
 
 There are no V2 rounds. Choose and activate a crew member, draw a mission token, take an action (or Continue), resolve any Opportunity shots, and resolve the enemy queue. Three clocks operate independently:
 
-- **Crew Cycle:** ten Turns, one normal activation slot per crew member. Refreshing slots changes readiness; the optional refresh-Time experiment is OFF by default. Injured, dead and working crew still consume their slots with mission draws and enemy pressure under the Full Pressure default. Slots are separate from availability: a released worker can act immediately if their slot is unconsumed, otherwise they wait for the next cycle.
+- **Crew Cycle:** ten Turns, one normal activation slot per crew member. Completing the cycle attempts to claim one physical Time token by default; Playtest Settings can disable this reward. Injured, dead and working crew still consume their slots with mission draws and enemy pressure under the Full Pressure default. Slots are separate from availability: a released worker can act immediately if their slot is unconsumed, otherwise they wait for the next cycle.
 - **Time / Progress:** a Time draw adds one Time and reduces every already-active job by one. Zero-Time jobs complete immediately, including batch station returns. Jobs started afterward wait for future draws. At 4/4 Time, a checkpoint waits until the current action, Opportunity window and enemy phase finish. It spreads unsuppressed fire, recalculates aircraft condition, checks Control/Structure/Engines independently, and advances one Progress if airborne. Then Time resets, its held tokens return, and both bags refill from discard. Crew readiness and surviving fighters are unchanged.
 - **Engagement:** each fighter has its own remaining enemy actions. The default counts attacks, rotations and Disrupted actions. Attack Pass Only counts attacks and Disrupted flybys but not pure rotations. A fighter completes its action before departing at zero. Excess Enemy draws still produce immediate Flak at the three-fighter cap.
 
@@ -20,7 +20,7 @@ There are no V2 rounds. Choose and activate a crew member, draw a mission token,
 | Mission Enemy / Resource / Time tokens | 20 / 12 / 10 |
 | Time Required Per Progress | 4 |
 | Navigator Unmanned Time Penalty | 0; suggested experiment: 1 |
-| Crew Cycle Refresh Grants Time | OFF |
+| Crew Cycle Refresh Grants Time | ON |
 | Unavailable Crew Pressure | Full Pressure; alternatives Draw Only and Compressed Pressure |
 | Outbound / return Progress | 8 / 3 |
 | Repair / Fire Control / Medical Time | 4 / 4 / 4 |
@@ -37,6 +37,8 @@ V2 settings are independent of V1 and apply only to a fresh sortie. Fighter kill
 When Time is full or Progress pending, a qualifying kill may bank **one overflow Time**. It removes a physical Time token from the mission bag, stores it in `overflowTimeTokens`, immediately advances active jobs once, and shows **BONUS TIME BANKED — carries into next Progress**. The active HUD never displays above its current threshold. Further kills cannot add overflow while that slot is occupied; missing bag Time creates no reward. Opportunity remains independent. At the checkpoint, ordinary active Time tokens return to the bag; the overflow token stays out and becomes 1 Time toward the next threshold without advancing work again. All fighter types use the same one-Opportunity/one-eligible-Time rewards.
 
 A between-turn Opportunity kill that fills Time opens a saved Opportunity decision window: finish any further shots, then **Continue to Progress**. This resolves the checkpoint before another activation, without an extra mission draw, enemy phase, Turn or Crew Cycle slot. Kills during an ordinary activation wait for that activation's normal enemy phase. If **Crew Cycle Refresh Grants Time** is ON, completing the ten-slot cycle claims exactly one available physical Time using the same active/overflow rules; an empty Time supply creates nothing.
+
+Fresh standalone V2 and Campaign sorties now default this reward ON, and **Reset V2** restores ON. Explicit saved preferences can still disable it. Existing sortie snapshots retain their stored ON/OFF value; historical snapshots missing this field migrate to OFF in resolved, visible and queued state. A successful reward presents **CREW CYCLE COMPLETE · +1 TIME**, or **+1 TIME BANKED** when full/pending. Work advances exactly once when the physical token is acquired, never again when overflow carries. Occupied overflow or no Time in the bag grants nothing; discard is not raided for a reward.
 
 **Navigator Unmanned Time Penalty** dynamically adds its integer value to the base requirement while the navigation function is unavailable. With base 4 and penalty 1 the HUD reads **TIME 3 / 5 — NAVIGATION UNMANNED**. A healthy, seated actual Navigator or Officer substitute qualifies, including Used/tapped crew. Injury, death, displacement, fire or working elsewhere removes the function; an Enlisted substitute does not supply it. The default penalty remains zero. Launch validation requires sufficient physical Time for the largest configured requirement.
 
@@ -71,6 +73,12 @@ A qualified operator rolls four d6 once. Tap/click a die and then Course, Drift 
 The healthy actual Bombardier physically occupying that station gets one free reroll. Officer substitutes get no free reroll. Spend 1 Officer resource for each additional single-die reroll; the spent physical resource goes to mission discard. Any of the four dice can be rerolled, including a placed die, and rearrangement remains available afterward. There is no direct +1/−1 adjustment.
 
 `mission.targetId` and `mission.bombRun` persist the target definition snapshot, all four dice, placement indexes, unused index, operator, free reroll availability/use, Officer rerolls spent, committed score, slot scores, status and outcome. Mid-run save/resume restores the exact dice and placement without rerolling. V1 retains its original one-die `bombingMin` check and round-based timing.
+
+### Disposable Bomb Run tester
+
+Open **Playtest settings → Test Bomb Run** for **BOMB RUN TEST — RESULTS ARE NOT SAVED**. It uses the production dice/placement interface, command dispatcher, authored target definitions, scoring, free actual-Bombardier reroll, Officer payments, Commit and final result presentation. A fresh healthy Bombardier occupies their real station; the tester owns three disposable Officer resources. Target options derive from the production target catalog. **Test Again** keeps the target with a new dice seed and restored resources/rerolls; **New Random Target** samples the catalog again (it may select the same target). Close, Escape and backdrop dismissal discard the session; reload never restores it.
+
+`bomb-run-test.mjs` accepts no live game, Campaign, preferences, queue or persistence references. It creates a fresh production state and a temporary crypto UUID seed, with independent target-selection and per-test dice PRNG state. `bomb-run-test-view.mjs` owns its modal rendering and intercepts its production control events before they reach the active game's document handlers. It never calls the host renderer, autosave, Campaign finalization or export. The host bridge only suspends a presentation timer and resumes it on close when appropriate; serialized queue flags and snapshots remain unchanged. Browser regressions assert full live session/Campaign/history/preferences/storage equality, zero storage writes, and identical next production random commands while another real Bomb Run is active.
 
 ## History-only campaign
 
@@ -193,6 +201,7 @@ The same configuration, seed, and sequence of decisions produce the same random 
 | `board-view.mjs` | Data-driven SVG geometry, individual crew/fighter tokens, arcs, work outlines, reticle and escort rendering. |
 | `views.mjs` | Crew/queue cards, draw tokens, event stage, grouped recorder and altitude track markup. |
 | `bombing.mjs`, `bombing-targets.mjs`, `bomb-run-view.mjs` | V1 bombing and separate V2 deterministic 4d6 placement/scoring, authorable targets and touch controls. |
+| `bomb-run-test.mjs`, `bomb-run-test-view.mjs` | Disposable fresh-state production Bomb Run, isolated PRNGs and modal event/render boundary; no persistence or Campaign access. |
 | `continuous.mjs`, `rulesets.mjs` | V2 Time/overflow, Crew Cycle, Engagement, pressure modes and saved identity/route dispatch. |
 | `crew-position.mjs` | Physical station assignment, specialist qualifications and effective navigation threshold. |
 | `campaign.mjs`, `campaign-session.mjs`, `campaign-view.mjs` | Validated local service histories, identity/stat credit, active-session backup and compact service-record UI. |
@@ -346,11 +355,11 @@ Crew rank, tags, role `abilities` arrays and station gun arcs live in `CREW_DEFS
 
 This pass deliberately does not add XP, persistent stat buffs, aircraft upgrades, crew skill bonuses, stronger-enemy reward scaling, target-specific bag modifiers/travel lengths, an economic campaign layer, paid between-sortie repairs, cloud storage or backend accounts. Surviving crew/aircraft reset mechanically; permadeath changes only historical identity and replacement records. Me-262, FW-190, BF-110 and BF-109 all retain the same eligible V2 Opportunity/Time kill rewards.
 
-Other deferred systems include Event cards, Locked In, Desperation, Fate, aircraft-specific critical abilities, full interior pathfinding, simultaneous healthy-crew station swapping, bailing out, a landing minigame, branching/hidden mission tiles and scouting. V2 Engagement is implemented and fighters persist across Progress; V1 still clears fighters at round end under its default. The optional navigation, cycle-Time and unavailable-pressure settings remain experiments, with 0/OFF/Full Pressure defaults. Playtest exports include the seed, configuration and event log for reproducibility; no balance or historical-accuracy claim follows from a successful diagnostic sortie.
+Other deferred systems include Event cards, Locked In, Desperation, Fate, aircraft-specific critical abilities, full interior pathfinding, simultaneous healthy-crew station swapping, bailing out, a landing minigame, branching/hidden mission tiles and scouting. V2 Engagement is implemented and fighters persist across Progress; V1 still clears fighters at round end under its default. The optional navigation, cycle-Time and unavailable-pressure settings remain experiments, with 0/ON/Full Pressure defaults. Playtest exports include the seed, configuration and event log for reproducibility; no balance or historical-accuracy claim follows from a successful diagnostic sortie.
 
 ## Validation
 
-All Hangar implementation and test changes are inside Milk Run. The measured pre-Hangar Node baseline passed **476/476 tests**. The complete post-Hangar suite passed **500/500**, with zero failures or skipped tests. All **12 current browser suites** passed, including Bomb Run, Campaign and the new multi-aircraft Hangar suite, with no runtime or asset errors. Validation was run on October 2, 2026.
+All cycle momentum/tester implementation and test changes are inside Milk Run. The current Node suite passes **517/517 tests**, with zero failures or skipped tests. All **13 current browser suites** pass, including the isolated tester, with no runtime or asset errors. Validation was run on October 2, 2026. Existing assertions were updated for the intended shorter V2 flights. Stale UI assertions were also corrected to match the existing five HUD metrics plus separate Opportunity, collapsed crew detail, scoped Wait action button and hidden Turn Back control; those production behaviors were not changed.
 
 From the repository root:
 
@@ -366,6 +375,7 @@ node src/milk-run/tests/crew-stations-browser-check.mjs
 node src/milk-run/tests/diagnostics-browser-check.mjs
 node src/milk-run/tests/status-qol-browser-check.mjs
 node src/milk-run/tests/bomb-run-browser-check.mjs
+node src/milk-run/tests/bomb-run-test-browser-check.mjs
 node src/milk-run/tests/campaign-browser-check.mjs
 node src/milk-run/tests/hangar-browser-check.mjs
 ```
@@ -382,12 +392,13 @@ node src/milk-run/tests/hangar-browser-check.mjs
 | Diagnostics | 7 checks |
 | Status/QoL | 3 groups |
 | Bomb Run | 8 groups |
+| Bomb Run tester | 12 groups; complete state/storage/RNG isolation, six widths, fresh chooser, active standalone and Campaign Bomb Runs, pending/automatic presentation, close/reload and reset defaults |
 | Campaign | 13 groups |
 | Hangar | 10 groups; multiple surviving aircraft, choice after loss, aircraft/personnel cross-links, import/migration and six responsive widths |
 
 The 24 focused Hangar Node cases cover one-plane selection; commissioning without replacing survivors; A/B/A service attribution; aircraft and crew relationship joins; selected-aircraft autosave/backup linkage; permanent loss and KIA; independent objective/return/abort results; idempotent finalization; invalid identity imports; three legacy migration states; and standalone isolation. Campaign and Hangar browser checks exercise actual forms and touch controls, with scripted outcome fixtures for service attribution and real rules-driven Turn Back return/loss in the Campaign suite. Aircraft and personnel records are checked expanded at 320/360/390/430/768/1440px.
 
-The Node suite covers physical mission/combat/Time conservation; overflow acquisition/carry and once-only work advancement; Assist countdowns, action cost, safe positioning and cancellation; specialist qualifications; direct Critical crew death versus Fire Spread blocking; exact unavailable-pressure phase counts; every Bomb Run range edge/threshold/reroll/placement; campaign creation/renaming/history/replacement/idempotence; backup validation and rollback; abort distances 2/5/7 and survived/lost return outcomes. Persistence tests round-trip resolved, visible and pending snapshots. Two deterministic V2 full flights execute **184 commands and 1,622 authoritative/visible/queued snapshot round-trips**, reach HOME with identical results and conserve tokens after every command. The browser Dev-tools flight completes the default 8/3 V2 route in **44 Turns / 11 Progress** with a Time-only bag; it tests progression, not combat balance.
+The Node suite covers physical mission/combat/Time conservation; overflow acquisition/carry and once-only work advancement; Assist countdowns, action cost, safe positioning and cancellation; specialist qualifications; direct Critical crew death versus Fire Spread blocking; exact unavailable-pressure phase counts; every Bomb Run range edge/threshold/reroll/placement; campaign creation/renaming/history/replacement/idempotence; backup validation and rollback; abort distances 2/5/7 and survived/lost return outcomes. Seventeen focused cycle/tester tests cover defaults, saved ON/OFF/missing-field migration, cycle reward/job conservation, production rule equivalence, resets and independent RNG. Persistence tests round-trip resolved, visible and pending snapshots. Two deterministic V2 full flights execute **168 commands and 1,530 authoritative/visible/queued snapshot round-trips**, reach HOME after **40 Turns each** with identical results and conserve tokens after every command. The browser Dev-tools fixture completes the default 8/3 V2 route in **41 Turns / 11 Progress** with a four-token Time-only bag; its empty-bag cycle cannot claim a reward. These fixtures test progression, not combat balance.
 
 The current V1 deterministic replay is `tests/fixtures/combat-economy-home-witness.json`, seed **combat-economy-21**. Regenerated for the intentional shared direct-Critical crew-death rule, it uses **344 legal commands, 19 rounds, 190 mission draws**, reaches HOME at **altitude 1 with ten living crew**, records **27 fighter kills**, a bombing **hit** and an engine restart. The unchanged assertions require Direct Fire, Advanced Fire, conversion, Repair, Fire Control, Medical and Restart Engine, exact final metrics, and physical Resource/combat conservation after every command. `tests/generate-economy-witness.mjs` uses visible state without future-RNG peeking or rule overrides and now accepts a successful witness only when all required action types occurred.
 
