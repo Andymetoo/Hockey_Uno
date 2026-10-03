@@ -160,6 +160,7 @@ function finishTurn(state, emit, shared) {
       crew.cycleSlotConsumed = false;
       crew.used = false;
       crew.activationCompleted = false;
+      crew.lastAction = null;
     }
     record(emit, 'CREW_CYCLE_REFRESHED', `Crew Cycle ${state.crewCycle.number}: crew slots refreshed.`);
   }

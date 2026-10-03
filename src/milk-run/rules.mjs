@@ -906,7 +906,7 @@ function startRound(state, emit) {
   const completing = state.jobs.filter(job => job.completeRound <= state.round);
   for (const job of completing) finishJob(state, job, emit, true);
   returnWorkers(state, completing.map(job => person(state, job.crewId)).filter(Boolean), emit);
-  for (const crew of state.crew) { crew.used = false; crew.activationCompleted = false; }
+  for (const crew of state.crew) { crew.used = false; crew.activationCompleted = false; crew.lastAction = null; }
   record(emit, 'CREW_READIED', 'Healthy crew without crisis jobs are ready.');
   if (state.escorts.length) { state.escorts = []; record(emit, 'ESCORTS_EXPIRED', 'Previous-round escorts depart.'); }
   resolveFireSpread(state, emit);
@@ -1051,6 +1051,7 @@ export function dispatch(original, command) {
       const crew = person(state, state.activeCrew);
       requireRule(crew?.health === 'healthy' && !crew.job && !underTreatment(state, crew.id), 'The active crew member cannot act.');
       validateAction(state, crew, command);
+      crew.lastAction = command.action;
       resolveAction(state, crew, command, emit);
       if (isV2(state)) refreshTimeRequirement(state);
       crew.activationCompleted = true;

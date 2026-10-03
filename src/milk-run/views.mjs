@@ -1,5 +1,5 @@
 /** HTML presentation only. These helpers never activate crew, draw or mutate state. */
-import { crewDefinition, crewStatus, stationStatus, SHORT_NAMES, arcPreview, headingLabel } from './ui-model.mjs';
+import { crewDefinition, crewStatus, crewActionMarker, actionIconMarkup, stationStatus, SHORT_NAMES, arcPreview, headingLabel } from './ui-model.mjs';
 import { fighterHeading } from './spatial.mjs';
 import { targetOptions } from './targeting.mjs';
 import { describeEvent, groupEvents } from './presentation.mjs';
@@ -10,7 +10,7 @@ const esc = value => String(value ?? '').replace(/[&<>"']/g, character => ({ '&'
 const classes = values => values.filter(Boolean).join(' ');
 const targetingFighters = interaction => interaction && ['basicFire', 'advancedFire', 'opportunityShot', 'rotateFighter'].includes(interaction.action);
 
-export function continuousHudMarkup(state) {
+export function continuousHudMarkup(state, expanded = false) {
   const threshold=effectiveTimeThreshold(state), navigationPenalty=threshold>state.config.v2TimePerProgress;
   const {outboundLength,returnLength}=missionLengths(state);
   const returning=state.mission.bombed||state.mission.aborted||state.mission.position>outboundLength;
@@ -20,12 +20,12 @@ export function continuousHudMarkup(state) {
   const consumed=state.crew.filter(crew=>crew.cycleSlotConsumed).length;
   const shownTime=Math.min(state.time,threshold);
   const timeGraphic=threshold<=8?`<span class="time-pips" aria-hidden="true">${Array.from({length:threshold},(_,index)=>`<i class="${index<shownTime?'filled':''}"></i>`).join('')}</span>`:`<progress class="hud-time-progress" aria-hidden="true" max="${threshold}" value="${shownTime}"></progress>`;
-  return `<button class="hud-metric" data-status-metric="cycle" data-hud="cycle" aria-label="Crew Cycle ${state.crewCycle.number}, ${consumed} of 10 slots consumed"><span>CREW CYCLE</span><strong>${consumed}<small>/10</small></strong><small>Cycle ${state.crewCycle.number}</small></button>
-    <button class="hud-metric hud-time ${state.pendingProgress?'pending':''}" data-status-metric="time" data-hud="time" aria-label="Time ${shownTime} of ${threshold}${navigationPenalty?', Navigation unmanned':''}${state.pendingProgress?', Progress checkpoint after this Turn':''}"><span>TIME</span><strong>${shownTime}<small>/${threshold}</small></strong>${timeGraphic}${navigationPenalty?'<small class="navigation-warning">NAVIGATION UNMANNED</small>':''}${state.overflowTimeTokens?.length?'<small class="time-bank">+1 BANKED</small>':''}</button>
-    <button class="hud-metric" data-status-metric="progress" data-hud="progress" aria-label="${leg} Progress ${progress} of ${length}"><span>PROGRESS</span><strong>${progress}<small>/${length}</small></strong><small>${leg}</small></button>
-    <button class="hud-metric" data-status-metric="altitude" data-hud="altitude" aria-label="Altitude ${state.altitude} of ${state.config.startingAltitude}"><span>ALTITUDE</span><strong class="${state.altitude<=1?'danger-text':''}">${state.altitude}</strong><small>Levels</small></button>
+  return `<button class="hud-metric hud-time ${state.pendingProgress?'pending':''}" data-status-metric="time" data-hud="time" aria-label="Time ${shownTime} of ${threshold}${navigationPenalty?', Navigation unmanned':''}${state.pendingProgress?', Progress checkpoint after this Turn':''}"><span>TIME</span><strong>${shownTime}<small>/${threshold}</small></strong>${timeGraphic}${navigationPenalty?'<small class="navigation-warning">NAVIGATION UNMANNED</small>':''}${state.overflowTimeTokens?.length?'<small class="time-bank">+1 BANKED</small>':''}</button>
     <button class="hud-metric" data-status-metric="resources" data-hud="resources" aria-label="Resources ${state.resources.Officer} Officer and ${state.resources.Enlisted} Enlisted"><span>RESOURCES</span><strong><b class="officer">${state.resources.Officer}</b><small> O</small> <b class="enlisted">${state.resources.Enlisted}</b><small> E</small></strong><small>Held outside bag</small></button>
-    <button class="hud-metric" data-status-metric="opportunity" data-ui="opportunity" aria-label="Opportunity ${state.opportunity??0} of ${state.config.opportunityCap}"><span>OPPORTUNITY</span><strong class="opportunity-count">${state.opportunity??0}<small>/${state.config.opportunityCap}</small></strong><small>${state.config.opportunityEnabled?'Banked':'Disabled'}</small></button>`;
+    <button class="hud-metric" data-status-metric="altitude" data-hud="altitude" aria-label="Altitude ${state.altitude} of ${state.config.startingAltitude}"><span>ALTITUDE</span><strong class="${state.altitude<=1?'danger-text':''}">${state.altitude}</strong><small>Levels</small></button>
+    <button class="hud-metric" data-status-metric="cycle" data-hud="cycle" aria-label="Crew Cycle ${state.crewCycle.number}, ${consumed} of 10 slots consumed"><span>CREW CYCLE</span><strong>${consumed}<small>/10</small></strong><small>Cycle ${state.crewCycle.number}</small></button>
+    <button class="hud-metric" data-status-metric="progress" data-hud="progress" aria-label="${leg} Progress ${progress} of ${length}"><span>PROGRESS</span><strong>${progress}<small>/${length}</small></strong><small>${leg}</small></button>
+    <button class="status-toggle" data-ui="status-toggle" aria-expanded="${expanded}" aria-label="${expanded?'Hide':'Show'} cycle and progress details" title="${expanded?'Hide':'Show'} extra flight status"><span aria-hidden="true">${expanded?'⌃':'⌄'}</span></button>`;
 }
 
 export const jobKindLabel=kind=>({repair:'REPAIR',fireControl:'FIRE CONTROL',medical:'MEDICAL'})[kind]??kind.toUpperCase();
@@ -41,17 +41,18 @@ export function crewMarkup(state, selectedCrew, interaction = null) {
     const definition = crewDefinition(crew.id);
     const selected = selectedCrew === crew.id;
     const status = crewStatus(state, crew, selected);
+    const actionMarker = crewActionMarker(state, crew);
     const station = stationStatus(state, crew);
     const legal = choosingCrew && choices.crew.includes(crew.id);
     const chosen = interaction?.targetId === crew.id || interaction?.gunnerId === crew.id;
     const control = station.cockpit ? station.operating ? 'CTRL' : 'OPEN' : !station.operating && crew.health !== 'dead' ? 'AWAY' : '';
     const until = status.job ? isV2(state) ? `${status.job.remainingTime} Time remaining${status.job.assistantId ? ' · assisted' : ''}` : `Until Round ${status.job.completeRound} start` : '';
     const location = station.displaced ? crew.job ? 'WORKING' : 'DISPLACED' : station.currentId === station.homeId ? 'HOME' : `AT ${({engineer:'TOP TURRET',radio:'DORSAL',navigator:'NOSE',bombardier:'NOSE',pilot:'PILOT',copilot:'COPILOT',ball:'BALL',leftWaist:'PORT',rightWaist:'STBD',tail:'TAIL'})[station.currentId]}`;
-    const detail = `${definition.name}, ${status.label}. Home Station: ${station.homeName}. Current Station: ${station.currentName}${station.displaced ? ' — Displaced' : ''}. ${station.label}. Position ${station.position}.${until ? ` ${until}.` : ''}`;
+    const detail = `${definition.name}, ${status.label}.${actionMarker ? ` ${actionMarker.title}.` : ''} Home Station: ${station.homeName}. Current Station: ${station.currentName}${station.displaced ? ' — Displaced' : ''}. ${station.label}. Position ${station.position}.${until ? ` ${until}.` : ''}`;
     return `<button type="button" class="${classes(['crew-card', `status-${status.id}`, station.displaced && !crew.job && 'is-displaced', selected && 'selected', legal && 'target-legal', choosingCrew && !legal && 'target-dim', chosen && 'target-chosen'])}" data-crew="${esc(crew.id)}" aria-pressed="${Boolean(selected || chosen)}" aria-label="${esc(detail)}" title="${esc(detail)}">
       <span class="crew-number">${definition.number}</span>
       <span class="crew-copy"><strong><span class="full-name">${esc(definition.name)}</span><span class="short-name">${esc(SHORT_NAMES[crew.id] || definition.name)}</span></strong><small class="crew-role">${esc(definition.rank)} · ${esc(definition.role || definition.tags.join(' / '))}</small><small class="crew-location">${esc(location)}</small></span>
-      <span class="crew-status"><span class="status-icon" aria-hidden="true">${esc(status.icon)}</span><span class="full-status">${esc(status.label)}</span><span class="short-status">${esc(status.short)}</span>${until ? `<small class="work-until">${isV2(state)?`${status.job.remainingTime} Time`:`R${status.job.completeRound}`}</small>` : ''}${isV2(state)?`<small class="cycle-slot">${crew.cycleSlotConsumed?'SLOT USED':'SLOT OPEN'}</small>`:''}</span>
+      <span class="crew-status"><span class="status-icon" aria-hidden="true">${esc(status.icon)}</span><span class="full-status">${esc(status.label)}</span><span class="short-status">${esc(status.short)}</span>${until ? `<small class="work-until">${isV2(state)?`${status.job.remainingTime} Time`:`R${status.job.completeRound}`}</small>` : ''}${isV2(state)?`<small class="cycle-slot">${crew.cycleSlotConsumed?'SLOT USED':'SLOT OPEN'}</small>`:''}${actionMarker ? `<span class="crew-action-marker" data-action="${esc(actionMarker.action)}" title="${esc(actionMarker.title)}">${actionIconMarkup(actionMarker.action, 'crew-action-glyph')}<span>${esc(actionMarker.short)}</span></span>` : ''}</span>
       ${control ? `<span class="station-indicator ${station.operating ? 'controlling' : 'uncontrolled'}" aria-label="${esc(station.label)}">${control}</span>` : ''}
     </button>`;
   }).join('');

@@ -21,7 +21,7 @@ export function createGame(overrides = {}, seed = 'MILK-RUN', ruleset = override
     resources: { Officer: config.startingOfficer, Enlisted: config.startingEnlisted },
     opportunity: config.opportunityEnabled ? Math.min(config.startingOpportunity, config.opportunityCap) : 0,
     crew: CREW_DEFS.map((member) => ({
-      id: member.id, health: 'healthy', used: false, activationCompleted: false,
+      id: member.id, health: 'healthy', used: false, activationCompleted: false, lastAction: null,
       ...(continuous ? { cycleSlotConsumed: false } : {}),
       position: [...STATIONS[member.station].cells], station: member.station, homeStation: member.station, displaced: false, job: null,
     })),

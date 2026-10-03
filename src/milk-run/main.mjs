@@ -13,7 +13,7 @@ import { campaignMarkup } from './campaign-view.mjs';
 import { campaignBackup, parseCampaignBackup, storeCampaignBackup } from './campaign-session.mjs';
 import { ResolutionQueue } from './queue.mjs';
 import { boardMarkup, fighterPositions } from './board-view.mjs';
-import { crewStatus, stationStatus, availableCount, actionGroup } from './ui-model.mjs';
+import { crewStatus, stationStatus, availableCount, actionGroup, actionIconMarkup } from './ui-model.mjs';
 import { describeEvent } from './presentation.mjs';
 import { crewMarkup, enemyMarkup, eventMarkup, logMarkup, altitudeMarkup, continuousHudMarkup, activeJobsMarkup, jobKindLabel } from './views.mjs';
 import { v2TelemetryRows } from './telemetry.mjs';
@@ -31,6 +31,7 @@ const cell = id => BOARD.find(c => c.id === id);
 let queue, selectedCrew = null, chosenAction = null, saveWarning = false;
 let focusBeforeDialog = null, interaction = null, previousFighters = new Map(), previousBeat = null;
 let interceptRequested = false;
+let compactHudExpanded = false;
 let hitMapEnabled = false, hitMapStructure = true, hitMapEmpty = true;
 let devPreferences = loadDevPreferences();
 let selectedBombDie = null, campaignStore, campaignStoreError = '', pendingCampaignImport = null;
@@ -56,7 +57,7 @@ $('#app').innerHTML = `
     <section class="crew-panel panel"><div class="panel-label">02 / YOUR CREW <span id="available-count">AVAILABLE 10/10</span></div><div id="crew-list" class="crew-list"></div><div id="active-jobs" class="active-jobs" hidden></div><p class="crew-note">One draw. One action. Then the fighters.<br>Injured, busy and lost crew still consume time.</p></section>
     <section class="board-panel panel">
       <div class="board-heading"><div><div class="eyebrow">BOEING B-17 / FLYING FORTRESS</div><h1>The long way home.</h1></div><button class="board-badge" id="enemy-shortcut" data-ui="enemies">0 / 3 HOSTILES<br>VIEW QUEUE ↓</button></div>
-      <div id="board-stage" class="board-stage" aria-live="polite"></div><div id="conditions" class="conditions"></div><div class="board-and-altitude"><div id="board" class="board-wrap"></div><div id="altitude-track" class="altitude-track" aria-label="Altitude track"></div></div><div id="target-detail" class="target-detail" hidden></div>
+      <div id="board-stage" class="board-stage" aria-live="polite"></div><div id="conditions" class="conditions"></div><div class="board-and-altitude"><div id="board" class="board-wrap"></div><div id="altitude-track" class="altitude-track" aria-label="Altitude track"></div><div id="map-opportunity" class="map-opportunity" role="img" hidden></div></div><div id="target-detail" class="target-detail" hidden></div>
       <div class="board-key"><span><i class="key-damage">×</i> Damage</span><span><i class="key-fire">♨</i> Fire</span><span><i class="key-crew">3</i> Crew</span><span>Quarter: 1 2 / 3 4</span></div>
       <div id="section-key" class="section-key"></div>
     </section>
@@ -116,9 +117,15 @@ function render() {
   $('#ruleset-label').textContent=isV2(s)?'V2 — CONTINUOUS TIME · EXPERIMENTAL':'V1 — ROUND-BASED';
   $('#ruleset-label').classList.toggle('experimental-label',isV2(s));
   if (!selectedCrew || !s.crew.some(c => c.id === selectedCrew)) selectedCrew = availableCrew(s)[0]?.id ?? null;
-  $('#status').classList.toggle('continuous-hud',isV2(s));
-  $('#status').innerHTML = isV2(s)?continuousHudMarkup(s):`<div><span>POSITION</span><strong>${missionName(s)} <small>${s.mission.position}</small></strong></div><div><span>ALTITUDE</span><strong class="${s.altitude <= 1 ? 'danger-text' : ''}">${s.altitude} <small>LEVELS</small></strong></div><div><span>RESOURCES</span><strong><b class="officer">${s.resources.Officer}</b><small> O</small> <b class="enlisted">${s.resources.Enlisted}</b><small> E</small>${s.config.opportunityEnabled?`<small class="opportunity-count" aria-label="${s.opportunity??0} of ${s.config.opportunityCap} Opportunity">◎ ${s.opportunity??0}/${s.config.opportunityCap}</small>`:''} </strong></div><div><span>ROUND / SLOT</span><strong>${s.round || '—'} <small>/ ${s.slot ?? 0} OF 10</small></strong></div>`;
-  $('#status').insertAdjacentHTML('afterbegin',`<div class="hud-ruleset ${isV2(s)?'experimental':''}">${esc($('#ruleset-label').textContent)}</div>`);
+  const status=$('#status');
+  status.classList.toggle('continuous-hud',isV2(s));
+  status.classList.toggle('hud-expanded',compactHudExpanded);
+  status.innerHTML = isV2(s)?continuousHudMarkup(s,compactHudExpanded):`<div><span>POSITION</span><strong>${missionName(s)} <small>${s.mission.position}</small></strong></div><div><span>ALTITUDE</span><strong class="${s.altitude <= 1 ? 'danger-text' : ''}">${s.altitude} <small>LEVELS</small></strong></div><div><span>RESOURCES</span><strong><b class="officer">${s.resources.Officer}</b><small> O</small> <b class="enlisted">${s.resources.Enlisted}</b><small> E</small>${s.config.opportunityEnabled?`<small class="opportunity-count" aria-label="${s.opportunity??0} of ${s.config.opportunityCap} Opportunity">◎ ${s.opportunity??0}/${s.config.opportunityCap}</small>`:''} </strong></div><div><span>ROUND / SLOT</span><strong>${s.round || '—'} <small>/ ${s.slot ?? 0} OF 10</small></strong></div>`;
+  const cap=Math.max(0,Number(s.config.opportunityCap)||0),opportunity=Math.max(0,Math.min(cap,Number(s.opportunity)||0)),mapOpportunity=$('#map-opportunity');
+  mapOpportunity.hidden=!s.config.opportunityEnabled||cap===0;
+  mapOpportunity.setAttribute('aria-label',`Opportunity ${opportunity} of ${cap}`);
+  mapOpportunity.title=`Opportunity ${opportunity} of ${cap}`;
+  mapOpportunity.innerHTML=Array.from({length:cap},(_,index)=>`<span class="${index<opportunity?'filled':''}" aria-hidden="true"></span>`).join('');
   const timeStatus=$('#time-status');timeStatus.hidden=!isV2(s)||!s.pendingProgress;
   if(isV2(s)){timeStatus.classList.toggle('pending',s.pendingProgress);timeStatus.innerHTML=`<strong>TIME ${Math.min(s.time,effectiveTimeThreshold(s))}/${effectiveTimeThreshold(s)}</strong><span>PROGRESS CHECKPOINT AFTER THIS TURN${s.overflowTimeTokens?.length?' · +1 BONUS TIME BANKED':''}</span>`;}
   renderTrack(s); renderCrew(s); renderBoard(s); renderEnemies(s); renderEvent(s); renderBags(s); renderAction(s); renderSummary(s);
@@ -272,7 +279,10 @@ function openOpportunity() {
 const actionDescriptions={assistWork:'Join an active Repair, Fire Control or Medical job. Uses this normal action, costs no resources, and reduces its remaining Time to the assisted duration if lower.',basicFire:'One free combat pull against a fighter in your operating gun arc.',advancedFire:'Keep hitting one fighter until a miss. A first-pull miss grants exactly one more pull.',repair:'Select connected damaged squares. Work completes after the configured duration.',fireControl:'Select connected burning squares. Squares under active suppression do not spread.',medical:'Treat one injured crewmate. Care completes after the configured duration.',relocate:'Move to a safe fuselage square. This uses your action.',manCockpit:'Take a vacant pilot seat. This uses your action.',manStation:'Spend this action to occupy a vacant, non-burning gun station or cockpit seat. Your rank and personal abilities stay the same.',returnHome:'Spend this action to return to your vacant, safe home station. Nobody is evicted.',leaveStation:'Spend this action to leave your station for nearby safe interior space. Your next reassignment requires another action.',restartEngine:'Attempt to restart a stopped, fully repaired engine from a pilot seat.',directFire:'Spend 1 Officer → order any healthy gunner at an operational gun station to make one immediate Basic Shot. Does not use that gunner’s activation.',convert:'Change Resource denominations. Enlisted to Officer returns surplus tokens to discard; Officer to Enlisted requires extra Resource tokens from the mission bag. Copilot only.',rotateFighter:'Turn one fighter 90° away from the B-17.',escort:'Call an escort into a random quadrant for the rest of this round.',wait:"Finish this crew member's turn without taking an action."};
 function crewDetails(s,c) {
  const d=def(c.id),status=crewStatus(s,c,selectedCrew===c.id),station=stationStatus(s,c);
- return '<div class="crew-detail status-'+status.id+'"><strong>'+esc(status.icon+' '+status.label)+'</strong><p>Home Station: <b>'+esc(station.homeName)+'</b></p><p>Current Station: <b>'+esc(station.currentName)+(station.displaced?' - Displaced':'')+'</b></p><p>Physical position: <b>'+esc(station.position)+'</b></p><p>'+esc(station.name)+' — <b>'+esc(station.label)+'</b></p>'+(status.job?'<p>Working: '+esc(({repair:'Repair',fireControl:'Fire Control',medical:'Medical'})[status.job.kind]??status.job.kind)+' · '+(isV2(s)?status.job.remainingTime+' Time remaining'+(status.job.assistantId?' · assisted':''):'completes Round '+status.job.completeRound)+'</p>':'')+(isV2(s)?`<p>Crew Cycle slot: <b>${c.cycleSlotConsumed?'consumed — waits for next Cycle':'open — may act when available'}</b></p>`:'')+'<small>'+esc(d.tags.join(' · '))+'</small></div>';
+ return '<details class="crew-detail status-'+status.id+'"><summary><strong>'+esc(status.label)+'</strong><span class="crew-detail-hint">Crew details</span></summary><div class="crew-detail-body"><p>Home Station: <b>'+esc(station.homeName)+'</b></p><p>Current Station: <b>'+esc(station.currentName)+(station.displaced?' - Displaced':'')+'</b></p><p>Physical position: <b>'+esc(station.position)+'</b></p><p>'+esc(station.name)+' — <b>'+esc(station.label)+'</b></p>'+(status.job?'<p>Working: '+esc(({repair:'Repair',fireControl:'Fire Control',medical:'Medical'})[status.job.kind]??status.job.kind)+' · '+(isV2(s)?status.job.remainingTime+' Time remaining'+(status.job.assistantId?' · assisted':''):'completes Round '+status.job.completeRound)+'</p>':'')+(isV2(s)?`<p>Crew Cycle slot: <b>${c.cycleSlotConsumed?'consumed — waits for next Cycle':'open — may act when available'}</b></p>`:'')+'<small>'+esc(d.tags.join(' · '))+'</small></div></details>';
+}
+function resourceSummary(s,canAct) {
+ return `<div class="action-resources" aria-label="Resources held: ${s.resources.Officer} Officer, ${s.resources.Enlisted} Enlisted"><div class="resource-counts"><span class="resource-count officer"><small>OFFICER</small><b>${s.resources.Officer}</b></span><span class="resource-count enlisted"><small>ENLISTED</small><b>${s.resources.Enlisted}</b></span></div><small class="resource-caption">AVAILABLE TO SPEND${canAct?'':' · PREVIEW — ACTIVATE FIRST'}</small></div>`;
 }
 function actionDescription(s,id) {return isV2(s)&&id==='escort'?`Call an escort into a random quadrant until the next Progress checkpoint (${s.config.v2MaxEscorts === null ? 'no simultaneous cap' : `maximum ${s.config.v2MaxEscorts} at once`}).`:actionDescriptions[id];}
 function openActions(crewId=queue.view.activeCrew??selectedCrew) {
@@ -291,7 +301,7 @@ function openActions(crewId=queue.view.activeCrew??selectedCrew) {
   {label:'Station Actions',items:actions.filter(a=>actionGroup(a.id)==='Station Actions'&&!['basicFire','advancedFire'].includes(a.id))},
   {label:'General Actions',items:actions.filter(a=>actionGroup(a.id)==='General Actions'&&a.id!=='wait')},
  ];
- $('#action-content').innerHTML=crewDetails(s,c)+'<p class="small muted">'+s.resources.Officer+' Officer / '+s.resources.Enlisted+' Enlisted resources held'+(!canAct?' · Preview: activate before taking an action.':'')+'</p>'+ordered.map(group=>group.items.length?'<section class="action-group"><h3>'+group.label+'</h3><div class="action-options">'+group.items.map(a=>'<button data-action="'+a.id+'" class="action-option" '+(canAct&&a.enabled?'':'disabled')+'><span><strong>'+esc(a.label)+'</strong><small>'+esc(a.enabled?actionDescription(s,a.id):a.reason)+'</small></span><b>'+esc(a.cost??'FREE')+'</b></button>').join('')+'</div></section>':'').join('')+'<div class="choice-footer"><button class="quiet" data-ui="close">Preview board</button>'+(canActivate?(def(crewId).abilities?.includes('intercept')&&isAtStation(s,c)?'<label class="intercept"><input id="sheet-intercept" type="checkbox"'+(interceptRequested?' checked':'')+'> Intercept Enemy draw as Flak</label>':'')+'<button class="primary" data-ui="activate">Activate & draw →</button>':'')+'</div>';
+ $('#action-content').innerHTML=crewDetails(s,c)+resourceSummary(s,canAct)+ordered.map(group=>group.items.length?'<section class="action-group"><h3>'+group.label+'</h3><div class="action-options">'+group.items.map(a=>{const resource=a.cost?.includes('Officer')?'officer':a.cost?.includes('Enlisted')?'enlisted':a.cost?'mixed':'free';return '<button data-action="'+a.id+'" class="action-option" '+(canAct&&a.enabled?'':'disabled')+'>'+actionIconMarkup(a.id)+'<span class="action-copy"><strong>'+esc(a.label)+'</strong><small>'+esc(a.enabled?actionDescription(s,a.id):a.reason)+'</small></span><b class="action-cost resource-'+resource+'">'+esc(a.cost??'FREE')+'</b></button>';}).join('')+'</div></section>':'').join('')+'<div class="choice-footer"><button class="quiet" data-ui="close">Preview board</button>'+(canActivate?(def(crewId).abilities?.includes('intercept')&&isAtStation(s,c)?'<label class="intercept"><input id="sheet-intercept" type="checkbox"'+(interceptRequested?' checked':'')+'> Intercept Enemy draw as Flak</label>':'')+'<button class="primary" data-ui="activate">Activate & draw →</button>':'')+'</div>';
  openDialog('#action-dialog');
 }
 const option=(value,label)=>`<option value="${esc(value)}">${esc(label)}</option>`;
@@ -484,6 +494,7 @@ document.addEventListener('click', e=>{
   const command=e.target.closest('[data-command]');if(command){send({type:command.dataset.command});return;}
   const control=e.target.closest('[data-ui]');if(!control)return;
   switch(control.dataset.ui){
+    case 'status-toggle':compactHudExpanded=!compactHudExpanded;render();break;
     case 'campaign':openCampaign();break;
     case 'campaign-new':newCampaignForm();break;
     case 'campaign-resume':closeDialog();break;
