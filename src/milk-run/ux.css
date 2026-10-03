@@ -197,3 +197,6 @@ dialog{background-color:#d8d2bb;background-image:repeating-linear-gradient(0deg,
   .diagnostic-tools button{flex:1 1 100%}
   .diagnostic-tools label{flex:1 1 auto}
 }
+
+.topbar .turn-back-button{background:#853c2e;border-color:#c6755e!important;color:#fff0d1!important;white-space:nowrap}
+.topbar .turn-back-button:hover{background:#a14c37;border-color:#e09a73!important;color:#fff8e6!important}

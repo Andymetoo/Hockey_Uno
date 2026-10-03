@@ -41,6 +41,7 @@ $('#app').innerHTML = `
   <header class="topbar">
     <a href="../../index.html" class="home-link" aria-label="Return to prototype launcher">← <span>PROTOTYPES</span></a>
     <div class="wordmark">MILK RUN <span id="ruleset-label">V1 — ROUND-BASED</span><span id="rules-modified" class="rules-modified" hidden>PLAYTEST RULES MODIFIED</span></div>
+    <button class="quiet turn-back-button" data-ui="turn-back" aria-label="Turn back and abort the mission" hidden>Turn Back</button>
     <button class="quiet" data-ui="new-sortie" aria-label="Start a new sortie"><span class="desktop-label">New sortie</span><span class="mobile-label">New</span></button>
     <button class="quiet" data-ui="help" aria-label="How to play"><span class="desktop-label">Field guide</span><span class="mobile-label">Guide</span></button>
     <button class="quiet" data-ui="dev" aria-label="Playtest settings"><span class="desktop-label">Playtest settings</span><span class="mobile-label">Dev</span></button>
@@ -101,6 +102,7 @@ function render() {
   const s = queue.view;
   saveWarning = !saveSession(queue.export());
   finalizeCampaignIfReady();
+  $('[data-ui="turn-back"]').hidden=queue.busy||Boolean(interaction)||!canTurnBack(s);
   $('#campaign-sortie-label').hidden=!s.campaign;
   if(s.campaign)$('#campaign-sortie-label').textContent=`CAMPAIGN · SORTIE ${s.campaign.sortieNumber}`;
   const warning=bombRunTargetWarning(s);$('#bombardier-warning').hidden=!warning;$('#bombardier-warning').textContent=warning;
@@ -215,7 +217,6 @@ function renderAction(s) {
   }
   else {const result=sortieResult(s);text=result.title;sub=result.reason;button='<button class="primary" data-ui="new-sortie">Plan another sortie →</button>';}
   if(!interaction)$('#target-detail').hidden=true;
-  if(!queue.busy&&!interaction&&canTurnBack(s))button=`<button class="quiet turn-back-button" data-ui="turn-back">TURN BACK</button>`+button;
   const chance=opportunityAvailability(s),control=$('#opportunity-control');
   const unavailableReason=queue.busy?'Wait for the current action to finish.':interaction?'Finish or cancel the current target selection first.':chance.reason;
   control.className=`opportunity-button ${chance.enabled&&!interaction&&!queue.busy?'available':'unavailable'}`;
