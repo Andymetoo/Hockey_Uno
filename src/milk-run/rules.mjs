@@ -8,6 +8,7 @@ import { resolveBombing, beginBombRun, placeBombDie, rerollBombDie, commitBombRu
 import { turnBack } from './turn-back.mjs';
 import { fighterHeading, turnHeadingToward, turnHeadingAway } from './spatial.mjs';
 import { isV2 } from './rulesets.mjs';
+import { breakOffFighter } from './continuous.mjs';
 import { engagementFor, spendEngagement, gainTime, gainBonusTime, gainFighterKillTime, completeContinuousTurn, continueCycle, completeBetweenTurnProgress, refreshTimeRequirement } from './continuous.mjs';
 import { observe, ensureV2Telemetry } from './telemetry.mjs';
 import { homeStationId, currentStationId, leaveStation, migrateCrewPositions } from './crew-position.mjs';
@@ -233,14 +234,39 @@ export function canAbortWork(state, jobId) {
     state.jobs.some(job => job.id === jobId);
 }
 
-function cancelWork(state, job, emit, reason) {
+function cancelWork(state, job, emit, reason, returnAfterHazard = false) {
   const workers = jobWorkers(state, job);
   state.jobs = state.jobs.filter(item => item.id !== job.id);
   for (const worker of workers) { worker.job = null; leaveStation(worker); }
-  record(emit, 'WORK_CANCELLED', `${job.kind === 'fireControl' ? 'Fire Control' : job.kind} cancelled: ${reason}${job.kind === 'fireControl' ? ' Fire suppression ends.' : ''} Workers remain at their work positions.`, {
+  record(emit, 'WORK_CANCELLED', `${job.kind === 'fireControl' ? 'Fire Control' : job.kind} cancelled: ${reason}${job.kind === 'fireControl' ? ' Fire suppression ends.' : ''} ${returnAfterHazard ? 'Workers return after hazard resolution when safe.' : 'Workers remain at their work positions.'}`, {
     crewId: job.crewId, jobId: job.id, kind: job.kind, cells: [...(job.cells ?? [])], targetId: job.targetId,
     workers: workers.map(worker => worker.id),
   });
+}
+
+function cancelMedical(state, job, emit, reason) {
+  state.medicalReturnPending = [...new Set([...(state.medicalReturnPending ?? []), ...jobWorkers(state, job).map(c => c.id)])];
+  cancelWork(state, job, emit, reason, true);
+}
+
+function returnCancelledMedical(state, emit) {
+  if (!state.medicalReturnPending?.length) return;
+  const workers = state.medicalReturnPending.map(id => person(state, id)).filter(c => c && !c.job);
+  delete state.medicalReturnPending;
+  returnWorkers(state, workers, emit);
+}
+
+function medicalValid(state, job) {
+  const target = person(state, job.targetId);
+  const workers = jobWorkers(state, job);
+  return target?.health === 'injured' && target.position.length > 0 && target.position.every(id => isSafe(state, id)) &&
+    workers.length === (job.assistantId ? 2 : 1) && workers.every(c => c.health === 'healthy' && c.job === job.id && c.position.length > 0 && c.position.every(id => isSafe(state, id)));
+}
+
+function cancelInvalidMedical(state, emit) {
+  for (const job of [...state.jobs]) if (job.kind === 'medical' && !medicalValid(state, job)) {
+    cancelMedical(state, job, emit, 'the patient or caregiver is no longer eligible, or their position is burning.');
+  }
 }
 
 function cancelJob(state, crew, emit) {
@@ -262,6 +288,9 @@ function injure(state, crew, emit, cause) {
     record(emit, 'CREW_KILLED', `${nameOf(crew.id)} is killed by ${cause}.`, { crewId: crew.id });
   }
   cancelJob(state, crew, emit);
+  if (crew.health === 'dead') for (const job of [...state.jobs]) {
+    if (job.kind === 'medical' && job.targetId === crew.id) cancelMedical(state, job, emit, `${nameOf(crew.id)} is dead.`);
+  }
   if (isV2(state)) refreshTimeRequirement(state);
 }
 
@@ -323,6 +352,8 @@ export function damageSquare(state, cellId, steps, emit, { injureCrew = true } =
   if (injureCrew) for (const crew of state.crew.filter(item => item.health !== 'dead' && item.position.includes(cellId))) {
     for (let step = 0; step < steps; step++) injure(state, crew, emit, `the hit at ${cellId}`);
   }
+  cancelInvalidMedical(state, emit);
+  returnCancelledMedical(state, emit);
   recalculateConditions(state, emit);
 }
 
@@ -332,13 +363,15 @@ export function resolveAttack(state, emit, { source = 'Enemy', fighterId, roll, 
   const result = roll ?? die(state, 6);
   const hitMinimum = Math.max(2, Math.min(6, 2 + storyModifier(state, 'enemyHit')));
   const outcome = resultOverride ?? (result < hitMinimum ? 'miss' : result === 6 ? 'critical' : 'hit');
-  record(emit, 'ENEMY_ATTACK_ROLL', `${source} rolls ${result}: ${outcome === 'off-target' ? 'OFF TARGET' : outcome === 'miss' ? 'MISS' : outcome === 'critical' ? 'CRITICAL HIT' : 'HIT'}.`, { fighterId, source, roll: result, result: outcome });
+  const experimental = isV2(state) && state.config.v2AircraftSpecificCrits && ENEMY_DEFS[fighter(state, fighterId)?.type ?? source];
+  const damageSteps = outcome === 'critical' ? experimental?.critSteps ?? 2 : 1;
+  record(emit, 'ENEMY_ATTACK_ROLL', `${source} rolls ${result}: ${outcome === 'off-target' ? 'OFF TARGET' : outcome === 'miss' ? 'MISS' : outcome === 'critical' ? 'CRITICAL HIT' : 'HIT'}.${experimental && outcome === 'critical' ? ` ${damageSteps} aircraft and crew damage step${damageSteps === 1 ? '' : 's'} (aircraft profile).` : ''}`, { fighterId, source, roll: result, result: outcome, ...(experimental && outcome === 'critical' ? { damageSteps } : {}) });
   if (outcome === 'off-target' || outcome === 'miss') return;
   bump(state, 'enemyHits');
   if (outcome === 'critical') bump(state, 'enemyCrits');
   const location = cellId ?? `${'ABCDEF'[die(state, 6) - 1]}${die(state, 6)}-${die(state, 4)}`;
   record(emit, 'ENEMY_HIT_LOCATION', `Hit location: ${location}.`, { cellId: location, fighterId });
-  damageSquare(state, location, outcome === 'critical' ? 2 : 1, emit);
+  damageSquare(state, location, damageSteps, emit);
 }
 
 function killFighter(state, target, emit, cause, gunfire = false, crewId = null) {
@@ -353,6 +386,7 @@ function killFighter(state, target, emit, cause, gunfire = false, crewId = null)
 }
 
 function damageFighter(state, target, amount, emit, cause, gunfire = false, crewId = null) {
+  const aboveThreshold = target.hp > target.maxHp / 2;
   target.hp = Math.max(0, target.hp - amount);
   record(emit, 'FIGHTER_DAMAGED', `${cause}: ${target.type} loses ${amount} HP (${target.hp}/${target.maxHp}).`, { fighterId: target.id, amount });
   if (!target.hp) killFighter(state, target, emit, cause, gunfire, crewId);
@@ -361,6 +395,13 @@ function damageFighter(state, target, amount, emit, cause, gunfire = false, crew
     record(emit, 'FIGHTER_DISRUPTED', `${target.type} is Disrupted until its next enemy action.`, {
       fighterId: target.id, cause, ...(isV2(state) ? { disruptEffect: state.config.v2DisruptEffect } : {}),
     });
+  }
+  if (target.hp > 0 && amount > 0 && isV2(state) && state.config.v2BadlyDamagedBreakoff &&
+      !target.badlyDamagedTriggered && (aboveThreshold || target.badlyDamagedTriggered === false) && target.hp <= target.maxHp / 2) {
+    target.badlyDamagedTriggered = true;
+    target.engagementRemaining = Math.max(0, target.engagementRemaining - 1);
+    record(emit, 'FIGHTER_BADLY_DAMAGED', `BADLY DAMAGED — ${target.type} BREAKING OFF SOONER: ${target.engagementRemaining} Engagement remaining.`, { fighterId: target.id, enemyType: target.type, engagementRemaining: target.engagementRemaining });
+    breakOffFighter(state, target, emit, 'after damage forces an early breakoff');
   }
 }
 
@@ -474,7 +515,7 @@ function missionDraw(state, crew, emit, { unavailable = false, intercept = false
   const hp = state.config[enemyDef.hpKey] ?? enemyDef.hp;
   const spawned = { id: `fighter-${state.nextId++}`, type: card, hp, maxHp: hp, quadrant: QUADRANTS[die(state, 4) - 1], altitude: ALTITUDES[die(state, 3) - 1], facing: state.config.spawnFacing, disrupted: false };
   spawned.heading = fighterHeading(spawned);
-  if (isV2(state)) spawned.engagementRemaining = engagementFor(state, card);
+  if (isV2(state)) { spawned.engagementRemaining = engagementFor(state, card); spawned.badlyDamagedTriggered = false; }
   state.fighters.push(spawned);
   bump(state, 'fightersSpawned');
   if (isV2(state)) observe(state, 'fightersSpawned');
@@ -560,7 +601,7 @@ export function legalWorkPositions(state, crewId, targetIds) {
 }
 
 export function eligibleMedicalTargets(state, crewId) {
-  return state.crew.filter(target => target.health === 'injured' && !underTreatment(state, target.id) &&
+  return state.crew.filter(target => target.health === 'injured' && target.position.every(id => isSafe(state,id)) && !underTreatment(state, target.id) &&
     legalWorkPositions(state, crewId, target.position).length > 0);
 }
 
@@ -611,10 +652,20 @@ function jobWorkers(state, job) {
 function completeJobs(state, jobs, emit) {
   const workers = jobs.flatMap(job => jobWorkers(state, job));
   for (const job of jobs) finishJob(state, job, emit, true);
+  if (state.medicalReturnPending) {
+    for (const id of state.medicalReturnPending) if (!workers.some(c => c.id === id)) workers.push(person(state, id));
+    delete state.medicalReturnPending;
+  }
   returnWorkers(state, workers, emit);
 }
 
 function finishJob(state, job, emit, deferReturn = false) {
+  if (!state.jobs.some(active => active.id === job.id)) return;
+  if (job.kind === 'medical' && !medicalValid(state, job)) {
+    cancelMedical(state, job, emit, 'the patient or caregiver is no longer eligible, or their position is burning.');
+    if (!deferReturn) returnCancelledMedical(state, emit);
+    return;
+  }
   record(emit, 'WORK_COMPLETING', `${nameOf(job.crewId)} completes ${job.kind === 'fireControl' ? 'Fire Control' : job.kind}.`, { crewId: job.crewId });
   const completedCells = [];
   let medicalComplete = false;
@@ -752,6 +803,9 @@ export function resolveFireSpread(state, emit) {
       }
     }
   }
+  // Keep physical occupancy fixed throughout all frozen fire groups.
+  cancelInvalidMedical(state, emit);
+  returnCancelledMedical(state, emit);
 }
 
 function validateAction(state, crew, command) {
@@ -788,6 +842,7 @@ function validateAction(state, crew, command) {
     case 'medical': {
       const target = person(state, command.targetId);
       requireRule(target?.health === 'injured', 'Choose an injured crew member.');
+      requireRule(target.position.length > 0 && target.position.every(id => isSafe(state, id)), 'Medical cannot treat a patient standing on Fire.');
       requireRule(!state.jobs.some(job => job.kind === 'medical' && job.targetId === target.id), 'Medical treatment is already in progress.');
       workPosition(state, crew, target.position, command.workCellId);
       break;
@@ -939,8 +994,7 @@ function startRound(state, emit) {
     record(emit, name === 'mission' ? 'MISSION_BAG_REFILLED' : 'COMBAT_BAG_REFILLED', `${name === 'mission' ? 'Mission' : 'Combat'} bag receives ${count} discarded tokens. Held resources remain outside the bag.`);
   }
   const completing = state.jobs.filter(job => job.completeRound <= state.round);
-  for (const job of completing) finishJob(state, job, emit, true);
-  returnWorkers(state, completing.map(job => person(state, job.crewId)).filter(Boolean), emit);
+  completeJobs(state, completing, emit);
   for (const crew of state.crew) { crew.used = false; crew.activationCompleted = false; crew.lastAction = null; }
   record(emit, 'CREW_READIED', 'Healthy crew without crisis jobs are ready.');
   if (state.escorts.length) { state.escorts = []; record(emit, 'ESCORTS_EXPIRED', 'Previous-round escorts depart.'); }
@@ -1035,6 +1089,8 @@ export function dispatch(original, command) {
   for (const target of state.fighters) target.heading = fighterHeading(target);
   const events = [];
   const emit = event => events.push({ ...event, state: copy(state) });
+  cancelInvalidMedical(state, emit);
+  returnCancelledMedical(state, emit);
   requireRule(state.phase !== 'ended', 'This sortie has ended. Start a new sortie to continue.');
   requireRule(state.phase !== 'story' || command.type === 'storyChoice', 'Resolve the current Story situation before continuing tactical play.');
   switch (command.type) {

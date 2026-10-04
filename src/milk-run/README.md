@@ -1,5 +1,42 @@
 # Milk Run — V1 and experimental V2
 
+## October 3 playtest correctives and combat experiments
+
+Ordinary new standalone and Campaign sorties offer a fresh `MR-XXXX-XXXX` code, generated from browser/Node cryptographic randomness outside the gameplay PRNG. `createGame` also generates a code when a V2 caller omits its seed. An explicit seed remains the deterministic override; both tactical RNG and the separate Story RNG derive from that exact string. Resume/import never calls seed generation for the saved flight. Dev launch retains its editable seed for reproduction. Export stores the original in `state.seed` and `metadata.seed`, uses its sanitized form in the filename, and keeps the existing Campaign history seed field. Export never rerolls a seed.
+
+Assist Work hints now use dark green text on the existing light work panels, with explicit available/unavailable wording. No yellow-only availability signal is required. The responsive regression measures text/background contrast in both states at 320/360/390/430/768/1440px.
+
+Medical has a target lifecycle as well as a worker lifecycle. The inspected fire-spread code already injured/killed patients normally: there was no explicit Medical immunity. The confirmed gaps were that patient death did not cancel the caregiver's job (patients do not own the worker's `job` pointer), and completion checked only for an injured patient, not a burning position or invalid caregiver. A direct hit, Critical or fire-spread death now invalidates treatment immediately. Fire-phase cancellation releases job pointers without changing physical positions until **all frozen fire groups** resolve; then the existing batch home-return/displacement rules return surviving caregivers when safe. Worker casualties retain existing cancellation semantics. Completion and command boundaries reject invalid treatment, including targets that are dead, missing, externally healed or standing on Fire. Medical cannot heal a dead target or turn an injured occupant healthy on Fire. Healthy occupants still block their intentional first spread; a healthy caregiver sharing the patient's square can block ignition but cannot protect an injured patient from death.
+
+Two new V2 Dev/Playtest settings apply only to new sorties and default **OFF**. They persist in the sortie configuration; historical missing flags mean OFF.
+
+| Experiment | ON behavior |
+| --- | --- |
+| Aircraft-Specific Crit Severity | Natural 6 uses `ENEMY_DEFS.critSteps`: BF-109 **1**, BF-110 **2**, FW-190 **2**, Me-262 **2**. Each resolved step applies to aircraft and crew consistently. Flak keeps its baseline 2-step Crit. The Critical beat explains the profile's step count. OFF preserves the baseline 2-step behavior, including V1. |
+| Badly Damaged Fighters Break Off Sooner | The first nonlethal hit reaching half maximum HP or less removes **1 Engagement**, once per fighter. Thus 4→2, 3→1 and 2→1 qualify. Zero uses ordinary BREAKS OFF/disengagement presentation, with no kill, kill Time, Opportunity reward or kill credit. Disrupt remains independent. Damage from Escorts also qualifies, without becoming B-17 kill credit. |
+
+New fighters save `badlyDamagedTriggered: false`, then `true` after the threshold triggers. Historical fighters missing the flag must cross from above half HP; loading an already-damaged fighter cannot trigger retroactively. Explicitly saved unprocessed state remains eligible on a later damaging shot. Story-tagged combat tokens use their ordinary Hit/Burst semantics and retain their ownership/lifetime.
+
+### Late-sortie performance evidence
+
+`node src/milk-run/tests/long-session-browser-check.mjs` runs a deterministic **110-turn, 11-Progress, Story-enabled V2 sortie** with the recorder open, production commands, four Story threads, ten final Story facts and 1,317 semantic events. This purpose-built progression fixture uses a 10-Time bag/threshold and no Enemy tokens to guarantee a complete long flight; it measures accumulated-session rendering, not combat balance. It samples command dispatch, presentation expansion, render, recorder rebuild, serialization/storage, attached DOM, heap and listener counts. It also reloads the exact final state/log/queue and traverses every recorder page.
+
+The demonstrated bottleneck was rebuilding the entire expanded recorder DOM on each beat, including raw JSON beneath closed event details. It also increased the cost of the surrounding full render. The recorder now displays **100 semantic events per page**, with Older/Newer/Latest controls and an absolute historical position that stays fixed as events arrive. All events remain authoritative and accessible; nothing is discarded. Unchanged pages are not rebuilt.
+
+Measurements from the same local headless Chromium fixture (milliseconds, segment means; environment-sensitive):
+
+| Sample | Events | Render before → after | Recorder before → after | Attached DOM before → after |
+| --- | ---: | ---: | ---: | ---: |
+| Turn 10 / Progress 1 | 118 | 13.88 → 15.99 | 2.41 → 2.88 | 2,073 → 1,935 |
+| Turn 50 / Progress 5 | 596 | 32.03 → 18.87 | 12.47 → 5.07 | 6,033 → 1,935 |
+| Turn 79 / Progress 7 | 926 | 112.90 → 18.53 | 37.48 → 4.68 | 8,793 → 1,945 |
+| Turn 100 / Progress 10 | 1,199 | 150.86 → 21.04 | 37.13 → 5.35 | 11,016 → 1,935 |
+| Turn 110 / HOME | 1,317 | 212.96 → 17.70 | 46.79 → 4.27 | 12,171 → 2,109 |
+
+Final-segment render p95 fell **498.2 → 27.1 ms** and rendered recorder rows **1,747 → 135**. Command means stayed about 1 ms; presentation expansion about 0.01 ms. State JSON grew only 8.3→10.6 KB, with ten Story facts. Listener count stayed **18** throughout. The same **458** autosave writes occurred in each run; the final UTF-16 payload was **495,466 bytes**, and final-segment autosave means were **2.25 → 2.15 ms**. Persistence was not the dominant measured bottleneck, so its exact per-beat recovery behavior is retained. Heap samples are GC-sensitive and did not establish a listener or retained-memory leak. These measurements demonstrate the open-recorder problem; they do not claim to reproduce every source of lag on physical phones or very large Campaign archives.
+
+Full results live under `.checks/long-session-before/` and `.checks/long-session-after/`. Opt-in `MILK_RUN_PROFILE` diagnostics are separate from saved state and never consume RNG. The regression enforces bounded recorder DOM and a broad early/late render-growth limit, verifies complete page traversal and exact save/resume. `node src/milk-run/tests/run-validation.mjs` reruns all Node tests, all browser suites, the stress fixture and the 24-sortie Story review, saving logs to `.checks/playtest-validation/`.
+
 New sorties offer **V1 — Round-Based** (the current/classic rules) or **V2 — Continuous Time — EXPERIMENTAL**. The `v3` names in old storage keys and historical documentation are implementation versions, not the new player-facing ruleset. V1 keeps its 14/5 mission, N+2 work, ten-slot rounds, fighter clearing, and Round Start refill/fire behavior.
 
 ## V2 continuous-time playtest
@@ -152,7 +189,7 @@ Version-1 stores and portable backups are validated before migration. Migration 
 
 ## Shared damage and presentation changes
 
-A successful direct enemy Critical Hit now applies **two aircraft steps and two crew steps** in both V1 and V2. A healthy crew member on the impacted occupied square goes Healthy→Injured→Dead; an injured member dies; dead remains dead. This does not alter Fire Spread's separate once-per-phase crew-blocking rule. A strong **CRITICAL HIT** beat appears before location resolution and the recorder identifies the Critical result.
+The baseline direct enemy Critical Hit applies **two aircraft steps and two crew steps** in both V1 and V2. A healthy crew member on the impacted occupied square goes Healthy→Injured→Dead; an injured member dies; dead remains dead. The optional V2 aircraft-specific profile above changes BF-109 severity only while enabled. This does not alter Fire Spread's separate once-per-phase crew-blocking rule. A strong **CRITICAL HIT** beat appears before location resolution and the recorder identifies the Critical result.
 
 Crew retain their immediate unavailable-card tilt, with text/icons as well as color: Working mustard/yellow, Injured muted salmon, Being Treated a distinct medical treatment, Dead charcoal and Displaced blue-gray. Combat token centers use clear **HIT**, **×2** and **MISS**; Burst has a darker stronger face. Paused bottom presentation controls include **▶ Play** immediately beside Skip.
 
@@ -182,7 +219,7 @@ Home Station, Current Station and physical work position are separate. Gun arcs 
 
 There is no Officer/Enlisted restriction on physically operating gun stations. The Navigator can operate the Ball Turret arc while seated there, but leaves navigation unmanned. A healthy Officer substitute at the Navigator/Bombardier station restores its specialist function; an Enlisted substitute can shoot its gun but cannot navigate/operate the bombsight. Sitting in another role's station grants no personal abilities. V1's existing bombing resolution is intentionally unchanged despite the shared station model.
 
-Completed workers return to their home only when safe and unoccupied under the existing coherent batch-return rules. Otherwise they remain displaced. Cancellation and V2 Abort Work retain the work position, remove the station assignment and immediately end suppression. Abort Work retains its validated V2-only between-turn eligibility.
+Completed workers return to their home only when safe and unoccupied under the existing coherent batch-return rules. Otherwise they remain displaced. Worker-casualty cancellation and V2 Abort Work retain the work position, remove the station assignment and immediately end suppression. Invalid-patient Medical cancellation releases caregivers and schedules a safe batch return after hazard resolution. Abort Work retains its validated V2-only between-turn eligibility.
 
 Saves store `crewPositionVersion: 1`, separate `homeStation` and nullable `station`, `displaced`, physical positions and active jobs in authoritative, visible and pending snapshots. Older saves use their existing assigned station as home, including historical cockpit substitutions; a full stationary footprint retains its current assignment. Working/displaced crew keep their exact physical position and become unassigned. Migration changes no clocks, config, bags or RNG.
 
@@ -393,15 +430,15 @@ Crew rank, tags, role `abilities` arrays and station gun arcs live in `CREW_DEFS
 
 This pass deliberately does not add XP, persistent stat buffs, aircraft upgrades, crew skill bonuses, stronger-enemy reward scaling, target-specific bag modifiers/travel lengths, an economic campaign layer, paid between-sortie repairs, cloud storage or backend accounts. Surviving crew/aircraft reset mechanically; permadeath changes only historical identity and replacement records. Me-262, FW-190, BF-110 and BF-109 all retain the same eligible V2 Opportunity/Time kill rewards.
 
-Other deferred systems include Event cards, Locked In, Desperation, Fate, aircraft-specific critical abilities, full interior pathfinding, simultaneous healthy-crew station swapping, bailing out, a landing minigame, branching/hidden mission tiles and scouting. V2 Engagement is implemented and fighters persist across Progress; V1 still clears fighters at round end under its default. The optional navigation, cycle-Time and unavailable-pressure settings remain experiments, with 0/ON/Full Pressure defaults. Playtest exports include the seed, configuration and event log for reproducibility; no balance or historical-accuracy claim follows from a successful diagnostic sortie.
+Other deferred systems include Event cards, Locked In, Desperation, Fate, aircraft-specific abilities beyond the dev-gated Critical severity profile, full interior pathfinding, simultaneous healthy-crew station swapping, bailing out, a landing minigame, branching/hidden mission tiles and scouting. V2 Engagement is implemented and fighters persist across Progress; V1 still clears fighters at round end under its default. The optional navigation, cycle-Time and unavailable-pressure settings remain experiments, with 0/ON/Full Pressure defaults. Playtest exports include the seed, configuration and event log for reproducibility; no balance or historical-accuracy claim follows from a successful diagnostic sortie.
 
 ## Validation
 
-All implementation and test changes are inside Milk Run. Validation rerun on **October 3, 2026** passes **594/594 Node tests**, with zero failures, skips or cancellations, and **15/15 Chromium suites**, with no runtime or asset errors. This includes all 14 prior browser suites plus Story Mode. There are **44 Story mechanics/lifecycle tests and 12 Story UI/config/migration tests**. Existing tactical witness fixtures explicitly disable Story where they test baseline V2; new Story scenarios test the enabled default. Logs are in `.checks/story-validation/`; screenshots and structured browser results are in each suite's `.checks/` folder, including `.checks/story/browser-results.json`.
+All implementation and test changes are inside Milk Run. Validation rerun on **October 3, 2026** passes **635/635 Node tests**, with zero failures, skips or cancellations, and **17/17 Chromium suites**, with no runtime or asset errors. This includes all 15 prior browser suites, the new nine-group correctives suite at all six requested widths, and the 110-turn Story-enabled performance regression. There are **41 new corrective Node tests**, alongside the existing **44 Story mechanics/lifecycle tests and 12 Story UI/config/migration tests**. Existing tactical witness fixtures explicitly disable Story where they test baseline V2; Medical regressions exercise both settings. Logs are in `.checks/playtest-validation/`; screenshots and structured browser results are in each suite's `.checks/` folder. No branch or PR was created.
 
 Story coverage includes deterministic selection and scheduled outcomes, one-prompt safe boundaries, marked Repair, ordinary Story inspection work and assistance, positive free Medical, tagged mission/combat draws and both refill paths, temporary accuracy/Flak/Time/Bomb Run rules, concurrent target follow-ups, absent Bombardier, conditions ending, Turn Back, HOME/loss finalization, Campaign facts, Dev Discard and exact Campaign file export/import. **76 Story-enabled semantic snapshots** round-trip through persistence, including a token between draw and discard, work completion, target arrival and choices. The existing **1,530 V2 diagnostic snapshot round-trips** also rerun.
 
-The human-playability aid runs actual commands with unmodified defaults, visible-state tactical decisions and varied Story choices: **24 deterministic sorties**, **24 distinct ordered thread sequences**, all **13 families**, **2–5 interactive decisions** per sortie (mean **4.25**) and mean **2.46** automatic follow-up outcomes. All flights ended: **21 HOME, 3 aircraft losses**. **32 of 94 conditions** were explicitly positive; mixed conditions also offered benefits. It verified physical Time, Resources, base combat tokens and owned temporary identities after **4,560 commands**. These are reviewed examples, not a balance/win-rate claim. Narratives include `story-review-5` bombing Bremen through the earlier cloud, `story-review-11` pushing an engine whose vibration settled, `story-review-4` repairing an engine after the gamble worsened, and `story-review-18` receiving Escort help from a bomber aided earlier. Review revisions removed a dominant navigation option, varied detour descriptions, replaced generic expiration text, corrected dead-person narration and added appropriate no-drop, externally stopped-engine and interrupted-work outcomes. Routine expiration bookkeeping stays in Recent/recorder rather than cluttering Campaign facts. Report: `.checks/story-review/sorties.json`.
+The human-playability aid runs actual commands with unmodified defaults, visible-state tactical decisions and varied Story choices: **24 deterministic sorties**, **24 distinct ordered thread sequences**, all **13 families**, **2–5 interactive decisions** per sortie (mean **4.25**) and mean **2.46** automatic follow-up outcomes. All flights ended: **20 HOME, 4 aircraft losses**. **32 of 94 conditions** were explicitly positive; mixed conditions also offered benefits. It verified physical Time, Resources, base combat tokens and owned temporary identities after **4,545 commands**. The policy now queries production Medical eligibility, matching the player UI and avoiding treatment of patients standing on Fire. Authored Story content is unchanged. These are reviewed examples, not a balance/win-rate claim. Routine expiration bookkeeping stays in Recent/recorder rather than cluttering Campaign facts. Report: `.checks/story-review/sorties.json`.
 
 From the repository root:
 
@@ -422,6 +459,8 @@ node src/milk-run/tests/campaign-browser-check.mjs
 node src/milk-run/tests/hangar-browser-check.mjs
 node src/milk-run/tests/dev-discard-browser-check.mjs
 node src/milk-run/tests/story-browser-check.mjs
+node src/milk-run/tests/playtest-correctives-browser-check.mjs
+node src/milk-run/tests/long-session-browser-check.mjs
 node src/milk-run/tests/story-playability-review.mjs 24
 ```
 
@@ -442,6 +481,8 @@ node src/milk-run/tests/story-playability-review.mjs 24
 | Hangar | 10 groups; multiple surviving aircraft, choice after loss, aircraft/personnel cross-links, import/migration and six responsive widths |
 | Dev Discard / emergency return | 12 groups; all seven return distances at six widths, destructive confirmation/cancellation, pending queue cleanup, storage rollback, no-history discard, reload, immediate relaunch, export and finalized-flight protection |
 | Story Mode | 11 groups; decisions/conditions at all six widths, exact reload, inspect/reopen, saved presentation boundary, marked-square inspection, positive supplies, defaults/reset/OFF, real Campaign file export/import and no-history Dev Discard |
+| Playtest correctives | 9 groups; fresh UI seeds, manual Dev seed, saved experiment switches, actual export seed/metadata/filename, available/unavailable Assist Work contrast at all six widths |
+| Long session | 110 Turns; five measurement points, bounded DOM, render-growth gate, exact save/resume and browser traversal of all 1,317 recorder events |
 
 The 24 focused Hangar Node cases cover one-plane selection; commissioning without replacing survivors; A/B/A service attribution; aircraft and crew relationship joins; selected-aircraft autosave/backup linkage; permanent loss and KIA; independent objective/return/abort results; idempotent finalization; invalid identity imports; three legacy migration states; and standalone isolation. Campaign and Hangar browser checks exercise actual forms and touch controls, with scripted outcome fixtures for service attribution and real rules-driven Turn Back return/loss in the Campaign suite. Aircraft and personnel records are checked expanded at 320/360/390/430/768/1440px.
 

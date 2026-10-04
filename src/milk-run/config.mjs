@@ -18,6 +18,7 @@ export const DEFAULT_CONFIG = Object.freeze({
   outboundLength: 14, returnLength: 5, bombingMin: 3, animationMs: 750, presentationSpeed: 'normal',
   v2CrewCycleTurns: 10,
   v2StoryMode: true,
+  v2AircraftSpecificCrits: false, v2BadlyDamagedBreakoff: false,
   v2MissionEnemy: 20, v2MissionResource: 12, v2MissionTime: 10,
   v2TimePerProgress: 4, v2OutboundLength: 8, v2ReturnLength: 3,
   v2NavigatorUnmannedTimePenalty: 0, v2CrewCycleRefreshGrantsTime: true, v2UnavailableCrewPressure: 'full',
@@ -41,6 +42,8 @@ export const CONFIG_FIELDS = [
     { value: 'v1', label: 'V1 — Round-Based' }, { value: 'v2-continuous', label: 'V2 — Continuous Time — EXPERIMENTAL' },
   ] },
   boolean('v2StoryMode', 'Story Mode', 'V2 — Continuous Time (Experimental)'),
+  boolean('v2AircraftSpecificCrits', 'Aircraft-Specific Crit Severity', 'V2 — Combat & escort (Experimental)'),
+  boolean('v2BadlyDamagedBreakoff', 'Badly Damaged Fighters Break Off Sooner', 'V2 — Combat & escort (Experimental)'),
   { ...number('v2CrewCycleTurns', 'V2 Crew Cycle Turns (fixed at 10)', 'V2 — Continuous Time (Experimental)', 10, 10), fixedReason: 'Fixed at 10: each of the ten crew must account for one Turn before readiness refreshes.' },
   number('v2MissionEnemy', 'V2 Mission Enemy tokens', 'V2 — Continuous Time (Experimental)', 0, 100),
   number('v2MissionResource', 'V2 Mission Resource tokens', 'V2 — Continuous Time (Experimental)', 0, 100),
@@ -174,10 +177,10 @@ export function modifiedConfigScopes(config, activeRuleset) {
 }
 
 export const ENEMY_DEFS = Object.freeze({
-  'BF-109': { name: 'BF-109', hp: 2, hpKey: 'bf109Hp', countKey: 'bf109Cards', abilities: [] },
-  'BF-110': { name: 'BF-110', hp: 2, hpKey: 'bf110Hp', countKey: 'bf110Cards', abilities: [] },
-  'FW-190': { name: 'FW-190', hp: 3, hpKey: 'fw190Hp', countKey: 'fw190Cards', abilities: [] },
-  'Me-262': { name: 'Me-262', hp: 4, hpKey: 'me262Hp', countKey: 'me262Cards', abilities: [] },
+  'BF-109': { name: 'BF-109', hp: 2, hpKey: 'bf109Hp', countKey: 'bf109Cards', critSteps: 1, abilities: [] },
+  'BF-110': { name: 'BF-110', hp: 2, hpKey: 'bf110Hp', countKey: 'bf110Cards', critSteps: 2, abilities: [] },
+  'FW-190': { name: 'FW-190', hp: 3, hpKey: 'fw190Hp', countKey: 'fw190Cards', critSteps: 2, abilities: [] },
+  'Me-262': { name: 'Me-262', hp: 4, hpKey: 'me262Hp', countKey: 'me262Cards', critSteps: 2, abilities: [] },
 });
 
 export const RESOURCE_BY_RANK = Object.freeze({ Officer: 'Officer', Enlisted: 'Enlisted' });

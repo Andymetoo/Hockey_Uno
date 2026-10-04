@@ -27,16 +27,17 @@ test('two-round Medical keeps worker and patient unavailable through N+1 and rel
   assert.equal(complete.crew.find(crew => crew.id === 'pilot').health, 'healthy');
 });
 
-test('a medically treated patient stays unavailable and cannot operate a station even if externally healed early', () => {
+test('an externally healed patient invalidates Medical and releases the caregiver at the next safe boundary', () => {
   const state = activated('radio', { medicalDuration: 2 });
   state.crew.find(crew => crew.id === 'pilot').health = 'injured';
   const started = work(state, 'medical', { targetId: 'pilot' }).state;
   const patient = started.crew.find(crew => crew.id === 'pilot');
   patient.health = 'healthy';
   const waiting = nextRound(started).state;
-  assert.equal(availableCrew(waiting).some(crew => crew.id === 'pilot'), false);
-  assert.equal(isAtStation(waiting, waiting.crew.find(crew => crew.id === 'pilot')), false);
-  assert.throws(() => dispatch(waiting, { type: 'activate', crewId: 'pilot' }), /available/i);
+  assert.equal(waiting.jobs.length, 0);
+  assert.equal(availableCrew(waiting).some(crew => crew.id === 'pilot'), true);
+  assert.equal(isAtStation(waiting, waiting.crew.find(crew => crew.id === 'pilot')), true);
+  assert.equal(waiting.crew.find(crew => crew.id === 'radio').job, null);
   const complete = nextRound(waiting).state;
   assert.equal(availableCrew(complete).some(crew => crew.id === 'pilot'), true);
   assert.equal(isAtStation(complete, complete.crew.find(crew => crew.id === 'pilot')), true);

@@ -1,13 +1,14 @@
 import { normalizeConfig, ENEMY_DEFS } from './config.mjs';
 import { BOARD, BOARD_VERSION, CREW_DEFS, ENGINE_CELLS, STATIONS } from './board.mjs';
-import { seedToInt } from './random.mjs';
+import { seedToInt, freshSortieSeed } from './random.mjs';
 import { RULESETS, V2_CONFIG_VERSION } from './rulesets.mjs';
 import { createV2Telemetry } from './telemetry.mjs';
 import { CREW_POSITION_VERSION } from './crew-position.mjs';
 import { createStory } from './story.mjs';
 
 const copies = (count, value) => Array.from({ length: count }, () => value);
-export function createGame(overrides = {}, seed = 'MILK-RUN', ruleset = overrides.preferredRuleset ?? 'v1') {
+export function createGame(overrides = {}, seed, ruleset = overrides.preferredRuleset ?? 'v1') {
+  seed ??= ruleset === 'v2-continuous' ? freshSortieSeed() : 'MILK-RUN';
   if (!RULESETS.includes(ruleset)) throw new RangeError(`Unknown sortie ruleset: ${ruleset}`);
   const config = normalizeConfig(overrides);
   const continuous = ruleset === 'v2-continuous';

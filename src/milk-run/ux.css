@@ -171,7 +171,10 @@ dialog{background-color:#d8d2bb;background-image:repeating-linear-gradient(0deg,
 .sortie-result h2{margin:0 0 8px;font-family:inherit;font-size:26px;font-weight:900;letter-spacing:1px}
 .sortie-result p{margin:5px 0}.sortie-result.lost{background:#452f29;border-color:#bb725b}
 .hud-time .navigation-warning{font-size:8px!important;color:#ffce8f!important;white-space:normal}.hud-time .time-bank{color:#f9dd82!important}
-.job-assist-note{display:block;color:#e8c971;font-size:10px;margin-top:4px}
+.job-assist-note{display:block;color:#303b32;font-size:11px;line-height:1.5;font-weight:600;margin-top:4px}
+.job-assist-note.unavailable{color:#414538;font-weight:500}
+.recorder-navigation{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 0;font-size:11px}
+.recorder-navigation span{flex:1;min-width:120px}
 .crew-location{display:block;font-size:9px;line-height:1.2;font-weight:700;white-space:normal}
 @media(max-width:650px){.crew-location{font-size:8px;margin-top:2px}}
 /* Keep frequently used presentation controls and playtest tools out of the board stack. */

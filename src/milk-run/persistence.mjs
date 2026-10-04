@@ -183,7 +183,9 @@ function validContinuousSnapshot(snapshot) {
     Array.isArray(snapshot.crew) && snapshot.crew.every(crew => typeof crew.cycleSlotConsumed === 'boolean') &&
     Array.isArray(snapshot.jobs) && snapshot.jobs.every(job => whole(job.remainingTime)) &&
     Array.isArray(snapshot.fighters) && snapshot.fighters.every(fighter => whole(fighter.engagementRemaining)) &&
+    snapshot.fighters.every(fighter => fighter.badlyDamagedTriggered === undefined || typeof fighter.badlyDamagedTriggered === 'boolean') &&
     Object.keys(DEFAULT_CONFIG).filter(key => key.startsWith('v2')).every(key => {
+      if (['v2AircraftSpecificCrits', 'v2BadlyDamagedBreakoff'].includes(key)) return snapshot.config[key] === undefined || typeof snapshot.config[key] === 'boolean';
       if (key === 'v2StoryMode') return snapshot.config[key] === undefined || typeof snapshot.config[key] === 'boolean';
       if (PLAYTEST_V2_CONFIG_KEYS.includes(key) && snapshot.config[key] === undefined) return true;
       if (key === 'v2NavigatorUnmannedTimePenalty') return whole(snapshot.config[key]);
@@ -205,6 +207,8 @@ function migrateV2Config(snapshot) {
   // Schema 1's missing fields mean the rules that existed when it was saved,
   // never today's new-sortie defaults. Preserve any explicitly saved additions.
   const config = { ...snapshot.config };
+  // Missing experiment flags remain implicitly OFF. A missing fighter trigger
+  // can only activate on an actual crossing from above half HP (rules.mjs).
   // Older live flights never acquire a new narrative situation on load. A
   // missing director or flag conservatively retains the pre-Story rules.
   if (config.v2StoryMode === undefined || !snapshot.story) config.v2StoryMode = false;

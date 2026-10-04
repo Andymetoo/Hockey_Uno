@@ -5,6 +5,7 @@ import { targetOptions } from './targeting.mjs';
 import { describeEvent, groupEvents } from './presentation.mjs';
 import { isV2, missionLengths } from './rulesets.mjs';
 import { effectiveTimeThreshold, specialistOperator } from './crew-position.mjs';
+import { eligibleAssistJobs } from './rules.mjs';
 
 const esc = value => String(value ?? '').replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]));
 const classes = values => values.filter(Boolean).join(' ');
@@ -29,9 +30,15 @@ export function continuousHudMarkup(state, expanded = false) {
 }
 
 export const jobKindLabel=kind=>({repair:'REPAIR',fireControl:'FIRE CONTROL',medical:'MEDICAL'})[kind]??kind.toUpperCase();
+function assistWorkNote(state, job) {
+  if (job.assistantId) return '';
+  const eligible = ['select','action'].includes(state.phase) && state.crew.some(crew =>
+    (state.phase !== 'action' || crew.id === state.activeCrew) && eligibleAssistJobs(state, crew.id).some(j => j.id === job.id));
+  return `<span class="job-assist-note${eligible ? '' : ' unavailable'}">${eligible ? '+ Assist Work · uses an available crew action' : 'Assist Work unavailable · needs an eligible crew action'}</span>`;
+}
 export function activeJobsMarkup(state,visual={}) {
   if(!isV2(state)||!state.jobs.length)return '';
-  return `<div class="active-jobs-heading">ACTIVE JOBS <small>Tap for workers, targets and Assist Work</small></div>${state.jobs.map(job=>`<button class="active-job ${visual.jobCountdown?.jobId===job.id?'counting-down':''}" data-job="${esc(job.id)}" data-job-id="${esc(job.id)}"><strong>${esc(jobKindLabel(job.kind))} — <span>${job.remainingTime} TIME REMAINING</span></strong><small>${[job.crewId,job.assistantId].filter(Boolean).map(id=>esc(crewDefinition(id)?.name??id)).join(' + ')}${job.targetId?` · Patient: ${esc(crewDefinition(job.targetId)?.name??job.targetId)}`:''}</small>${!job.assistantId?'<span class="job-assist-note">+ Assist Work · uses an available crew action</span>':''}</button>`).join('')}`;
+  return `<div class="active-jobs-heading">ACTIVE JOBS <small>Tap for workers, targets and Assist Work</small></div>${state.jobs.map(job=>`<button class="active-job ${visual.jobCountdown?.jobId===job.id?'counting-down':''}" data-job="${esc(job.id)}" data-job-id="${esc(job.id)}"><strong>${esc(jobKindLabel(job.kind))} — <span>${job.remainingTime} TIME REMAINING</span></strong><small>${[job.crewId,job.assistantId].filter(Boolean).map(id=>esc(crewDefinition(id)?.name??id)).join(' + ')}${job.targetId?` · Patient: ${esc(crewDefinition(job.targetId)?.name??job.targetId)}`:''}</small>${assistWorkNote(state,job)}</button>`).join('')}`;
 }
 
 export function crewMarkup(state, selectedCrew, interaction = null) {

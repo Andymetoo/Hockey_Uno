@@ -1,4 +1,11 @@
 /** Serializable seeded PRNG. Random choices never depend on presentation speed. */
+export function freshSortieSeed() {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const bytes = globalThis.crypto.getRandomValues(new Uint8Array(8));
+  const code = [...bytes].map(n => alphabet[n & 31]).join('');
+  return `MR-${code.slice(0, 4)}-${code.slice(4)}`;
+}
+
 export function seedToInt(seed) {
   let hash = 2166136261;
   for (const char of String(seed)) {

@@ -119,6 +119,7 @@ export function describeEvent(event = {}) {
   if (type === 'TURN_COMPLETE') description.title = 'Turn complete';
   if (type === 'FIGHTER_DISENGAGED') description.title = 'Engagement ended · fighter disengages';
   if (type === 'FIGHTER_BREAKING_OFF') description.title = `${event.enemyType ?? eventFighter(event)?.type ?? 'Fighter'} BREAKS OFF`;
+  if (type === 'FIGHTER_BADLY_DAMAGED') description.title = `BADLY DAMAGED — ${event.enemyType} BREAKING OFF SOONER`;
   if (type === 'ENGAGEMENT_SPENT' && continuous) {
     const remaining = event.engagementRemaining ?? eventFighter(event)?.engagementRemaining;
     description.major = remaining > 0;

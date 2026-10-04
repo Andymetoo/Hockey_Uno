@@ -22,11 +22,15 @@ export function spendEngagement(state, target, attackPass, emit) {
   target.engagementRemaining = Math.max(0, target.engagementRemaining - 1);
   observe(state, 'engagementActionsSpent');
   record(emit, 'ENGAGEMENT_SPENT', `${target.type}: ${target.engagementRemaining} Engagement remaining.`, { fighterId: target.id, attackPass });
-  if (target.engagementRemaining === 0) {
+  breakOffFighter(state, target, emit);
+}
+
+export function breakOffFighter(state, target, emit, reason = 'after completing its enemy action') {
+  if (state.fighters.includes(target) && target.engagementRemaining === 0) {
     record(emit, 'FIGHTER_BREAKING_OFF', `${target.type} BREAKS OFF`, { fighterId: target.id, enemyType: target.type });
     state.fighters = state.fighters.filter(item => item.id !== target.id);
     observe(state, 'fightersDisengaged');
-    record(emit, 'FIGHTER_DISENGAGED', `${target.type} disengages after completing its enemy action.`, { fighterId: target.id });
+    record(emit, 'FIGHTER_DISENGAGED', `${target.type} disengages ${reason}.`, { fighterId: target.id });
   }
 }
 

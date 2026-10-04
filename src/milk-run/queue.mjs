@@ -1,4 +1,5 @@
 import { advanceVisual, describeEvent, eventDelay, expandPresentation } from './presentation.mjs';
+import { measure } from './performance.mjs';
 
 // Rules resolve transactionally, but only the current beat's snapshot reaches UI.
 // Synthetic draw/focus beats never consume RNG or enter the raw semantic log.
@@ -21,14 +22,14 @@ export class ResolutionQueue {
   }
   get busy() { return this.presenting || this.pending.length > 0; }
   export() {
-    return { version: 1, presentationVersion: 2, state: this.state, view: this.view, pending: this.pending,
+    return { version: 1, presentationVersion: 2, metadata: { seed: this.state.seed, ruleset: this.state.ruleset }, state: this.state, view: this.view, pending: this.pending,
       log: this.log, current: this.current, speed: this.speed, visual: this.visual, beat: this.beat, presenting: this.presenting };
   }
   changed() { this.onChange?.(this); }
   send(command) {
     if (this.busy) throw new Error('Let the current event sequence finish first.');
-    const result = this.dispatch(this.state, command);
-    this.pending = expandPresentation(result.events, this.view);
+    const result = measure('command', () => this.dispatch(this.state, command));
+    this.pending = measure('presentation', () => expandPresentation(result.events, this.view));
     this.state = result.state;
     if (!this.pending.length) this.view = this.state;
     this.presenting = this.pending.length > 0;

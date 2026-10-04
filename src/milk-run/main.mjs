@@ -1,4 +1,8 @@
 import { createGame } from './state.mjs';
+import { freshSortieSeed } from './random.mjs';
+import { missionExportFilename } from './mission-export.mjs';
+import { recorderWindow, RECORDER_PAGE_SIZE } from './recorder.mjs';
+import { measure } from './performance.mjs';
 import { DEFAULT_CONFIG, CONFIG_FIELDS, normalizeConfig, configScope, modifiedConfigScopes } from './config.mjs';
 import { isV2, missionLengths as rulesetMissionLengths } from './rulesets.mjs';
 import { BOARD, SECTIONS, STATIONS, CREW_DEFS } from './board.mjs';
@@ -41,6 +45,7 @@ let selectedBombDie = null, campaignStore, campaignStoreError = '', pendingCampa
 let resultPresented = false;
 let autosaveEnabled = true, pendingDiscard = null;
 let shownStoryPrompt = null;
+let recorderEnd = null, renderedRecorderLog = null, renderedRecorderKey = '';
 try {campaignStore=loadCampaignStore();}catch(error){campaignStore=createCampaignStore();campaignStoreError=error.message;}
 
 $('#app').innerHTML = `
@@ -86,6 +91,9 @@ $('#app').innerHTML = `
 `;
 
 const bombTestDialog = document.createElement('dialog');
+const recorderNavigation = document.createElement('div');
+recorderNavigation.className = 'recorder-navigation';
+$('#event-log').before(recorderNavigation);
 bombTestDialog.id = 'bomb-run-test-dialog';
 bombTestDialog.className = 'sheet wide bomb-test-dialog';
 bombTestDialog.setAttribute('aria-label', 'Bomb Run test — results are not saved');
@@ -110,7 +118,7 @@ discardButton.type = 'button'; discardButton.dataset.ui = 'discard-campaign';
 discardButton.textContent = 'Discard Active Campaign Sortie (DEV)';
 $('#dev-dialog .dialog-content').prepend(discardButton);
 
-function initialize(config = devPreferences, seed = 'MILK-RUN', saved = null, ruleset = config.preferredRuleset ?? 'v1', targetId=DEFAULT_BOMBING_TARGET, persist = true) {
+function initialize(config = devPreferences, seed, saved = null, ruleset = config.preferredRuleset ?? 'v1', targetId=DEFAULT_BOMBING_TARGET, persist = true) {
   const state=saved?.state??createGame(config,seed,ruleset);
   if(!saved&&isV2(state))state.mission.targetId=getBombingTarget(targetId).id;
   queue?.dispose();
@@ -121,6 +129,7 @@ function initialize(config = devPreferences, seed = 'MILK-RUN', saved = null, ru
   selectedBombDie = null;
   resultPresented = false;
   shownStoryPrompt = null;
+  recorderEnd = null; renderedRecorderLog = null; renderedRecorderKey = '';
   render();
 }
 
@@ -132,9 +141,10 @@ function missionName(s) {
   if (s.mission.aborted) return 'ABORTED · RETURN';
   return s.mission.position < outbound ? 'OUTBOUND' : 'RETURN';
 }
-function render() {
+function render() { return measure('render', renderFrame); }
+function renderFrame() {
   const s = queue.view;
-  saveWarning = autosaveEnabled && !saveSession(queue.export());
+  saveWarning = autosaveEnabled && !measure('autosave', () => saveSession(queue.export()));
   finalizeCampaignIfReady();
   $('[data-ui="turn-back"]').hidden=queue.busy||Boolean(interaction)||!canTurnBack(s);
   $('#campaign-sortie-label').hidden=!s.campaign;
@@ -281,10 +291,15 @@ function renderAction(s) {
   $('#primary-action').innerHTML=button;
 }
 function renderLog() {
+  const page = recorderWindow(queue.log, recorderEnd);
+  const pageKey = `${page.from}:${page.to}`;
+  recorderNavigation.innerHTML = `<button class="quiet" data-ui="log-newer" ${page.to >= page.total ? 'disabled' : ''}>Newer</button><span>Events ${page.total ? page.from + 1 : 0}–${page.to} of ${page.total} · full history retained</span><button class="quiet" data-ui="log-older" ${page.from === 0 ? 'disabled' : ''}>Older</button><button class="quiet" data-ui="log-latest" ${recorderEnd === null ? 'disabled' : ''}>Latest</button>`;
+  if (renderedRecorderLog === queue.log && renderedRecorderKey === pageKey) return;
   const key=d=>d.dataset.logGroup??`raw:${d.querySelector('summary')?.textContent}`;
   const expanded=new Set([...$('#event-log').querySelectorAll('details[open]')].map(key));
-  $('#event-log').innerHTML=logMarkup(queue.log);
+  measure('recorder', () => { $('#event-log').innerHTML=logMarkup(page.events); });
   $('#event-log').querySelectorAll('details').forEach(d=>{if(expanded.has(key(d)))d.open=true;});
+  renderedRecorderLog = queue.log; renderedRecorderKey = pageKey;
 }
 function renderSummary(s) {
   $('#summary').hidden=s.phase!=='ended'; if(s.phase!=='ended')return;
@@ -427,7 +442,7 @@ function resetScope(scope) {
   $('#dev-prefs-status').textContent=`${scope.toUpperCase()} defaults restored for the next sortie.${saved?'':' Browser storage is unavailable.'} Current sortie unchanged.`;
   render();
 }
-function openNewSortie(seed=queue.state.seed) {
+function openNewSortie(seed=freshSortieSeed()) {
   closeDialog();
   const form=$('#sortie-form');
   form.elements.ruleset.value=devPreferences.preferredRuleset??'v1';
@@ -483,8 +498,8 @@ function help() {
   openDialog('#info-dialog');
 }
 function exportRun() {
-  const s=queue.state,clock=isV2(s)?`v2-cycle-${s.crewCycle.number}-turn-${s.crewCycle.turn}`:`round-${s.round}`;
-  const blob=new Blob([JSON.stringify(queue.export(),null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`milk-run-${s.seed.replace(/[^a-z0-9_-]/gi,'_')}-${clock}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+  const s=queue.state;
+  const blob=new Blob([JSON.stringify(queue.export(),null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=missionExportFilename(s);a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 
 function persistCampaign(nextStore) {
@@ -520,7 +535,7 @@ function activeCampaignPreventsReplacement() {
 }
 function launchCampaign(form) {
   if(activeCampaignPreventsReplacement())return;
-  const values=new FormData(form),fresh=createGame(devPreferences,values.get('seed')||'MILK-RUN','v2-continuous');
+  const values=new FormData(form),fresh=createGame(devPreferences,values.get('seed')||undefined,'v2-continuous');
   fresh.mission.targetId=getBombingTarget(values.get('bombingTarget')||DEFAULT_BOMBING_TARGET).id;
   const prepared=prepareCampaignSortie(campaignStore,campaignStore.activeCampaignId,fresh,{aircraftId:values.get('aircraftId')});
   const session={version:1,presentationVersion:2,state:prepared.state,view:prepared.state,pending:[],log:[],current:null,speed:devPreferences.presentationSpeed,presenting:false};
@@ -629,6 +644,9 @@ document.addEventListener('click', e=>{
     case 'step':queue.step();break;
     case 'skip':queue.flush();break;
     case 'export':exportRun();break;
+    case 'log-older':recorderEnd=recorderWindow(queue.log,recorderEnd).from;renderLog();break;
+    case 'log-newer':recorderEnd=Math.min(queue.log.length,(recorderEnd??queue.log.length)+RECORDER_PAGE_SIZE);if(recorderEnd===queue.log.length)recorderEnd=null;renderLog();break;
+    case 'log-latest':recorderEnd=null;renderLog();break;
   }
 });
 document.addEventListener('change',e=>{
@@ -662,6 +680,6 @@ document.querySelectorAll('dialog').forEach(d=>d.addEventListener('click',e=>{if
 const savedSession=loadSession();
 const legacyBoardSave=!savedSession&&hasLegacyBoardSave();
 initialize(savedSession?.state.config??DEFAULT_CONFIG,'MILK-RUN',savedSession);
-if(!savedSession)openNewSortie('MILK-RUN');
+if(!savedSession)openNewSortie();
 if(legacyBoardSave)notice('The board geometry has been corrected. Start a new sortie on this map; your previous-board save has been kept separately.');
 window.milkRun={ getState:()=>structuredClone(queue.state),getView:()=>structuredClone(queue.view),getQueue:()=>queue.pending.map(({state,...e})=>e),getInteraction:()=>structuredClone(interaction),getBombRunTest:()=>bombTest.snapshot(),getCampaignStore:()=>structuredClone(campaignStore),send,restart:(config,seed,ruleset)=>{closeDialog();initialize(config??devPreferences,seed,null,ruleset??config?.preferredRuleset??devPreferences.preferredRuleset);},getPreferences:()=>({...devPreferences}),setSpeed:s=>queue.setSpeed(s),flush:()=>queue.flush(),exportSession:()=>queue.export() };

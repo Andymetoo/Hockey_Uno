@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { createGame } from '../state.mjs';
 import { BOARD, CREW_DEFS, STATIONS } from '../board.mjs';
 import { dispatch, availableCrew, availableActions, legalTargets, isAtStation,
-  eligibleCrisisTargets, legalWorkPositions, opportunityAvailability, conversionOptions } from '../rules.mjs';
+  eligibleCrisisTargets, eligibleMedicalTargets, legalWorkPositions, opportunityAvailability, conversionOptions } from '../rules.mjs';
 import { scoreBombDie } from '../bombing-targets.mjs';
 import { STORY_CONTENT_COUNTS } from '../story-content.mjs';
 
@@ -36,7 +36,7 @@ function actionFor(s, id) {
         add(kind, score, { cells: [cell.id], workCellId: positions[0].id });
       }
     }
-    if (options.has('medical')) for (const target of s.crew.filter(c => c.health === 'injured' && !s.jobs.some(j => j.targetId === c.id))) {
+    if (options.has('medical')) for (const target of eligibleMedicalTargets(s, id)) {
       const positions = legalWorkPositions(s, id, target.position);
       if (positions.length) add('medical', (['pilot', 'engineer', 'bombardier', 'radio'].includes(target.id) ? 96 : 67) - (s.jobs.length >= 3 ? 40 : 0), { targetId: target.id, workCellId: positions[0].id });
     }
