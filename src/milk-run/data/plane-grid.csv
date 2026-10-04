@@ -50,7 +50,7 @@ B6-4,Empty,,
 C1-1,Empty,,
 C1-2,Empty,,
 C1-3,Empty (Engine Running Token - Visual only),,
-C1-4,NosePort,,Bombardier
+C1-4,NosePort,,Navigator
 C2-1,NosePort,Engine 2 Front,
 C2-2,NosePort,,Pilot
 C2-3,NosePort,Engine 2 Back,
@@ -73,7 +73,7 @@ C6-3,Empty,,
 C6-4,Empty,,
 D1-1,Empty,,
 D1-2,Empty,,
-D1-3,NoseStarboard,,Navigator
+D1-3,NoseStarboard,,Bombardier
 D1-4,Empty (Engine Running Token - Visual only),,
 D2-1,NoseStarboard,,Copilot
 D2-2,NoseStarboard,Engine 3 Front,

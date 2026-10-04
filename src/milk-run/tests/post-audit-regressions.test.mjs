@@ -47,7 +47,7 @@ for (const disruptOnHit of [false, true]) test(`actual legacy V2 save preserves 
       const displaced = Boolean(c.job) || c.position.length !== STATIONS[c.station].cells.length || !STATIONS[c.station].cells.every(id => c.position.includes(id));
       return { ...c, homeStation: c.station, station: displaced ? null : c.station, displaced };
     });
-    assert.deepEqual(s, { ...snapshots[i], overflowTimeTokens: [], crewPositionVersion: 1, crew: expectedCrew, v2ConfigVersion: 2, config: { ...snapshots[i].config,
+    assert.deepEqual(s, { ...snapshots[i], boardVersion: 'plane-grid-v2', overflowTimeTokens: [], crewPositionVersion: 2, crew: expectedCrew, v2ConfigVersion: 2, config: { ...snapshots[i].config,
       v2StoryMode: false, v2NavigatorUnmannedTimePenalty: 0, v2CrewCycleRefreshGrantsTime: false, v2UnavailableCrewPressure: 'full',
       v2FighterKillGrantsTime: false, v2DisruptEnabled: disruptOnHit, v2DisruptEffect: 'auto-miss', v2MaxEscorts: null } });
     for (const k of ['v2RepairTime', 'v2FireTime', 'v2MedicalTime']) assert.equal(s.config[k], 6);

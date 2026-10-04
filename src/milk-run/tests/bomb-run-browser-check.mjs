@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { openBrowser } from './browser-harness.mjs';
-import { createGame } from '../state.mjs';
+import { createGame as createGameBase } from '../state.mjs';
+// Exercise the retained legacy interaction; compact ON has its own touch suite.
+const createGame=(config={},...args)=>createGameBase({...(args[1]==='v2-continuous'?{v2CompactCrewFlow:false}:{}),...config},...args);
 import { beginBombRun, bombRunPreview } from '../bombing.mjs';
 import { die } from '../random.mjs';
 
@@ -90,7 +92,7 @@ try {
   const unmanned = fresh(); unmanned.mission.position = unmanned.config.v2OutboundLength - 1;
   unmanned.crew.find(crew => crew.id === 'bombardier').health = 'injured';
   await inject(unmanned);
-  assert.match(await evaluate('document.body.textContent'), /BOMBARDIER STATION UNMANNED — NO DROP POSSIBLE AT TARGET/);
+  assert.match(await evaluate('document.body.textContent'), /BOMBSIGHT.*UNMANNED.*NO DROP POSSIBLE AT TARGET/);
   unmanned.time = unmanned.config.v2TimePerProgress;
   unmanned.timeTokens = Array(unmanned.time).fill('Time'); unmanned.pendingProgress = true;
   for (let i = 0; i < unmanned.time; i++) unmanned.bags.mission.tokens.splice(unmanned.bags.mission.tokens.indexOf('Time'), 1);

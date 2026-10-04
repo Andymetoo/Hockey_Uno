@@ -22,9 +22,8 @@ async function turn() {
   const member = state.crew.find(crew => crew.health === 'healthy' && !crew.cycleSlotConsumed && !crew.job);
   assert.ok(member);
   await touch(`#crew-list [data-crew="${member.id}"]`);
-  await click('#action-content [data-ui="activate"]'); await flush();
-  await click('[data-ui="choose"]'); await click('#action-dialog button[data-action="wait"]');
-  await click('#choice-form button[type="submit"]'); await flush();
+  assert.equal((await getState()).config.v2CompactCrewFlow,true,'new Campaign uses compact flow');
+  await flush();await touch('[data-compact-action="wait"]');await flush();
 }
 async function confirmAbort() {
   await click('[data-ui="turn-back"]');

@@ -1,3 +1,4 @@
+import { compactCrewFlow, crewFlowState, compactCost, actionPalette, STATION_PALETTE, nearbyTargets } from './crew-flow.mjs';
 import { createGame } from './state.mjs';
 import { freshSortieSeed } from './random.mjs';
 import { missionExportFilename } from './mission-export.mjs';
@@ -6,8 +7,8 @@ import { measure } from './performance.mjs';
 import { DEFAULT_CONFIG, CONFIG_FIELDS, normalizeConfig, configScope, modifiedConfigScopes } from './config.mjs';
 import { isV2, missionLengths as rulesetMissionLengths } from './rulesets.mjs';
 import { BOARD, SECTIONS, STATIONS, CREW_DEFS } from './board.mjs';
-import { dispatch, availableCrew, availableActions, isAtStation, conversionOptions, opportunityAvailability, canAbortWork, eligibleStations, eligibleAssistJobs, legalWorkPositions } from './rules.mjs';
-import { effectiveTimeThreshold } from './crew-position.mjs';
+import { dispatch, availableCrew, availableActions, conversionOptions, opportunityAvailability, canAbortWork, eligibleStations, eligibleAssistJobs, legalWorkPositions, reclaimReliefPlan } from './rules.mjs';
+import { effectiveTimeThreshold, homeStationId, crewStateProblems } from './crew-position.mjs';
 import { sortieResult } from './results.mjs';
 import { bombRunTargetWarning, DEFAULT_BOMBING_TARGET, getBombingTarget, bombingOutcomeLabel } from './bombing.mjs';
 import { bombRunMarkup, targetChoiceMarkup } from './bomb-run-view.mjs';
@@ -24,8 +25,10 @@ import { crewMarkup, enemyMarkup, eventMarkup, logMarkup, altitudeMarkup, contin
 import { v2TelemetryRows } from './telemetry.mjs';
 import { DIRECT_ACTIONS, beginTargeting, targetOptions, selectTarget, needsWorkPosition, canConfirm, targetingCommand, assistantOptions } from './targeting.mjs';
 import { crisisTargetCap } from './rules.mjs';
-import { loadSession, saveSession, hasLegacyBoardSave, loadDevPreferences, saveDevPreferences, resetDevPreferences, resetDevPreferencesScope } from './persistence.mjs';
+import { SAVE_KEY, loadSession, saveSession, hasLegacyBoardSave, loadDevPreferences, saveDevPreferences, resetDevPreferences, resetDevPreferencesScope } from './persistence.mjs';
 import { deriveCellHistory, hitLocationHeatMap } from './diagnostics.mjs';
+import { healthProvenance } from './crew-health.mjs';
+import { specialistStatus } from './crew-position.mjs';
 import { storyIndicatorMarkup, storyConditionsMarkup, storyChoiceMarkup, storyFactsMarkup } from './story-view.mjs';
 import { storyToken, storyJobTime } from './story-effects.mjs';
 
@@ -37,7 +40,7 @@ const section = id => SECTIONS[id] ?? { name: id, color: '#8b9880' };
 const cell = id => BOARD.find(c => c.id === id);
 let queue, selectedCrew = null, chosenAction = null, saveWarning = false;
 let focusBeforeDialog = null, interaction = null, previousFighters = new Map(), previousBeat = null;
-let interceptRequested = false;
+let compactChoice = null, paletteFocus = null, targetChooser = null;
 let compactHudExpanded = false;
 let hitMapEnabled = false, hitMapStructure = true, hitMapEmpty = true;
 let devPreferences = loadDevPreferences();
@@ -45,6 +48,7 @@ let selectedBombDie = null, campaignStore, campaignStoreError = '', pendingCampa
 let resultPresented = false;
 let autosaveEnabled = true, pendingDiscard = null;
 let shownStoryPrompt = null;
+let storySelection = null;
 let recorderEnd = null, renderedRecorderLog = null, renderedRecorderKey = '';
 try {campaignStore=loadCampaignStore();}catch(error){campaignStore=createCampaignStore();campaignStoreError=error.message;}
 
@@ -81,7 +85,7 @@ $('#app').innerHTML = `
     <section class="log-panel panel"><details id="log-details"><summary>Flight recorder <span id="log-count"></span></summary><div class="log-tools"><button class="quiet" data-ui="export">Export sortie + log</button></div><ol id="event-log" reversed></ol></details></section>
     <section id="summary" class="summary-panel panel" hidden></section>
   </main>
-  <footer class="action-dock"><button id="opportunity-control" class="opportunity-button unavailable" data-ui="opportunity" aria-label="Opportunity status"></button><div id="action-context"></div><div id="primary-action"></div></footer>
+  <footer class="action-dock"><section id="crew-flow" aria-label="Crew action panel" hidden></section><button id="opportunity-control" class="opportunity-button unavailable" data-ui="opportunity" aria-label="Opportunity status"></button><div id="action-context"></div><div id="primary-action"></div></footer>
   <div id="notice" role="alert" hidden></div>
   <dialog id="action-dialog" class="sheet"><div class="dialog-heading"><div><div class="eyebrow">CREW ACTIVATION</div><h2 id="action-title">Choose one action</h2></div><button data-ui="close" class="close" aria-label="Close actions">×</button></div><div id="action-content" class="dialog-content"></div></dialog>
   <dialog id="dev-dialog" class="sheet wide"><div class="dialog-heading"><div><div class="eyebrow">NEXT SORTIE / PLAYTEST SETTINGS</div><h2>Flight test settings</h2></div><button data-ui="close" class="close" aria-label="Close playtest settings">×</button></div><div class="dialog-content"><p><b>Applies to next sortie.</b> Valid changes save automatically on this browser. Common settings apply to either ruleset; V1 and V2 settings are stored separately. Your current sortie keeps its rules. Presentation speed can also be changed beside the board.</p><p id="dev-prefs-status" class="small" role="status"></p><form id="dev-form"></form></div><footer class="dialog-footer dev-footer"><div class="reset-controls"><button class="quiet" data-ui="reset-v1">Reset V1</button><button class="quiet" data-ui="reset-v2">Reset V2</button><button class="quiet" data-ui="reset-defaults">Reset All to Defaults</button></div><button class="primary" data-ui="apply-dev">Launch with these settings</button></footer></dialog>
@@ -119,16 +123,17 @@ discardButton.textContent = 'Discard Active Campaign Sortie (DEV)';
 $('#dev-dialog .dialog-content').prepend(discardButton);
 
 function initialize(config = devPreferences, seed, saved = null, ruleset = config.preferredRuleset ?? 'v1', targetId=DEFAULT_BOMBING_TARGET, persist = true) {
+  if(persist)unreadableSave=false;
   const state=saved?.state??createGame(config,seed,ruleset);
   if(!saved&&isV2(state))state.mission.targetId=getBombingTarget(targetId).id;
   queue?.dispose();
   autosaveEnabled = persist;
   queue = new ResolutionQueue({ state, dispatch, saved, onChange: render });
-  selectedCrew = null; interaction = null; previousFighters = new Map(); previousBeat = null; interceptRequested = false;
+  selectedCrew = null; interaction = null; previousFighters = new Map(); previousBeat = null; compactChoice = null; paletteFocus = null; targetChooser = null;
   hitMapEnabled = false; hitMapStructure = true; hitMapEmpty = true;
   selectedBombDie = null;
   resultPresented = false;
-  shownStoryPrompt = null;
+  shownStoryPrompt = null; storySelection = null;
   recorderEnd = null; renderedRecorderLog = null; renderedRecorderKey = '';
   render();
 }
@@ -150,7 +155,7 @@ function renderFrame() {
   $('#campaign-sortie-label').hidden=!s.campaign;
   if(s.campaign)$('#campaign-sortie-label').textContent=`CAMPAIGN · SORTIE ${s.campaign.sortieNumber}`;
   const warning=bombRunTargetWarning(s);$('#bombardier-warning').hidden=!warning;$('#bombardier-warning').textContent=warning;
-  const bombPanel=$('#bomb-run-panel');bombPanel.hidden=!isV2(s)||s.phase!=='bombing'||!s.mission.bombRun;
+  const bombPanel=$('#bomb-run-panel');bombPanel.hidden=!isV2(s)||!s.mission.bombRun||(s.phase!=='bombing'&&s.mission.bombRun.status!=='no-drop');
   bombPanel.innerHTML=bombPanel.hidden?'':bombRunMarkup(s,selectedBombDie,queue.busy);
   const modifiedScopes=modifiedConfigScopes(s.config,s.ruleset);
   if(queue.speed!==DEFAULT_CONFIG.presentationSpeed&&!modifiedScopes.includes('common'))modifiedScopes.unshift('common');
@@ -159,6 +164,7 @@ function renderFrame() {
   $('#rules-modified').title='Only Common and this active sortie’s ruleset are compared with canonical defaults. Next-sortie preferences do not alter this flight.';
   $('#ruleset-label').textContent=isV2(s)?'V2 — CONTINUOUS TIME · EXPERIMENTAL':'V1 — ROUND-BASED';
   $('#ruleset-label').classList.toggle('experimental-label',isV2(s));
+  if (compactCrewFlow(s) && s.activeCrew && !interaction?.gunnerId) selectedCrew=s.activeCrew;
   if (!selectedCrew || !s.crew.some(c => c.id === selectedCrew)) selectedCrew = availableCrew(s)[0]?.id ?? null;
   const status=$('#status');
   const storyStatus=$('#story-status');
@@ -173,7 +179,7 @@ function renderFrame() {
   mapOpportunity.innerHTML=Array.from({length:cap},(_,index)=>`<span class="${index<opportunity?'filled':''}" aria-hidden="true"></span>`).join('');
   const timeStatus=$('#time-status');timeStatus.hidden=!isV2(s)||!s.pendingProgress;
   if(isV2(s)){timeStatus.classList.toggle('pending',s.pendingProgress);timeStatus.innerHTML=`<strong>TIME ${Math.min(s.time,effectiveTimeThreshold(s))}/${effectiveTimeThreshold(s)}</strong><span>PROGRESS CHECKPOINT AFTER THIS TURN${s.overflowTimeTokens?.length?' · +1 BONUS TIME BANKED':''}</span>`;}
-  renderTrack(s); renderCrew(s); renderBoard(s); renderEnemies(s); renderEvent(s); renderBags(s); renderAction(s); renderSummary(s);
+  renderTrack(s); renderCrew(s); renderBoard(s); renderEnemies(s); renderEvent(s); renderBags(s); renderAction(s); renderCompactFlow(s); renderSummary(s);
   $('#speed').value = queue.speed;
   $('[data-ui="pause"]').textContent = queue.paused ? 'Play' : 'Pause';
   $('[data-ui="pause"]').disabled = queue.speed==='manual';
@@ -249,8 +255,8 @@ function targetHint(s) {
   if(t.stage==='work')return 'Tap a highlighted safe interior position. Same row is preferred; fuselage targets can use an adjacent row if the target row is unsafe. Shared work positions are allowed.';
   if(['repair','fireControl'].includes(t.action))return `${t.cells.length}/${crisisTargetCap(s,t.crewId,t.action)} selected · ${s.config.eightWayWork?'Eight-way':'Orthogonal'} connections · Primary: ${t.cells[0]??'tap the board'}`;
   if(t.action==='medical')return t.targetId?`${def(t.targetId).name} selected. Choose the worker’s position next.`:'Tap an injured crew marker or card.';
-  if(t.action==='directFire'&&t.targetId)return `${s.fighters.find(f=>f.id===t.targetId)?.type} selected. Firing one Basic Shot now; Pilot spends 1 Officer.`;
-  if(t.action==='directFire')return `Tap a highlighted aircraft or queue card · ${options.fighters.length} legal targets · one Basic Shot fires immediately.`;
+  if(t.action==='directFire'&&t.targetId)return `${s.fighters.find(f=>f.id===t.targetId)?.type} selected. Confirm to fire one Basic Shot; Pilot spends Officer resources.`;
+  if(t.action==='directFire')return `Tap a highlighted aircraft or queue card · ${options.fighters.length} legal targets · confirm before the Basic Shot fires.`;
   const spend=t.action==='opportunityShot'?'1 Opportunity':t.action==='directFire'?'1 Officer for Pilot Direct Fire':'the action';
   return t.targetId?`${s.fighters.find(f=>f.id===t.targetId)?.type} selected. Confirm to spend ${spend}.`:`Tap a highlighted aircraft or queue card · ${options.fighters.length} legal targets`;
 }
@@ -260,7 +266,7 @@ function renderAction(s) {
     const t=interaction,options=targetOptions(s,t);text=targetTitle(s);sub=targetHint(s);
     button='<button class="quiet" data-ui="cancel-target">Cancel</button>';
     if(needsWorkPosition(t)&&t.stage!=='work')button+=`<button class="primary" data-ui="work-position" ${options.work.length?'':'disabled'}>Choose work position →</button>`;
-    else if(t.stage!=='gunner')button+=`<button class="primary" data-ui="confirm-target" ${canConfirm(s,t)?'':'disabled'}>Confirm ${t.stage==='work'?t.workCellId??'position':'target'} →</button>`;
+    else if(t.stage!=='gunner')button+=`<button class="primary" data-ui="confirm-target" ${canConfirm(s,t)?'':'disabled'}>Confirm ${t.stage==='work'?t.workCellId??'position':['basicFire','advancedFire','directFire','opportunityShot'].includes(t.action)?'fire':'target'} →</button>`;
     const detail=$('#target-detail');detail.hidden=false;detail.innerHTML=`<strong>${esc(def(t.gunnerId??t.crewId)?.name??'Choose a completed gunner')} · ${esc(t.action==='opportunityShot'?'1 Opportunity':availableActions(s,t.crewId).find(a=>a.id===t.action)?.cost??'Free')}</strong><span>${esc(t.cells.join(' + ')||t.targetId&&def(t.targetId)?.name||'Tap highlighted targets')}</span>${needsWorkPosition(t)?`<span>${workTiming(s,t)}</span>`:''}${t.stage==='work'?`<span>Worker${t.assistantId?'s':''}: ${esc(t.workCellId??'choose internal position')} · targets stay on their original squares</span>`:''}${assistantMarkup(s,t)}`;
   }
   else if(queue.busy) { text=describeEvent(queue.current).title;sub=queue.speed==='manual'||queue.paused?'Step through each major beat at your pace.':queue.current?.message??'';button=`<button class="quiet" data-ui="skip">Skip</button>${queue.paused||queue.speed==='manual'?'<button class="quiet" data-ui="play">▶ Play</button>':''}<button class="primary" data-ui="${queue.speed==='manual'||queue.paused?'step':'pause'}">${queue.speed==='manual'||queue.paused?'Next beat →':'Pause beats'}</button>`; }
@@ -268,7 +274,7 @@ function renderAction(s) {
   else if(isV2(s)&&s.pendingProgress&&['select','betweenOpportunity'].includes(s.phase)) {text='Opportunity window · Time track full';sub='Finish any Opportunity Shots, then resolve Progress before the next crew activation.';button='<button class="primary" data-command="continueProgress">Continue to Progress →</button>';}
   else if(isV2(s)&&s.phase==='betweenOpportunity'&&s.config.v2OpportunityProvokesEnemyPhase) {text='Between-turn Opportunity window';sub=opportunityAvailability(s).enabled?'Chain Opportunity Shots, then resolve one enemy phase before the next crew activation.':'Opportunity sequence complete. Resolve one enemy phase before the next crew activation.';button='<button class="primary" data-command="continueBetweenOpportunity">Continue to Enemy Phase →</button>';}
   else if(s.phase==='ready') { text=s.round?'Crew ready for the next leg.':'Your aircraft is ready.';sub=s.round?'Refill bags, complete work, then resolve fire.':'Begin round one. Choose your crew order.';button=`<button class="primary" data-command="startRound">${s.round?'Begin next round':'Begin sortie'} →</button>`; }
-  else if(s.phase==='select') {const c=def(selectedCrew);text=c?`${c.number} / ${c.name}`:'Choose an available crew member';sub='Tap crew for abilities and a free gun-arc preview.';button=`${c?.abilities?.includes('intercept')&&isAtStation(s,s.crew.find(v=>v.id===c.id))?'<label class="intercept"><input id="intercept" type="checkbox"'+(interceptRequested?' checked':'')+'> Intercept</label>':''}<button class="primary" data-ui="activate" ${availableCrew(s).some(c=>c.id===selectedCrew)?'':'disabled'}>Activate & draw →</button>`;if(isV2(s)&&!availableCrew(s).length){text='No crew available to act.';sub='Unavailable crew slots pass time, then draw a mission token and resolve the enemy queue.';button='<button class="primary" data-command="advanceUnavailable">Continue unavailable Turns →</button>';}}
+  else if(s.phase==='select') {const c=def(selectedCrew);text=c?`${c.number} / ${c.name}`:'Choose an available crew member';sub='Tap crew for abilities and a free gun-arc preview.';button=`<button class="primary" data-ui="activate" ${availableCrew(s).some(c=>c.id===selectedCrew)?'':'disabled'}>Activate & draw →</button>`;if(isV2(s)&&!availableCrew(s).length){text='No crew available to act.';sub='Unavailable crew slots pass time, then draw a mission token and resolve the enemy queue.';button='<button class="primary" data-command="advanceUnavailable">Continue unavailable Turns →</button>';}}
   else if(s.phase==='action') {text=`${def(s.activeCrew)?.name ?? 'Crew'} · choose one action`;sub='Complete your action, then use any available Opportunity before the enemy queue.';button='<button class="primary" data-ui="choose">Choose action →</button>';}
   else if(s.phase==='opportunity') {text='Opportunity window';sub=opportunityAvailability(s).enabled?'Take a Basic Shot with a completed gunner, or continue to the pending enemy phase.':'No legal Opportunity Shot remains. Continue to the pending enemy phase.';button='<button class="primary" data-command="continueEnemyPhase">Continue to Enemy Phase →</button>';}
   else if(s.phase==='roundEnd') {text='All ten time slots complete.';sub='Check control, structure and engines independently.';button='<button class="primary" data-command="endRound">Altitude checks & advance →</button>';}
@@ -317,7 +323,7 @@ function openStoryChoice() {
   const s=queue.view,pending=s.story?.pending;
   if(queue.busy||interaction||s.phase!=='story'||!pending)return;
   closeDialog();shownStoryPrompt=pending.id;
-  $('#story-title').textContent=pending.title;$('#story-content').innerHTML=storyChoiceMarkup(pending);
+  $('#story-title').textContent=pending.title;$('#story-content').innerHTML=storyChoiceMarkup(pending, storySelection?.pendingId === pending.id ? storySelection.choiceId : null);
   openDialog('#story-dialog');
 }
 function openStoryConditions() {
@@ -330,9 +336,11 @@ function notice(message) {
   $('#notice').textContent=message;$('#notice').hidden=false;clearTimeout(notice.timer);notice.timer=setTimeout(()=>$('#notice').hidden=true,6500);
 }
 function send(command) {
-  const prior=interaction;interaction=null;
+  if(queue.busy)return false;
+  if(unreadableSave){notice('Launch a new sortie to replace the unreadable save. Its original data is still retained.');return false;}
+  const prior=interaction;interaction=null;compactChoice=null;targetChooser=null;paletteFocus=null;
   autosaveEnabled = true;
-  try {queue.send(command);if(command.type==='activate')interceptRequested=false;closeDialog();if(queue.busy)$('#board-stage').scrollIntoView({block:'start',behavior:'instant'});return true;}
+  try {queue.send(command);closeDialog();if(queue.busy)$('#board-stage').scrollIntoView({block:'start',behavior:'instant'});return true;}
   catch(e){interaction=prior;render();notice(e.message);return false;}
 }
 
@@ -348,10 +356,10 @@ function openOpportunity() {
   $('#crew-list').scrollIntoView({block:'center',behavior:'instant'});
 }
 
-const actionDescriptions={assistWork:'Join an active Repair, Fire Control or Medical job. Uses this normal action, costs no resources, and reduces its remaining Time to the assisted duration if lower.',basicFire:'One free combat pull against a fighter in your operating gun arc.',advancedFire:'Keep hitting one fighter until a miss. A first-pull miss grants exactly one more pull.',repair:'Select connected damaged squares. Work completes after the configured duration.',fireControl:'Select connected burning squares. Squares under active suppression do not spread.',medical:'Treat one injured crewmate. Care completes after the configured duration.',relocate:'Move to a safe fuselage square. This uses your action.',manCockpit:'Take a vacant pilot seat. This uses your action.',manStation:'Spend this action to occupy a vacant, non-burning gun station or cockpit seat. Your rank and personal abilities stay the same.',returnHome:'Spend this action to return to your vacant, safe home station. Nobody is evicted.',leaveStation:'Spend this action to leave your station for nearby safe interior space. Your next reassignment requires another action.',restartEngine:'Attempt to restart a stopped, fully repaired engine from a pilot seat.',directFire:'Spend 1 Officer → order any healthy gunner at an operational gun station to make one immediate Basic Shot. Does not use that gunner’s activation.',convert:'Change Resource denominations. Enlisted to Officer returns surplus tokens to discard; Officer to Enlisted requires extra Resource tokens from the mission bag. Copilot only.',rotateFighter:'Turn one fighter 90° away from the B-17.',escort:'Call an escort into a random quadrant for the rest of this round.',wait:"Finish this crew member's turn without taking an action."};
+const actionDescriptions={reclaimHome:'Spend your normal action to relieve the substitute. They return home if free and safe, otherwise stay on this station footprint as Displaced. Their action slot is unchanged.',assistWork:'Join an active Repair, Fire Control or Medical job. Uses this normal action, costs no resources, and reduces its remaining Time to the assisted duration if lower.',basicFire:'One free combat pull against a fighter in your operating gun arc.',advancedFire:'Keep hitting one fighter until a miss. A first-pull miss grants exactly one more pull.',repair:'Select connected damaged squares. Work completes after the configured duration.',fireControl:'Select connected burning squares. Squares under active suppression do not spread.',medical:'Treat one injured crewmate. Care completes after the configured duration.',relocate:'Move to a safe fuselage square. This uses your action.',manCockpit:'Take a vacant pilot seat. This uses your action.',manStation:'Spend this action to occupy a vacant, non-burning gun station or cockpit seat. Your rank and personal abilities stay the same.',returnHome:'Spend this action to return to your vacant, safe home station. Nobody is evicted.',leaveStation:'Spend this action to leave your station for nearby safe interior space. Your next reassignment requires another action.',restartEngine:'Attempt to restart a stopped, fully repaired engine from a pilot seat.',directFire:'Spend 1 Officer → order any healthy gunner at an operational gun station to make one immediate Basic Shot. Does not use that gunner’s activation.',convert:'Change Resource denominations. Enlisted to Officer returns surplus tokens to discard; Officer to Enlisted requires extra Resource tokens from the mission bag. Copilot only.',rotateFighter:'Turn one fighter 90° away from the B-17.',escort:'Call an escort into a random quadrant for the rest of this round.',wait:"Finish this crew member's turn without taking an action."};
 function crewDetails(s,c) {
  const d=def(c.id),status=crewStatus(s,c,selectedCrew===c.id),station=stationStatus(s,c);
- return '<details class="crew-detail status-'+status.id+'"><summary><strong>'+esc(status.label)+'</strong><span class="crew-detail-hint">Crew details</span></summary><div class="crew-detail-body"><p>Home Station: <b>'+esc(station.homeName)+'</b></p><p>Current Station: <b>'+esc(station.currentName)+(station.displaced?' - Displaced':'')+'</b></p><p>Physical position: <b>'+esc(station.position)+'</b></p><p>'+esc(station.name)+' — <b>'+esc(station.label)+'</b></p>'+(status.job?'<p>Working: '+esc(({repair:'Repair',fireControl:'Fire Control',medical:'Medical'})[status.job.kind]??status.job.kind)+' · '+(isV2(s)?status.job.remainingTime+' Time remaining'+(status.job.assistantId?' · assisted':''):'completes Round '+status.job.completeRound)+'</p>':'')+(isV2(s)?`<p>Crew Cycle slot: <b>${c.cycleSlotConsumed?'consumed — waits for next Cycle':'open — may act when available'}</b></p>`:'')+'<small>'+esc(d.tags.join(' · '))+'</small></div></details>';
+ return `<p class="crew-health-history"><b>${esc(d.name)} — ${esc(c.health.toUpperCase())}</b><br>${esc(healthProvenance(s,c))}</p><div class="crew-cell-links">${c.position.map(id=>`<button class="quiet" data-crew-history="${esc(id)}">View Cell History${c.position.length>1?' · '+esc(id):''}</button>`).join('')}</div>${['navigator','bombardier'].includes(station.currentId??station.homeId)?`<p class="specialist-status">${esc(specialistStatus(s,station.currentId??station.homeId).reason)}</p>`:''}` + '<details class="crew-detail status-'+status.id+'"><summary><strong>'+esc(status.label)+'</strong><span class="crew-detail-hint">Crew details</span></summary><div class="crew-detail-body"><p>Home Station: <b>'+esc(station.homeName)+'</b></p><p>Current Station: <b>'+esc(station.currentName)+(station.displaced?' - Displaced':'')+'</b></p><p>Physical position: <b>'+esc(station.position)+'</b></p><p>'+esc(station.name)+' — <b>'+esc(station.label)+'</b></p>'+(status.job?'<p>Working: '+esc(({repair:'Repair',fireControl:'Fire Control',medical:'Medical'})[status.job.kind]??status.job.kind)+' · '+(isV2(s)?status.job.remainingTime+' Time remaining'+(status.job.assistantId?' · assisted':''):'completes Round '+status.job.completeRound)+'</p>':'')+(isV2(s)?`<p>Crew Cycle slot: <b>${c.cycleSlotConsumed?'consumed — waits for next Cycle':'open — may act when available'}</b></p>`:'')+'<small>'+esc(d.tags.join(' · '))+'</small></div></details>';
 }
 function resourceSummary(s,canAct) {
  return `<div class="action-resources" aria-label="Resources held: ${s.resources.Officer} Officer, ${s.resources.Enlisted} Enlisted"><div class="resource-counts"><span class="resource-count officer"><small>OFFICER</small><b>${s.resources.Officer}</b></span><span class="resource-count enlisted"><small>ENLISTED</small><b>${s.resources.Enlisted}</b></span></div><small class="resource-caption">AVAILABLE TO SPEND${canAct?'':' · PREVIEW — ACTIVATE FIRST'}</small></div>`;
@@ -363,14 +371,14 @@ function actionDescription(s,id) {
   return actionDescriptions[id];
 }
 function openActions(crewId=queue.view.activeCrew??selectedCrew) {
+ if(compactCrewFlow(queue.view)&&queue.view.phase==='action'&&crewId===queue.view.activeCrew){compactChoice=null;interaction=null;closeDialog();render();return;}
  chosenAction=null;
  const s=queue.view,c=s.crew.find(c=>c.id===crewId);if(!c)return;
- if(selectedCrew!==crewId)interceptRequested=false;
  selectedCrew=crewId;render();
  const canAct=!queue.busy&&s.phase==='action'&&s.activeCrew===crewId;
  const canActivate=!queue.busy&&s.phase==='select'&&(!isV2(s)||!s.pendingProgress)&&availableCrew(s).some(c=>c.id===crewId);
  $('#action-title').textContent=def(crewId).name+(canAct?' · one action':' · crew details');
- const actions=availableActions(s,crewId).filter(a=>!(a.id==='medical'&&a.reason==='No untreated injured crew.')&&!(a.id==='repair'&&a.reason?.startsWith('No available damaged'))&&!(a.id==='fireControl'&&a.reason?.startsWith('No available fire')));
+ const actions=availableActions(s,crewId);
  const ordered=[
   {label:'Combat Actions',items:actions.filter(a=>['basicFire','advancedFire'].includes(a.id))},
   {label:'No Action',items:actions.filter(a=>a.id==='wait')},
@@ -378,11 +386,13 @@ function openActions(crewId=queue.view.activeCrew??selectedCrew) {
   {label:'Station Actions',items:actions.filter(a=>actionGroup(a.id)==='Station Actions'&&!['basicFire','advancedFire'].includes(a.id))},
   {label:'General Actions',items:actions.filter(a=>actionGroup(a.id)==='General Actions'&&a.id!=='wait')},
  ];
- $('#action-content').innerHTML=crewDetails(s,c)+resourceSummary(s,canAct)+ordered.map(group=>group.items.length?'<section class="action-group"><h3>'+group.label+'</h3><div class="action-options">'+group.items.map(a=>{const resource=a.cost?.includes('Officer')?'officer':a.cost?.includes('Enlisted')?'enlisted':a.cost?'mixed':'free';return '<button data-action="'+a.id+'" class="action-option" '+(canAct&&a.enabled?'':'disabled')+'>'+actionIconMarkup(a.id)+'<span class="action-copy"><strong>'+esc(a.label)+'</strong><small>'+esc(a.enabled?actionDescription(s,a.id):a.reason)+'</small></span><b class="action-cost resource-'+resource+'">'+esc(a.cost??'FREE')+'</b></button>';}).join('')+'</div></section>':'').join('')+'<div class="choice-footer"><button class="quiet" data-ui="close">Preview board</button>'+(canActivate?(def(crewId).abilities?.includes('intercept')&&isAtStation(s,c)?'<label class="intercept"><input id="sheet-intercept" type="checkbox"'+(interceptRequested?' checked':'')+'> Intercept Enemy draw as Flak</label>':'')+'<button class="primary" data-ui="activate">Activate & draw →</button>':'')+'</div>';
+ $('#action-content').innerHTML=crewDetails(s,c)+resourceSummary(s,canAct)+ordered.map(group=>group.items.length?'<section class="action-group"><h3>'+group.label+'</h3><div class="action-options">'+group.items.map(a=>{const resource=a.cost?.includes('Officer')?'officer':a.cost?.includes('Enlisted')?'enlisted':a.cost?'mixed':'free';return '<button data-action="'+a.id+'" class="action-option" '+(canAct&&a.enabled?'':'disabled')+'>'+actionIconMarkup(a.id)+'<span class="action-copy"><strong>'+esc(a.label)+'</strong><small>'+esc(a.enabled?actionDescription(s,a.id):a.reason)+'</small></span><b class="action-cost resource-'+resource+'">'+esc(a.cost??'FREE')+'</b></button>';}).join('')+'</div></section>':'').join('')+'<div class="choice-footer"><button class="quiet" data-ui="close">Preview board</button>'+(canActivate?'<button class="primary" data-ui="activate">Activate & draw →</button>':'')+'</div>';
  openDialog('#action-dialog');
 }
 const option=(value,label)=>`<option value="${esc(value)}">${esc(label)}</option>`;
 function chooseAction(id) {
+  if(queue.busy)return;
+  if(compactCrewFlow(queue.view)){chooseCompactAction(id);return;}
   chosenAction=id;
   const s=queue.view,c=s.crew.find(c=>c.id===s.activeCrew),action=availableActions(s,s.activeCrew).find(a=>a.id===id);
   if(!action?.enabled)return;
@@ -403,6 +413,89 @@ function chooseAction(id) {
   $('#action-content').innerHTML=`<p>${esc(actionDescription(s,id))}</p><form id="choice-form">${choices}<div class="choice-footer"><button type="button" data-ui="back-actions" class="quiet">← Actions</button><button class="primary" type="submit">${esc(action.label)}${action.cost?` · ${esc(action.cost)}`:''}</button></div></form>`;
   if(id==='assistWork') updateAssistPositions();
 }
+function inspectCrew(id) {
+  const c=queue.view.crew.find(c=>c.id===id);if(!c)return;
+  $('#info-title').textContent=def(id).name;
+  const occupants=queue.view.crew.filter(other=>other.position.some(cell=>c.position.includes(cell)));
+  const shared=occupants.length>1?`<section class="shared-occupants" aria-label="Shared physical occupants"><p><b>Sharing this footprint</b> · Each occupant is exposed to hits in their occupied cells.</p><div class="crew-cell-links">${occupants.map(other=>{const station=stationStatus(queue.view,other);return `<button class="quiet" data-inspect-occupant="${esc(other.id)}">${esc(def(other.id).name)} · ${esc(other.health)} · ${other.job?'Working':other.displaced?'Displaced':station.operating?'Operator':'Not operating'}</button>`;}).join('')}</div></section>`:'';
+  $('#info-content').innerHTML=crewDetails(queue.view,c)+shared;openDialog('#info-dialog');
+}
+function compactTile(a) {
+  const labels={reclaimHome:'Reclaim Home',assistWork:'Assist',rotateFighter:'Distract',convert:'Convert',escort:'Escort'};
+  return `<button type="button" data-compact-action="${a.id}" aria-disabled="${!a.enabled}" aria-describedby="compact-description" class="action-tile ${paletteFocus===a.id?'highlighted':''}">${actionIconMarkup(a.id)}<strong>${esc(labels[a.id]??a.label)}</strong><span>${esc(compactCost(a.cost))}${a.enabled?'':' · Unavailable'}</span></button>`;
+}
+function renderCompactFlow(s) {
+  const focusedAction=document.activeElement?.dataset.compactAction;
+  const panel=$('#crew-flow'),dock=$('.action-dock'),mode=crewFlowState(queue,interaction,compactChoice);
+  dock.dataset.crewFlow=mode;panel.hidden=mode==='legacy'||mode==='selection'||mode==='story';
+  panel.dataset.state=mode;
+  if(mode==='legacy')return;
+  if(mode==='selection'&&s.phase==='select'&&availableCrew(s).length&&!s.pendingProgress){$('#action-context').innerHTML='<strong>Choose your next crew</strong><small>Tap a crew card to activate · aircraft tokens inspect</small>';$('#primary-action').innerHTML='';}
+  if(panel.hidden)return;
+  const actor=s.activeCrew??queue.state.activeCrew??selectedCrew;
+  const heading=`<div class="compact-heading"><strong>${esc(def(actor)?.name??'Crew')} · ${mode==='ready'?'ONE ACTION':mode==='targeting'?'TARGET':mode==='choosing'?'CHOOSE':mode==='activating'?'ACTIVATING':'TOKEN / RESOLUTION'}</strong><span>${s.resources.Enlisted}E · ${s.resources.Officer}O</span></div>`;
+  if(queue.busy){panel.innerHTML=heading+`<p class="compact-beat" role="status">${esc(describeEvent(queue.current).title)} · Actions locked</p>`;return;}
+  if(interaction){
+    const f=s.fighters.find(f=>f.id===interaction.targetId),gunner=def(interaction.gunnerId??interaction.crewId)?.name;
+    const cost=interaction.action==='opportunityShot'?'1 Opportunity':compactCost(availableActions(s,interaction.crewId).find(a=>a.id===interaction.action)?.cost);
+    panel.innerHTML=`<div class="compact-heading"><strong>${esc(gunner??'Choose gunner')} → ${esc(f?`#${s.fighters.indexOf(f)+1} ${f.type}`:def(interaction.targetId)?.name??(interaction.cells.join(' + ')||'Choose target'))}</strong><span>${f?`HP ${f.hp}/${f.maxHp} · ENG ${f.engagementRemaining??'—'}<br>`:''}${esc(cost)}</span></div>`;
+    if(targetChooser)panel.innerHTML+=`<div class="target-chooser" aria-label="Select target"><strong>Select target</strong>${targetChooser.ids.map(id=>{const f=s.fighters.find(f=>f.id===id),c=s.crew.find(c=>c.id===id);return `<button data-target-choice="${esc(id)}">${f?`#${s.fighters.indexOf(f)+1} ${esc(f.type)} · HP ${f.hp}/${f.maxHp} · ENG ${f.engagementRemaining??'—'}`:c?`${esc(def(id).name)} · ${esc(c.health)}`:esc(id)}</button>`;}).join('')}</div>`;
+    return;
+  }
+  const actions=availableActions(s,s.activeCrew);
+  if(compactChoice){panel.innerHTML=heading+compactChoicesMarkup(s,actions);return;}
+  const palette=actionPalette(actions),a=palette.find(a=>a.id===paletteFocus);
+  panel.innerHTML=heading+`<div class="action-palette">${palette.map(compactTile).join('')}</div><div id="compact-description" class="compact-description" role="status">${a?`<b>${esc(a.label)} · ${esc(compactCost(a.cost))}</b> ${esc(a.enabled?(actionDescription(s,a.id)??'Choose a station action.'):a.reason)}`:'Choose an action. Unavailable tiles explain why.'}</div>`;
+  if(focusedAction)panel.querySelector(`[data-compact-action="${focusedAction}"]`)?.focus({preventScroll:true});
+}
+function chooseCompactAction(id) {
+  const s=queue.view;if(queue.busy||s.phase!=='action')return;
+  paletteFocus=id;
+  if(id==='stations'){compactChoice={action:id,values:{}};render();return;}
+  const a=availableActions(s,s.activeCrew).find(a=>a.id===id);
+  if(!a?.enabled){render();return;}
+  closeDialog();
+  if(id==='wait'){send({type:'action',action:id});return;}
+  if(DIRECT_ACTIONS.includes(id)){compactChoice=null;interaction=beginTargeting(id,s.activeCrew);render();$('#board-stage').scrollIntoView({block:'start',behavior:'instant'});return;}
+  compactChoice={action:id,values:{}};render();
+}
+function compactChoicesMarkup(s,actions) {
+  const {action:id,values}=compactChoice;
+  if(id==='stations')return `<div class="action-palette">${actions.filter(a=>STATION_PALETTE.includes(a.id)).map(compactTile).join('')}</div><p id="compact-description" role="status">${esc(actions.find(a=>a.id===paletteFocus)?.reason??'Choose a station action; confirm the destination before moving.')}</p><button data-ui="cancel-target">Back to actions</button>`;
+  const a=actions.find(a=>a.id===id),c=s.crew.find(c=>c.id===s.activeCrew);
+  const select=(name,label,items)=>`<label>${label}<select name="${name}" required><option value="">Choose…</option>${items.map(([value,label])=>`<option value="${esc(value)}" ${values[name]===value?'selected':''}>${esc(label)}</option>`).join('')}</select></label>`;
+  let fields='',required=[];
+  if(['returnHome','reclaimHome'].includes(id)){const plan=id==='reclaimHome'?reclaimReliefPlan(s,c.id):null;fields=`<p>Destination: <b>${esc(STATIONS[homeStationId(c)].name)}</b>${plan?` · ${esc(def(plan.substituteId).name)} ${plan.relief==='returned'?'returns home':`stays here, Displaced (${plan.substitutePosition.join(' + ')}). ${esc(plan.returnReason)}`}`:''}</p>`;}
+  if(id==='manStation'||id==='manCockpit'){required=['stationId'];fields=`<div class="compact-options" aria-label="Destination station">${eligibleStations(s,c.id).filter(i=>id!=='manCockpit'||['pilot','copilot'].includes(i)).map(i=>`<button data-compact-value="stationId" data-value="${i}" aria-pressed="${values.stationId===i}">${esc(STATIONS[i].name)}</button>`).join('')}</div>`;}
+  if(id==='restartEngine'){required=['targetId'];fields=select('targetId','Engine',s.engines.filter(e=>!e.running&&BOARD.filter(b=>b.engine===e.id).every(b=>s.cells[b.id]==='healthy')).map(e=>[e.id,e.id]));}
+  if(id==='relocate'){required=['targetId'];fields=select('targetId','Safe position',BOARD.filter(b=>b.fuselage&&s.cells[b.id]!=='fire'&&!(c.position.length===1&&c.position[0]===b.id)&&!s.crew.some(o=>o.id!==c.id&&o.health!=='dead'&&o.position.includes(b.id))).map(b=>[b.id,b.id]));}
+  if(id==='convert'){required=['to'];fields=select('to','Conversion',conversionOptions(s).filter(o=>o.enabled).map(o=>[o.to,o.label]));}
+  if(id==='assistWork'){
+    required=['jobId','workCellId'];const jobs=eligibleAssistJobs(s,c.id),job=jobs.find(j=>j.id===values.jobId);
+    fields=select('jobId','Job',jobs.map(j=>[j.id,`${jobKindLabel(j.kind)} · ${def(j.crewId).name} · ${j.remainingTime} Time`]));
+    if(job){const targets=job.kind==='medical'?s.crew.find(c=>c.id===job.targetId).position:job.cells;fields+=select('workCellId','Safe position',legalWorkPositions(s,c.id,targets).map(b=>[b.id,b.id]));}
+  }
+  return `<div id="compact-choice"><p id="compact-description"><b>${esc(a?.label)} · ${esc(compactCost(a?.cost))}</b> ${esc(actionDescription(s,id))}</p>${fields}<div class="compact-confirm"><button data-ui="cancel-target">Cancel</button><button class="primary" data-compact-confirm ${required.every(k=>values[k])?'':'disabled'}>Confirm ${esc(a?.label)}</button></div></div>`;
+}
+function handleCompactClick(e) {
+  if(!compactCrewFlow(queue.view))return false;
+  const tile=e.target.closest('[data-compact-action]');if(tile){chooseCompactAction(tile.dataset.compactAction);return true;}
+  const value=e.target.closest('[data-compact-value]');if(value){if(compactChoice&&!queue.busy){compactChoice.values[value.dataset.compactValue]=value.dataset.value;render();}return true;}
+  if(e.target.closest('[data-compact-confirm]')){if(!queue.busy&&compactChoice){const {action,values}=compactChoice;send({type:'action',action,...values});}return true;}
+  const choice=e.target.closest('[data-target-choice]');if(choice){if(!queue.busy&&interaction&&targetChooser){interaction=selectTarget(queue.view,interaction,targetChooser.kind,choice.dataset.targetChoice);targetChooser=null;render();}return true;}
+  if(!interaction||queue.busy)return false;
+  const el=e.target.closest('#board [data-fighter],#board [data-crew-id],#board [data-cell]');if(!el)return false;
+  const kind=interaction.stage==='work'?'cell':interaction.stage==='gunner'||interaction.action==='medical'?'crew':['repair','fireControl'].includes(interaction.action)?'cell':'fighter',attr={fighter:'data-fighter',crew:'data-crew-id',cell:'data-cell'}[kind];
+  const options=targetOptions(queue.view,interaction),valid=kind==='fighter'?options.fighters:kind==='crew'?options.crew:interaction.stage==='work'?options.work:options.cells;
+  const rects=[...document.querySelectorAll(`#board [${attr}]`)].filter(n=>valid.includes(n.getAttribute(attr))).map(n=>({id:n.getAttribute(attr),...(()=>{const r=n.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height};})()}));
+  const bounds=el.getBoundingClientRect(),x=e.clientX||bounds.x+bounds.width/2,y=e.clientY||bounds.y+bounds.height/2;
+  const primary=valid.includes(el.getAttribute(attr))?el.getAttribute(attr):rects.find(r=>x>=r.x&&x<=r.x+r.width&&y>=r.y&&y<=r.y+r.height)?.id;
+  if(!primary)return false;
+  const ids=nearbyTargets(rects,primary,x,y,kind==='fighter'?24:8);
+  if(ids.length>1){targetChooser={kind,ids};render();return true;}
+  targetChooser=null;interaction=selectTarget(queue.view,interaction,kind,primary);render();return true;
+}
+document.addEventListener('focusin',e=>{const tile=e.target.closest('[data-compact-action]');if(tile&&!compactChoice){paletteFocus=tile.dataset.compactAction;const a=actionPalette(availableActions(queue.view,queue.view.activeCrew)).find(a=>a.id===paletteFocus);if(a&&$('#compact-description'))$('#compact-description').textContent=`${a.label} · ${compactCost(a.cost)} — ${a.enabled?actionDescription(queue.view,a.id)??'Choose a station action.':a.reason}`;}});
 function updateAssistPositions() {
   const select=$('#assist-job'),positions=$('#assist-position');if(!select||!positions)return;
   const s=queue.view,job=s.jobs.find(job=>job.id===select.value);if(!job)return;
@@ -429,6 +522,8 @@ function rememberPreferences(config) {
 }
 function openDev() {
   configForm(devPreferences,queue.state.seed);
+  let flow=$('#compact-flow-setting');if(!flow){flow=document.createElement('label');flow.id='compact-flow-setting';flow.innerHTML='<input type="checkbox" id="compact-flow-current"> Compact Crew Flow · current sortie (UX only)';$('#dev-form').before(flow);}
+  flow.hidden=!isV2(queue.state);$('#compact-flow-current').checked=compactCrewFlow(queue.state);$('#compact-flow-current').disabled=queue.busy;
   const scopes=modifiedConfigScopes(devPreferences);
   $('#dev-prefs-status').textContent=scopes.length?`Saved next-sortie overrides: ${scopes.map(scope=>scope.toUpperCase()).join(', ')}.`:'Canonical defaults · applies to next sortie.';
   discardButton.disabled = !discardTarget();
@@ -585,7 +680,9 @@ function performDiscard() {
 }
 
 document.addEventListener('click', e=>{
-  const storyChoice=e.target.closest('[data-story-choice]');if(storyChoice){if(!storyChoice.disabled)send({type:'storyChoice',choiceId:storyChoice.dataset.storyChoice});return;}
+  const occupant=e.target.closest('[data-inspect-occupant]');if(occupant){inspectCrew(occupant.dataset.inspectOccupant);return;}
+  const history=e.target.closest('[data-crew-history]');if(history){closeDialog();inspectCell(history.dataset.crewHistory);return;}
+  const storyChoice=e.target.closest('[data-story-choice]');if(storyChoice){if(!storyChoice.disabled&&!queue.busy&&queue.view.story?.pending){storySelection={pendingId:queue.view.story.pending.id,choiceId:storyChoice.dataset.storyChoice};openStoryChoice();}return;}
   const storyCell=e.target.closest('[data-story-cell]');if(storyCell){closeDialog();inspectCell(storyCell.dataset.storyCell);return;}
   const service=e.target.closest('[data-service-aircraft],[data-service-personnel]');
   if(service){
@@ -600,8 +697,9 @@ document.addEventListener('click', e=>{
   const reroll=e.target.closest('[data-bomb-reroll]');if(reroll&&!queue.busy&&selectedBombDie!==null){send({type:'rerollBombDie',dieIndex:selectedBombDie,source:reroll.dataset.bombReroll});return;}
   const hud=e.target.closest('[data-hud]');if(hud){inspectHud(hud.dataset.hud);return;}
   const job=e.target.closest('[data-job]');if(job){inspectJob(job.dataset.job);return;}
-  const fighter=e.target.closest('[data-fighter]');if(fighter){const id=fighter.dataset.fighter;if(interaction&&!queue.busy){interaction=selectTarget(queue.view,interaction,'fighter',id);if(interaction.action==='directFire'&&canConfirm(queue.view,interaction))send(targetingCommand(interaction));else render();}else{const f=queue.view.fighters.find(f=>f.id===id);if(f){const engagementKey={'BF-109':'v2Bf109Engagement','BF-110':'v2Bf110Engagement','FW-190':'v2Fw190Engagement','Me-262':'v2Me262Engagement'}[f.type];$('#info-title').textContent=`#${queue.view.fighters.indexOf(f)+1} ${f.type}`;$('#info-content').innerHTML=`<p>HP ${f.hp}/${f.maxHp}</p>${isV2(queue.view)&&engagementKey?`<p>Engagement ${f.engagementRemaining}/${queue.view.config[engagementKey]}</p>`:''}<p>${esc(f.quadrant)} / ${esc(f.altitude)} · ${f.facing===0?'Facing B-17: attacks next enemy phase.':`${f.facing}° away: rotates next enemy phase.`}</p><p>Select a gunner and Fire to target this aircraft.</p>`;openDialog('#info-dialog');}}return;}
-  const crew=e.target.closest('[data-crew],[data-crew-id]');if(crew){const id=crew.dataset.crew??crew.dataset.crewId;if(interaction&&!queue.busy){const wasGunner=interaction.stage==='gunner';interaction=selectTarget(queue.view,interaction,'crew',id);if(wasGunner&&interaction.stage==='target')selectedCrew=interaction.gunnerId;render();if(wasGunner&&interaction.stage==='target')$('#board-stage').scrollIntoView({block:'start',behavior:'instant'});}else {openActions(id);}return;}
+  if(handleCompactClick(e))return;
+  const fighter=e.target.closest('[data-fighter]');if(fighter){const id=fighter.dataset.fighter;if(interaction&&!queue.busy){interaction=selectTarget(queue.view,interaction,'fighter',id);render();}else{const f=queue.view.fighters.find(f=>f.id===id);if(f){const engagementKey={'BF-109':'v2Bf109Engagement','BF-110':'v2Bf110Engagement','FW-190':'v2Fw190Engagement','Me-262':'v2Me262Engagement'}[f.type];$('#info-title').textContent=`#${queue.view.fighters.indexOf(f)+1} ${f.type}`;$('#info-content').innerHTML=`<p>HP ${f.hp}/${f.maxHp}</p>${isV2(queue.view)&&engagementKey?`<p>Engagement ${f.engagementRemaining}/${queue.view.config[engagementKey]}</p>`:''}<p>${esc(f.quadrant)} / ${esc(f.altitude)} · ${f.facing===0?'Facing B-17: attacks next enemy phase.':`${f.facing}° away: rotates next enemy phase.`}</p><p>Select a gunner and Fire to target this aircraft.</p>`;openDialog('#info-dialog');}}return;}
+  const crew=e.target.closest('[data-crew],[data-crew-id]');if(crew){const id=crew.dataset.crew??crew.dataset.crewId;if(interaction&&!queue.busy){const wasGunner=interaction.stage==='gunner';interaction=selectTarget(queue.view,interaction,'crew',id);if(wasGunner&&interaction.stage==='target')selectedCrew=interaction.gunnerId;render();if(wasGunner&&interaction.stage==='target')$('#board-stage').scrollIntoView({block:'start',behavior:'instant'});}else if(!queue.busy){if(compactCrewFlow(queue.view)&&crew.dataset.crew&&queue.view.phase==='select'&&!queue.view.pendingProgress&&availableCrew(queue.view).some(c=>c.id===id)){selectedCrew=id;send({type:'activate',crewId:id});}else if(compactCrewFlow(queue.view)){inspectCrew(id);}else openActions(id);}return;}
   const square=e.target.closest('[data-cell]');if(square){if(interaction&&!queue.busy){interaction=selectTarget(queue.view,interaction,'cell',square.dataset.cell);render();}else inspectCell(square.dataset.cell);return;}
   const action=e.target.closest('[data-action]');if(action){chooseAction(action.dataset.action);return;}
   const command=e.target.closest('[data-command]');if(command){send({type:command.dataset.command});return;}
@@ -609,6 +707,7 @@ document.addEventListener('click', e=>{
   switch(control.dataset.ui){
     case 'story-conditions':openStoryConditions();break;
     case 'story-choice':openStoryChoice();break;
+    case 'story-continue':{const selected=storySelection,pending=queue.state.story?.pending;if(!queue.busy&&selected?.pendingId===pending?.id&&pending.choices.some(c=>c.id===selected.choiceId&&!c.disabled)){storySelection=null;send({type:'storyChoice',choiceId:selected.choiceId});}break;}
     case 'status-toggle':compactHudExpanded=!compactHudExpanded;render();break;
     case 'campaign':openCampaign();break;
     case 'campaign-new':newCampaignForm();break;
@@ -619,10 +718,10 @@ document.addEventListener('click', e=>{
     case 'confirm-turn-back':send({type:'turnBack',confirmed:true});break;
     case 'bomb-run-focus':$('#bomb-run-panel').scrollIntoView({block:'center',behavior:'instant'});break;
     case 'hit-map-toggle':hitMapEnabled=!hitMapEnabled;render();break;
-    case 'activate':send({type:'activate',crewId:selectedCrew,intercept:Boolean(def(selectedCrew)?.abilities?.includes('intercept')&&interceptRequested)});break;
+    case 'activate':send({type:'activate',crewId:selectedCrew});break;
     case 'choose':case 'back-actions':openActions();break;
     case 'opportunity':openOpportunity();break;
-    case 'cancel-target':interaction=null;render();break;
+    case 'cancel-target':interaction=null;compactChoice=null;targetChooser=null;render();break;
     case 'work-position':if(interaction&&targetOptions(queue.view,interaction).work.length){interaction={...interaction,stage:'work'};render();}break;
     case 'confirm-target':if(canConfirm(queue.view,interaction))send(targetingCommand(interaction));break;
     case 'abort-work':send({type:'abortWork',jobId:control.dataset.abortJob});break;
@@ -650,19 +749,22 @@ document.addEventListener('click', e=>{
   }
 });
 document.addEventListener('change',e=>{
+  if(e.target.id==='compact-flow-current'){
+    if(queue.busy)return;
+    queue.state.config.v2CompactCrewFlow=e.target.checked;queue.view.config.v2CompactCrewFlow=e.target.checked;
+    interaction=null;compactChoice=null;targetChooser=null;paletteFocus=null;render();return;
+  }
   if(e.target.matches('#sortie-form [name="ruleset"]')){$('#sortie-target').hidden=e.target.value!=='v2-continuous';return;}
   if(e.target.id==='campaign-select'){try{persistCampaign(selectCampaign(campaignStore,e.target.value));openCampaign();}catch(error){notice(error.message);}return;}
   if(e.target.id==='campaign-import'){
     const file=e.target.files?.[0];if(!file)return;
     file.text().then(text=>{const parsed=parseCampaignBackup(text);pendingCampaignImport={kind:'milk-run-campaign-backup',version:1,...parsed};$('#campaign-content').innerHTML=`<p>Import ${parsed.store.campaigns.length} campaign(s) with ${parsed.store.campaigns.reduce((n,c)=>n+c.sorties.length,0)} recorded sorties${parsed.activeSession?' and its active flight':''}. This replaces the campaign history on this browser${parsed.activeSession?' and the active sortie autosave':''}.</p><p>Export the current campaign first if you want to keep both backups.</p><button class="primary" data-ui="campaign-import-confirm">Import this backup</button> <button class="quiet" data-ui="campaign">Cancel</button>`;}).catch(error=>notice(error.message));return;
   }
+  if(e.target.matches('#compact-choice select')){compactChoice.values[e.target.name]=e.target.value;if(e.target.name==='jobId')delete compactChoice.values.workCellId;render();return;}
   if(e.target.id==='assist-job'){updateAssistPositions();return;}
   if(e.target.id==='hit-map-structure'){hitMapStructure=e.target.checked;render();return;}
   if(e.target.id==='hit-map-empty'){hitMapEmpty=e.target.checked;render();return;}
   if(e.target.id==='job-assistant'&&interaction){interaction={...interaction,assistantId:e.target.value||null};render();return;}
-  if(!e.target.matches('#intercept,#sheet-intercept'))return;
-  interceptRequested=e.target.checked;
-  document.querySelectorAll('#intercept,#sheet-intercept').forEach(input=>{input.checked=interceptRequested;});
 });
 document.addEventListener('submit',e=>{
   if(e.target.id==='campaign-new-form'){e.preventDefault();try{persistCampaign(createCampaign(campaignStore,{name:new FormData(e.target).get('name')}).store);openCampaign();}catch(error){notice(error.message);}return;}
@@ -678,8 +780,11 @@ $('#dev-form').addEventListener('change',()=>{if(!$('#dev-form').checkValidity()
 $('#log-details').addEventListener('toggle',()=>{if($('#log-details').open)renderLog();});
 document.querySelectorAll('dialog').forEach(d=>d.addEventListener('click',e=>{if(e.target===d){const r=d.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)closeDialog();}}));
 const savedSession=loadSession();
+let unreadableSave=false;try{unreadableSave=!savedSession&&Boolean(localStorage.getItem(SAVE_KEY));}catch{/* Storage can be unavailable. */}
 const legacyBoardSave=!savedSession&&hasLegacyBoardSave();
-initialize(savedSession?.state.config??DEFAULT_CONFIG,'MILK-RUN',savedSession);
+initialize(savedSession?.state.config??DEFAULT_CONFIG,'MILK-RUN',savedSession,undefined,DEFAULT_BOMBING_TARGET,!unreadableSave);
 if(!savedSession)openNewSortie();
+if(unreadableSave)notice('The saved sortie could not be safely loaded. Its original data is retained until you deliberately launch a new sortie.');
+if(savedSession){const problems=crewStateProblems(savedSession.state);if(problems.length)notice('Saved crew state needs attention: '+problems.join(' '));}
 if(legacyBoardSave)notice('The board geometry has been corrected. Start a new sortie on this map; your previous-board save has been kept separately.');
 window.milkRun={ getState:()=>structuredClone(queue.state),getView:()=>structuredClone(queue.view),getQueue:()=>queue.pending.map(({state,...e})=>e),getInteraction:()=>structuredClone(interaction),getBombRunTest:()=>bombTest.snapshot(),getCampaignStore:()=>structuredClone(campaignStore),send,restart:(config,seed,ruleset)=>{closeDialog();initialize(config??devPreferences,seed,null,ruleset??config?.preferredRuleset??devPreferences.preferredRuleset);},getPreferences:()=>({...devPreferences}),setSpeed:s=>queue.setSpeed(s),flush:()=>queue.flush(),exportSession:()=>queue.export() };

@@ -54,13 +54,13 @@ for (const [name, assignments] of [
 });
 
 test('a worker whose home remains burning still blocks another return at their temporary position', () => {
-  const s = crossedWorkers([['pilot', 'B2-4', 'D2-1'], ['copilot', 'C2-1', 'C2-2']]);
-  s.round = 2; s.phase = 'ready'; s.cells['C2-2'] = 'fire';
-  s.jobs.push({ id: 'suppression', kind: 'fireControl', crewId: 'tail', cells: ['C2-2'], completeRound: 10 });
+  const s = crossedWorkers([['radio', 'B2-4', 'C2-4'], ['engineer', 'A3-1', 'C3-2']]);
+  s.round = 2; s.phase = 'ready'; s.cells['D3-1'] = 'fire';
+  s.jobs.push({ id: 'suppression', kind: 'fireControl', crewId: 'tail', cells: ['D3-1'], completeRound: 10 });
   member(s, 'tail').job = 'suppression';
   const result = dispatch(s, { type: 'startRound' });
-  assert.deepEqual(member(result.state, 'pilot').position, ['D2-1']);
-  assert.deepEqual(member(result.state, 'copilot').position, ['C2-2']);
+  assert.deepEqual(member(result.state, 'radio').position, ['C2-4']);
+  assert.deepEqual(member(result.state, 'engineer').position, ['C3-2']);
   assert.equal(result.events.filter(e => e.type === 'CREW_DISPLACED').length, 2);
 });
 
@@ -81,10 +81,10 @@ test('Medical requires a reachable patient when target and adjacent interior row
   for (const cell of BOARD.filter(c => c.fuselage && [0,1,2].includes(Math.floor(c.y/2)))) s.cells[cell.id] = 'fire';
   const medical = availableActions(s).find(a => a.id === 'medical');
   assert.equal(medical.enabled, false);
-  assert.match(medical.reason, /safe interior work position/i);
+  assert.match(medical.reason, /contains Fire/i);
   assert.deepEqual(eligibleMedicalTargets(s, 'radio'), []);
   const before = structuredClone(s);
-  assert.throws(() => action(s, 'medical', { targetId: 'pilot' }), /safe interior/i);
+  assert.throws(() => action(s, 'medical', { targetId: 'pilot' }), /contains Fire/i);
   assert.deepEqual(s, before);
   member(s, 'tail').health = 'injured';
   assert.equal(availableActions(s).find(a => a.id === 'medical').enabled, true);

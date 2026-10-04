@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { openBrowser } from './browser-harness.mjs';
-import { createGame } from '../state.mjs';
+import { createGame as createGameBase } from '../state.mjs';
+// Exercise the retained legacy interaction; compact ON has its own touch suite.
+const createGame=(config={},...args)=>createGameBase({...(args[1]==='v2-continuous'?{v2CompactCrewFlow:false}:{}),...config},...args);
 import { dispatch, availableCrew } from '../rules.mjs';
 import { BOARD, STATIONS } from '../board.mjs';
 import { rngForIndexes, fighter } from './fixtures.mjs';
@@ -68,6 +70,7 @@ try{
   for(const width of [320,360,390]){
     await viewport(width,844);s=activate(fresh('v2-continuous'),'engineer');
     for(const c of BOARD.filter(c=>c.fuselage&&c.id[1]==='4'))s.cells[c.id]='fire';
+    for(const id of ['leftWaist','rightWaist'])member(s,id).health='dead';
     await inject(s);await choose('fireControl');await touch('#board [data-cell="C4-2"]');await click('[data-ui=work-position]');
     const positions=await evaluate("[...document.querySelectorAll('#board [data-work-cell]')].map(e=>e.dataset.workCell)");
     assert.ok(positions.some(id=>id[1]==='3'));assert.ok(positions.some(id=>id[1]==='5'));assert.ok(positions.every(id=>['3','5'].includes(id[1])));

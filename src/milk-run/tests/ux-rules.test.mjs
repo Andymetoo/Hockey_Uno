@@ -166,6 +166,7 @@ test('wing/fire work rejects wing, different-row and burning positions before sp
   const state = activated('radio');
   state.cells['B2-4'] = 'fire';
   state.cells[STATIONS.pilot.cells[0]] = 'fire';
+  state.crew.find(c=>c.id==='pilot').health='dead';
   const before = structuredClone(state);
   for (const workCellId of ['B2-4', 'C4-2', STATIONS.pilot.cells[0]]) {
     assert.throws(() => action(state, 'fireControl', { cells: ['B2-4'], workCellId }), /interior work position/i);

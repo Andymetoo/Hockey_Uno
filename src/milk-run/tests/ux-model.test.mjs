@@ -78,9 +78,9 @@ test('cockpit duty explains leaving for crisis work and regaining control on ret
 });
 
 test('action groups distinguish person role abilities from currently operated stations', () => {
-  for (const id of ['repair', 'fireControl', 'medical', 'relocate', 'manCockpit', 'wait']) assert.equal(actionGroup(id), 'General Actions');
+  for (const id of ['repair', 'fireControl', 'medical', 'relocate', 'wait']) assert.equal(actionGroup(id), 'General Actions');
   for (const id of ['directFire', 'convert', 'rotateFighter', 'escort']) assert.equal(actionGroup(id), 'Role Actions');
-  for (const id of ['basicFire', 'advancedFire', 'restartEngine']) assert.equal(actionGroup(id), 'Station Actions');
+  for (const id of ['basicFire', 'advancedFire', 'restartEngine', 'manCockpit', 'reclaimHome']) assert.equal(actionGroup(id), 'Station Actions');
 });
 
 test('a straddling crew token center preserves the entire mapped hit footprint', () => {

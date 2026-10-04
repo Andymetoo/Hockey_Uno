@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { openBrowser } from './browser-harness.mjs';
-import { createGame } from '../state.mjs';
+import { createGame as createGameBase } from '../state.mjs';
+// Exercise the retained legacy interaction; compact ON has its own touch suite.
+const createGame=(config={},...args)=>createGameBase({...(args[1]==='v2-continuous'?{v2CompactCrewFlow:false}:{}),...config},...args);
 import { dispatch } from '../rules.mjs';
 import { startStoryThread } from '../story.mjs';
 import { addStoryCondition } from '../story-effects.mjs';
@@ -34,7 +36,7 @@ try {
     assert.match(await evaluate("document.querySelector('#info-content').textContent"),/waiting for your decision/);
     await click('#info-content [data-ui=story-choice]');
     assert.equal(await evaluate("document.querySelector('#story-dialog').open"),true);
-    await touch('#story-dialog [data-story-choice=enter]');await flush();
+    await touch('#story-dialog [data-story-choice=enter]');assert.deepEqual(await getState(),JSON.parse(JSON.stringify(state)));await touch('[data-ui=story-continue]');await flush();
     const chosen=await getState();assert.equal(chosen.phase,'select');assert.ok(chosen.story.conditions.some(c=>c.id==='heavy_cloud'));
     await reload();assert.deepEqual(await getState(),chosen);
     assert.equal(await evaluate("document.querySelector('#story-dialog').open"),false);
@@ -96,7 +98,7 @@ try {
   await evaluate("(()=>{const original=URL.createObjectURL;URL.createObjectURL=blob=>{window.__storyBackup=blob;return original(blob)}})()");
   await click('[data-ui=campaign-export]');const backupText=await evaluate('window.__storyBackup.text()');
   const backup=JSON.parse(backupText);assert.deepEqual(backup.activeSession.state.story,flight.state.story);
-  await click('#campaign-dialog [data-ui=close]');await click('[data-ui=story-choice]');await click('[data-story-choice=around]');await flush();
+  await click('#campaign-dialog [data-ui=close]');await click('[data-ui=story-choice]');await click('[data-story-choice=around]');await click('[data-ui=story-continue]');await flush();
   assert.equal((await getState()).story.pending,null);await click('[data-ui=campaign]');
   await evaluate(`(()=>{const transfer=new DataTransfer();transfer.items.add(new File([${JSON.stringify(backupText)}],'story-backup.json',{type:'application/json'}));const input=document.querySelector('#campaign-import');input.files=transfer.files;input.dispatchEvent(new Event('change',{bubbles:true}));})()`);
   await waitFor("!!document.querySelector('[data-ui=campaign-import-confirm]')");await click('[data-ui=campaign-import-confirm]');

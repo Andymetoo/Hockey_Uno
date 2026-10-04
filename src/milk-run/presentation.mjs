@@ -80,10 +80,11 @@ export function describeEvent(event = {}) {
     Object.assign(description, { kind: 'die', roll: event.roll, title: `FIRE SPREAD · ${result === 'no spread' ? 'NO SPREAD' : upper(result)}` });
   }
   if (type === 'FIRE_SPREAD_BLOCKED') description.title = `FIRE SPREAD BLOCKED · ${event.cellId ?? ''}`;
-  if (type === 'FIRE_STOPPED_BY_CREW') description.title = `FIRE SPREAD BLOCKED BY CREW · ${event.cellId ?? ''}`;
+  if (type === 'FIRE_STOPPED_BY_CREW') description.title = `FIRE BLOCKED BY LIVING CREW · ${event.cellId ?? ''}`;
   if (type === 'WORK_COMPLETED') description.title = `${upper(event.kind === 'fireControl' ? 'Fire Control' : event.kind)} COMPLETED`;
   if (type === 'WORK_CANCELLED') description.title = `${upper(event.kind === 'fireControl' ? 'Fire Control' : event.kind)} CANCELLED`;
   if (type === 'STATION_MANNED' || type === 'COCKPIT_MANNED') description.title = event.message?.replace(/\.$/, '') || 'Crew takes station';
+  if (type === 'STATION_RECLAIMED') description.title = 'HOME STATION RECLAIMED';
   if (type === 'CREW_RELOCATED') description.title = event.message?.replace(/\.$/, '') || 'Crew changes position';
   if (type === 'CREW_RETURNED') description.title = event.message?.replace(/\.$/, '') || 'Crew returns home';
   if (type === 'CREW_KILLED') description.title = 'CREW LOST';
@@ -100,9 +101,9 @@ export function describeEvent(event = {}) {
   if (type === 'WORK_ASSISTED') description.title = 'ASSIST WORK · TWO WORKERS';
   if (type === 'BOMB_RUN_ROLLED') description.title = 'BOMB RUN · 4d6';
   if (type === 'BOMB_DIE_REROLLED') Object.assign(description,{kind:'die',roll:event.roll,title:'BOMB RUN · REROLL'});
-  if (type === 'BOMBING_NO_DROP') description.title = 'NO DROP · BOMBARDIER FUNCTION UNMANNED';
+  if (type === 'BOMBING_NO_DROP') description.title = 'NO DROP · BOMBSIGHT UNAVAILABLE';
   if (type === 'BOMBING_RESOLVED' && continuous) description.title = `BOMB RUN · ${event.score??'—'}/9 · ${upper(event.outcome)}`;
-  if (type === 'BOMBARDIER_WARNING') description.title = 'BOMBARDIER STATION UNMANNED — NO DROP POSSIBLE AT TARGET';
+  if (type === 'BOMBARDIER_WARNING' || type === 'BOMBARDIER_TARGET_WARNING') description.title = event.message?.split('. ')[0] || 'BOMBSIGHT UNAVAILABLE — NO DROP POSSIBLE AT TARGET';
   if (type === 'MISSION_ABORTED') description.title = 'MISSION ABORTED — RETURNING HOME';
   if (type === 'MISSION_ENDED') description.title = event.title ?? event.result?.title ?? (event.outcome === 'success' ? 'RETURNED HOME' : 'AIRCRAFT LOST');
   if (type === 'FIGHTER_KILL_TIME_TAKEN') description.title = 'FIGHTER KILL · TIME CLAIMED';
@@ -308,7 +309,7 @@ function outcomeSummary(events) {
 
   const action = find('CREW_ACTION')?.action;
   if (['manStation', 'manCockpit', 'returnHome'].includes(action)) {
-    const station = find('STATION_MANNED') ?? find('COCKPIT_MANNED');
+    const station = find('STATION_RECLAIMED') ?? find('STATION_MANNED') ?? find('COCKPIT_MANNED');
     const lead = action === 'returnHome' ? 'Return Home' : 'Man Station';
     return station ? `${lead} · ${crewName(station.crewId)} → ${stationNames[station.stationId] ?? station.stationId}` : lead;
   }

@@ -177,7 +177,7 @@ test('workers stay displaced if their assigned station is burning when a job com
   const id=square(0,4);state.cells[id]='damaged';
   const worked=action(state,'repair',{cells:[id]}).state;
   const workPosition=[...worked.crew.find(c=>c.id==='radio').position];
-  worked.cells[STATIONS.radio.cells[0]]='fire';
+  worked.cells[STATIONS.radio.cells.find(id=>!workPosition.includes(id))]='fire';
   worked.rng=rngForDice([1]);
   const result=nextRound(worked);
   assert.deepEqual(result.state.crew.find(c=>c.id==='radio').position,workPosition);

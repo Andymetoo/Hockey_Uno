@@ -4,8 +4,9 @@ import { ResolutionQueue } from '../queue.mjs';
 import { eventDelay } from '../presentation.mjs';
 import { SAVE_KEY, LEGACY_SAVE_KEY, saveSession, loadSession, hasLegacyBoardSave } from '../persistence.mjs';
 import { BOARD_VERSION } from '../board.mjs';
+import { createGame } from '../state.mjs';
 
-const initial = () => ({ version: 1, boardVersion: BOARD_VERSION, round: 1, phase: 'action', damage: 0, crew: [], config: { animationSpeed: 'normal' }, bags: {}, cells: {}, rng: 42 });
+const initial = () => ({ ...createGame({},'presentation-fixture'), round: 1, phase: 'action', damage: 0, rng: 42 });
 function sequence(state) {
   const hit = { ...state, phase: 'resolving' };
   const damaged = { ...hit, damage: 1 };

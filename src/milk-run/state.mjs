@@ -24,7 +24,7 @@ export function createGame(overrides = {}, seed, ruleset = overrides.preferredRu
     resources: { Officer: config.startingOfficer, Enlisted: config.startingEnlisted },
     opportunity: config.opportunityEnabled ? Math.min(config.startingOpportunity, config.opportunityCap) : 0,
     crew: CREW_DEFS.map((member) => ({
-      id: member.id, health: 'healthy', used: false, activationCompleted: false, lastAction: null,
+      id: member.id, health: 'healthy', healthSince: { health: 'healthy', turn: 0, cause: 'Sortie began', source: 'Initial crew' }, used: false, activationCompleted: false, lastAction: null,
       ...(continuous ? { cycleSlotConsumed: false } : {}),
       position: [...STATIONS[member.station].cells], station: member.station, homeStation: member.station, displaced: false, job: null,
     })),

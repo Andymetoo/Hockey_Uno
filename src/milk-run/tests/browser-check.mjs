@@ -6,7 +6,9 @@ import { createServer } from 'node:http';
 import { readFile, mkdir, writeFile } from 'node:fs/promises';
 import { resolve, extname, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createGame } from '../state.mjs';
+import { createGame as createGameBase } from '../state.mjs';
+// Exercise the retained legacy interaction; compact ON has its own touch suite.
+const createGame=(config={},...args)=>createGameBase({...(args[1]==='v2-continuous'?{v2CompactCrewFlow:false}:{}),...config},...args);
 import { SAVE_KEY } from '../persistence.mjs';
 import { DEFAULT_CONFIG, CONFIG_FIELDS } from '../config.mjs';
 import { dispatch } from '../rules.mjs';

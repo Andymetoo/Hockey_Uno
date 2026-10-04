@@ -195,7 +195,7 @@ test('Enlisted at the bombsight can physically hold the station but causes immed
   assert.equal(state.mission.bombingResult, 'no-drop');
   assert.equal(state.mission.bombRun.committedScore, null);
   assert.deepEqual(state.mission.bombRun.dice, []);
-  assert.match(events[0].message, /NO DROP.*not operationally manned.*Turning for HOME/);
+  assert.match(events[0].message, /NO DROP.*Engineer.*Enlisted.*Turning for HOME/);
   assert.equal(validateBombRunSnapshot(state), true);
 });
 
@@ -253,7 +253,7 @@ test('target warning appears one outbound Progress away and uses current qualifi
   state.mission.position = state.config.v2OutboundLength - 2;
   assert.equal(bombRunTargetWarning(state), '');
   state.mission.position++;
-  assert.equal(bombRunTargetWarning(state), 'BOMBARDIER STATION UNMANNED — NO DROP POSSIBLE AT TARGET');
+  assert.match(bombRunTargetWarning(state), /BOMBSIGHT.*UNMANNED.*NO DROP POSSIBLE AT TARGET/);
   substitute(state, 'navigator');
   assert.equal(bombRunTargetWarning(state), '');
   substitute(state, 'engineer'); crew(state, 'navigator').station = null;

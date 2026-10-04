@@ -1,7 +1,7 @@
 /** All geometry is derived from data/plane-grid.csv; artwork is presentation only. */
 import { parsePlaneGrid, SECTION_DEFINITIONS } from './plane-grid.mjs';
 export { parsePlaneGrid, validatePlaneGrid, cellId } from './plane-grid.mjs';
-export const BOARD_VERSION = 'plane-grid-v1';
+export const BOARD_VERSION = 'plane-grid-v2';
 export const QUADRANTS = ['Fore', 'Starboard', 'Aft', 'Port'];
 export const ALTITUDES = ['High', 'Level', 'Low'];
 export const SECTIONS = SECTION_DEFINITIONS;
@@ -27,7 +27,7 @@ export const CREW_DEFS = [
   { id: 'copilot', number: 4, name: 'Copilot', role: 'Resource conversion', rank: 'Officer', tags: ['Officer', 'Pilot', 'Copilot'], abilities: ['convert'], station: 'copilot' },
   { id: 'navigator', number: 2, name: 'Navigator', role: 'Nose gun / evasion', rank: 'Officer', tags: ['Officer', 'Gunner', 'Navigator'], abilities: ['rotateFighter'], station: 'navigator', arc: arc(['Fore'], ['Level', 'High', 'Low']) },
   { id: 'bombardier', number: 1, name: 'Bombardier', role: 'Nose gun / target', rank: 'Officer', tags: ['Officer', 'Gunner', 'Bombardier'], abilities: [], station: 'bombardier', arc: arc(['Fore'], ['Level', 'High', 'Low']) },
-  { id: 'radio', number: 6, name: 'Radio Operator', role: 'Dorsal gun / intercept', rank: 'Enlisted', tags: ['Enlisted', 'Gunner', 'Radio'], abilities: ['intercept', 'escort'], station: 'radio', arc: arc(['Aft'], ['High', 'Level']) },
+  { id: 'radio', number: 6, name: 'Radio Operator', role: 'Dorsal gun / escort', rank: 'Enlisted', tags: ['Enlisted', 'Gunner', 'Radio'], abilities: ['escort'], station: 'radio', arc: arc(['Aft'], ['High', 'Level']) },
   { id: 'engineer', number: 5, name: 'Engineer', role: 'Top turret / enhanced repair', rank: 'Enlisted', tags: ['Enlisted', 'Gunner', 'Engineer'], abilities: ['enhancedRepair'], station: 'engineer', arc: arc(['Fore','Port','Starboard','Aft'], ['Level', 'High']) },
   { id: 'ball', number: 7, name: 'Ball Turret', role: 'Lower gun', rank: 'Enlisted', tags: ['Enlisted', 'Gunner'], abilities: [], station: 'ball', arc: arc([...QUADRANTS], ['Low', 'Level']) },
   { id: 'leftWaist', number: 8, name: 'Left Waist', role: 'Port gun', rank: 'Enlisted', tags: ['Enlisted', 'Gunner'], abilities: [], station: 'leftWaist', arc: arc(['Port'], [...ALTITUDES]) },

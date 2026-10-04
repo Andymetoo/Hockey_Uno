@@ -1,7 +1,9 @@
 // Real touch regressions for the corrective rules/UI pass.
 import assert from 'node:assert/strict';
 import { openBrowser } from './browser-harness.mjs';
-import { createGame } from '../state.mjs';
+import { createGame as createGameBase } from '../state.mjs';
+// Exercise the retained legacy interaction; compact ON has its own touch suite.
+const createGame=(config={},...args)=>createGameBase({...(args[1]==='v2-continuous'?{v2CompactCrewFlow:false}:{}),...config},...args);
 import { dispatch } from '../rules.mjs';
 import { BOARD } from '../board.mjs';
 import { activated, fighter } from './fixtures.mjs';
@@ -21,22 +23,11 @@ try {
     await inject(radio);
     await touch('#crew-list [data-crew="radio"]');
     await click('#action-content [data-ui="close"]');
-    await touch('#intercept');
-    assert.equal(await evaluate("document.querySelector('#sheet-intercept').checked"), true, 'closed sheet mirrors the visible footer preference');
+    assert.equal(await evaluate("document.querySelectorAll('#intercept,#sheet-intercept').length"),0);
     await touch('[data-ui="activate"]'); await flush();
-    const intercepted = await eventTypes();
-    assert.ok(intercepted.includes('INTERCEPT_DECLARED'));
-    assert.ok(intercepted.includes('FLAK_STARTED'));
-    assert.equal(intercepted.includes('FIGHTER_SPAWNED'), false);
-    assert.equal((await getState()).stats.missionDraws, 1);
-
-    // Both controls edit the same preference, including unchecking after a sheet closes.
-    await inject(radio); await touch('#crew-list [data-crew="radio"]'); await touch('#sheet-intercept');
-    await click('#action-content [data-ui="close"]');
-    assert.equal(await evaluate("document.querySelector('#intercept').checked"), true);
-    await touch('#intercept'); await touch('[data-ui="activate"]'); await flush();
-    assert.equal((await eventTypes()).includes('INTERCEPT_DECLARED'), false);
-    assert.equal((await getState()).fighters.length, 1);
+    assert.equal((await eventTypes()).includes('INTERCEPT_DECLARED'),false);
+    assert.equal((await getState()).fighters.length,1);
+    assert.equal((await getState()).stats.missionDraws,1);
 
     const gunner = activated('engineer');
     gunner.fighters = [fighter('before-enemies', { hp:3, maxHp:3 })];
@@ -68,13 +59,13 @@ try {
     assert.equal((await getState()).phase, 'select', 'Continue returns to crew selection after resolving the enemy phase');
     assert.ok(await evaluate('document.documentElement.scrollWidth <= innerWidth + 1'));
   }
-  note('Desktop and 320/360/390 touch: shared Intercept preference and an explicit completed-action Opportunity window before one enemy phase');
+  note('Desktop and 320/360/390 touch: removed Intercept controls and an explicit completed-action Opportunity window before one enemy phase');
 
   const pilot = activated('pilot'); pilot.opportunity = 0;
   Object.assign(pilot.crew.find(c => c.id === 'engineer'), { used:true, activationCompleted:true });
   pilot.fighters = [fighter('pilot-order', { hp:3, maxHp:3 })]; pilot.bags.combat = { tokens:['Hit'], discard:[] };
   await inject(pilot); await choose('directFire');
-  await touch('#crew-list [data-crew="engineer"]'); await touch('#enemies [data-fighter="pilot-order"]'); await flush();
+  await touch('#crew-list [data-crew="engineer"]'); await touch('#enemies [data-fighter="pilot-order"]'); assert.equal((await getState()).phase,'action'); await click('[data-ui=confirm-target]'); await flush();
   assert.equal((await getState()).phase, 'select'); assert.equal((await getState()).opportunity, 0);
   assert.equal((await getState()).fighters[0].hp, 2);
   assert.equal((await eventTypes()).filter(e => e === 'GUNNER_SHOT_ROLL').length, 1);

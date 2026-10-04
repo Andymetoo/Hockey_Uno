@@ -18,7 +18,7 @@ export function targetChoiceMarkup(selectedId = DEFAULT_BOMBING_TARGET) {
 export function bombRunMarkup(state, selectedDieIndex = null, disabled = false) {
   const run = state.mission.bombRun;
   if (!run) return '';
-  const heading = `<div class="bomb-run-heading"><div><span class="eyebrow">OVER TARGET / ${esc(run.target.difficulty)}</span><h2>${esc(run.target.name)}</h2></div><span class="bomb-run-stamp">BOMB<br>RUN</span></div>`;
+  const heading = `<div class="bomb-run-heading"><div><span class="eyebrow">${run.status === 'no-drop' ? 'TARGET RESULT' : 'OVER TARGET'} / ${esc(run.target.difficulty)}</span><h2>${esc(run.target.name)}</h2></div><span class="bomb-run-stamp">BOMB<br>RUN</span></div>`;
   if (run.status === 'no-drop') return `<section class="bomb-run bomb-run-no-drop" aria-label="Bomb Run result">${heading}<strong class="bomb-run-result">NO DROP</strong><p>${esc(run.noDropReason)}</p><b>TURNING FOR HOME</b></section>`;
   const preview = bombRunPreview(state);
   const locked = disabled || run.status !== 'placing' || state.phase !== 'bombing';

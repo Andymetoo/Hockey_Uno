@@ -2,7 +2,7 @@
 // four-die Bomb Run below; both resolve without DOM or presentation timers.
 import { die } from './random.mjs';
 import { CREW_DEFS } from './board.mjs';
-import { specialistOperator } from './crew-position.mjs';
+import { specialistOperator, specialistStatus } from './crew-position.mjs';
 import { isV2 } from './rulesets.mjs';
 import { storyConditions, storyFlag, addStoryFact, reconcileStory } from './story-effects.mjs';
 import { BOMBRUN_SLOTS, DEFAULT_BOMBING_TARGET, getBombingTarget, validBombingTarget,
@@ -30,9 +30,10 @@ const usedDice = run => BOMBRUN_SLOTS.map(slot => run.placement[slot]).filter(in
 const unusedDie = run => usedDice(run).length === 3 ? [0, 1, 2, 3].find(index => !usedDice(run).includes(index)) : null;
 
 export function bombRunTargetWarning(state) {
+  const readiness = specialistStatus(state, 'bombardier');
   return isV2(state) && !state.mission.bombed && !state.mission.aborted &&
-    state.mission.position === state.config.v2OutboundLength - 1 && !bombardierOperator(state)
-    ? 'BOMBARDIER STATION UNMANNED — NO DROP POSSIBLE AT TARGET' : '';
+    state.mission.position >= state.config.v2OutboundLength - 1 && !readiness.operator
+    ? `BOMBSIGHT — ${readiness.kind === 'unqualified' ? 'UNQUALIFIED' : 'UNMANNED'} — NO DROP POSSIBLE AT TARGET. ${readiness.reason} Move the healthy Bombardier or another Officer here before TARGET or the mission will be NO DROP.` : '';
 }
 
 /** Start once, using the operator and target at arrival. Neither rolling nor
@@ -47,7 +48,7 @@ export function beginBombRun(state, emit, targetId = state.mission.targetId ?? D
     if (target.ranges[slot]) target.ranges[slot] = [Math.max(1, target.ranges[slot][0] - amount), Math.min(6, target.ranges[slot][1] + amount)];
   }
   const operator = bombardierOperator(state);
-  const noDropReason = operator ? null : 'Bombardier station is not operationally manned by the healthy Bombardier or an Officer substitute.';
+  const noDropReason = operator ? null : specialistStatus(state, 'bombardier').reason;
   state.mission.targetId = target.id;
   state.mission.bombRun = {
     version: BOMB_RUN_VERSION, target, status: operator ? 'placing' : 'no-drop',

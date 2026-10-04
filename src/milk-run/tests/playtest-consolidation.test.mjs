@@ -101,6 +101,8 @@ test('Assist Work enforces existing safe row positioning and rejects illegal or 
   assert.throws(() => action(s, 'assistWork', { jobId: id, workCellId: 'A1-1' }));
   const cell = legalWorkPositions(s, 'engineer', s.jobs[0].cells)[0].id;
   s.cells[cell] = 'fire';
+  // This fixture models a vacant burning work square.
+  for(const c of s.crew)if(c.position.includes(cell)) {c.position=['C5-2'];c.station=null;c.displaced=true;}
   assert.throws(() => action(s, 'assistWork', { jobId: id, workCellId: cell }));
   const r = action(s, 'assistWork', { jobId: id });
   assert.notEqual(crew(r.state,'engineer').position[0], cell);

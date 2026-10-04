@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { openBrowser } from './browser-harness.mjs';
-import { createGame } from '../state.mjs';
+import { createGame as createGameBase } from '../state.mjs';
+// Exercise the retained legacy interaction; compact ON has its own touch suite.
+const createGame=(config={},...args)=>createGameBase({...(args[1]==='v2-continuous'?{v2CompactCrewFlow:false}:{}),...config},...args);
 import { dispatch } from '../rules.mjs';
 
 const b=await openBrowser({port:9360,artifactFolder:'playtest-correctives'}), checks=[];

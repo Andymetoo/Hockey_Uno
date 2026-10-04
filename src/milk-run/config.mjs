@@ -17,7 +17,7 @@ export const DEFAULT_CONFIG = Object.freeze({
   enginesSafe: 1, enginesMid: 2, enginesAuto: 4, enginesMidMin: 3, enginesHighMin: 5,
   outboundLength: 14, returnLength: 5, bombingMin: 3, animationMs: 750, presentationSpeed: 'normal',
   v2CrewCycleTurns: 10,
-  v2StoryMode: true,
+  v2StoryMode: true, v2CompactCrewFlow: true,
   v2AircraftSpecificCrits: false, v2BadlyDamagedBreakoff: false,
   v2MissionEnemy: 20, v2MissionResource: 12, v2MissionTime: 10,
   v2TimePerProgress: 4, v2OutboundLength: 8, v2ReturnLength: 3,
@@ -41,6 +41,7 @@ export const CONFIG_FIELDS = [
   { key: 'preferredRuleset', label: 'Preferred ruleset for new sorties', group: 'New sortie', type: 'select', options: [
     { value: 'v1', label: 'V1 — Round-Based' }, { value: 'v2-continuous', label: 'V2 — Continuous Time — EXPERIMENTAL' },
   ] },
+  boolean('v2CompactCrewFlow', 'Compact Crew Flow', 'Interaction'),
   boolean('v2StoryMode', 'Story Mode', 'V2 — Continuous Time (Experimental)'),
   boolean('v2AircraftSpecificCrits', 'Aircraft-Specific Crit Severity', 'V2 — Combat & escort (Experimental)'),
   boolean('v2BadlyDamagedBreakoff', 'Badly Damaged Fighters Break Off Sooner', 'V2 — Combat & escort (Experimental)'),
@@ -108,7 +109,8 @@ export const CONFIG_FIELDS = [
   number('engineerBonus', 'Engineer additional repair squares', 'Crisis work', 0, 6),
   boolean('eightWayWork', 'Allow diagonal work connections', 'Crisis work'),
   boolean('extinguishLeavesDamage', 'Extinguished fire leaves Damage', 'Crisis work'),
-  boolean('crewBlocksFirstFire', 'Healthy crew stop first fire spread', 'Crisis work'),
+  // crewBlocksFirstFire remains a readable legacy save field; living crew
+  // blocking ignition is now unconditional and has no next-sortie switch.
   number('medicalDuration', 'Medical duration (round starts)', 'Crisis work', 0, 4),
   number('repairDuration', 'Repair duration (round starts)', 'Crisis work', 0, 4),
   number('fireDuration', 'Fire Control duration (round starts)', 'Crisis work', 0, 4),

@@ -1,4 +1,4 @@
-import { BOARD } from './board.mjs';
+import { BOARD, STATIONS } from './board.mjs';
 
 const cellPattern = /\b[A-F][1-6]-[1-4]\b/g;
 const crewNames = {
@@ -12,10 +12,12 @@ function cellsInMessage(message = '') {
 }
 
 function cellsForEvent(event = {}) {
+  if (event.type === 'STATION_RECLAIMED') return [...(STATIONS[event.stationId]?.cells ?? []), ...(event.substitutePosition ?? [])];
   if (['FIRE_SPREAD_ROLL', 'FIRE_SPREAD_BLOCKED'].includes(event.type)) return event.cells ?? [event.cellId].filter(Boolean);
   if (['WORK_COMPLETED', 'WORK_CANCELLED'].includes(event.type)) return event.cells ?? [];
   if (event.type === 'WORK_STARTED') return cellsInMessage(event.message);
   if (['CREW_INJURED', 'CREW_KILLED'].includes(event.type)) {
+    if (event.cellId) return [event.cellId];
     const location = event.message?.match(/(?:hit at|spreading toward) ([A-F][1-6]-[1-4])\b/i)?.[1];
     return location ? [location] : [];
   }
@@ -34,6 +36,7 @@ function crewName(id) { return crewNames[id] ?? String(id ?? 'Crew').replaceAll(
 
 function historyDescription(event, id) {
   switch (event.type) {
+    case 'STATION_RECLAIMED': return event.message;
     case 'ENEMY_HIT_LOCATION': return `Attack location rolled here${event.source ? ` · ${event.source}` : ''}`;
     case 'ATTACK_EMPTY_SPACE': return 'Hit location landed in empty space · no aircraft damage';
     case 'AIRCRAFT_SQUARE_DAMAGED': return 'Healthy → Damaged';
@@ -43,9 +46,10 @@ function historyDescription(event, id) {
     case 'FIRE_EXTINGUISHED': return `Fire suppressed · leaves ${(event.message?.match(/leaving ([^.]+)/i)?.[1] ?? 'repaired structure')}`;
     case 'FIRE_SPREAD_ROLL': return `Fire Spread d${event.roll} · ${event.result === 'no spread' ? 'no spread' : event.result}`;
     case 'FIRE_SPREAD_BLOCKED': return `Fire spread blocked${event.direction ? ` · ${event.direction}` : ''}`;
-    case 'FIRE_STOPPED_BY_CREW': return 'Fire spread stopped by crew here';
+    case 'FIRE_STOPPED_BY_CREW': return 'Fire occupation stopped by living crew here';
     case 'CREW_INJURED': return `${crewName(event.crewId)} injured here`;
     case 'CREW_KILLED': return `${crewName(event.crewId)} killed here`;
+    case 'CREW_HEALED': return `${crewName(event.crewId)} healed here`;
     case 'WORK_STARTED': return `${event.kind === 'fireControl' ? 'Fire Control' : event.kind === 'repair' ? 'Repair' : 'Medical'} started${event.kind === 'fireControl' ? ' · suppression begins' : ''}`;
     case 'WORK_COMPLETED': return `${event.kind === 'fireControl' ? 'Fire Control' : event.kind === 'repair' ? 'Repair' : 'Medical'} completed here`;
     case 'WORK_CANCELLED': return `${event.kind === 'fireControl' ? 'Fire Control' : event.kind === 'repair' ? 'Repair' : 'Medical'} cancelled${event.kind === 'fireControl' ? ' · suppression ends' : ''}`;

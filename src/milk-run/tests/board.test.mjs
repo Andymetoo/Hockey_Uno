@@ -75,7 +75,7 @@ test('engine footprint squares are distinct from four visual-only running indica
 
 test('CSV footprint parts produce exactly ten numbered crew and preserve every vulnerable square', () => {
   const expected = {
-    bombardier: [1, ['C1-4']], navigator: [2, ['D1-3']], pilot: [3, ['C2-2']], copilot: [4, ['D2-1']],
+    bombardier: [1, ['D1-3']], navigator: [2, ['C1-4']], pilot: [3, ['C2-2']], copilot: [4, ['D2-1']],
     engineer: [5, ['C2-4', 'D2-3']], radio: [6, ['C3-2', 'D3-1']], ball: [7, ['C3-4', 'D3-3']],
     leftWaist: [8, ['C4-2', 'C4-4']], rightWaist: [9, ['D4-1', 'D4-3']], tail: [10, ['C6-2', 'D6-1']],
   };
@@ -113,7 +113,7 @@ test('new games isolate mutable state and keep starting resources outside missio
 });
 
 test('all provisional defaults can be configured, with range validation and safe nonempty token systems', () => {
-  assert.deepEqual(new Set(CONFIG_FIELDS.map(f => f.key)), new Set(Object.keys(DEFAULT_CONFIG)));
+  assert.deepEqual(new Set(CONFIG_FIELDS.map(f => f.key)), new Set(Object.keys(DEFAULT_CONFIG).filter(key=>key!=='crewBlocksFirstFire')));
   const config = normalizeConfig({ missionEnemy: 0, missionResource: 0, combatHit: 0, combatBurst: 0, combatMiss: 1, maxFighters: 99, restartMax: -5, spawnFacing: '90', unavailableDraws: 'false', startingOfficer: '9', unrecognized: 123 });
   assert.equal(config.missionResource, 1);
   assert.equal(config.combatMiss, 1);

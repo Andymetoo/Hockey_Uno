@@ -11,10 +11,11 @@ import { isV2 } from './rulesets.mjs';
 import { breakOffFighter } from './continuous.mjs';
 import { engagementFor, spendEngagement, gainTime, gainBonusTime, gainFighterKillTime, completeContinuousTurn, continueCycle, completeBetweenTurnProgress, refreshTimeRequirement } from './continuous.mjs';
 import { observe, ensureV2Telemetry } from './telemetry.mjs';
-import { homeStationId, currentStationId, leaveStation, migrateCrewPositions } from './crew-position.mjs';
+import { homeStationId, currentStationId, leaveStation, migrateCrewPositions, assertCrewTransition } from './crew-position.mjs';
 import { recordSortieEnd } from './results.mjs';
 import { evaluateStoryBoundary, chooseStory, reconcileStory } from './story.mjs';
 import { storyEnabled, storyToken, storyModifier, storyFlag, storyJobTime, storyActionCost, consumeStoryAction } from './story-effects.mjs';
+import { recordHealth, assertFireOccupancy } from './crew-health.mjs';
 
 const copy = value => structuredClone(value);
 const def = id => CREW_DEFS.find(item => item.id === id);
@@ -120,11 +121,70 @@ function stationEmpty(state, stationId, exceptId) {
     crew.id !== exceptId && crew.health === 'healthy' && crew.position.some(id => cells.includes(id)));
 }
 
+/** Automatic relief is conservative: unlike a deliberate Man Station action,
+ * it cannot step into another living person's footprint, even a casualty's. */
+export function automaticHomeReturnStatus(state, crewId) {
+  const crew = person(state, crewId), home = crew && homeStationId(crew), cells = stationCells(home);
+  const blocker = state.crew.find(other => other.id !== crewId && other.health !== 'dead' && other.position.some(id => cells.includes(id)));
+  const reason = !crew || crew.health !== 'healthy' ? 'Automatic relief return requires healthy crew.'
+    : crew.job || underTreatment(state, crewId) ? 'Active work or Medical treatment prevents automatic return.'
+    : !cells.length ? 'Home station has no valid footprint.'
+    : !cells.every(id => isSafe(state, id)) ? 'Home station contains Fire.'
+    : blocker ? `${nameOf(blocker.id)} physically occupies the home station${blocker.job ? ' while working' : blocker.health === 'injured' ? ' while injured' : ''}.` : '';
+  return { enabled: !reason, reason, homeStation: home };
+}
+
 export function eligibleStations(state, crewId) {
   const crew = person(state, crewId);
   if (!crew || crew.health !== 'healthy' || crew.job || underTreatment(state, crewId)) return [];
   return Object.keys(STATIONS).filter(id => (def(id)?.arc || ['pilot', 'copilot'].includes(id)) &&
     currentStationId(crew) !== id && stationEmpty(state, id, crewId));
+}
+
+export function homeActionStatus(state, crewId) {
+  const crew = person(state, crewId), home = crew && homeStationId(crew);
+  const substitute = state.crew.find(c => c.id !== crewId && currentStationId(c) === home);
+  const unavailable = !crew || crew.health !== 'healthy' || crew.job || underTreatment(state, crewId);
+  const common = unavailable ? 'Crew member must be healthy and free of work or treatment.'
+    : currentStationId(crew) === home ? 'Already operating the home station.'
+    : !stationCells(home).length || !stationCells(home).every(id => isSafe(state, id)) ? 'Home station contains Fire.' : '';
+  const blocking = state.crew.find(c => c.id !== crewId && c.id !== substitute?.id && c.health === 'healthy' && c.position.some(id => stationCells(home).includes(id)));
+  const returnReason = common || (substitute?.health === 'healthy' ? `${nameOf(substitute.id)} operates your home station. Use Reclaim Home Station.`
+    : blocking ? `${nameOf(blocking.id)} is physically in the home station; finish work or move them first.` : '');
+  const reclaimReason = common || (!substitute ? 'No substitute is operating your home station.'
+    : substitute.health !== 'healthy' ? 'The substitute is a casualty: use Return Home or Man Station when safe; the casualty stays physically in place.'
+    : substitute.job || underTreatment(state, substitute.id) ? 'The substitute is committed to active work or Medical treatment.'
+    : blocking ? `${nameOf(blocking.id)} is physically in the home station; finish work or move them first.`
+    : '');
+  return { returnReason, reclaimReason, substituteId: substitute?.id ?? null };
+}
+
+export function reclaimReliefPlan(state, crewId) {
+  const eligibility=homeActionStatus(state,crewId);
+  if(eligibility.reclaimReason)return null;
+  const crew=person(state,crewId),substitute=person(state,eligibility.substituteId);
+  // Evaluate occupancy after the rightful owner releases their old footprint.
+  const after={...state,crew:state.crew.map(c=>c.id===crewId?{...c,position:[...stationCells(homeStationId(c))],station:homeStationId(c),displaced:false}:c.id===substitute.id?{...c,station:null,displaced:true}:c)};
+  const status=automaticHomeReturnStatus(after,substitute.id);
+  return {substituteId:substitute.id,homeStation:homeStationId(crew),relief:status.enabled?'returned':'stayed',returnReason:status.reason,
+    substitutePosition:[...(status.enabled?stationCells(homeStationId(substitute)):substitute.position)]};
+}
+
+function reclaimHome(state, crew, emit) {
+  const eligibility = homeActionStatus(state, crew.id);
+  requireRule(!eligibility.reclaimReason, eligibility.reclaimReason);
+  const plan=reclaimReliefPlan(state,crew.id);
+  const substitute = person(state, eligibility.substituteId);
+  // Relinquish both assignments, then plan the replacement in the final state.
+  // No event observes an artificially unmanned cockpit. No activation is reset.
+  leaveStation(crew); leaveStation(substitute);
+  crew.position = [...stationCells(homeStationId(crew))];
+  crew.station = homeStationId(crew); crew.displaced = false;
+  if (plan.relief==='returned') {
+    substitute.station = homeStationId(substitute); substitute.displaced = false;
+    substitute.position = [...stationCells(substitute.station)];
+  } // Otherwise keep the ENTIRE previous footprint, including straddling seats.
+  record(emit, 'STATION_RECLAIMED', `${nameOf(crew.id)} reclaims ${STATIONS[crew.station].name}. ${nameOf(substitute.id)} ${substitute.displaced ? `remains at ${substitute.position.join(' + ')}, Displaced: ${plan.returnReason}` : 'returns to their home station.'}`, { crewId: crew.id, stationId: crew.station, ...plan });
 }
 
 // Leaving a station is one abstract move to the nearest safe interior space.
@@ -173,10 +233,9 @@ export function availableActions(state, crewId = state.activeCrew) {
     const hasWorkPosition = targets.some(cell => legalWorkPositions(state, crewId, [cell.id]).length);
     add(id, label, hasWorkPosition && affordable(rank, cost), !targets.length ? `No available ${targetStatus} squares.` : !hasWorkPosition ? 'No non-burning interior work position on a target row.' : `Needs ${cost} ${rank} resource.`, cost ? `${cost} ${rank}` : undefined);
   }
-  const injured = state.crew.some(target => target.health === 'injured' && !underTreatment(state, target.id));
-  const medicalTargets = eligibleMedicalTargets(state, crewId);
   const medicalCost = storyActionCost(state, 'medical', state.config.medicalCost);
-  add('medical', 'Medical', medicalTargets.length > 0 && affordable(rank, medicalCost), !injured ? 'No untreated injured crew.' : !medicalTargets.length ? 'No safe interior work position on an injured crewmate’s row.' : `Needs ${medicalCost} ${rank} resource.`, `${medicalCost} ${rank}`);
+  const medicalReason = medicalEligibility(state, crewId).reason;
+  add('medical', 'Medical', !medicalReason, medicalReason, `${medicalCost} ${rank}`);
   if (isV2(state)) add('assistWork', 'Assist Work', eligibleAssistJobs(state, crewId).length > 0, 'No active unassisted job has a safe work position.');
   add('relocate', 'Relocate', BOARD.some(cell => cell.fuselage && isSafe(state, cell.id) &&
     !(crew.position.length === 1 && crew.position[0] === cell.id) &&
@@ -184,7 +243,9 @@ export function availableActions(state, crewId = state.activeCrew) {
   const seats = ['pilot', 'copilot'].some(id => stationEmpty(state, id, crew.id) && !(crew.station === id && isAtStation(state, crew)));
   add('manCockpit', 'Man Cockpit', seats, 'No empty, safe cockpit seat.');
   add('manStation', 'Man Station', eligibleStations(state, crewId).length > 0, 'No vacant, non-burning station is available.');
-  add('returnHome', 'Return Home', eligibleStations(state, crewId).includes(homeStationId(crew)), 'Home station is occupied, burning, or already assigned to this crew member.');
+  const home = homeActionStatus(state, crewId);
+  add('returnHome', 'Return Home', !home.returnReason, home.returnReason);
+  add('reclaimHome', 'Reclaim Home Station', !home.reclaimReason, home.reclaimReason);
   add('leaveStation', 'Leave Station', Boolean(stationExitPosition(state, crewId)), 'No occupied station or safe interior space to leave for.');
   if (cockpitSeat(state, crew)) {
     const ready = state.engines.some(engine => !engine.running && engineSquares(engine.id).every(cell => status(state, cell.id) === 'healthy'));
@@ -276,16 +337,18 @@ function cancelJob(state, crew, emit) {
   else crew.job = null;
 }
 
-function injure(state, crew, emit, cause) {
+function injure(state, crew, emit, cause, source = {}) {
   if (crew.health === 'dead') return;
   if (crew.health === 'healthy') {
     crew.health = 'injured';
+    recordHealth(state, crew, cause, source);
     bump(state, 'crewInjured');
-    record(emit, 'CREW_INJURED', `${nameOf(crew.id)} is injured by ${cause}.`, { crewId: crew.id });
+    record(emit, 'CREW_INJURED', `${nameOf(crew.id)} is injured by ${cause}.`, { crewId: crew.id, ...crew.healthSince });
   } else {
     crew.health = 'dead';
+    recordHealth(state, crew, cause, source);
     bump(state, 'crewKilled');
-    record(emit, 'CREW_KILLED', `${nameOf(crew.id)} is killed by ${cause}.`, { crewId: crew.id });
+    record(emit, 'CREW_KILLED', `${nameOf(crew.id)} is killed by ${cause}.`, { crewId: crew.id, ...crew.healthSince });
   }
   cancelJob(state, crew, emit);
   if (crew.health === 'dead') for (const job of [...state.jobs]) {
@@ -332,7 +395,7 @@ export function recalculateConditions(state, emit) {
   }
 }
 
-export function damageSquare(state, cellId, steps, emit, { injureCrew = true } = {}) {
+export function damageSquare(state, cellId, steps, emit, { injureCrew = true, source = 'Aircraft hit', fighterId } = {}) {
   const cell = getCell(cellId);
   if (!cell?.structure) {
     record(emit, 'ATTACK_EMPTY_SPACE', `${cellId}: the shot passes through empty space.`, { cellId });
@@ -340,21 +403,38 @@ export function damageSquare(state, cellId, steps, emit, { injureCrew = true } =
   }
   bump(state, 'aircraftHits');
   for (let step = 0; step < steps; step++) {
+    const prior = status(state, cellId);
+    // Each step sees the health left by the previous step. Even structural-only
+    // Story damage must resolve occupants before attempting ignition.
+    if (prior !== 'healthy') for (const crew of state.crew.filter(c => c.health !== 'dead' && c.position.includes(cellId))) {
+      injure(state, crew, emit, `${source} at ${cellId}`, { cellId, source, ...(fighterId ? { fighterId } : {}) });
+    }
     if (status(state, cellId) === 'healthy') {
       state.cells[cellId] = 'damaged';
       record(emit, 'AIRCRAFT_SQUARE_DAMAGED', `${cellId}: healthy structure becomes damaged.`, { cellId });
+      if (injureCrew) for (const crew of state.crew.filter(c => c.health !== 'dead' && c.position.includes(cellId))) {
+        injure(state, crew, emit, `${source} at ${cellId}`, { cellId, source, ...(fighterId ? { fighterId } : {}) });
+      }
     } else if (status(state, cellId) === 'damaged') {
-      state.cells[cellId] = 'fire';
-      bump(state, 'firesStarted');
-      record(emit, 'FIRE_STARTED', `${cellId}: another damage step starts a fire.`, { cellId });
+      igniteUnoccupied(state, cellId, emit, 'damage');
     } else record(emit, 'AIRCRAFT_HIT_BURNING', `${cellId} is already burning; this damage step has no additional effect.`, { cellId });
-  }
-  if (injureCrew) for (const crew of state.crew.filter(item => item.health !== 'dead' && item.position.includes(cellId))) {
-    for (let step = 0; step < steps; step++) injure(state, crew, emit, `the hit at ${cellId}`);
   }
   cancelInvalidMedical(state, emit);
   returnCancelledMedical(state, emit);
   recalculateConditions(state, emit);
+}
+
+// The only Fire writer. Damage/spread resolve crew first; surviving physical
+// occupants block ignition regardless of a historical experimental setting.
+function igniteUnoccupied(state, cellId, emit, cause = 'spread') {
+  if (state.crew.some(c => c.health !== 'dead' && c.position.includes(cellId))) {
+    record(emit, 'FIRE_STOPPED_BY_CREW', `${cellId}: the living occupant stops the first Fire occupation; structure remains ${status(state, cellId)}.`, { cellId });
+    return false;
+  }
+  state.cells[cellId] = 'fire';
+  bump(state, 'firesStarted');
+  record(emit, 'FIRE_STARTED', cause === 'damage' ? `${cellId}: another damage step starts a fire.` : `${cellId} catches fire.`, { cellId, cause });
+  return true;
 }
 
 export function resolveAttack(state, emit, { source = 'Enemy', fighterId, roll, resultOverride, cellId } = {}) {
@@ -371,7 +451,7 @@ export function resolveAttack(state, emit, { source = 'Enemy', fighterId, roll, 
   if (outcome === 'critical') bump(state, 'enemyCrits');
   const location = cellId ?? `${'ABCDEF'[die(state, 6) - 1]}${die(state, 6)}-${die(state, 4)}`;
   record(emit, 'ENEMY_HIT_LOCATION', `Hit location: ${location}.`, { cellId: location, fighterId });
-  damageSquare(state, location, damageSteps, emit);
+  damageSquare(state, location, damageSteps, emit, { source, fighterId });
 }
 
 function killFighter(state, target, emit, cause, gunfire = false, crewId = null) {
@@ -476,7 +556,7 @@ function flak(state, emit, reason) {
   record(emit, 'FLAK_ENDED', 'Flak salvo complete.');
 }
 
-function missionDraw(state, crew, emit, { unavailable = false, intercept = false } = {}) {
+function missionDraw(state, crew, emit, { unavailable = false } = {}) {
   const draw = drawBag(state, state.bags.mission);
   if (draw.refilled) record(emit, 'MISSION_BAG_REFILLED', 'The mission bag was empty. Emergency refill from its discard pool.');
   const token = storyToken(draw.token);
@@ -503,7 +583,6 @@ function missionDraw(state, crew, emit, { unavailable = false, intercept = false
     return;
   }
   state.bags.mission.discard.push(draw.token);
-  if (intercept) return flak(state, emit, 'Radio Intercept turns the Enemy draw into Flak.');
   if (state.fighters.length >= state.config.maxFighters) return flak(state, emit, 'The fighter queue is full; no enemy card is drawn.');
   const deckDraw = drawDeck(state, state.deck);
   const card = typeof deckDraw === 'string' ? deckDraw : deckDraw.card ?? deckDraw.token;
@@ -601,8 +680,28 @@ export function legalWorkPositions(state, crewId, targetIds) {
 }
 
 export function eligibleMedicalTargets(state, crewId) {
-  return state.crew.filter(target => target.health === 'injured' && target.position.every(id => isSafe(state,id)) && !underTreatment(state, target.id) &&
-    legalWorkPositions(state, crewId, target.position).length > 0);
+  return state.crew.filter(target => !medicalEligibility(state, crewId, target.id, { resources: false }).reason);
+}
+
+export function medicalEligibility(state, crewId, targetId, { resources = true } = {}) {
+  const worker = person(state, crewId);
+  let reason = !worker || worker.health !== 'healthy' ? 'Caregiver must be healthy.'
+    : worker.job || underTreatment(state, crewId) ? 'Caregiver is unavailable: another job or treatment is active.' : '';
+  if (!reason && targetId) {
+    const patient = person(state, targetId);
+    reason = patient?.health !== 'injured' ? 'Selected patient is not injured or is no longer alive.'
+      : underTreatment(state, targetId) ? 'Target is already being treated.'
+      : patient.job ? 'Patient still has another active job.'
+      : !patient.position.length || !patient.position.every(id => isSafe(state, id)) ? 'Patient position is invalid or contains Fire.'
+      : !legalWorkPositions(state, crewId, patient.position).length ? 'No legal safe interior work position on the patient’s row.' : '';
+  } else if (!reason) {
+    const patients = state.crew.filter(c => c.health === 'injured');
+    const reasons = patients.map(c => medicalEligibility(state, crewId, c.id, { resources: false }).reason);
+    reason = !patients.length ? 'No injured target.' : reasons.every(Boolean) ? [...new Set(reasons)].join(' ') : '';
+  }
+  const cost = storyActionCost(state, 'medical', state.config.medicalCost);
+  if (!reason && resources && state.resources[rankOf(worker)] < cost) reason = `Needs ${cost} ${rankOf(worker)} resource; the other resource pool cannot pay for this caregiver.`;
+  return { enabled: !reason, reason };
 }
 
 function workPosition(state, crew, targetIds, selectedId) {
@@ -673,8 +772,9 @@ function finishJob(state, job, emit, deferReturn = false) {
     const target = person(state, job.targetId);
     if (target?.health === 'injured') {
       target.health = 'healthy';
+      recordHealth(state, target, `Medical completed by ${nameOf(job.crewId)}`, { cellId: target.position[0], source: 'Medical' });
       medicalComplete = true;
-      record(emit, 'CREW_HEALED', `${nameOf(target.id)} is healthy again.`, { crewId: target.id });
+      record(emit, 'CREW_HEALED', `${nameOf(target.id)} is healthy again.`, { crewId: target.id, ...target.healthSince });
     } else record(emit, 'MEDICAL_NO_EFFECT', `${nameOf(job.targetId)} no longer has a treatable injury.`, { crewId: job.targetId });
   } else for (const id of job.cells) {
     if (job.kind === 'repair' && status(state, id) === 'damaged') {
@@ -768,7 +868,6 @@ export function resolveFireSpread(state, emit) {
   const spreadThisPhase = new Set();
   // A straddling crew member is struck once by a spread phase. Both occupied
   // subcells stop this first spread; another round can kill the injured member.
-  const healthyAtStart = new Set(state.crew.filter(crew => crew.health === 'healthy').map(crew => crew.id));
   const affectedCrew = new Set();
   // The phase's source groups and protection are fixed at its start. Injury
   // removes the job immediately, but cannot add a retroactive roll this phase.
@@ -787,18 +886,12 @@ export function resolveFireSpread(state, emit) {
     for (const id of destinations) {
       spreadThisPhase.add(id);
       const occupants = state.crew.filter(crew => crew.health !== 'dead' && crew.position.includes(id));
-      const blocked = state.config.crewBlocksFirstFire && occupants.some(crew => healthyAtStart.has(crew.id));
       record(emit, 'FIRE_SPREAD_TARGET', `Fire spreads toward ${id}.`, { cellId: id });
       for (const occupant of occupants) if (!affectedCrew.has(occupant.id)) {
         affectedCrew.add(occupant.id);
-        injure(state, occupant, emit, `fire spreading toward ${id}`);
+        injure(state, occupant, emit, `Fire spread from ${group.join(' + ')} → ${id}`, { cellId: id, sourceCells: [...group], source: 'Fire Spread' });
       }
-      if (blocked) {
-        record(emit, 'FIRE_STOPPED_BY_CREW', `${id}: the first spread injures its healthy occupant and stops here.`, { cellId: id });
-      } else {
-        state.cells[id] = 'fire';
-        bump(state, 'firesStarted');
-        record(emit, 'FIRE_STARTED', `${id} catches fire.`, { cellId: id });
+      if (igniteUnoccupied(state, id, emit)) {
         recalculateConditions(state, emit);
       }
     }
@@ -841,16 +934,16 @@ function validateAction(state, crew, command) {
     }
     case 'medical': {
       const target = person(state, command.targetId);
-      requireRule(target?.health === 'injured', 'Choose an injured crew member.');
-      requireRule(target.position.length > 0 && target.position.every(id => isSafe(state, id)), 'Medical cannot treat a patient standing on Fire.');
-      requireRule(!state.jobs.some(job => job.kind === 'medical' && job.targetId === target.id), 'Medical treatment is already in progress.');
+      const eligibility = medicalEligibility(state, crew.id, command.targetId);
+      requireRule(target && eligibility.enabled, eligibility.reason || 'Choose an injured crew member.');
       workPosition(state, crew, target.position, command.workCellId);
       break;
     }
     case 'relocate': requireRule(getCell(command.targetId)?.fuselage && isSafe(state, command.targetId) && !(crew.position.length === 1 && crew.position[0] === command.targetId) && !state.crew.some(other => other.id !== crew.id && other.health !== 'dead' && other.position.includes(command.targetId)), 'Choose another unoccupied, non-burning fuselage square.'); break;
     case 'manCockpit': requireRule(['pilot', 'copilot'].includes(command.stationId) && stationEmpty(state, command.stationId, crew.id) && !(crew.station === command.stationId && isAtStation(state, crew)), 'Choose an empty, non-burning cockpit seat.'); break;
     case 'manStation': requireRule(eligibleStations(state, crew.id).includes(command.stationId), 'Choose a vacant, non-burning station.'); break;
-    case 'returnHome': requireRule(eligibleStations(state, crew.id).includes(homeStationId(crew)), 'Home station is not vacant and safe.'); break;
+    case 'returnHome': requireRule(!homeActionStatus(state, crew.id).returnReason, homeActionStatus(state, crew.id).returnReason); break;
+    case 'reclaimHome': requireRule(!homeActionStatus(state, crew.id).reclaimReason, homeActionStatus(state, crew.id).reclaimReason); break;
     case 'leaveStation': requireRule(stationExitPosition(state, crew.id), 'No safe interior space is available to leave for.'); break;
     case 'restartEngine': {
       const engine = state.engines.find(item => item.id === command.targetId);
@@ -879,6 +972,7 @@ function resolveAction(state, crew, command, emit) {
     case 'manCockpit': occupyStation(state, crew, command.stationId, emit, 'COCKPIT_MANNED'); break;
     case 'manStation': occupyStation(state, crew, command.stationId, emit); break;
     case 'returnHome': occupyStation(state, crew, homeStationId(crew), emit, 'STATION_MANNED'); break;
+    case 'reclaimHome': reclaimHome(state, crew, emit); break;
     case 'leaveStation': {
       const cellId = stationExitPosition(state, crew.id);
       crew.position = [cellId]; leaveStation(crew);
@@ -966,7 +1060,8 @@ function storyServices(state, emit) {
   const workerFor = effect => {
     const cells = effect.kind === 'medical' ? person(state, effect.targetId)?.position : [effect.cellId];
     if (!cells?.length || (effect.kind === 'repair' && status(state, effect.cellId) !== 'damaged') || state.jobs.some(job => job.cells?.includes(effect.cellId))) return null;
-    return state.crew.filter(crew => crew.health === 'healthy' && !crew.job && !underTreatment(state, crew.id) && legalWorkPositions(state, crew.id, cells).length)
+    return state.crew.filter(crew => crew.health === 'healthy' && !crew.job && !underTreatment(state, crew.id) && legalWorkPositions(state, crew.id, cells).length &&
+      (effect.kind !== 'medical' || medicalEligibility(state, crew.id, effect.targetId, { resources: false }).enabled))
       .sort((a, b) => Number(b.id === 'engineer') - Number(a.id === 'engineer'))[0] ?? null;
   };
   return {
@@ -976,7 +1071,7 @@ function storyServices(state, emit) {
       requireRule(worker, 'No healthy free worker can reach the Story work.');
       startJob(state, worker, { action: effect.kind, cells: [effect.cellId], targetId: effect.targetId }, emit, { time: effect.time, threadId: thread.id });
     },
-    damage: (cellId, steps) => damageSquare(state, cellId, steps, emit, { injureCrew: false }),
+    damage: (cellId, steps) => damageSquare(state, cellId, steps, emit, { source: 'Story damage' }),
     recalculate: () => recalculateConditions(state, emit),
     gainTime: () => gainBonusTime(state, emit, jobs => completeJobs(state, jobs, emit), 'story'),
   };
@@ -1001,7 +1096,7 @@ function startRound(state, emit) {
   resolveFireSpread(state, emit);
   state.phase = 'select';
   if (!availableCrew(state).length) endActivation(state, emit);
-  else record(emit, 'CREW_SELECTION_READY', 'Choose an available crew member. Radio may declare Intercept before drawing.');
+  else record(emit, 'CREW_SELECTION_READY', 'Choose an available crew member.');
 }
 
 function loseAltitude(state, cause, emit) {
@@ -1120,15 +1215,14 @@ export function dispatch(original, command) {
       requireRule(!isV2(state) || !state.pendingProgress, 'Close the Opportunity window and resolve pending Progress before activating crew.');
       const crew = availableCrew(state).find(item => item.id === command.crewId);
       requireRule(crew, 'That crew member is not available.');
-      requireRule(!command.intercept || hasAbility(crew, 'intercept') && isAtStation(state, crew), 'Intercept requires Radio at an operating station and must be declared before drawing.');
+      requireRule(!Object.hasOwn(command, 'intercept'), 'Radio Intercept has been removed.');
       crew.used = true;
       if (isV2(state)) crew.cycleSlotConsumed = true;
       crew.activationCompleted = false;
       state.slot++;
       state.activeCrew = crew.id;
       record(emit, 'CREW_ACTIVATED', isV2(state) ? `Turn ${state.crewCycle.turn + 1}, Crew Cycle ${state.crewCycle.number}: activate ${nameOf(crew.id)}.` : `Time slot ${state.slot}/${CREW_DEFS.length}: activate ${nameOf(crew.id)}.`, { crewId: crew.id });
-      if (command.intercept) record(emit, 'INTERCEPT_DECLARED', 'Radio declares Intercept before the mission draw.', { crewId: crew.id });
-      missionDraw(state, crew, emit, { intercept: Boolean(command.intercept) });
+      missionDraw(state, crew, emit);
       if (crew.health !== 'healthy' || crew.job) {
         record(emit, 'CREW_ACTION_LOST', `${nameOf(crew.id)} can no longer perform an action after the mission draw.`, { crewId: crew.id });
         enemyPhase(state, emit);
@@ -1226,5 +1320,7 @@ export function dispatch(original, command) {
     reconcileStory(state, emit);
   }
   if (storyEnabled(state) && !state.outcome) refreshTimeRequirement(state);
+  assertFireOccupancy(state);
+  assertCrewTransition(migrateCrewPositions(original), state);
   return { state, events };
 }

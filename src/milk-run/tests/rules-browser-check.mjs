@@ -1,7 +1,9 @@
 // Actual-browser regression checks for the combat/economy playtest pass.
 import assert from 'node:assert/strict';
 import { openBrowser, sleep } from './browser-harness.mjs';
-import { createGame } from '../state.mjs';
+import { createGame as createGameBase } from '../state.mjs';
+// Exercise the retained legacy interaction; compact ON has its own touch suite.
+const createGame=(config={},...args)=>createGameBase({...(args[1]==='v2-continuous'?{v2CompactCrewFlow:false}:{}),...config},...args);
 import { DEFAULT_CONFIG } from '../config.mjs';
 import { DEV_PREFERENCES_KEY } from '../persistence.mjs';
 import { dispatch } from '../rules.mjs';
@@ -138,7 +140,7 @@ try {
   note('Canceling a fully targeted Opportunity shot spends no token and leaves the fighter unchanged');
 
   const pilot=activated('pilot');pilot.fighters=[fighter('pilot-direct',{hp:3,maxHp:3})];pilot.bags.combat={tokens:['Hit'],discard:[]};await inject(pilot);await choose('directFire');
-  await touch('#crew-list [data-crew="engineer"]');await touch('#enemies [data-fighter="pilot-direct"]');await flush();
+  await touch('#crew-list [data-crew="engineer"]');await touch('#enemies [data-fighter="pilot-direct"]');assert.equal((await getState()).phase,'action');await click('[data-ui="confirm-target"]');await flush();
   assert.equal((await getState()).fighters[0].hp,2);
   assert.equal((await getState()).opportunity,pilot.opportunity);
   assert.equal((await getState()).resources.Officer,pilot.resources.Officer-1);

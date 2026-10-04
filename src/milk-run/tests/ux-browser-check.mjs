@@ -2,7 +2,9 @@
 // Run: node src/milk-run/tests/ux-browser-check.mjs
 import assert from 'node:assert/strict';
 import { openBrowser, sleep } from './browser-harness.mjs';
-import { createGame } from '../state.mjs';
+import { createGame as createGameBase } from '../state.mjs';
+// Exercise the retained legacy interaction; compact ON has its own touch suite.
+const createGame=(config={},...args)=>createGameBase({...(args[1]==='v2-continuous'?{v2CompactCrewFlow:false}:{}),...config},...args);
 import { dispatch } from '../rules.mjs';
 import { BOARD, STATIONS, CREW_DEFS } from '../board.mjs';
 import { die } from '../random.mjs';
@@ -133,6 +135,8 @@ try {
   assert.equal((await evaluate('window.milkRun.getInteraction()')).action,'directFire');
   assert.equal(await evaluate("document.querySelector('#enemies [data-fighter=pilot-target]').classList.contains('target-legal')"),true,'legal target highlights after gunner selection');
   await touch('#enemies [data-fighter="pilot-target"]');
+  assert.equal((await getState()).phase,'action','target selection remains tentative');
+  await click('[data-ui="confirm-target"]');
   assert.equal(await evaluate("document.querySelector('#opportunity-control').disabled"),true,'Opportunity cannot interrupt a resolving shot');
   await flush();
   assert.equal((await getState()).crew.find(c=>c.id==='engineer').used,false,'Pilot fire does not consume or tap gunner activation');
@@ -144,11 +148,12 @@ try {
   await inject(menu);await evaluate("document.querySelectorAll('dialog[open]').forEach(d=>d.close())");await click('[data-ui="choose"]');
   const menuActions=await evaluate("[...document.querySelectorAll('#action-content [data-action]')].map(e=>e.dataset.action)");
   assert.ok(menuActions.indexOf('basicFire')<menuActions.indexOf('advancedFire'),'gunner Basic Fire precedes Advanced Fire');
-  assert.equal(menuActions.includes('medical'),false,'Medical hides when no untreated injuries exist');
-  assert.equal(menuActions.includes('repair'),false,'Repair hides when there is no damage');
-  assert.equal(menuActions.includes('fireControl'),false,'Fire Control hides when there are no fires');
+  assert.equal(menuActions.includes('medical'),true,'Medical remains visible with unavailable reason');
+  assert.match(await evaluate("document.querySelector('[data-action=medical]').textContent"),/No injured target/);
+  assert.equal(menuActions.includes('repair'),true,'Repair remains visible with reason');
+  assert.equal(menuActions.includes('fireControl'),true,'Fire Control remains visible with reason');
   await closeSheet();
-  note('Gunner action menu puts Basic/Advanced first and hides irrelevant crisis actions');
+  note('Gunner action menu puts Basic/Advanced first and explains unavailable crisis actions');
 
   // Every fighter in a three aircraft formation has a separate touch center at phone widths.
   const cluster=activated('engineer');cluster.fighters=[fighter('touch-1',{facing:180}),fighter('touch-2',{facing:180}),fighter('touch-3',{facing:180})];
@@ -224,6 +229,7 @@ try {
 
   for (const [action, condition] of [['repair', 'damaged'], ['fireControl', 'fire']]) {
     const work = activated('engineer'); work.cells['A3-1'] = condition; work.cells['A3-2'] = condition; work.cells['C6-2'] = condition;
+    if(condition==='fire')work.crew.find(c=>c.id==='tail').health='dead';
     await inject(work); await choose(action);
     assert.ok(await evaluate("document.querySelector('#board [data-cell=\"A3-1\"]').classList.contains('target-legal')"));
     await touch('#board [data-cell="A3-1"]'); await touch('#board [data-cell="A3-2"]');

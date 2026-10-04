@@ -5,7 +5,7 @@ const folder=new URL('../.checks/playtest-validation/',import.meta.url);
 await mkdir(folder,{recursive:true});
 const tests=(await readdir(new URL('./',import.meta.url))).filter(n=>n.endsWith('.test.mjs')).map(n=>`src/milk-run/tests/${n}`);
 const suites=['browser','ux-browser','rules-browser','corrective-browser','continuous-browser','dev-tools-browser','crew-stations-browser',
-  'diagnostics-browser','status-qol-browser','bomb-run-browser','bomb-run-test-browser','campaign-browser','hangar-browser','dev-discard-browser','story-browser','playtest-correctives-browser','long-session-browser'];
+  'diagnostics-browser','status-qol-browser','bomb-run-browser','bomb-run-test-browser','campaign-browser','hangar-browser','dev-discard-browser','story-browser','playtest-correctives-browser','correctness-story-browser','compact-crew-browser','station-audit-browser','long-session-browser'];
 const tasks=[['node',['--test','--test-reporter=tap',...tests]],...suites.map(name=>[name,[`src/milk-run/tests/${name}-check.mjs`]]),['story-review',['src/milk-run/tests/story-playability-review.mjs','24']]];
 const results=[];
 for(const [name,args] of tasks){

@@ -125,19 +125,11 @@ test('90-degree spawn setting is optional and preserves the default of inward-fa
   assert.equal(acted.state.stats.enemyAttacks, 0);
 });
 
-test('radio Intercept is declared before draw, changes Enemy to Flak, and leaves Resource draws intact', () => {
-  for (const token of ['Enemy', 'Resource']) {
-    const state = dispatch(fresh(), { type: 'startRound' }).state;
-    state.bags.mission = { tokens: [token], discard: [] };
-    const deck = structuredClone(state.deck);
-    const result = dispatch(state, { type: 'activate', crewId: 'radio', intercept: true });
-    assert.equal(result.events[1].type, 'INTERCEPT_DECLARED');
-    assert.equal(result.events[2].type, 'MISSION_TOKEN_DRAWN');
-    assert.equal(result.state.fighters.length, 0);
-    assert.deepEqual(result.state.deck, deck);
-    assert.equal(result.state.stats.flakAttacks, token === 'Enemy' ? 1 : 0);
-    if (token === 'Resource') assert.equal(result.state.resources.Enlisted, state.resources.Enlisted + 1);
-  }
+test('removed Radio Intercept commands reject transactionally', () => {
+  const state = dispatch(fresh(), { type: 'startRound' }).state;
+  const before = structuredClone(state);
+  for (const intercept of [true, false]) assert.throws(() => dispatch(state, { type:'activate',crewId:'radio',intercept }), /removed/);
+  assert.deepEqual(state,before);
 });
 
 test('escort inflicts one damage only when post-attack movement enters its quadrant', () => {

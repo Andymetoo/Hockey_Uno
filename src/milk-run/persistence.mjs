@@ -1,4 +1,4 @@
-import { BOARD_VERSION, STATIONS } from './board.mjs';
+import { BOARD_VERSION, STATIONS, CREW_DEFS, getCell } from './board.mjs';
 import { DEFAULT_CONFIG, normalizeConfig, configScope } from './config.mjs';
 import { RULESETS, isV2, V2_CONFIG_VERSION } from './rulesets.mjs';
 import { CREW_POSITION_VERSION, migrateCrewPositions } from './crew-position.mjs';
@@ -186,7 +186,7 @@ function validContinuousSnapshot(snapshot) {
     snapshot.fighters.every(fighter => fighter.badlyDamagedTriggered === undefined || typeof fighter.badlyDamagedTriggered === 'boolean') &&
     Object.keys(DEFAULT_CONFIG).filter(key => key.startsWith('v2')).every(key => {
       if (['v2AircraftSpecificCrits', 'v2BadlyDamagedBreakoff'].includes(key)) return snapshot.config[key] === undefined || typeof snapshot.config[key] === 'boolean';
-      if (key === 'v2StoryMode') return snapshot.config[key] === undefined || typeof snapshot.config[key] === 'boolean';
+      if (['v2StoryMode','v2CompactCrewFlow'].includes(key)) return snapshot.config[key] === undefined || typeof snapshot.config[key] === 'boolean';
       if (PLAYTEST_V2_CONFIG_KEYS.includes(key) && snapshot.config[key] === undefined) return true;
       if (key === 'v2NavigatorUnmannedTimePenalty') return whole(snapshot.config[key]);
       if (key === 'v2CrewCycleRefreshGrantsTime') return typeof snapshot.config[key] === 'boolean';
@@ -228,10 +228,16 @@ export function loadSession(storage) {
       !Array.isArray(data.pending) || !Array.isArray(data.log) ||
       !Array.isArray(data.state.crew) || !data.state.config || !data.state.bags ||
       !data.state.cells || !Number.isFinite(data.state.rng) ||
-      data.state.boardVersion !== BOARD_VERSION || data.view.boardVersion !== BOARD_VERSION ||
-      data.pending.some(event => event.state?.boardVersion !== BOARD_VERSION)) return null;
+      ![BOARD_VERSION, 'plane-grid-v1'].includes(data.state.boardVersion) || ![BOARD_VERSION, 'plane-grid-v1'].includes(data.view.boardVersion) ||
+      data.pending.some(event => ![BOARD_VERSION, 'plane-grid-v1'].includes(event.state?.boardVersion))) return null;
     const snapshots = [data.state, data.view, ...data.pending.map(event => event.state)];
-    if (snapshots.some(snapshot => snapshot.crewPositionVersion !== undefined && snapshot.crewPositionVersion !== CREW_POSITION_VERSION)) return null;
+    // Reject shapes the renderer cannot safely inspect. Keep storage untouched;
+    // meaningful but inconsistent development states are diagnosed, not moved.
+    if(snapshots.some(s=>!Array.isArray(s.crew)||s.crew.length!==CREW_DEFS.length||
+      CREW_DEFS.some(d=>s.crew.filter(c=>c?.id===d.id).length!==1)||s.crew.some(c=>
+        !Array.isArray(c.position)||!c.position.length||c.position.some(id=>!getCell(id)?.structure)||
+        !['healthy','injured','dead'].includes(c.health))))return null;
+    if (snapshots.some(snapshot => snapshot.crewPositionVersion !== undefined && ![1, CREW_POSITION_VERSION].includes(snapshot.crewPositionVersion))) return null;
     if (snapshots.some(snapshot => snapshot.crewPositionVersion === CREW_POSITION_VERSION &&
       (!Array.isArray(snapshot.crew) || snapshot.crew.some(crew => !STATIONS[crew.homeStation] ||
         (crew.station !== null && !STATIONS[crew.station]) || typeof crew.displaced !== 'boolean')))) return null;

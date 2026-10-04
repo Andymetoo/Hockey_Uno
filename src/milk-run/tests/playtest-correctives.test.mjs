@@ -92,15 +92,14 @@ for(const story of [false,true]) {
   });
   test(`Story ${story}: invalid burning patient cannot become healthy on completion`,()=>{
     const s=medical(story);s.cells['D2-1']='fire';s.jobs[0].remainingTime=1;
-    const r=dispatch(s,{type:'activate',crewId:'pilot'});
-    assert.equal(r.state.jobs.length,0);assert.equal(crew(r.state,'copilot').health,'injured');
-    assert.ok(!r.events.some(e=>e.type==='CREW_HEALED'));
-    assert.ok(!r.state.crew.some(c=>c.health==='healthy'&&c.position.some(id=>r.state.cells[id]==='fire')));
+    const before=structuredClone(s);
+    assert.throws(()=>dispatch(s,{type:'activate',crewId:'pilot'}),/Fire\/crew invariant/);
+    assert.deepEqual(s,before,'corrupt input cannot commit an illegal heal or move');
   });
 }
 test('a burning Medical work square cancels the job without healing the patient',()=>{
   const s=medical();s.cells['C2-4']='damaged';damageSquare(s,'C2-4',1,()=>{});
-  assert.equal(s.cells['C2-4'],'fire');assert.equal(s.jobs.length,0);assert.equal(crew(s,'radio').job,null);
+  assert.equal(s.cells['C2-4'],'damaged');assert.equal(crew(s,'radio').health,'injured');assert.equal(s.jobs.length,0);assert.equal(crew(s,'radio').job,null);
 });
 test('a blocked caregiver home uses existing displaced return semantics',()=>{
   const s=medical();s.cells['C3-2']='fire';resolveAttack(s,()=>{},{roll:2,cellId:'D2-1'});
@@ -127,7 +126,7 @@ test('shared work position never shields an injured patient; casualty return wai
 test('a selectable safe patient cannot make a different burning patient a legal Medical target',()=>{
   const s=fresh();crew(s,'pilot').health='injured';crew(s,'copilot').health='injured';s.cells['D2-1']='fire';
   s.phase='action';s.activeCrew='radio';
-  assert.throws(()=>dispatch(s,{type:'action',action:'medical',targetId:'copilot',workCellId:'C2-4'}),/standing on Fire/);
+  assert.throws(()=>dispatch(s,{type:'action',action:'medical',targetId:'copilot',workCellId:'C2-4'}),/contains Fire/);
 });
 test('missing target or assistant invalidates Medical and releases remaining workers',()=>{
   for(const missing of ['copilot','ball']) {

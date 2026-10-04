@@ -168,6 +168,7 @@ test('central Fire Control prefers its row and offers both adjacent interior row
   let s=activate(fresh(),'engineer');s.cells['C4-2']='fire';
   assert.ok(legalWorkPositions(s,'engineer',['C4-2']).every(c=>c.id[1]==='4'));
   for(const c of BOARD.filter(c=>c.fuselage&&c.id[1]==='4'))s.cells[c.id]='fire';
+  for(const id of ['leftWaist','rightWaist'])member(s,id).health='dead';
   const choices=legalWorkPositions(s,'engineer',['C4-2']);
   assert.deepEqual(new Set(choices.map(c=>c.id[1])),new Set(['3','5']));assert.ok(choices.every(c=>c.fuselage&&s.cells[c.id]!=='fire'));
   const chosen=choices.find(c=>c.id[1]==='5').id;

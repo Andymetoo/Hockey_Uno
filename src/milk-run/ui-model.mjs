@@ -22,11 +22,11 @@ const ACTION_LABELS = {
   assistWork: ['Assist Work', 'ASSIST'], basicFire: ['Basic Fire', 'BASIC FIRE'], advancedFire: ['Advanced Fire', 'ADV. FIRE'],
   repair: ['Repair', 'REPAIR'], fireControl: ['Fire Control', 'FIRE CTRL'], medical: ['Medical', 'MEDICAL'],
   relocate: ['Relocate', 'MOVE'], manCockpit: ['Man Cockpit', 'COCKPIT'], manStation: ['Man Station', 'STATION'],
-  returnHome: ['Return Home', 'HOME'], leaveStation: ['Leave Station', 'LEAVE'], restartEngine: ['Restart Engine', 'ENGINE'],
+  reclaimHome: ['Reclaim Home Station', 'RECLAIM'], returnHome: ['Return Home', 'HOME'], leaveStation: ['Leave Station', 'LEAVE'], restartEngine: ['Restart Engine', 'ENGINE'],
   directFire: ['Direct Fire', 'DIRECT FIRE'], convert: ['Convert Resources', 'CONVERT'], rotateFighter: ['Distract Fighter', 'DISTRACT'],
   escort: ['Summon Escort', 'ESCORT'], wait: ['No Action', 'NO ACTION'],
 };
-const iconKind = action => ({ basicFire:'combat', advancedFire:'combat', directFire:'combat', rotateFighter:'combat', manCockpit:'move', manStation:'move', returnHome:'move', leaveStation:'move', relocate:'move', restartEngine:'engine' })[action] || action;
+const iconKind = action => ({ basicFire:'combat', advancedFire:'combat', directFire:'combat', rotateFighter:'combat', manCockpit:'move', manStation:'move', reclaimHome:'move', returnHome:'move', leaveStation:'move', relocate:'move', restartEngine:'engine' })[action] || action;
 export function actionIconMarkup(action, className = 'action-glyph') {
   const kind = iconKind(action), paths = ACTION_ICONS[kind] || ACTION_ICONS.wait;
   return `<svg class="${className}" data-action-icon="${kind}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
@@ -68,7 +68,7 @@ export function availableCount(state) {
   const active=state.crew.find(c=>c.id===state.activeCrew);
   return availableCrew(state).length+(state.phase==='action'&&active?.health==='healthy'&&!active.job&&!active.activationCompleted?1:0);
 }
-const STATION_ACTIONS=new Set(['basicFire','advancedFire','restartEngine','opportunityShot']);
+const STATION_ACTIONS=new Set(['reclaimHome','returnHome','manStation','manCockpit','leaveStation','basicFire','advancedFire','restartEngine','opportunityShot']);
 const ROLE_ACTIONS=new Set(['directFire','convert','rotateFighter','escort']);
 export function actionGroup(id) {return STATION_ACTIONS.has(id)?'Station Actions':ROLE_ACTIONS.has(id)?'Role Actions':'General Actions';}
 export function arcPreview(state,crewId) {
