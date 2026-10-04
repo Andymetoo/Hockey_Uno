@@ -6,7 +6,7 @@ import { availableCrew, availableActions, dispatch, isAtStation, damageSquare, p
 import { fighter, rngForIndexes, rngForDice, collect, commitTestBombRun } from './fixtures.mjs';
 
 const member = (state, id) => state.crew.find(crew => crew.id === id);
-const fresh = (config = {}) => createGame({ opportunityEnabled: false, v2MissionEnemy: 0, v2MissionResource: 80, v2MissionTime: 20, ...config }, 'continuous-tests', 'v2-continuous');
+const fresh = (config = {}) => createGame({ v2StoryMode: false, opportunityEnabled: false, v2MissionEnemy: 0, v2MissionResource: 80, v2MissionTime: 20, ...config }, 'continuous-tests', 'v2-continuous');
 function activate(state, token = 'Resource', crewId = availableCrew(state)[0]?.id) {
   const bag = state.bags.mission;
   const pool = bag.tokens.length ? bag.tokens : bag.discard;

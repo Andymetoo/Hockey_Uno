@@ -8,7 +8,7 @@ const b = await openBrowser({ port: 9352, artifactFolder: 'bomb-run' });
 const { evaluate, click, touch, inject, flush, getState, viewport, screenshot, reload } = b;
 const checks = [];
 const note = text => { checks.push(text); console.log(text); };
-const fresh = () => createGame({ opportunityEnabled: false }, 'bomb-run-browser', 'v2-continuous');
+const fresh = () => createGame({ v2StoryMode: false, opportunityEnabled: false }, 'bomb-run-browser', 'v2-continuous');
 
 try {
   for (const [width, height] of [[320, 740], [360, 800], [390, 844], [768, 1024], [1440, 1000]]) {

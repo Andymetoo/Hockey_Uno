@@ -4,19 +4,19 @@ import { fighterHeading } from './spatial.mjs';
 import { targetOptions } from './targeting.mjs';
 import { describeEvent, groupEvents } from './presentation.mjs';
 import { isV2, missionLengths } from './rulesets.mjs';
-import { effectiveTimeThreshold } from './crew-position.mjs';
+import { effectiveTimeThreshold, specialistOperator } from './crew-position.mjs';
 
 const esc = value => String(value ?? '').replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]));
 const classes = values => values.filter(Boolean).join(' ');
 const targetingFighters = interaction => interaction && ['basicFire', 'advancedFire', 'opportunityShot', 'rotateFighter'].includes(interaction.action);
 
 export function continuousHudMarkup(state, expanded = false) {
-  const threshold=effectiveTimeThreshold(state), navigationPenalty=threshold>state.config.v2TimePerProgress;
+  const threshold=effectiveTimeThreshold(state), navigationPenalty=(state.config.v2NavigatorUnmannedTimePenalty??0)>0&&!specialistOperator(state,'navigator');
   const {outboundLength,returnLength}=missionLengths(state);
   const returning=state.mission.bombed||state.mission.aborted||state.mission.position>outboundLength;
   const progress=returning?Math.max(0,state.mission.position-outboundLength):state.mission.position;
   const length=returning?returnLength:outboundLength;
-  const leg=state.mission.position>=outboundLength+returnLength?'HOME':state.phase==='bombing'?'TARGET':state.mission.aborted?'ABORTED · RETURN':returning?'RETURN':'OUTBOUND';
+  const leg=state.mission.position>=outboundLength+returnLength?'HOME':state.phase==='bombing'||state.phase==='story'&&state.story?.pending?.resumePhase==='bombing'?'TARGET':state.mission.aborted?'ABORTED · RETURN':returning?'RETURN':'OUTBOUND';
   const consumed=state.crew.filter(crew=>crew.cycleSlotConsumed).length;
   const shownTime=Math.min(state.time,threshold);
   const timeGraphic=threshold<=8?`<span class="time-pips" aria-hidden="true">${Array.from({length:threshold},(_,index)=>`<i class="${index<shownTime?'filled':''}"></i>`).join('')}</span>`:`<progress class="hud-time-progress" aria-hidden="true" max="${threshold}" value="${shownTime}"></progress>`;

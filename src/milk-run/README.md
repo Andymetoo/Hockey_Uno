@@ -80,6 +80,36 @@ Open **Playtest settings → Test Bomb Run** for **BOMB RUN TEST — RESULTS ARE
 
 `bomb-run-test.mjs` accepts no live game, Campaign, preferences, queue or persistence references. It creates a fresh production state and a temporary crypto UUID seed, with independent target-selection and per-test dice PRNG state. `bomb-run-test-view.mjs` owns its modal rendering and intercepts its production control events before they reach the active game's document handlers. It never calls the host renderer, autosave, Campaign finalization or export. The host bridge only suspends a presentation timer and resumes it on close when appropriate; serialized queue flags and snapshots remain unchanged. Browser regressions assert full live session/Campaign/history/preferences/storage equality, zero storage writes, and identical next production random commands while another real Bomb Run is active.
 
+## Story Mode / narrative director
+
+**Story Mode** is a V2 Playtest setting, ON for new standalone V2 and Campaign sorties. Reset V2 restores ON. Like other gameplay settings it applies to the next flight; an active flight retains its saved setting. OFF follows the baseline tactical rules without Story evaluation, conditions or extra random draws. V1 has no Story state. Old in-progress saves missing either the flag or director load with Story OFF, in resolved, visible and queued snapshots; migration does not invent situations or reroll anything.
+
+The director turns existing damage, crew availability and route decisions into developing situations. It does not introduce formation, morale, fatigue, fuel, oxygen or stress meters. A damaged engine can be pushed, shut down, or assigned an ordinary 2-Time Repair job. Cloud changes both sides' visibility, and may later obscure the same target. A friendly bomber helped earlier may pass your call sign to an Escort patrol. Medical supplies and checked ammunition are useful finds, not another punishment.
+
+`story-content.mjs` contains 13 thread families with 44 authored stages and 31 choices: weather front, rough engine, damaged oxygen line, uncertain landmarks, reported flak corridor, fighter hunters, broken radio aerial, medical locker, wounded friendly bomber, ammunition locker, corrected target markers, homeward sea crossing, and bomb-door hydraulic damage. Eligibility examines actual damage, running engines, wounded crew, specialists, radio, fighters, leg, target distance and prior conditions. Threads bind the specific aircraft square/engine when selected. The same distinctive thread occurs at most once per sortie; the previous Campaign flight's families are deprioritized when another eligible family exists.
+
+`story.mjs` owns serialized stages, choices, delayed branches, history facts and pacing. New situations normally leave at least one quiet Progress boundary after a decision. A sortie has a five-new-prompt budget (existing threads can still need their target follow-up); due follow-ups take priority over starting unrelated stories. A saved delayed branch is sampled when scheduled and waits at least one future checkpoint. No follow-up dialog chains directly from its choice. Automatic acknowledgements use the normal recorder/presentation queue.
+
+Evaluation occurs in the dispatcher **after** the complete Progress checkpoint and any compressed unavailable-crew enemy phase. The checkpoint only sets a boundary marker; automatic unavailable-slot processing stops there. All work completion, Fire Spread, condition/altitude checks, movement, Time return, refill and Escort departure precede evaluation. A decision sets `phase: 'story'`; the UI waits for the presentation queue to drain before opening it. Crew actions, Opportunity, enemy attacks, Flak and Bomb Run interactions cannot open a Story prompt. At TARGET, Story runs before the Bomb Run's initial dice; resolving the decision starts the ordinary Bomb Run exactly once.
+
+The compact **Conditions** control below the main HUD opens active effects, their cause, how they end and any pending consequence. Positive supplies appear alongside hazards. Temporary tokens show live counts in bag and discard. A marked aircraft square has a small `!` and an inspection link. Recent resolutions remain available. A Story dialog can be closed to inspect the aircraft; the decision stays saved, tactical commands stay blocked, and **Resolve situation** reopens it. Buttons and scrollable sheets support narrow touch screens.
+
+`story-effects.mjs` supplies composable adapters for:
+
+- A next-Progress Time requirement adjustment, bounded by the physical Time supply; existing physical-Time claims and work advancement.
+- Normal/Disrupted enemy hit thresholds, Flak salvo size and Engagement for newly arriving fighters.
+- Owned temporary Hit/Miss/Burst combat tokens and Enemy mission-pressure tokens.
+- Next Medical/Repair/Fire Control/Advanced Fire/Escort free, action resource adjustments, work-duration adjustments, and temporary radio/Escort blocking.
+- Ordinary Repair jobs with safe work positions, worker availability, assistance, cancellation, Time countdown and normal home returns; marked-cell Repair and altitude resolution triggers.
+- Existing-cell damage, engine shutdown and an explicit altitude-for-safety descent.
+- Bomb Run accepted-range adjustments and Officer reroll blocking; the real Bombardier's free reroll remains available.
+
+Tokens use unique `Story:<condition uid>:<index>:<face>` identities. A draw resolves their normal face but moves the original identity into discard; both refill paths preserve it. Expiration removes only that condition's tagged tokens from bag and discard. Configured/default tokens are untouched. Temporary Resource and Time injection is rejected because those faces enter fungible held pools. A Story shortcut instead claims an existing Time token using normal active/overflow rules, advancing jobs once and never raiding discard or manufacturing Time. No base-token subtraction, temporary fighter HP, fuel accounting or replacement Bomb Run game is implemented.
+
+Story randomness uses its own seeded, serialized stream inside the sortie. Tactical RNG is unchanged by Story selection; subsequent tactical effects naturally change the flight. Pending choices, chosen future branches, bindings, conditions, jobs and owned tokens survive autosave and Campaign backup/import exactly. Current schemas validate Story state before accepting imports. Turn Back cancels target-only conditions/follow-ups while existing physical damage, jobs and relevant return problems remain. HOME or aircraft loss closes threads and removes temporary tokens before finalization. Dev Discard continues to release the reservation without writing any flight history.
+
+Campaign records copy structured Story facts and encountered thread IDs, alongside existing bombing and personnel outcomes. The service record can therefore recall the cloud entered earlier, engine gamble, actual bombing outcome, recorded KIA and return/loss. History supplies no XP, upgrades or tactical bonuses.
+
 ## History-only campaign
 
 The **Campaign Hangar** offers New Campaign, multiple surviving aircraft, commissioning, explicit pre-sortie selection, aircraft service records, editable personnel cards and sortie history. Standalone V1 and V2 remain available. Campaign sorties use V2 and the same current rules/preferences as standalone V2: history never grants XP, upgrades, stats, easier dice, extra resources or combat advantages.
@@ -209,6 +239,8 @@ The same configuration, seed, and sequence of decisions produce the same random 
 | `bombing.mjs`, `bombing-targets.mjs`, `bomb-run-view.mjs` | V1 bombing and separate V2 deterministic 4d6 placement/scoring, authorable targets and touch controls. |
 | `bomb-run-test.mjs`, `bomb-run-test-view.mjs` | Disposable fresh-state production Bomb Run, isolated PRNGs and modal event/render boundary; no persistence or Campaign access. |
 | `continuous.mjs`, `rulesets.mjs` | V2 Time/overflow, Crew Cycle, Engagement, pressure modes and saved identity/route dispatch. |
+| `story.mjs`, `story-content.mjs` | Deterministic director, paced boundary decisions, state-sensitive authored threads, saved delayed branches and historical facts. |
+| `story-effects.mjs`, `story-view.mjs` | Reusable tactical modifiers, owned bag-token lifecycle, condition resolution and mobile choices/conditions. |
 | `crew-position.mjs` | Physical station assignment, specialist qualifications and effective navigation threshold. |
 | `campaign.mjs`, `campaign-session.mjs`, `campaign-view.mjs` | Validated local service histories, identity/stat credit, active-session backup and compact service-record UI. |
 | `turn-back.mjs`, `results.mjs` | Confirmed campaign reversal and authoritative end-state presentation. |
@@ -365,7 +397,11 @@ Other deferred systems include Event cards, Locked In, Desperation, Fate, aircra
 
 ## Validation
 
-All implementation and test changes are inside Milk Run. The current Node suite passes **538/538 tests**, with zero failures or skipped tests. All **14 current browser suites** pass, including the isolated tester and new Dev Discard/emergency-return checks, with no runtime or asset errors. Validation was rerun on October 2, 2026. The Campaign/Hangar fixtures now fly the emergency return; position-zero aborts no longer finalize immediately. Hangar initially exposed that stale fixture, then passed all 10 groups after its required checkpoint was added. The other browser suites passed unchanged. Fresh run logs are in `.checks/revision-validation/`; the Hangar rerun and new discard results are in `.checks/hangar/browser-results.json` and `.checks/dev-discard/browser-results.json`.
+All implementation and test changes are inside Milk Run. Validation rerun on **October 3, 2026** passes **594/594 Node tests**, with zero failures, skips or cancellations, and **15/15 Chromium suites**, with no runtime or asset errors. This includes all 14 prior browser suites plus Story Mode. There are **44 Story mechanics/lifecycle tests and 12 Story UI/config/migration tests**. Existing tactical witness fixtures explicitly disable Story where they test baseline V2; new Story scenarios test the enabled default. Logs are in `.checks/story-validation/`; screenshots and structured browser results are in each suite's `.checks/` folder, including `.checks/story/browser-results.json`.
+
+Story coverage includes deterministic selection and scheduled outcomes, one-prompt safe boundaries, marked Repair, ordinary Story inspection work and assistance, positive free Medical, tagged mission/combat draws and both refill paths, temporary accuracy/Flak/Time/Bomb Run rules, concurrent target follow-ups, absent Bombardier, conditions ending, Turn Back, HOME/loss finalization, Campaign facts, Dev Discard and exact Campaign file export/import. **76 Story-enabled semantic snapshots** round-trip through persistence, including a token between draw and discard, work completion, target arrival and choices. The existing **1,530 V2 diagnostic snapshot round-trips** also rerun.
+
+The human-playability aid runs actual commands with unmodified defaults, visible-state tactical decisions and varied Story choices: **24 deterministic sorties**, **24 distinct ordered thread sequences**, all **13 families**, **2–5 interactive decisions** per sortie (mean **4.25**) and mean **2.46** automatic follow-up outcomes. All flights ended: **21 HOME, 3 aircraft losses**. **32 of 94 conditions** were explicitly positive; mixed conditions also offered benefits. It verified physical Time, Resources, base combat tokens and owned temporary identities after **4,560 commands**. These are reviewed examples, not a balance/win-rate claim. Narratives include `story-review-5` bombing Bremen through the earlier cloud, `story-review-11` pushing an engine whose vibration settled, `story-review-4` repairing an engine after the gamble worsened, and `story-review-18` receiving Escort help from a bomber aided earlier. Review revisions removed a dominant navigation option, varied detour descriptions, replaced generic expiration text, corrected dead-person narration and added appropriate no-drop, externally stopped-engine and interrupted-work outcomes. Routine expiration bookkeeping stays in Recent/recorder rather than cluttering Campaign facts. Report: `.checks/story-review/sorties.json`.
 
 From the repository root:
 
@@ -385,6 +421,8 @@ node src/milk-run/tests/bomb-run-test-browser-check.mjs
 node src/milk-run/tests/campaign-browser-check.mjs
 node src/milk-run/tests/hangar-browser-check.mjs
 node src/milk-run/tests/dev-discard-browser-check.mjs
+node src/milk-run/tests/story-browser-check.mjs
+node src/milk-run/tests/story-playability-review.mjs 24
 ```
 
 | Browser suite | Passing scope |
@@ -403,6 +441,7 @@ node src/milk-run/tests/dev-discard-browser-check.mjs
 | Campaign | 13 groups |
 | Hangar | 10 groups; multiple surviving aircraft, choice after loss, aircraft/personnel cross-links, import/migration and six responsive widths |
 | Dev Discard / emergency return | 12 groups; all seven return distances at six widths, destructive confirmation/cancellation, pending queue cleanup, storage rollback, no-history discard, reload, immediate relaunch, export and finalized-flight protection |
+| Story Mode | 11 groups; decisions/conditions at all six widths, exact reload, inspect/reopen, saved presentation boundary, marked-square inspection, positive supplies, defaults/reset/OFF, real Campaign file export/import and no-history Dev Discard |
 
 The 24 focused Hangar Node cases cover one-plane selection; commissioning without replacing survivors; A/B/A service attribution; aircraft and crew relationship joins; selected-aircraft autosave/backup linkage; permanent loss and KIA; independent objective/return/abort results; idempotent finalization; invalid identity imports; three legacy migration states; and standalone isolation. Campaign and Hangar browser checks exercise actual forms and touch controls, with scripted outcome fixtures for service attribution and real rules-driven Turn Back return/loss in the Campaign suite. Aircraft and personnel records are checked expanded at 320/360/390/430/768/1440px.
 

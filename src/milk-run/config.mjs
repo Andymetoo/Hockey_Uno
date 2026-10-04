@@ -17,6 +17,7 @@ export const DEFAULT_CONFIG = Object.freeze({
   enginesSafe: 1, enginesMid: 2, enginesAuto: 4, enginesMidMin: 3, enginesHighMin: 5,
   outboundLength: 14, returnLength: 5, bombingMin: 3, animationMs: 750, presentationSpeed: 'normal',
   v2CrewCycleTurns: 10,
+  v2StoryMode: true,
   v2MissionEnemy: 20, v2MissionResource: 12, v2MissionTime: 10,
   v2TimePerProgress: 4, v2OutboundLength: 8, v2ReturnLength: 3,
   v2NavigatorUnmannedTimePenalty: 0, v2CrewCycleRefreshGrantsTime: true, v2UnavailableCrewPressure: 'full',
@@ -39,6 +40,7 @@ export const CONFIG_FIELDS = [
   { key: 'preferredRuleset', label: 'Preferred ruleset for new sorties', group: 'New sortie', type: 'select', options: [
     { value: 'v1', label: 'V1 — Round-Based' }, { value: 'v2-continuous', label: 'V2 — Continuous Time — EXPERIMENTAL' },
   ] },
+  boolean('v2StoryMode', 'Story Mode', 'V2 — Continuous Time (Experimental)'),
   { ...number('v2CrewCycleTurns', 'V2 Crew Cycle Turns (fixed at 10)', 'V2 — Continuous Time (Experimental)', 10, 10), fixedReason: 'Fixed at 10: each of the ten crew must account for one Turn before readiness refreshes.' },
   number('v2MissionEnemy', 'V2 Mission Enemy tokens', 'V2 — Continuous Time (Experimental)', 0, 100),
   number('v2MissionResource', 'V2 Mission Resource tokens', 'V2 — Continuous Time (Experimental)', 0, 100),

@@ -10,11 +10,13 @@ const compact = new Set([
   'UNAVAILABLE_DRAW_SKIPPED', 'AIRCRAFT_HIT_BURNING', 'CREW_HELD_POSITION',
   'ACTIVATION_COMPLETED', 'OPPORTUNITY_WINDOW_OPENED', 'CREW_CYCLE_REFRESHED', 'TURN_COMPLETE', 'ENGAGEMENT_SPENT', 'FIGHTER_DISENGAGED',
   'BOMB_DIE_PLACED',
+  'STORY_FACT_RECORDED',
 ]);
-const categoryIcons = { crew: '●', resource: '+', gunfire: '⌖', enemy: '✈', damage: '◆', injury: '✚', repair: '⚒', altitude: '↕', time: '◷', departure: '↗' };
+const categoryIcons = { crew: '●', resource: '+', gunfire: '⌖', enemy: '✈', damage: '◆', injury: '✚', repair: '⚒', altitude: '↕', time: '◷', departure: '↗', story: '◆' };
 
 export function eventCategory(event) {
   const type = event?.type ?? '';
+  if (/^STORY_/.test(type)) return 'story';
   if (/^(FIGHTER_KILL_TIME_|CREW_CYCLE_TIME_)/.test(type)) return 'time';
   if (type === 'FIGHTER_BREAKING_OFF' || type === 'FIGHTER_DISENGAGED') return 'departure';
   if (/^(TIME_|PROGRESS_|CHECKPOINT_)/.test(type) || type === 'MISSION_TOKEN_DRAWN' && event.token === 'Time') return 'time';
@@ -43,6 +45,7 @@ export function describeEvent(event = {}) {
     category, icon: categoryIcons[category], title: friendly(type) || 'Ready for orders',
     detail: event.message ?? '', major: !compact.has(type), kind: 'text', tone: category,
   };
+  if (/^STORY_/.test(type)) Object.assign(description, { icon: '◆', title: event.title ?? (type === 'STORY_CONDITION_RESOLVED' ? 'Situation resolved' : type === 'STORY_CHOICE' ? 'The crew decides' : 'A developing situation'), tone: 'story' });
   if (type === 'UNAVAILABLE_CREW_SLOT') description.title = 'Unavailable crew slot — time passes';
   if (type === 'ENEMY_PHASE_STARTED' && /no active fighters/i.test(event.message ?? '')) description.major = false;
   if (type === 'FIRE_PHASE_STARTED' && /^Fire phase: 0 unsuppressed/i.test(event.message ?? '') && !continuous) description.major = false;

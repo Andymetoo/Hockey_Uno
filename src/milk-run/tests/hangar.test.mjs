@@ -177,7 +177,9 @@ test('invalid imports cannot assign a lost plane or KIA, resurrect identities or
 test('version-1 lineage migration preserves all identities, auto-created replacement, history and active linkage', () => {
   const old = legacy(), before = structuredClone(old), migrated = parseCampaignBackup(old), a = migrated.store.campaigns[0], b = old.store.campaigns[0];
   assert.equal(migrated.store.version, 2); assert.deepEqual(old, before);
-  assert.deepEqual(a.aircraft, b.aircraft); assert.deepEqual(a.activeSortie, b.activeSortie); assert.deepEqual(migrated.activeSession, old.activeSession);
+  const expectedSession=structuredClone(old.activeSession);
+  for(const snapshot of [expectedSession.state,expectedSession.view,...expectedSession.pending.map(event=>event.state)])snapshot.config.v2StoryMode=false;
+  assert.deepEqual(a.aircraft, b.aircraft); assert.deepEqual(a.activeSortie, b.activeSortie); assert.deepEqual(migrated.activeSession, expectedSession);
   assert.equal(a.aircraft[1].replacement, true); assert.equal(aircraftStatus(a, a.aircraft[1].id), 'on-sortie');
   assert.deepEqual(a.crew.map(c => c.id), b.crew.map(c => c.id)); assert.deepEqual(a.sorties.map(s => s.id), b.sorties.map(s => s.id));
   for (const [i, oldSortie] of b.sorties.entries()) for (const key of Object.keys(oldSortie)) assert.deepEqual(a.sorties[i][key], oldSortie[key]);

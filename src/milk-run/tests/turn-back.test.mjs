@@ -12,7 +12,7 @@ function setup(position = 2) {
   let next = 0; const idFactory = () => `turn-back-${++next}`;
   const created = createCampaign(createCampaignStore(), { idFactory });
   const prepared = prepareCampaignSortie(created.store, created.campaign.id,
-    createGame({ v2MissionEnemy: 0, v2MissionResource: 0, v2MissionTime: 10, opportunityEnabled: false }, 'turn-back', 'v2-continuous'), { aircraftId: created.campaign.currentAircraftId, idFactory });
+    createGame({ v2StoryMode: false, v2MissionEnemy: 0, v2MissionResource: 0, v2MissionTime: 10, opportunityEnabled: false }, 'turn-back', 'v2-continuous'), { aircraftId: created.campaign.currentAircraftId, idFactory });
   prepared.state.mission.position = position;
   return prepared;
 }

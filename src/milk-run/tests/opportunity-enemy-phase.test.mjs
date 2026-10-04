@@ -5,7 +5,7 @@ import { dispatch } from '../rules.mjs';
 import { fighter, rngForIndexes } from './fixtures.mjs';
 
 const v2 = overrides => createGame({
-  opportunityEnabled: true, startingOpportunity: 2, v2MissionEnemy: 0,
+  v2StoryMode: false, opportunityEnabled: true, startingOpportunity: 2, v2MissionEnemy: 0,
   v2MissionResource: 20, v2MissionTime: 20, ...overrides,
 }, 'opportunity-phase-test', 'v2-continuous');
 
@@ -97,4 +97,3 @@ test('the V2-only experiment does not add between-turn enemy phases to V1', () =
   assert.equal(shot.state.phase, 'select');
   assert.equal(eventsOf(shot, 'ENEMY_PHASE_STARTED').length, 0);
 });
-

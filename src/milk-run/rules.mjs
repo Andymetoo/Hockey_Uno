@@ -8,10 +8,12 @@ import { resolveBombing, beginBombRun, placeBombDie, rerollBombDie, commitBombRu
 import { turnBack } from './turn-back.mjs';
 import { fighterHeading, turnHeadingToward, turnHeadingAway } from './spatial.mjs';
 import { isV2 } from './rulesets.mjs';
-import { engagementFor, spendEngagement, gainTime, gainFighterKillTime, completeContinuousTurn, continueCycle, completeBetweenTurnProgress, refreshTimeRequirement } from './continuous.mjs';
+import { engagementFor, spendEngagement, gainTime, gainBonusTime, gainFighterKillTime, completeContinuousTurn, continueCycle, completeBetweenTurnProgress, refreshTimeRequirement } from './continuous.mjs';
 import { observe, ensureV2Telemetry } from './telemetry.mjs';
 import { homeStationId, currentStationId, leaveStation, migrateCrewPositions } from './crew-position.mjs';
 import { recordSortieEnd } from './results.mjs';
+import { evaluateStoryBoundary, chooseStory, reconcileStory } from './story.mjs';
+import { storyEnabled, storyToken, storyModifier, storyFlag, storyJobTime, storyActionCost, consumeStoryAction } from './story-effects.mjs';
 
 const copy = value => structuredClone(value);
 const def = id => CREW_DEFS.find(item => item.id === id);
@@ -159,11 +161,12 @@ export function availableActions(state, crewId = state.activeCrew) {
   const targets = legalTargets(state, crewId);
   if (operatingArc(state, crew.id) || def(crew.id).arc) {
     add('basicFire', 'Basic Fire', targets.length > 0, 'No fighter in an operating gun arc.');
-    add('advancedFire', 'Advanced Fire', targets.length > 0 && affordable('Enlisted', 1), targets.length ? 'Needs 1 Enlisted resource.' : 'No fighter in an operating gun arc.', '1 Enlisted');
+    const cost = storyActionCost(state, 'advancedFire', 1);
+    add('advancedFire', 'Advanced Fire', targets.length > 0 && affordable('Enlisted', cost), targets.length ? `Needs ${cost} Enlisted resource.` : 'No fighter in an operating gun arc.', `${cost} Enlisted`);
   }
   for (const [id, label, targetStatus, cost] of [
-    ['repair', 'Repair', 'damaged', state.config.repairCost],
-    ['fireControl', 'Fire Control', 'fire', state.config.fireCost],
+    ['repair', 'Repair', 'damaged', storyActionCost(state, 'repair', state.config.repairCost)],
+    ['fireControl', 'Fire Control', 'fire', storyActionCost(state, 'fireControl', state.config.fireCost)],
   ]) {
     const targets = eligibleCrisisTargets(state, id);
     const hasWorkPosition = targets.some(cell => legalWorkPositions(state, crewId, [cell.id]).length);
@@ -171,7 +174,8 @@ export function availableActions(state, crewId = state.activeCrew) {
   }
   const injured = state.crew.some(target => target.health === 'injured' && !underTreatment(state, target.id));
   const medicalTargets = eligibleMedicalTargets(state, crewId);
-  add('medical', 'Medical', medicalTargets.length > 0 && affordable(rank, state.config.medicalCost), !injured ? 'No untreated injured crew.' : !medicalTargets.length ? 'No safe interior work position on an injured crewmate’s row.' : `Needs ${state.config.medicalCost} ${rank} resource.`, state.config.medicalCost ? `${state.config.medicalCost} ${rank}` : undefined);
+  const medicalCost = storyActionCost(state, 'medical', state.config.medicalCost);
+  add('medical', 'Medical', medicalTargets.length > 0 && affordable(rank, medicalCost), !injured ? 'No untreated injured crew.' : !medicalTargets.length ? 'No safe interior work position on an injured crewmate’s row.' : `Needs ${medicalCost} ${rank} resource.`, `${medicalCost} ${rank}`);
   if (isV2(state)) add('assistWork', 'Assist Work', eligibleAssistJobs(state, crewId).length > 0, 'No active unassisted job has a safe work position.');
   add('relocate', 'Relocate', BOARD.some(cell => cell.fuselage && isSafe(state, cell.id) &&
     !(crew.position.length === 1 && crew.position[0] === cell.id) &&
@@ -197,7 +201,8 @@ export function availableActions(state, crewId = state.activeCrew) {
   if (hasAbility(crew, 'rotateFighter')) add('rotateFighter', 'Distract Fighter', state.fighters.some(item => item.facing < 180), 'No fighter can turn farther away.');
   if (hasAbility(crew, 'escort')) {
     const atCap = isV2(state) && state.config.v2MaxEscorts !== null && state.escorts.length >= state.config.v2MaxEscorts;
-    add('escort', 'Summon Escort', !atCap && affordable('Enlisted', state.config.escortCost), atCap ? `Maximum ${state.config.v2MaxEscorts} simultaneous Escort${state.config.v2MaxEscorts === 1 ? '' : 's'} already active.` : 'Needs Enlisted resources.', `${state.config.escortCost} Enlisted`);
+    const cost = storyActionCost(state, 'escort', state.config.escortCost), blocked = storyFlag(state, 'radioBlocked');
+    add('escort', 'Summon Escort', !blocked && !atCap && affordable('Enlisted', cost), blocked ? 'Radio contact is lost. Inspect Current Conditions.' : atCap ? `Maximum ${state.config.v2MaxEscorts} simultaneous Escort${state.config.v2MaxEscorts === 1 ? '' : 's'} already active.` : 'Needs Enlisted resources.', `${cost} Enlisted`);
   }
   add('wait', 'No Action');
   return actions;
@@ -325,7 +330,8 @@ export function resolveAttack(state, emit, { source = 'Enemy', fighterId, roll, 
   bump(state, 'enemyAttacks');
   record(emit, 'ENEMY_ATTACK', `${source} attacks.`, { fighterId, source });
   const result = roll ?? die(state, 6);
-  const outcome = resultOverride ?? (result === 1 ? 'miss' : result === 6 ? 'critical' : 'hit');
+  const hitMinimum = Math.max(2, Math.min(6, 2 + storyModifier(state, 'enemyHit')));
+  const outcome = resultOverride ?? (result < hitMinimum ? 'miss' : result === 6 ? 'critical' : 'hit');
   record(emit, 'ENEMY_ATTACK_ROLL', `${source} rolls ${result}: ${outcome === 'off-target' ? 'OFF TARGET' : outcome === 'miss' ? 'MISS' : outcome === 'critical' ? 'CRITICAL HIT' : 'HIT'}.`, { fighterId, source, roll: result, result: outcome });
   if (outcome === 'off-target' || outcome === 'miss') return;
   bump(state, 'enemyHits');
@@ -398,7 +404,8 @@ function enemyPhase(state, emit) {
       const disrupted = target.disrupted;
       if (disrupted && isV2(state) && state.config.v2DisruptEffect === 'accuracy-penalty') {
         const roll = die(state, 6);
-        const outcome = roll <= 3 ? 'off-target' : roll <= 5 ? 'hit' : 'critical';
+        const minimum = Math.max(2, Math.min(6, 4 + storyModifier(state, 'enemyHit') + storyModifier(state, 'disruptedHit')));
+        const outcome = roll < minimum ? 'off-target' : roll <= 5 ? 'hit' : 'critical';
         resolveAttack(state, emit, { source: target.type, fighterId: id, roll, resultOverride: outcome });
         record(emit, 'DISRUPT_ACCURACY_RESOLVED', `${target.type}'s Disrupt accuracy roll resolves as ${outcome === 'off-target' ? 'Off Target' : outcome === 'critical' ? 'Critical' : 'Hit'}.`, { fighterId: id, roll, result: outcome });
       } else if (disrupted && !isV2(state)) {
@@ -422,15 +429,16 @@ function enemyPhase(state, emit) {
 
 function flak(state, emit, reason) {
   bump(state, 'flakAttacks');
-  record(emit, 'FLAK_STARTED', `${reason} Flak fires ${state.config.flakShots} consecutive shot${state.config.flakShots === 1 ? '' : 's'}.`);
-  for (let shot = 0; shot < state.config.flakShots; shot++) resolveAttack(state, emit, { source: `Flak ${shot + 1}/${state.config.flakShots}` });
+  const shots = Math.max(0, state.config.flakShots + storyModifier(state, 'flakShots'));
+  record(emit, 'FLAK_STARTED', `${reason} Flak fires ${shots} consecutive shot${shots === 1 ? '' : 's'}.`);
+  for (let shot = 0; shot < shots; shot++) resolveAttack(state, emit, { source: `Flak ${shot + 1}/${shots}` });
   record(emit, 'FLAK_ENDED', 'Flak salvo complete.');
 }
 
 function missionDraw(state, crew, emit, { unavailable = false, intercept = false } = {}) {
   const draw = drawBag(state, state.bags.mission);
   if (draw.refilled) record(emit, 'MISSION_BAG_REFILLED', 'The mission bag was empty. Emergency refill from its discard pool.');
-  const token = draw.token;
+  const token = storyToken(draw.token);
   if (!token) {
     record(emit, 'MISSION_BAG_EMPTY', 'The mission bag and discard are empty; no mission token is available.');
     return;
@@ -453,7 +461,7 @@ function missionDraw(state, crew, emit, { unavailable = false, intercept = false
     }
     return;
   }
-  state.bags.mission.discard.push(token);
+  state.bags.mission.discard.push(draw.token);
   if (intercept) return flak(state, emit, 'Radio Intercept turns the Enemy draw into Flak.');
   if (state.fighters.length >= state.config.maxFighters) return flak(state, emit, 'The fighter queue is full; no enemy card is drawn.');
   const deckDraw = drawDeck(state, state.deck);
@@ -481,8 +489,9 @@ function combatPull(state, emit, crewId, fighterId) {
     return 'Miss';
   }
   state.bags.combat.discard.push(result.token);
-  record(emit, 'GUNNER_SHOT_ROLL', `${nameOf(crewId)} pulls ${result.token.toUpperCase()}.`, { crewId, fighterId, token: result.token });
-  return result.token;
+  const token = storyToken(result.token);
+  record(emit, 'GUNNER_SHOT_ROLL', `${nameOf(crewId)} pulls ${token.toUpperCase()}.`, { crewId, fighterId, token });
+  return token;
 }
 
 function shoot(state, crew, targetId, emit, advanced = false) {
@@ -638,22 +647,26 @@ function finishJob(state, job, emit, deferReturn = false) {
   for (const worker of workers) worker.job = null;
   if (!deferReturn) returnWorkers(state, workers, emit);
   recalculateConditions(state, emit);
+  reconcileStory(state, emit);
 }
 
-function startJob(state, crew, command, emit) {
+function startJob(state, crew, command, emit, storyWork = null) {
   const kind = command.action;
   const targetCells = kind === 'medical' ? person(state, command.targetId).position : command.cells;
   const location = workPosition(state, crew, targetCells, command.workCellId);
   const durationKey = kind === 'fireControl' ? 'fireDuration' : `${kind}Duration`;
   const assistant = isV2(state) && command.assistantId ? person(state, command.assistantId) : null;
   const timeKind = kind === 'fireControl' ? 'Fire' : kind === 'medical' ? 'Medical' : 'Repair';
-  const duration = isV2(state) ? state.config[`v2${assistant ? 'Assisted' : ''}${timeKind}Time`] : state.config[durationKey];
+  const duration = storyWork?.time ?? (isV2(state) ? Math.max(0, state.config[`v2${assistant ? 'Assisted' : ''}${timeKind}Time`] + storyJobTime(state, kind)) : state.config[durationKey]);
   const costKey = kind === 'fireControl' ? 'fireCost' : `${kind}Cost`;
-  if (state.config[costKey]) spend(state, rankOf(crew), state.config[costKey], emit);
+  const cost = storyWork ? 0 : storyActionCost(state, kind, state.config[costKey]);
+  if (cost) spend(state, rankOf(crew), cost, emit);
+  if (!storyWork) consumeStoryAction(state, kind, emit);
   crew.position = location;
   leaveStation(crew);
   record(emit, 'CREW_RELOCATED', `${nameOf(crew.id)} moves to safe work position ${location.join(', ')}.`, { crewId: crew.id, cellId: location[0] });
   const job = { id: `job-${state.nextId++}`, kind, crewId: crew.id, targetId: command.targetId || null, cells: kind === 'medical' ? [] : [...command.cells], ...(isV2(state) ? { remainingTime: duration, ...(assistant ? { assistantId: assistant.id } : {}) } : { completeRound: state.round + duration }), workPosition: location };
+  if (storyWork) job.storyThreadId = storyWork.threadId;
   crew.job = job.id;
   if (assistant) {
     assistant.job = job.id;
@@ -675,7 +688,7 @@ function assistJob(state, crew, command, emit) {
   const position = workPosition(state, crew, assistWorkTargets(state, job), command.workCellId);
   const timeKind = job.kind === 'fireControl' ? 'Fire' : job.kind === 'medical' ? 'Medical' : 'Repair';
   const previousTime = job.remainingTime;
-  job.remainingTime = Math.min(previousTime, state.config[`v2Assisted${timeKind}Time`]);
+  job.remainingTime = Math.min(previousTime, Math.max(0, state.config[`v2Assisted${timeKind}Time`] + storyJobTime(state, job.kind)));
   job.assistantId = crew.id;
   crew.position = position;
   crew.job = job.id;
@@ -683,6 +696,7 @@ function assistJob(state, crew, command, emit) {
   observe(state, 'assistedJobs');
   record(emit, 'CREW_RELOCATED', `${nameOf(crew.id)} moves to safe work position ${position.join(', ')}.`, { crewId: crew.id, cellId: position[0] });
   record(emit, 'WORK_ASSISTED', `${nameOf(crew.id)} assists ${nameOf(job.crewId)}: ${previousTime} → ${job.remainingTime} Time remaining. Their normal crew action is consumed; no resources are spent.`, { crewId: crew.id, assistantId: crew.id, primaryCrewId: job.crewId, jobId: job.id, kind: job.kind, previousTime, remainingTime: job.remainingTime });
+  if (job.remainingTime === 0) completeJobs(state, [job], emit);
 }
 
 export function resolveFireSpread(state, emit) {
@@ -803,7 +817,7 @@ function resolveAction(state, crew, command, emit) {
   record(emit, 'CREW_ACTION', `${nameOf(crew.id)}: ${availableActions(state, crew.id).find(item => item.id === action).label}.`, { crewId: crew.id, action });
   switch (action) {
     case 'basicFire': shoot(state, crew, command.targetId, emit); break;
-    case 'advancedFire': spend(state, 'Enlisted', 1, emit); shoot(state, crew, command.targetId, emit, true); break;
+    case 'advancedFire': spend(state, 'Enlisted', storyActionCost(state, 'advancedFire', 1), emit); consumeStoryAction(state, 'advancedFire', emit); shoot(state, crew, command.targetId, emit, true); break;
     case 'repair': case 'fireControl': case 'medical': startJob(state, crew, command, emit); break;
     case 'assistWork': assistJob(state, crew, command, emit); break;
     case 'relocate': crew.position = [command.targetId]; leaveStation(crew); record(emit, 'CREW_RELOCATED', `${nameOf(crew.id)} relocates to ${command.targetId}.`, { crewId: crew.id, cellId: command.targetId }); break;
@@ -856,7 +870,8 @@ function resolveAction(state, crew, command, emit) {
       break;
     }
     case 'escort': {
-      spend(state, 'Enlisted', state.config.escortCost, emit);
+      spend(state, 'Enlisted', storyActionCost(state, 'escort', state.config.escortCost), emit);
+      consumeStoryAction(state, 'escort', emit);
       const quadrant = QUADRANTS[die(state, 4) - 1];
       state.escorts.push({ id: `escort-${state.nextId++}`, quadrant, ...(isV2(state) ? { progress: state.mission.position } : { round: state.round }) });
       record(emit, 'ESCORT_SUMMONED', isV2(state) ? `Escort arrives in ${quadrant} until the next Progress checkpoint.` : `Escort arrives in ${quadrant} for the rest of Round ${state.round}.`, { quadrant });
@@ -890,6 +905,26 @@ function endActivation(state, emit) {
 function continuousSystems(state, emit) {
   return { availableCrew, nameOf, missionDraw, enemyPhase, resolveFireSpread, recalculateConditions, resolveAltitude,
     completeJobs: jobs => completeJobs(state, jobs, emit) };
+}
+
+function storyServices(state, emit) {
+  const workerFor = effect => {
+    const cells = effect.kind === 'medical' ? person(state, effect.targetId)?.position : [effect.cellId];
+    if (!cells?.length || (effect.kind === 'repair' && status(state, effect.cellId) !== 'damaged') || state.jobs.some(job => job.cells?.includes(effect.cellId))) return null;
+    return state.crew.filter(crew => crew.health === 'healthy' && !crew.job && !underTreatment(state, crew.id) && legalWorkPositions(state, crew.id, cells).length)
+      .sort((a, b) => Number(b.id === 'engineer') - Number(a.id === 'engineer'))[0] ?? null;
+  };
+  return {
+    canWork: effect => Boolean(workerFor(effect)),
+    startWork: (effect, thread) => {
+      const worker = workerFor(effect);
+      requireRule(worker, 'No healthy free worker can reach the Story work.');
+      startJob(state, worker, { action: effect.kind, cells: [effect.cellId], targetId: effect.targetId }, emit, { time: effect.time, threadId: thread.id });
+    },
+    damage: (cellId, steps) => damageSquare(state, cellId, steps, emit, { injureCrew: false }),
+    recalculate: () => recalculateConditions(state, emit),
+    gainTime: () => gainBonusTime(state, emit, jobs => completeJobs(state, jobs, emit), 'story'),
+  };
 }
 
 function startRound(state, emit) {
@@ -1001,7 +1036,9 @@ export function dispatch(original, command) {
   const events = [];
   const emit = event => events.push({ ...event, state: copy(state) });
   requireRule(state.phase !== 'ended', 'This sortie has ended. Start a new sortie to continue.');
+  requireRule(state.phase !== 'story' || command.type === 'storyChoice', 'Resolve the current Story situation before continuing tactical play.');
   switch (command.type) {
+    case 'storyChoice': chooseStory(state, command.choiceId, emit, storyServices(state, emit)); break;
     case 'turnBack': turnBack(state, emit, command.confirmed); break;
     case 'placeBombDie': placeBombDie(state, command.slot, command.dieIndex, emit); break;
     case 'rerollBombDie': rerollBombDie(state, command.dieIndex, command.source, emit); break;
@@ -1122,5 +1159,16 @@ export function dispatch(original, command) {
       break;
     default: throw new Error(`Unknown command: ${command.type}`);
   }
+  reconcileStory(state, emit);
+  if (state.storyBoundaryReady) {
+    delete state.storyBoundaryReady;
+    evaluateStoryBoundary(state, emit, storyServices(state, emit));
+  }
+  // Story owns the target boundary before any Bomb Run dice are rolled.
+  if (storyEnabled(state) && state.phase === 'bombing' && !state.mission.bombRun && !state.outcome) {
+    beginBombRun(state, emit);
+    reconcileStory(state, emit);
+  }
+  if (storyEnabled(state) && !state.outcome) refreshTimeRequirement(state);
   return { state, events };
 }

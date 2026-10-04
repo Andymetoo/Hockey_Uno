@@ -9,7 +9,7 @@ const b = await openBrowser({ port: 9341, artifactFolder: 'continuous' });
 const { evaluate, click, touch, inject, flush, getState, viewport, screenshot } = b;
 const checks = [];
 const note = message => { checks.push(message); console.log(message); };
-const fresh = config => createGame({ opportunityEnabled: false, ...config }, 'continuous-browser', 'v2-continuous');
+const fresh = config => createGame({ v2StoryMode: false, opportunityEnabled: false, ...config }, 'continuous-browser', 'v2-continuous');
 const choose = async action => { await click('[data-ui="choose"]'); await click(`[data-action="${action}"]`); };
 
 try {

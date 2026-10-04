@@ -264,3 +264,21 @@ dialog{background-color:#d8d2bb;background-image:repeating-linear-gradient(0deg,
 .crew-action-marker[data-action="basicFire"],.crew-action-marker[data-action="advancedFire"],.crew-action-marker[data-action="directFire"]{color:#99492d;background:#f0ded0;border-color:#c99877}
 .crew-action-marker[data-action="wait"]{color:#646b5b;background:#e5e4d9;border-color:#c1c2b4}
 @media(max-width:650px){.crew-detail>summary{min-height:36px;padding:6px 9px;font-size:11px}.crew-detail-body{padding:2px 9px 8px}.resource-counts{gap:24px}.resource-count small{font-size:8px}.resource-count b{font-size:20px}.resource-caption{font-size:7px}.action-glyph{width:26px;height:26px;flex-basis:26px;padding:4px}.action-option{gap:8px}.action-option .action-cost{min-width:42px;padding:4px 5px;font-size:8px}.crew-action-marker{font-size:6px;gap:2px;padding:2px}.crew-action-glyph{width:11px;height:11px;flex-basis:11px}}
+/* Saved Story situations share the aircraft's existing sheets and HUD. */
+.story-status{display:flex;justify-content:flex-end;padding:3px 24px 0;min-height:0}
+.story-status[hidden]{display:none}
+.story-indicator{display:inline-flex;align-items:center;gap:7px;min-height:44px;padding:5px 10px;font-size:10px;background:transparent;border-color:transparent;color:#777766;position:relative}
+.story-indicator.has-conditions{color:#72501f;border-color:#b49a60;background:#eee1bd}
+.story-indicator>span:first-child{font-size:16px}.story-indicator b{min-width:19px;padding:2px 4px;border-radius:12px;background:#78643d;color:#fff6d6;text-align:center}
+.story-pending-dot{height:7px;width:7px;border-radius:50%;background:#a54329}
+.story-condition{border:1px solid #bbb49b;border-left:4px solid #a88745;padding:13px 15px;margin:13px 0;background:#f2ecd9;border-radius:5px;overflow-wrap:anywhere}
+.story-condition.positive{border-left-color:#4d7757;background:#e7eddb}.story-condition.negative{border-left-color:#a5513d}
+.story-condition h3{font-size:14px;line-height:1.35;margin:0 0 7px}.story-condition p{margin:7px 0 12px}
+.story-condition dl{display:grid;grid-template-columns:100px minmax(0,1fr);gap:6px 10px;margin:0}.story-condition dt{font-weight:750;font-size:11px}.story-condition dd{margin:0;font-size:12px}
+.story-cell-link{margin-top:10px;white-space:normal;font-size:11px}
+.story-condition .story-token-count{font-size:11px;line-height:1.5;margin:10px 0 0;color:#62664f}
+.story-recent{margin-top:19px;border-top:1px solid var(--line)}.story-recent summary{padding:13px 0}.story-recent ul{padding:0;list-style:none;margin:0}.story-recent li{padding:8px 0;font-size:12px;line-height:1.5}.story-recent li b,.story-recent li span{display:block}.story-recent li span{color:#6b6f5b}
+.story-choices{display:grid;gap:10px}.story-choice{text-align:left;display:grid;gap:7px;padding:15px;min-height:72px;background:#f7f1dc;border-color:#b7b69c;white-space:normal;overflow-wrap:anywhere}.story-choice strong{font-size:14px}.story-choice span{font-size:12px;font-weight:400;line-height:1.55}.story-choice small{color:#944e38;font-size:11px;font-weight:600}
+.story-situation{font-family:Georgia,serif;font-size:17px;line-height:1.6}.story-inspect-note{margin-top:20px;color:#686e5b}
+.story-flight-facts{margin:18px 0;padding:12px 15px;background:#eee8d4;border-left:3px solid #928357;border-radius:3px;overflow-wrap:anywhere}.story-flight-facts h3{font-family:Georgia,serif;font-size:17px;font-weight:500;margin:0 0 10px}.story-flight-facts ol{padding-left:20px;margin:0}.story-flight-facts li{font-size:12px;line-height:1.55;padding:3px 0}.story-flight-facts small{font-size:9px;margin-left:8px;color:#777965}
+@media(max-width:650px){.story-status{padding:1px 7px 0}.story-indicator{font-size:10px;padding:4px 9px}.story-condition{padding:12px;margin:11px 0}.story-condition dl{grid-template-columns:1fr;gap:2px}.story-condition dd{margin-bottom:7px;font-size:12px}.story-dialog .dialog-heading h2{font-size:23px}.story-dialog .dialog-content{padding:14px 16px 20px}.story-choice{padding:13px;gap:5px}.story-situation{font-size:16px}.story-flight-facts{padding:12px}.story-flight-facts small{display:block;margin-left:0}}

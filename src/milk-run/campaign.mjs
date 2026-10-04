@@ -176,6 +176,8 @@ export function prepareCampaignSortie(store, campaignId, freshState, { aircraftI
   }
   const assignment = { campaignId: campaign.id, sortieId: idFactory(), sortieNumber: campaign.sorties.length + 1,
     aircraftId: aircraft.id, crewIds: { ...campaign.roster }, startedAt: createdAt };
+  const priorStoryThreads = campaign.sorties.at(-1)?.storyThreads ?? [];
+  if (priorStoryThreads.length) assignment.priorStoryThreads = [...priorStoryThreads];
   campaign.activeSortie = clone(assignment); updated.activeCampaignId = campaign.id;
   const state = { ...clone(freshState), campaign: clone(assignment) };
   validateCampaignStore(updated);
@@ -287,7 +289,8 @@ export function finalizeCampaignSortie(store, state, events = []) {
     bombing, progressReached: state.mission.position, missionLength: missionLengths(state).outboundLength + missionLengths(state).returnLength,
     turns: state.stats.turns, finalAltitude: state.altitude, finalCompromisedSections: [...state.compromised],
     enginesLost: state.engines.filter(engine => !engine.running).length, aircraftHits: state.stats.aircraftHits,
-    config: clone(state.config), telemetry: clone(state.telemetry ?? null) };
+    config: clone(state.config), telemetry: clone(state.telemetry ?? null),
+    storyFacts: clone(state.story?.facts ?? []), storyThreads: Object.keys(state.story?.threads ?? {}) };
   const aircraft = campaign.aircraft.find(item => item.id === assignment.aircraftId);
   aircraft.missionsFlown++; if (aircraftSurvived) aircraft.missionsSurvived++; if (aborted) aircraft.missionsAborted++;
   aircraft.fightersDestroyed += record.fightersDestroyed; aircraft.timesDamaged += record.aircraftHits;
@@ -313,6 +316,7 @@ function validateAssignment(value, campaign) {
     campaign.aircraft.some(item => item.id === value.aircraftId && !item.lost) && date(value.startedAt) && object(value.crewIds), 'invalid sortie assignment: aircraft must be available, never lost.');
   check(Object.keys(value.crewIds).length === roles.length && roles.every(role =>
     campaign.crew.some(member => member.id === value.crewIds[role] && member.role === role && !member.kia)), 'invalid assigned crew: KIA personnel cannot fly.');
+  check(value.priorStoryThreads === undefined || Array.isArray(value.priorStoryThreads) && value.priorStoryThreads.every(thread => text(thread)), 'invalid prior Story metadata.');
 }
 
 /** Reject unknown versions, malformed identity links and inconsistent totals before replacing storage. */
@@ -343,6 +347,9 @@ function validateStore(store, version) {
     check(campaign.aircraft.some(item => item.id === campaign.currentAircraftId) &&
       roles.every(role => campaign.crew.some(member => member.id === campaign.roster[role] && member.role === role)), 'invalid current aircraft or roster.');
     for (const [index, sortie] of campaign.sorties.entries()) {
+      check(sortie.storyFacts === undefined || Array.isArray(sortie.storyFacts) && sortie.storyFacts.every(fact =>
+        object(fact) && text(fact.text, 1000) && count(fact.progress) && (fact.threadId === undefined || text(fact.threadId))), 'invalid Story history facts.');
+      check(sortie.storyThreads === undefined || Array.isArray(sortie.storyThreads) && sortie.storyThreads.every(thread => text(thread)), 'invalid Story history threads.');
       check(object(sortie) && sortie.number === index + 1 && date(sortie.date) && date(sortie.startedAt) && typeof sortie.seed === 'string' && text(sortie.result) &&
         ['success', 'destroyed'].includes(sortie.outcome) && typeof sortie.aborted === 'boolean' && typeof sortie.completed === 'boolean' && typeof sortie.aircraftSurvived === 'boolean' &&
         sortie.aircraftSurvived === (sortie.outcome === 'success') && campaign.aircraft.some(item => item.id === sortie.aircraftId) &&

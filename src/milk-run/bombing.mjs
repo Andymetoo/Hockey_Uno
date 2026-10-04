@@ -4,6 +4,7 @@ import { die } from './random.mjs';
 import { CREW_DEFS } from './board.mjs';
 import { specialistOperator } from './crew-position.mjs';
 import { isV2 } from './rulesets.mjs';
+import { storyConditions, storyFlag, addStoryFact, reconcileStory } from './story-effects.mjs';
 import { BOMBRUN_SLOTS, DEFAULT_BOMBING_TARGET, getBombingTarget, validBombingTarget,
   scoreBombDie, targetOutcome, bombingOutcomeLabel } from './bombing-targets.mjs';
 
@@ -42,6 +43,9 @@ export function beginBombRun(state, emit, targetId = state.mission.targetId ?? D
     'A V2 Bomb Run is available only over the outbound target before a drop or abort.');
   requireRule(!state.mission.bombRun, 'This Bomb Run has already begun.');
   const target = structuredClone(getBombingTarget(targetId));
+  for (const condition of storyConditions(state)) for (const [slot, amount] of Object.entries(condition.modifiers?.bombRange ?? {})) {
+    if (target.ranges[slot]) target.ranges[slot] = [Math.max(1, target.ranges[slot][0] - amount), Math.min(6, target.ranges[slot][1] + amount)];
+  }
   const operator = bombardierOperator(state);
   const noDropReason = operator ? null : 'Bombardier station is not operationally manned by the healthy Bombardier or an Officer substitute.';
   state.mission.targetId = target.id;
@@ -52,12 +56,15 @@ export function beginBombRun(state, emit, targetId = state.mission.targetId ?? D
     freeRerollAvailable: operator?.id === 'bombardier', freeRerollUsed: false,
     officerRerollsSpent: 0, slotScores: null, committedScore: null,
     outcome: operator ? null : 'no-drop', noDropReason,
+    ...(storyConditions(state).length ? { storyOfficerBlocked: storyFlag(state, 'bombOfficerBlocked') } : {}),
   };
   if (!operator) {
     state.mission.bombed = true;
     state.mission.bombingResult = 'no-drop';
     state.phase = 'select';
     record(emit, 'BOMBING_NO_DROP', `NO DROP — ${noDropReason} Turning for HOME.`, { targetId: target.id, outcome: 'no-drop', reason: noDropReason });
+    if (state.story) addStoryFact(state, 'target', `${target.name}: NO DROP — ${noDropReason}`, 'bombing');
+    reconcileStory(state, emit);
   } else {
     record(emit, 'BOMBING_STARTED', `${target.name} — BOMB RUN. Place three of four dice into Course, Drift and Release.`, { targetId: target.id, operatorId: operator.id });
     record(emit, 'BOMB_RUN_ROLLED', `4d6: ${state.mission.bombRun.dice.join(' · ')}. ${operator.id === 'bombardier' ? 'Bombardier: one free die reroll.' : 'Officer substitute: no free reroll.'}`, {
@@ -94,6 +101,7 @@ export function rerollBombDie(state, dieIndex, source = 'auto', emit) {
   requireRule(['auto', 'free', 'officer'].includes(source), 'Choose the free Bombardier reroll or one Officer resource.');
   const free = source === 'free' || source === 'auto' && run.freeRerollAvailable;
   requireRule(!free || run.freeRerollAvailable, 'The free Bombardier reroll is unavailable.');
+  requireRule(free || !run.storyOfficerBlocked, 'Current target conditions prevent Officer-resource rerolls.');
   requireRule(free || state.resources.Officer >= 1, 'A die reroll needs 1 Officer resource.');
   const before = run.dice[dieIndex];
   if (free) {
@@ -134,10 +142,12 @@ export function commitBombRun(state, emit) {
   state.mission.bombed = true;
   state.mission.bombingResult = run.outcome;
   state.phase = 'select';
+  if (state.story) addStoryFact(state, 'target', `${run.target.name} ${state.story.conditions.some(c => c.id === 'cloud_target') ? 'bombed through the earlier cloud' : 'Bomb Run completed'} — ${bombingOutcomeLabel(run.outcome)} (${run.committedScore}/9).`, 'bombing');
   record(emit, 'BOMBING_RESOLVED', `${BOMBRUN_SLOTS.map(slot => `${slot.toUpperCase()} ${run.slotScores[slot]}/3`).join(' · ')} — TOTAL ${run.committedScore}/9 — ${bombingOutcomeLabel(run.outcome)}. Turning for HOME.`, {
     targetId: run.target.id, operatorId: run.operatorId, dice: [...run.dice], placement: { ...run.placement },
     unusedDie: run.unusedDie, slotScores: { ...run.slotScores }, score: run.committedScore, outcome: run.outcome,
   });
+  reconcileStory(state, emit);
   return { ...preview };
 }
 
@@ -150,7 +160,8 @@ export function validateBombRunSnapshot(state) {
   if (!isV2(state) || run.version !== BOMB_RUN_VERSION || !validBombingTarget(run.target) ||
       state.mission.targetId !== run.target.id || !['placing', 'committed', 'no-drop'].includes(run.status) ||
       !Array.isArray(run.dice) || !run.placement || typeof run.freeRerollAvailable !== 'boolean' ||
-      typeof run.freeRerollUsed !== 'boolean' || !Number.isSafeInteger(run.officerRerollsSpent) || run.officerRerollsSpent < 0) return false;
+      typeof run.freeRerollUsed !== 'boolean' || (run.storyOfficerBlocked !== undefined && typeof run.storyOfficerBlocked !== 'boolean') ||
+      !Number.isSafeInteger(run.officerRerollsSpent) || run.officerRerollsSpent < 0) return false;
   if (!BOMBRUN_SLOTS.every(slot => run.placement[slot] === null || Number.isInteger(run.placement[slot]) && run.placement[slot] >= 0 && run.placement[slot] < 4)) return false;
   const placed = usedDice(run);
   if (new Set(placed).size !== placed.length || run.unusedDie !== unusedDie(run)) return false;

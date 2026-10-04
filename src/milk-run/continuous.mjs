@@ -6,14 +6,15 @@ import { observe } from './telemetry.mjs';
 import { effectiveTimeThreshold } from './crew-position.mjs';
 import { recordSortieEnd } from './results.mjs';
 import { beginBombRun, bombRunTargetWarning } from './bombing.mjs';
+import { storyEnabled, storyModifier } from './story-effects.mjs';
 
 const record = (emit, type, message, extra = {}) => emit({ type, message, ...extra });
 
 export function engagementFor(state, type) {
-  return state.config[{
+  return Math.max(1, state.config[{
     'BF-109': 'v2Bf109Engagement', 'BF-110': 'v2Bf110Engagement',
     'FW-190': 'v2Fw190Engagement', 'Me-262': 'v2Me262Engagement',
-  }[type]];
+  }[type]] + storyModifier(state, 'engagement'));
 }
 
 export function spendEngagement(state, target, attackPass, emit) {
@@ -39,8 +40,8 @@ export function gainTime(state, emit, completeJobs, { overflow = false, source =
   if (overflow) state.overflowTimeTokens.push('Time');
   else { state.timeTokens.push('Time'); state.time++; }
   if (source) {
-    const prefix = source === 'crew-cycle' ? 'CREW_CYCLE_TIME' : 'FIGHTER_KILL_TIME';
-    record(emit, `${prefix}_TAKEN`, `${source === 'crew-cycle' ? 'Crew Cycle refresh' : 'B-17 gunfire'} pulls 1 Time token from the mission bag.`, { source, token: 'Time', overflow });
+    const prefix = source === 'crew-cycle' ? 'CREW_CYCLE_TIME' : source === 'story' ? 'STORY_TIME' : 'FIGHTER_KILL_TIME';
+    record(emit, `${prefix}_TAKEN`, `${source === 'crew-cycle' ? 'Crew Cycle refresh' : source === 'story' ? 'The route opportunity' : 'B-17 gunfire'} pulls 1 Time token from the mission bag.`, { source, token: 'Time', overflow });
   }
   observe(state, 'timeTokensDrawn');
   observe(state, state.mission.bombed || state.mission.aborted ? 'returnTime' : 'outboundTime');
@@ -59,7 +60,7 @@ export function gainTime(state, emit, completeJobs, { overflow = false, source =
 
 /** Fighter kills can claim a real Time token already in the mission bag. */
 export function gainBonusTime(state, emit, completeJobs, source = 'fighter-kill') {
-  const prefix = source === 'crew-cycle' ? 'CREW_CYCLE_TIME' : 'FIGHTER_KILL_TIME';
+  const prefix = source === 'crew-cycle' ? 'CREW_CYCLE_TIME' : source === 'story' ? 'STORY_TIME' : 'FIGHTER_KILL_TIME';
   const overflow = state.pendingProgress || state.time >= effectiveTimeThreshold(state);
   if (overflow && state.overflowTimeTokens?.length) {
     record(emit, `${prefix}_FULL`, 'Bonus Time is already banked; no additional Time gained.', { source });
@@ -104,7 +105,7 @@ function progressCheckpoint(state, emit, shared) {
     } else if (state.mission.position >= outboundLength && !state.mission.bombed && !state.mission.aborted) {
       state.phase = 'bombing';
       record(emit, 'BOMBING_READY', 'TARGET reached. Begin the four-die Bomb Run.');
-      beginBombRun(state, emit);
+      if (!storyEnabled(state)) beginBombRun(state, emit);
     }
     const warning = bombRunTargetWarning(state);
     if (warning) record(emit, 'BOMBARDIER_TARGET_WARNING', warning);
@@ -133,6 +134,7 @@ function progressCheckpoint(state, emit, shared) {
     record(emit, 'ESCORTS_EXPIRED', 'Escorts depart at the Progress checkpoint.');
   }
   record(emit, 'PROGRESS_COMPLETED', `Progress checkpoint complete. Time reset; accumulated Time tokens returned${state.config.v2RefillAtProgress === false ? '; discards retained for emergency refill' : ' and discards refilled'}.`);
+  if (storyEnabled(state) && !state.outcome) state.storyBoundaryReady = true;
 }
 
 /** Close a between-turn shot chain without spending a Turn or an enemy phase. */
@@ -172,7 +174,7 @@ export function continueCycle(state, emit, shared) {
   const startingCycle = state.crewCycle.number;
   const mode = state.config.v2UnavailableCrewPressure ?? 'full';
   let deferredSlots = 0;
-  while (state.phase === 'select' && !state.pendingProgress && !shared.availableCrew(state).length) {
+  while (state.phase === 'select' && !state.pendingProgress && !state.storyBoundaryReady && !shared.availableCrew(state).length) {
     const crew = state.crew.find(item => !item.cycleSlotConsumed);
     if (!crew) throw new Error('A V2 Crew Cycle must refresh after its ten completed slots.');
     crew.cycleSlotConsumed = true;

@@ -32,7 +32,7 @@ async function confirmAbort() {
 }
 
 try {
-  await evaluate(`localStorage.removeItem(${JSON.stringify(CAMPAIGN_STORE_KEY)});localStorage.removeItem(${JSON.stringify(SAVE_KEY)});localStorage.setItem(${JSON.stringify(DEV_PREFERENCE_KEYS.v2)},JSON.stringify({version:1,overrides:{v2MissionEnemy:0,v2MissionResource:0,v2MissionTime:4,v2TimePerProgress:1}}));localStorage.setItem(${JSON.stringify(DEV_PREFERENCE_KEYS.common)},JSON.stringify({version:1,overrides:{opportunityEnabled:false,presentationSpeed:'instant'}}));`);
+  await evaluate(`localStorage.removeItem(${JSON.stringify(CAMPAIGN_STORE_KEY)});localStorage.removeItem(${JSON.stringify(SAVE_KEY)});localStorage.setItem(${JSON.stringify(DEV_PREFERENCE_KEYS.v2)},JSON.stringify({version:1,overrides:{v2StoryMode:false,v2MissionEnemy:0,v2MissionResource:0,v2MissionTime:4,v2TimePerProgress:1}}));localStorage.setItem(${JSON.stringify(DEV_PREFERENCE_KEYS.common)},JSON.stringify({version:1,overrides:{opportunityEnabled:false,presentationSpeed:'instant'}}));`);
   await reload();
   if (await evaluate("document.querySelector('#sortie-dialog').open")) {
     await click('#sortie-form input[value="v2-continuous"]'); await click('#sortie-form button[type="submit"]');

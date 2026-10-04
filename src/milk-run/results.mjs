@@ -1,4 +1,5 @@
 import { isV2, missionLengths } from './rulesets.mjs';
+import { finishStory } from './story.mjs';
 
 /** Stable, semantic end-state description shared by the HUD and recorder. */
 export function sortieResult(state) {
@@ -23,6 +24,7 @@ export function sortieResult(state) {
 }
 
 export function recordSortieEnd(state, emit) {
+  if (isV2(state)) finishStory(state, state.outcome === 'destroyed' ? 'destroyed' : 'home', emit);
   const result = sortieResult(state);
   emit({ type: 'MISSION_ENDED', message: `${result.title}. ${result.reason}.${result.aircraftSurvived ? '' : ` ${result.distanceLabel}.`}${result.bombingOutcome ? ` Bombing: ${String(result.bombingOutcome).toUpperCase()}.` : ''}${result.noDropReason ? ` ${result.noDropReason}` : ''}`, outcome: state.outcome, ...result });
 }

@@ -1,4 +1,5 @@
 import { CREW_DEFS, STATIONS } from './board.mjs';
+import { storyModifier } from './story-effects.mjs';
 
 export const CREW_POSITION_VERSION = 1;
 export const homeStationId = crew => crew.homeStation ?? crew.station ?? CREW_DEFS.find(c => c.id === crew.id)?.station;
@@ -38,5 +39,8 @@ export function specialistOperator(state, stationId) {
 }
 
 export function effectiveTimeThreshold(state) {
-  return state.config.v2TimePerProgress + (specialistOperator(state, 'navigator') ? 0 : state.config.v2NavigatorUnmannedTimePenalty ?? 0);
+  const base = state.config.v2TimePerProgress + (specialistOperator(state, 'navigator') ? 0 : state.config.v2NavigatorUnmannedTimePenalty ?? 0);
+  const modifier = storyModifier(state, 'nextProgress');
+  // A detour can never require more physical Time than this sortie owns.
+  return modifier ? Math.max(1, Math.min(state.config.v2MissionTime, base + modifier)) : base;
 }

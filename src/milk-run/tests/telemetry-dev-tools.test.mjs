@@ -6,7 +6,7 @@ import { saveSession, loadSession } from '../persistence.mjs';
 import { v2TelemetryRows } from '../telemetry.mjs';
 import { rngForIndexes, commitTestBombRun } from './fixtures.mjs';
 
-const fresh = overrides => createGame({ opportunityEnabled: false, v2MissionEnemy: 10, v2MissionResource: 80, v2MissionTime: 40, ...overrides }, 'telemetry-controls', 'v2-continuous');
+const fresh = overrides => createGame({ v2StoryMode: false, opportunityEnabled: false, v2MissionEnemy: 10, v2MissionResource: 80, v2MissionTime: 40, ...overrides }, 'telemetry-controls', 'v2-continuous');
 function activate(state, token = 'Time', crewId = availableCrew(state)[0].id) {
   const pool = state.bags.mission.tokens.length ? state.bags.mission.tokens : state.bags.mission.discard;
   const index = pool.indexOf(token); assert.ok(index >= 0);

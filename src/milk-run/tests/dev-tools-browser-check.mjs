@@ -10,7 +10,7 @@ const b = await openBrowser({ port: 9342, artifactFolder: 'dev-tools' });
 const { evaluate, click, touch, viewport, inject, getState, getView, flush, screenshot } = b;
 const checks = [], widths = [1440, 768, 320, 360, 390];
 const note = text => { checks.push(text); console.log(text); };
-const fresh = overrides => createGame({ opportunityEnabled: false, ...overrides }, 'ui-dev-pass', 'v2-continuous');
+const fresh = overrides => createGame({ v2StoryMode: false, opportunityEnabled: false, ...overrides }, 'ui-dev-pass', 'v2-continuous');
 async function editFields(values) {
   await evaluate(`(() => { const form=document.querySelector('#dev-form');
     for(const [key,value] of Object.entries(${JSON.stringify(values)})) {

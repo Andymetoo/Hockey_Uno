@@ -48,7 +48,7 @@ for (const disruptOnHit of [false, true]) test(`actual legacy V2 save preserves 
       return { ...c, homeStation: c.station, station: displaced ? null : c.station, displaced };
     });
     assert.deepEqual(s, { ...snapshots[i], overflowTimeTokens: [], crewPositionVersion: 1, crew: expectedCrew, v2ConfigVersion: 2, config: { ...snapshots[i].config,
-      v2NavigatorUnmannedTimePenalty: 0, v2CrewCycleRefreshGrantsTime: false, v2UnavailableCrewPressure: 'full',
+      v2StoryMode: false, v2NavigatorUnmannedTimePenalty: 0, v2CrewCycleRefreshGrantsTime: false, v2UnavailableCrewPressure: 'full',
       v2FighterKillGrantsTime: false, v2DisruptEnabled: disruptOnHit, v2DisruptEffect: 'auto-miss', v2MaxEscorts: null } });
     for (const k of ['v2RepairTime', 'v2FireTime', 'v2MedicalTime']) assert.equal(s.config[k], 6);
     for (const k of ['v2AssistedRepairTime', 'v2AssistedFireTime', 'v2AssistedMedicalTime']) assert.equal(s.config[k], 4);
@@ -256,7 +256,7 @@ test('two full V2 diagnostics are deterministic, conserve physical tokens, and r
   let commands = 0, snapshots = 0;
   const normalized = value => JSON.stringify(value, (key, v) => ['startedAt', 'endedAt'].includes(key) && v !== null ? 0 : v);
   function flight() {
-    let s = createGame({ v2MissionEnemy: 0, v2MissionResource: 0, v2MissionTime: 10, opportunityEnabled: false }, 'full-v2-diagnostic', 'v2-continuous');
+    let s = createGame({ v2StoryMode: false, v2MissionEnemy: 0, v2MissionResource: 0, v2MissionTime: 10, opportunityEnabled: false }, 'full-v2-diagnostic', 'v2-continuous');
     const resources = resourceCount(s), trace = [];
     while (s.phase !== 'ended') {
       const command = s.phase === 'select' ? { type: 'activate', crewId: availableCrew(s)[0].id }

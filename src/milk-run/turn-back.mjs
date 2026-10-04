@@ -1,5 +1,6 @@
 /** Campaign strategy only. Reversal changes the route, never the combat clocks. */
 import { isV2 } from './rulesets.mjs';
+import { finishStory } from './story.mjs';
 
 export function emergencyReturnDistance(state) {
   // Position counts completed physical Progress, including the TARGET space.
@@ -22,6 +23,7 @@ export function turnBack(state, emit, confirmed = false) {
   state.mission.bombingResult = 'aborted';
   state.phase = 'select';
   state.activeCrew = null;
+  finishStory(state, 'turnBack', emit);
   emit({ type: 'MISSION_ABORTED', abortProgress: state.mission.abortProgress, emergencyReturnLength: state.mission.emergencyReturnLength,
     message: `MISSION ABORTED — RETURNING HOME. Emergency route replaces the outbound flight plan: ${state.mission.emergencyReturnLength} Progress to HOME. Current aircraft, crew, fighters, damage, fires, work and supplies remain in play.` });
 }

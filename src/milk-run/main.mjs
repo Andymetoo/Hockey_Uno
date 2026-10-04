@@ -22,6 +22,8 @@ import { DIRECT_ACTIONS, beginTargeting, targetOptions, selectTarget, needsWorkP
 import { crisisTargetCap } from './rules.mjs';
 import { loadSession, saveSession, hasLegacyBoardSave, loadDevPreferences, saveDevPreferences, resetDevPreferences, resetDevPreferencesScope } from './persistence.mjs';
 import { deriveCellHistory, hitLocationHeatMap } from './diagnostics.mjs';
+import { storyIndicatorMarkup, storyConditionsMarkup, storyChoiceMarkup, storyFactsMarkup } from './story-view.mjs';
+import { storyToken, storyJobTime } from './story-effects.mjs';
 
 const $ = selector => document.querySelector(selector);
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -38,6 +40,7 @@ let devPreferences = loadDevPreferences();
 let selectedBombDie = null, campaignStore, campaignStoreError = '', pendingCampaignImport = null;
 let resultPresented = false;
 let autosaveEnabled = true, pendingDiscard = null;
+let shownStoryPrompt = null;
 try {campaignStore=loadCampaignStore();}catch(error){campaignStore=createCampaignStore();campaignStoreError=error.message;}
 
 $('#app').innerHTML = `
@@ -51,6 +54,7 @@ $('#app').innerHTML = `
   </header>
   <div class="playback-topline"><button class="quiet campaign-entry" data-ui="campaign">Campaign</button><span id="campaign-sortie-label" class="campaign-sortie-label" hidden></span><div class="playback" aria-label="Presentation controls"><label>Speed <select id="speed" aria-label="Presentation speed"><option value="manual">Step / Manual</option><option value="normal">Normal</option><option value="fast">Fast</option><option value="instant">Instant</option></select></label><button data-ui="pause" class="quiet">Pause</button><button data-ui="step" class="quiet">Step</button><button data-ui="skip" class="quiet">Skip</button></div></div>
   <div id="status" class="status-strip" aria-label="Sortie status"></div>
+  <div id="story-status" class="story-status" hidden></div>
   <div id="time-status" class="time-status" hidden aria-live="polite"></div>
   <div id="bombardier-warning" class="bombardier-warning" role="alert" hidden></div>
   <main class="tabletop">
@@ -86,6 +90,12 @@ bombTestDialog.id = 'bomb-run-test-dialog';
 bombTestDialog.className = 'sheet wide bomb-test-dialog';
 bombTestDialog.setAttribute('aria-label', 'Bomb Run test — results are not saved');
 $('#app').append(bombTestDialog);
+const storyDialog = document.createElement('dialog');
+storyDialog.id = 'story-dialog';
+storyDialog.className = 'sheet story-dialog';
+storyDialog.setAttribute('aria-labelledby', 'story-title');
+storyDialog.innerHTML = '<div class="dialog-heading"><div><div class="eyebrow">IN FLIGHT / STORY</div><h2 id="story-title"></h2></div><button data-ui="close" class="close" aria-label="Inspect aircraft before deciding">×</button></div><div id="story-content" class="dialog-content"></div>';
+$('#app').append(storyDialog);
 const bombTest = mountBombRunTest(bombTestDialog, () => {
   const suspendedQueue = queue, hadTimer = queue.timer !== null;
   queue.dispose(); // Timer only: do not change/export any gameplay or queue flags.
@@ -110,6 +120,7 @@ function initialize(config = devPreferences, seed = 'MILK-RUN', saved = null, ru
   hitMapEnabled = false; hitMapStructure = true; hitMapEmpty = true;
   selectedBombDie = null;
   resultPresented = false;
+  shownStoryPrompt = null;
   render();
 }
 
@@ -117,7 +128,7 @@ function missionLengths(s) { const lengths=rulesetMissionLengths(s);return {outb
 function missionName(s) {
   const { outbound, back } = missionLengths(s);
   if (s.mission.position >= outbound + back) return 'HOME';
-  if (s.phase === 'bombing') return 'OVER TARGET';
+  if (s.phase === 'bombing' || s.phase === 'story' && s.story?.pending?.resumePhase === 'bombing') return 'OVER TARGET';
   if (s.mission.aborted) return 'ABORTED · RETURN';
   return s.mission.position < outbound ? 'OUTBOUND' : 'RETURN';
 }
@@ -140,6 +151,8 @@ function render() {
   $('#ruleset-label').classList.toggle('experimental-label',isV2(s));
   if (!selectedCrew || !s.crew.some(c => c.id === selectedCrew)) selectedCrew = availableCrew(s)[0]?.id ?? null;
   const status=$('#status');
+  const storyStatus=$('#story-status');
+  storyStatus.innerHTML=storyIndicatorMarkup(s);storyStatus.hidden=!storyStatus.innerHTML;
   status.classList.toggle('continuous-hud',isV2(s));
   status.classList.toggle('hud-expanded',compactHudExpanded);
   status.innerHTML = isV2(s)?continuousHudMarkup(s,compactHudExpanded):`<div><span>POSITION</span><strong>${missionName(s)} <small>${s.mission.position}</small></strong></div><div><span>ALTITUDE</span><strong class="${s.altitude <= 1 ? 'danger-text' : ''}">${s.altitude} <small>LEVELS</small></strong></div><div><span>RESOURCES</span><strong><b class="officer">${s.resources.Officer}</b><small> O</small> <b class="enlisted">${s.resources.Enlisted}</b><small> E</small>${s.config.opportunityEnabled?`<small class="opportunity-count" aria-label="${s.opportunity??0} of ${s.config.opportunityCap} Opportunity">◎ ${s.opportunity??0}/${s.config.opportunityCap}</small>`:''} </strong></div><div><span>ROUND / SLOT</span><strong>${s.round || '—'} <small>/ ${s.slot ?? 0} OF 10</small></strong></div>`;
@@ -160,6 +173,15 @@ function render() {
   $('#queue-count').textContent = queue.busy ? `${queue.pending.length} TO FOLLOW` : 'AWAITING ORDERS';
   $('#log-count').textContent = `${queue.log.length} events${saveWarning ? ' · autosave unavailable' : ' · autosaved'}`;
   if ($('#log-details').open) renderLog();
+  // The saved decision becomes visible only after the entire tactical sequence.
+  // Inspecting the board dismisses its sheet, never the decision itself.
+  const pending = s.phase === 'story' ? s.story?.pending : null;
+  if (!queue.busy && !interaction && pending && shownStoryPrompt !== pending.id && !document.querySelector('dialog[open]')) {
+    const pendingId = pending.id;
+    requestAnimationFrame(() => {
+      if (!queue.busy && !interaction && queue.view.phase === 'story' && queue.view.story?.pending?.id === pendingId && !document.querySelector('dialog[open]')) openStoryChoice();
+    });
+  }
 }
 function renderTrack(s) {
   const { outbound, back } = missionLengths(s), total = outbound + back;
@@ -193,7 +215,7 @@ function renderEvent(s) {
  $('#board-stage').innerHTML=interaction?'<div class="beat-icon">⌖</div><div><strong>'+esc(targetTitle(s))+'</strong><small>'+esc(targetHint(s))+'</small></div>':markup.stage;
 }
 function renderBags(s) {
-  const m=s.bags.mission,c=s.bags.combat,count=(bag,t)=>bag.tokens.filter(v=>v===t).length;
+  const m=s.bags.mission,c=s.bags.combat,count=(bag,t)=>bag.tokens.filter(v=>storyToken(v)===t).length;
   $('#bags').innerHTML=`<div class="bag-line"><span>Mission</span><strong>${m.tokens.length} in bag</strong></div><div class="bag-line muted"><span>${count(m,'Enemy')} enemy · ${count(m,'Resource')} resource${isV2(s)?` · ${count(m,'Time')} Time`:''}</span><span>${m.discard.length} discard</span></div><div class="bag-line"><span>Combat</span><strong>${count(c,'Hit')} hit / ${count(c,'Burst')} burst / ${count(c,'Miss')} miss</strong></div><div class="bag-line muted"><span>Held resources stay out.</span><span>${c.discard.length} discard</span></div><p class="small muted">${isV2(s)?`${s.timeTokens.length} Time held toward Progress; ${s.overflowTimeTokens?.length??0} bonus Time banked. ${s.config.v2RefillAtProgress===false?'Discard refill at Progress is disabled; accumulated Time still returns.':'Normal refill occurs at a Progress checkpoint.'}`:'Spent resources return next round.'} Bags refill early only when empty.</p>`;
 }
 function targetTitle(s) {
@@ -202,7 +224,7 @@ function targetTitle(s) {
   return ({repair:'Select damaged squares',fireControl:'Select burning squares',medical:'Select an injured crewmate',rotateFighter:'Select a fighter to turn',opportunityShot:'Select the gunner’s target',directFire:'Pilot Direct Fire · choose a fighter',basicFire:'Select a fighter · Basic Fire',advancedFire:'Select a fighter · Advanced Fire'})[t.action];
 }
 function workTiming(s,t) {
-  if(isV2(s)){const kind=t.action==='fireControl'?'Fire':t.action==='medical'?'Medical':'Repair';return `Completes after ${s.config[`v2${t.assistantId?'Assisted':''}${kind}Time`]} future Time draws${t.assistantId?' · assisted':''}`;}
+  if(isV2(s)){const kind=t.action==='fireControl'?'Fire':t.action==='medical'?'Medical':'Repair';const duration=Math.max(0,s.config[`v2${t.assistantId?'Assisted':''}${kind}Time`]+storyJobTime(s,t.action));return duration===0?'Completes immediately':`Completes after ${duration} future Time draws${t.assistantId?' · assisted':''}`;}
   const duration=s.config[t.action==='fireControl'?'fireDuration':t.action+'Duration'];
   return duration===0?'Completes immediately':`Completes at Round ${s.round+duration} start`;
 }
@@ -232,6 +254,7 @@ function renderAction(s) {
     const detail=$('#target-detail');detail.hidden=false;detail.innerHTML=`<strong>${esc(def(t.gunnerId??t.crewId)?.name??'Choose a completed gunner')} · ${esc(t.action==='opportunityShot'?'1 Opportunity':availableActions(s,t.crewId).find(a=>a.id===t.action)?.cost??'Free')}</strong><span>${esc(t.cells.join(' + ')||t.targetId&&def(t.targetId)?.name||'Tap highlighted targets')}</span>${needsWorkPosition(t)?`<span>${workTiming(s,t)}</span>`:''}${t.stage==='work'?`<span>Worker${t.assistantId?'s':''}: ${esc(t.workCellId??'choose internal position')} · targets stay on their original squares</span>`:''}${assistantMarkup(s,t)}`;
   }
   else if(queue.busy) { text=describeEvent(queue.current).title;sub=queue.speed==='manual'||queue.paused?'Step through each major beat at your pace.':queue.current?.message??'';button=`<button class="quiet" data-ui="skip">Skip</button>${queue.paused||queue.speed==='manual'?'<button class="quiet" data-ui="play">▶ Play</button>':''}<button class="primary" data-ui="${queue.speed==='manual'||queue.paused?'step':'pause'}">${queue.speed==='manual'||queue.paused?'Next beat →':'Pause beats'}</button>`; }
+  else if(isV2(s)&&s.phase==='story'&&s.story?.pending) {text=s.story.pending.title;sub='Inspect the aircraft and Current Conditions, then decide how the crew should respond.';button='<button class="primary" data-ui="story-choice">Resolve situation →</button>';}
   else if(isV2(s)&&s.pendingProgress&&['select','betweenOpportunity'].includes(s.phase)) {text='Opportunity window · Time track full';sub='Finish any Opportunity Shots, then resolve Progress before the next crew activation.';button='<button class="primary" data-command="continueProgress">Continue to Progress →</button>';}
   else if(isV2(s)&&s.phase==='betweenOpportunity'&&s.config.v2OpportunityProvokesEnemyPhase) {text='Between-turn Opportunity window';sub=opportunityAvailability(s).enabled?'Chain Opportunity Shots, then resolve one enemy phase before the next crew activation.':'Opportunity sequence complete. Resolve one enemy phase before the next crew activation.';button='<button class="primary" data-command="continueBetweenOpportunity">Continue to Enemy Phase →</button>';}
   else if(s.phase==='ready') { text=s.round?'Crew ready for the next leg.':'Your aircraft is ready.';sub=s.round?'Refill bags, complete work, then resolve fire.':'Begin round one. Choose your crew order.';button=`<button class="primary" data-command="startRound">${s.round?'Begin next round':'Begin sortie'} →</button>`; }
@@ -271,9 +294,20 @@ function renderSummary(s) {
   const telemetry=Object.entries(s.stats).filter(([key])=>!isV2(s)||key!=='rounds');
   const continuous=isV2(s)?`<h3>Playtest telemetry</h3><p class="small muted">Observations for comparing rules. Fighter averages include every spawned fighter, including early kills and fighters still active. Enemy actions completed and Engagement countdown spent are measured separately. Outbound and return Time count drawn Time tokens, not elapsed minutes.</p><div class="telemetry v2-telemetry">${v2TelemetryRows(s).map(row=>`<div><small>${esc(row.label)}</small><strong>${esc(row.value)}</strong></div>`).join('')}</div><h3>Flight record</h3>`:'';
   $('#summary').innerHTML=`<div class="eyebrow">END OF SORTIE / ${isV2(s)?'V2 — CONTINUOUS TIME · EXPERIMENTAL':'V1 — ROUND-BASED'} / SEED ${esc(s.seed)}</div><div class="sortie-result ${s.outcome==='success'?'returned':'lost'}" role="status"><h2>${esc(result.title)}</h2><p>${esc(result.reason)}</p>${result.distance?`<p>${esc(result.distanceLabel)}</p>`:''}<p>${esc(s.mission.aborted?'ABORTED — NO BOMBING CREDIT':s.mission.bombingResult?bombingOutcomeLabel(s.mission.bombingResult):'Target not reached')}${s.mission.bombRun?.noDropReason?' — '+esc(s.mission.bombRun.noDropReason):''}</p></div><p>${isV2(s)?`${s.stats.turns??0} Turns · ${s.mission.position} Progress`:`${s.round} rounds`} · ${elapsed} minutes · bombing ${s.mission.bombed ? esc(s.mission.bombingResult ?? 'attempted') : 'not reached'}</p>${continuous}<div class="telemetry">${telemetry.map(([k,v])=>`<div><small>${esc(k.replace(/([A-Z])/g,' $1'))}</small><strong>${typeof v==='object'?Object.entries(v).map(([a,b])=>`${a}: ${b}`).join(' · '):esc(v)}</strong></div>`).join('')}</div><button data-ui="export" class="quiet">Export full report</button>${s.campaign?'<button data-ui="campaign" class="primary">Return to Hangar</button>':''}`;
+  $('#summary .sortie-result').insertAdjacentHTML('afterend',storyFactsMarkup(s.story?.facts));
 }
 
 function openDialog(id) { if(queue.busy&&!queue.paused&&queue.speed!=='manual')queue.togglePause();focusBeforeDialog=document.activeElement; const dialog=$(id);if(!dialog.open)dialog.showModal(); }
+function openStoryChoice() {
+  const s=queue.view,pending=s.story?.pending;
+  if(queue.busy||interaction||s.phase!=='story'||!pending)return;
+  closeDialog();shownStoryPrompt=pending.id;
+  $('#story-title').textContent=pending.title;$('#story-content').innerHTML=storyChoiceMarkup(pending);
+  openDialog('#story-dialog');
+}
+function openStoryConditions() {
+  closeDialog();$('#info-title').textContent='Current Conditions';$('#info-content').innerHTML=storyConditionsMarkup(queue.view);openDialog('#info-dialog');
+}
 function closeDialog() {document.querySelectorAll('dialog[open]').forEach(d=>d.close());focusBeforeDialog?.focus({preventScroll:true});}
 function notice(message) {
   const content=document.querySelector('dialog[open] .dialog-content');
@@ -307,7 +341,12 @@ function crewDetails(s,c) {
 function resourceSummary(s,canAct) {
  return `<div class="action-resources" aria-label="Resources held: ${s.resources.Officer} Officer, ${s.resources.Enlisted} Enlisted"><div class="resource-counts"><span class="resource-count officer"><small>OFFICER</small><b>${s.resources.Officer}</b></span><span class="resource-count enlisted"><small>ENLISTED</small><b>${s.resources.Enlisted}</b></span></div><small class="resource-caption">AVAILABLE TO SPEND${canAct?'':' · PREVIEW — ACTIVATE FIRST'}</small></div>`;
 }
-function actionDescription(s,id) {return isV2(s)&&id==='escort'?`Call an escort into a random quadrant until the next Progress checkpoint (${s.config.v2MaxEscorts === null ? 'no simultaneous cap' : `maximum ${s.config.v2MaxEscorts} at once`}).`:actionDescriptions[id];}
+function actionDescription(s,id) {
+  if(isV2(s)&&id==='escort')return `Call an escort into a random quadrant until the next Progress checkpoint (${s.config.v2MaxEscorts === null ? 'no simultaneous cap' : `maximum ${s.config.v2MaxEscorts} at once`}).`;
+  if(isV2(s)&&['repair','medical','fireControl'].includes(id))return `${actionDescriptions[id]} ${workTiming(s,{action:id})}.`;
+  if(id==='directFire')return `Spend ${s.config.directFireCost} Officer → order any healthy gunner at an operational gun station to make one immediate Basic Shot. Does not use that gunner’s activation.`;
+  return actionDescriptions[id];
+}
 function openActions(crewId=queue.view.activeCrew??selectedCrew) {
  chosenAction=null;
  const s=queue.view,c=s.crew.find(c=>c.id===crewId);if(!c)return;
@@ -405,6 +444,8 @@ function inspectCell(id) {
   $('#info-title').textContent=`Cell History · ${id}`;
   const entries=history.entries.length?`<ol class="cell-history">${history.entries.map(item=>`<li><time>${esc(item.time)}</time><span>${esc(item.description)}</span></li>`).join('')}</ol>`:'<p class="cell-history-empty">No recorded events at this square yet.</p>';
   $('#info-content').innerHTML=`<p>${b.structure?`${esc(section(b.section).name)} · <b>${esc(s.cells[id])}</b>`:'Open sky · attack locations here pass through without structure damage.'}</p>${b.engine?`<p>Engine ${esc(b.engine)} damageable footprint.</p>`:''}${b.engineIndicator?`<p>${esc(b.engineIndicator)} running indicator: visual only. This square contains no aircraft structure and cannot damage the engine.</p>`:''}<p class="small">Hit-location rolls: <b>${b.structure?rolls.structure[id]??0:rolls.empty[id]??0}</b> ${b.structure?'on aircraft structure':'into empty space'}.</p>${entries}<p>${s.crew.filter(c=>c.health!=='dead'&&c.position.includes(id)).map(c=>`${esc(def(c.id).name)}: ${esc(c.health)}`).join('<br>')||'No crew at this position.'}</p><p class="small muted">Quarters: 1 top left, 2 top right, 3 bottom left, 4 bottom right. A rolled attack location is separate from actual structure damage.</p>`;
+  const storyConditions=s.config.v2StoryMode?s.story?.conditions.filter(condition=>(condition.cellId??condition.repairCell)===id)??[]:[];
+  if(storyConditions.length)$('#info-content').insertAdjacentHTML('afterbegin',`<div class="story-marked-cell">${storyConditions.map(condition=>`<p><b>◆ ${esc(condition.title)}</b><br>${esc(condition.effectText)}<br>${esc(condition.resolveText)}</p>`).join('')}<button class="quiet" data-ui="story-conditions">Current Conditions →</button></div>`);
   openDialog('#info-dialog');
 }
 function inspectHud(metric) {
@@ -529,6 +570,8 @@ function performDiscard() {
 }
 
 document.addEventListener('click', e=>{
+  const storyChoice=e.target.closest('[data-story-choice]');if(storyChoice){if(!storyChoice.disabled)send({type:'storyChoice',choiceId:storyChoice.dataset.storyChoice});return;}
+  const storyCell=e.target.closest('[data-story-cell]');if(storyCell){closeDialog();inspectCell(storyCell.dataset.storyCell);return;}
   const service=e.target.closest('[data-service-aircraft],[data-service-personnel]');
   if(service){
     const aircraft=service.dataset.serviceAircraft;
@@ -549,6 +592,8 @@ document.addEventListener('click', e=>{
   const command=e.target.closest('[data-command]');if(command){send({type:command.dataset.command});return;}
   const control=e.target.closest('[data-ui]');if(!control)return;
   switch(control.dataset.ui){
+    case 'story-conditions':openStoryConditions();break;
+    case 'story-choice':openStoryChoice();break;
     case 'status-toggle':compactHudExpanded=!compactHudExpanded;render();break;
     case 'campaign':openCampaign();break;
     case 'campaign-new':newCampaignForm();break;
