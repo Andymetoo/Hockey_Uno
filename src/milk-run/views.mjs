@@ -9,7 +9,7 @@ import { eligibleAssistJobs } from './rules.mjs';
 
 const esc = value => String(value ?? '').replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]));
 const classes = values => values.filter(Boolean).join(' ');
-const targetingFighters = interaction => interaction && ['basicFire', 'advancedFire', 'opportunityShot', 'rotateFighter'].includes(interaction.action);
+const targetingFighters = interaction => interaction && ['basicFire', 'advancedFire', 'directFire', 'opportunityShot', 'rotateFighter'].includes(interaction.action);
 
 export function continuousHudMarkup(state, expanded = false) {
   const threshold=effectiveTimeThreshold(state), navigationPenalty=(state.config.v2NavigatorUnmannedTimePenalty??0)>0&&!specialistOperator(state,'navigator');

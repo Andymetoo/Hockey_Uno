@@ -1,5 +1,79 @@
 # Milk Run — V1 and experimental V2
 
+## October 10 mobile presentation pass
+
+This is a **presentation-only** revision. Engine commands, legal actions, costs, probabilities, physical tokens, Time/Progress, crew qualifications, station ownership, Story effects, Campaign mechanics and Bomb Run scoring are unchanged. All work stays in `src/milk-run`; no dependencies, remote assets, branch, PR or deployment were added.
+
+### Audit and visual direction
+
+The starting Chromium audit reproduced the physical-phone framing problem with **raw touch input**, without the existing harness's automatic `scrollIntoView`. After activating from low in the document, at most **18.0% / 14.4% / 10.5%** of the aircraft grid was above the ready sheet at **360 / 390 / 430px**. Those baseline fractions ignore the sticky HUD, so are conservative upper bounds. The previous touch helpers concealed this problem. Other findings were repeated target instructions, crowded unavailable labels, equal emphasis for routine and climactic decisions, and next-flight Hangar controls buried beneath statistics. Late CSS also overrode injured/used board-token colors; sector backdrops could obscure and intercept taps on neighboring clustered fighters.
+
+The direction remains an olive/parchment **bomber operations board**: a clear plotting surface, restrained instrument graphics, readable wartime paperwork, and a consistent controller at the thumb edge. Mobile and desktop use the same actions and confirmation rhythm. The new final styles are separated by responsibility: `mobile-polish.css` for the controller/layout, `board-polish.css` for the tactical plot, and `sortie-polish.css` for situations, target instruments and service records.
+
+### Controller and viewport behavior
+
+- `viewport.mjs` measures `visualViewport`, the sticky HUD and the **actual** controller height, including its safe-area padding. It fits and centers the aircraft/fighter field in the remaining space when actions become ready, when targeting changes stage, or when a chooser changes the available height. On a short screen it preserves a readable minimum scale and favors relevant legal targets when the whole field cannot fit.
+- Framing happens at interaction boundaries, not on every event or tentative target selection. Wheel/touch inspection cancels queued automatic framing; pinch zoom retains the player's view. A **Choose crew** control brings the two-row roster into reach after resolution.
+- The ready palette keeps every relevant unavailable action visible. Consistent icons, family accents, concise cost labels, dashed unavailable states and the shared reason area replace repeated text. Targeting reduces the controller and keeps the action, cost, tentative target, Cancel and Confirm together. Medical/Repair/Fire Control retain patient/cell selection, safe work positions and optional assistance.
+- Clustered fighters retain the full-size chooser. Direct Fire and Opportunity keep separate gunner and fighter stages. Selections, inspection and Cancel never dispatch a command or consume RNG/resources. Native keyboard controls, SVG Enter/Space activation, focus restoration across replaced DOM, and Escape cancellation remain available.
+
+### Aircraft, crew, contacts and motion
+
+The structural outline, damaged hatch/cross, vector Fire symbol, suppressed-fire outline, engine indicators and legal/selected target markings are clearer. Crew keep their exact footprints and stacked-occupant packing; operator bars and accessible labels distinguish station operation from physical presence. Injured, used, dead, working, treated and displaced crew have distinct markings. The existing tapped-roster tilt remains.
+
+Contact tokens retain queue identity, HP/Engagement segments, heading and Disruption. All sector backgrounds now render before contacts, fixing overlap and hit interception. A tentative aiming line shows the gunner/target relationship. Finite cues show spawn, movement/rotation, gunfire results, damage, destruction, breakoff, crew movement/health changes, repairs, Fire and engine changes. Hit/Burst/Miss remain tied to the actual bag result; Burst is stronger, and Escort damage cannot inherit a stale gunner tracer. Route advancement, homebound direction, final approach, resource/Time/Opportunity gains and altitude loss receive restrained feedback.
+
+Normal and Manual board movement uses **360ms**, Fast **120ms**, and Instant/reduced motion omit movement. CSS follows the same speed variables and `prefers-reduced-motion`; semantic state and result text remain. Motion adds no authoritative queue waits or animation timers. Repeating board pulses were removed. Unchanged board/crew/enemy markup is retained rather than reconstructed; changed snapshots still render the authoritative visible queue state.
+
+### Story, target and service record
+
+Story now separates the crew report, numbered orders and selection status, with paired **Inspect aircraft / Continue** controls. Select → inspect → reopen → Continue and deterministic saved decisions are preserved. Conditions lead with Advantage/Hazard/Situation, effect and expiry; background and resolved history recede while remaining inspectable.
+
+The Bomb Run uses a target header, four tactile dice, per-slot range/distance and three-point scoring marks, a nine-point total, distinct rerolls and a clear Commit. At 390px the richer panel occupies **625px**, compared with **628px** in the audit. NO DROP shows its exact reason; after the next Progress it becomes a compact, expandable record instead of occupying the return leg. HOME/loss/abort debriefs separate aircraft return, bombing outcome and recorded crew health without inventing post-loss survival.
+
+The Hangar prioritizes aircraft selection and flight orders above archives/file management. At 390px its first aircraft moved from **y1182 to y363**, and flight orders from **y1574 to y685**. Campaign history, personnel links, import/export and telemetry remain available.
+
+### Fresh validation and evidence
+
+| Final validation | Result |
+| --- | --- |
+| Complete Node suite | **794 passed; 0 failed, skipped or cancelled** |
+| Chromium suites | **23 passed**, including compact flow, combat/economy, Story, Campaign/Hangar, Bomb Run, station/Reclaim, persistence, export/import, Turn Back and long-session checks |
+| New presentation browser coverage | **36 check groups**: 18 viewport/interaction, 10 board/motion, 8 Story/climax/focus |
+| Story playability review | **24/24 complete**, all **13 families**, **4,552 conservation checks**; 18 HOME / 6 lost |
+| Headless smoke | **4/4 complete**, **738 invariant checks**, 4 identical reruns and 4 exact replays |
+| Expanded headless, two policies across standard V2 / tactical V2 / standard V1 | **24/24 complete**, **4,251 invariant checks**, 12 identical pilot reruns and 12 exact pilot replays |
+
+The combined headless batches completed **28 sorties / 4,989 invariant checks**, with **zero invalid operations, stalls, limit hits, engine errors or invariant failures**. Eleven aircraft returned and 17 were lost; these are deterministic validation examples, not a balance estimate. The four smoke sorties also match the pre-edit baseline at **all 734 command/state/event/tactical-RNG/Story-RNG checkpoints**, including complete metrics and final hashes. The runner fingerprint is unchanged. The broad engine-source fingerprint includes top-level presentation modules, so its expected change does not imply a rules change; the semantic comparison is retained separately.
+
+Real Chromium interaction covers **320 / 360 / 390 / 430 / 768 / 1440px**, plus short-phone layouts. New checks exercise raw touch without helper scrolling, the actual Enemy-spawn-to-confirmed-shot sequence, clustered targets, Medical, multi-cell Repair/Fire Control, Direct Fire, Opportunity, intentional inspection scrolling, keyboard focus, live reduced-motion changes and unchanged-DOM retention. Board and Story suites add stacked crew, injury/work states, actual Burst/destruction, Story inspect/reopen/Continue, Conditions, 9/9 release, exact NO DROP, HOME/loss and Hangar. Their final captures have no runtime-console or asset-load errors and no horizontal overflow in checked flows.
+
+Earlier full-run failures exposed and corrected compact roster height/tilt and Campaign heading regressions. The final full run passed 22 browser suites; its Story/climax suite passed all six widths but then hit a **test-fixture race** between an OS motion-preference event's autosave and an injected save. The preference check now runs last and verifies unchanged saved Story state. Its isolated final rerun passed all eight groups. Original failed logs and rerun evidence are preserved rather than reported as an uninterrupted all-green invocation. No production-source change was needed for this harness correction.
+
+Reproduce the complete current suite with `node src/milk-run/tests/run-validation.mjs`. The final simulation commands were `npm.cmd run simulate:milk-run -- --count 2 --seed visual-ux-smoke --out src/milk-run/.checks/visual-ux-final/simulation-smoke` and `npm.cmd run simulate:milk-run -- --count 4 --seed visual-ux-validation --scenarios standard,v2-tactical,v1-standard --out src/milk-run/.checks/visual-ux-final/simulation-expanded`.
+
+Local evidence: [interactive before/after gallery](.checks/visual-ux-final/gallery.html), [validation summary](.checks/visual-ux-final/validation-summary.json), [full-run task results](.checks/playtest-validation/results.json), [semantic comparison](.checks/visual-ux-final/semantic-comparison.json), [expanded simulation report](.checks/visual-ux-final/simulation-expanded/comparison.html). Ready-palette captures: [360](.checks/visual-ux-final/palette-360.png), [390](.checks/visual-ux-final/palette-390.png), [430](.checks/visual-ux-final/palette-430.png), [1440](.checks/visual-ux-final/palette-1440.png). The gallery also links targeting, damaged/stacked aircraft, Story, Conditions, Bomb Run, debrief and Hangar captures.
+
+### Measured presentation cost
+
+Final Chromium measurements use the same local machine, with no claim about Android frame rate. The matched-state board comparison costs **0.335 → 0.359ms mean** (median unchanged at **0.3ms**, p95 **0.7 → 0.8ms**) and **651 → 671 board nodes**. Unchanged presentation updates retain the existing board DOM. Earlier full-page baseline timings were collected under concurrent audit load, so they are not used to claim a speedup.
+
+| Final measurement | Mean | p95 / size |
+| --- | ---: | ---: |
+| 390px ready-palette render | 12.45ms | 14.60ms |
+| 390px targeting render | 10.05ms | 11.20ms |
+| 390px ready / targeting layout measurement | 5.10 / 9.63ms | 5.70 / 23.00ms |
+| 390px ready / targeting framing | 0.40 / 0.20ms | 0.50 / 0.20ms |
+| Early sortie update, turn 10 | 12.60ms | 19.10ms |
+| Late sortie update, turn 110 | 17.39ms | 27.70ms |
+| Ready → targeting controller at 390px | — | 321 → 139px tall |
+
+Transition profiles contain two render samples each and are regression observations, not benchmark distributions. At turn 110 / Progress 11, all **1,317 events** remain available while the recorder renders **135 rows**; the live document has **2,171 elements**. Listener count stays **25** across the run. The long-session check also traverses older history and reloads the saved session. The new framing checks keep the aircraft fully visible in ready/targeting fixtures at all six requested widths and in short **360×640 / 390×700** targeting fixtures.
+
+### Deliberate limits
+
+No gameplay defect or balance change was included. Corrected defects are visual/input issues: framing, crew-color overrides, cluster occlusion, stale tracer attribution and keyboard focus. Full-canvas game rendering, external graphics/fonts, new meters, repeated modal confirmations, full recorder-DOM rebuilding and long cinematic waits were rejected. Real Android hardware should still judge thumb reach, browser-chrome/safe-area changes, pinch zoom and frame rate under thermal load; Chromium emulation is not a physical-phone claim.
+
 ## October 10 headless automated sorties
 
 `simulation/` runs the **existing browser engine** under Node. `adapter.mjs` wraps `createGame`, the new read-only `rules.mjs:legalCommands`, transactional `dispatch`, and `sortieResult`. It contains no combat, damage, mission, work, Story or weather rules. Existing defaults and balance are unchanged. V1 and V2, including V2 Story decisions and Bomb Run placement/rerolls, are supported.

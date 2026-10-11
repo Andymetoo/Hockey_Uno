@@ -4,6 +4,7 @@ import { freshSortieSeed } from './random.mjs';
 import { missionExportFilename } from './mission-export.mjs';
 import { recorderWindow, RECORDER_PAGE_SIZE } from './recorder.mjs';
 import { measure } from './performance.mjs';
+import { createViewportChoreographer } from './viewport.mjs';
 import { DEFAULT_CONFIG, CONFIG_FIELDS, normalizeConfig, configScope, modifiedConfigScopes } from './config.mjs';
 import { isV2, missionLengths as rulesetMissionLengths } from './rulesets.mjs';
 import { BOARD, SECTIONS, STATIONS, CREW_DEFS } from './board.mjs';
@@ -18,7 +19,8 @@ import { createCampaignStore, loadCampaignStore, saveCampaignStore, createCampai
 import { campaignMarkup } from './campaign-view.mjs';
 import { campaignBackup, parseCampaignBackup, storeCampaignBackup, discardActiveCampaignSession } from './campaign-session.mjs';
 import { ResolutionQueue } from './queue.mjs';
-import { boardMarkup, fighterPositions } from './board-view.mjs';
+import { boardMarkup, fighterPositions, crewPositions } from './board-view.mjs';
+import { debriefMarkup } from './debrief-view.mjs';
 import { crewStatus, stationStatus, availableCount, actionGroup, actionIconMarkup } from './ui-model.mjs';
 import { describeEvent } from './presentation.mjs';
 import { crewMarkup, enemyMarkup, eventMarkup, logMarkup, altitudeMarkup, continuousHudMarkup, activeJobsMarkup, jobKindLabel } from './views.mjs';
@@ -40,6 +42,8 @@ const section = id => SECTIONS[id] ?? { name: id, color: '#8b9880' };
 const cell = id => BOARD.find(c => c.id === id);
 let queue, selectedCrew = null, chosenAction = null, saveWarning = false;
 let focusBeforeDialog = null, interaction = null, previousFighters = new Map(), previousBeat = null;
+let previousCrew = new Map(), boardCache = null;
+const motionPreference = matchMedia('(prefers-reduced-motion: reduce)');
 let compactChoice = null, paletteFocus = null, targetChooser = null;
 let compactHudExpanded = false;
 let hitMapEnabled = false, hitMapStructure = true, hitMapEmpty = true;
@@ -50,6 +54,23 @@ let autosaveEnabled = true, pendingDiscard = null;
 let shownStoryPrompt = null;
 let storySelection = null;
 let recorderEnd = null, renderedRecorderLog = null, renderedRecorderKey = '';
+let lastMissionPosition = null;
+let lastUiBeat = null;
+const renderedMarkup = new WeakMap();
+function putMarkup(element, markup) {
+  if (renderedMarkup.get(element) === markup) return;
+  element.innerHTML = markup;
+  renderedMarkup.set(element, markup);
+}
+function focusAnchor(element) {
+  if(!element||element===document.body)return null;
+  if(element.id)return `#${CSS.escape(element.id)}`;
+  if(element.matches('#compact-choice select[name]'))return `#compact-choice select[name="${CSS.escape(element.name)}"]`;
+  const attribute=['data-compact-action','data-compact-value','data-target-choice','data-crew','data-crew-id','data-fighter','data-cell','data-ui'].find(name=>element.hasAttribute(name));
+  if(!attribute)return null;
+  const scope=element.closest('#crew-flow,#board,#crew-list,#enemies,#primary-action');
+  return `${scope?.id?'#'+scope.id+' ':''}[${attribute}="${CSS.escape(element.getAttribute(attribute))}"]${element.hasAttribute('data-value')?`[data-value="${CSS.escape(element.dataset.value)}"]`:''}`;
+}
 try {campaignStore=loadCampaignStore();}catch(error){campaignStore=createCampaignStore();campaignStoreError=error.message;}
 
 $('#app').innerHTML = `
@@ -121,6 +142,7 @@ const discardButton = document.createElement('button');
 discardButton.type = 'button'; discardButton.dataset.ui = 'discard-campaign';
 discardButton.textContent = 'Discard Active Campaign Sortie (DEV)';
 $('#dev-dialog .dialog-content').prepend(discardButton);
+const viewportFlow = createViewportChoreographer();
 
 function initialize(config = devPreferences, seed, saved = null, ruleset = config.preferredRuleset ?? 'v1', targetId=DEFAULT_BOMBING_TARGET, persist = true) {
   if(persist)unreadableSave=false;
@@ -135,6 +157,8 @@ function initialize(config = devPreferences, seed, saved = null, ruleset = confi
   resultPresented = false;
   shownStoryPrompt = null; storySelection = null;
   recorderEnd = null; renderedRecorderLog = null; renderedRecorderKey = '';
+  lastMissionPosition = null; lastUiBeat = null; viewportFlow.reset();
+  previousCrew = new Map(); boardCache = null;
   render();
 }
 
@@ -148,7 +172,16 @@ function missionName(s) {
 }
 function render() { return measure('render', renderFrame); }
 function renderFrame() {
+  const focused=document.activeElement, focusSelector=focusAnchor(focused);
   const s = queue.view;
+  const flow = crewFlowState(queue, interaction, compactChoice);
+  document.body.dataset.presentationSpeed = queue.speed;
+  document.body.dataset.flow = flow;
+  document.body.dataset.interaction = interaction?.action ?? '';
+  document.body.dataset.event = queue.current?.type ?? '';
+  const uiBeat = queue.current?.beat ?? queue.current?.sequence;
+  document.body.dataset.beatChanged = String(lastUiBeat !== null && uiBeat !== lastUiBeat);
+  lastUiBeat = uiBeat;
   saveWarning = autosaveEnabled && !measure('autosave', () => saveSession(queue.export()));
   finalizeCampaignIfReady();
   $('[data-ui="turn-back"]').hidden=queue.busy||Boolean(interaction)||!canTurnBack(s);
@@ -180,6 +213,9 @@ function renderFrame() {
   const timeStatus=$('#time-status');timeStatus.hidden=!isV2(s)||!s.pendingProgress;
   if(isV2(s)){timeStatus.classList.toggle('pending',s.pendingProgress);timeStatus.innerHTML=`<strong>TIME ${Math.min(s.time,effectiveTimeThreshold(s))}/${effectiveTimeThreshold(s)}</strong><span>PROGRESS CHECKPOINT AFTER THIS TURN${s.overflowTimeTokens?.length?' · +1 BONUS TIME BANKED':''}</span>`;}
   renderTrack(s); renderCrew(s); renderBoard(s); renderEnemies(s); renderEvent(s); renderBags(s); renderAction(s); renderCompactFlow(s); renderSummary(s);
+  const frameMode = queue.busy && compactCrewFlow(s) ? 'resolving' : flow;
+  viewportFlow.update({ mode: frameMode, actor: interaction?.gunnerId ?? s.activeCrew,
+    key: [frameMode, queue.busy ? '' : s.activeCrew, interaction?.action, interaction?.stage, interaction?.gunnerId, compactChoice?.action].join(':') });
   $('#speed').value = queue.speed;
   $('[data-ui="pause"]').textContent = queue.paused ? 'Play' : 'Pause';
   $('[data-ui="pause"]').disabled = queue.speed==='manual';
@@ -189,6 +225,10 @@ function renderFrame() {
   $('#queue-count').textContent = queue.busy ? `${queue.pending.length} TO FOLLOW` : 'AWAITING ORDERS';
   $('#log-count').textContent = `${queue.log.length} events${saveWarning ? ' · autosave unavailable' : ' · autosaved'}`;
   if ($('#log-details').open) renderLog();
+  if(focusSelector&&!focused.isConnected) {
+    const replacement=document.querySelector(focusSelector)??(interaction?$('#board .target-legal[tabindex="0"]'):compactChoice?$('#compact-choice select, #compact-choice button, #crew-flow .action-tile'):$('#crew-flow [data-compact-action="'+CSS.escape(paletteFocus??'')+'"]')??$('#crew-flow [data-compact-action]'));
+    replacement?.focus({preventScroll:true});
+  }
   // The saved decision becomes visible only after the entire tactical sequence.
   // Inspecting the board dismisses its sheet, never the decision itself.
   const pending = s.phase === 'story' ? s.story?.pending : null;
@@ -201,34 +241,48 @@ function renderFrame() {
 }
 function renderTrack(s) {
   const { outbound, back } = missionLengths(s), total = outbound + back;
+  const missionPanel = $('.mission-panel');
+  missionPanel.dataset.advance = String(lastMissionPosition !== null && lastMissionPosition !== s.mission.position);
+  lastMissionPosition = s.mission.position;
   $('#mission-label').textContent = s.mission.aborted ? `ABORTED — ${Math.max(0,total-s.mission.position)} PROGRESS TO HOME · EMERGENCY ROUTE` : `${isV2(s)?'PROGRESS · ':''}SEED ${s.seed}`;
-  $('#mission-track').innerHTML = Array.from({length:total + 1}, (_, i) => `<div class="track-space ${i === s.mission.position ? 'current' : ''} ${i < s.mission.position ? 'passed' : ''} ${i === outbound ? 'target' : ''}"><span>${i === s.mission.position ? '✈' : i < s.mission.position ? '·' : i === outbound ? '◎' : '—'}</span><small>${i === 0 ? 'START' : i === total ? 'HOME' : i === outbound ? s.mission.aborted?'TURN BACK':'TARGET' : String(i).padStart(2,'0')}</small></div>`).join('');
+  putMarkup($('#mission-track'), Array.from({length:total + 1}, (_, i) => `<div class="track-space ${i === s.mission.position ? 'current' : ''} ${i < s.mission.position ? 'passed' : ''} ${i === outbound ? 'target' : ''}" ${i === s.mission.position ? 'aria-current="step"' : ''}><span>${i === s.mission.position ? '✈' : i < s.mission.position ? '·' : i === outbound ? '◎' : '—'}</span><small>${i === 0 ? 'START' : i === total ? 'HOME' : i === outbound ? s.mission.aborted?'TURN BACK':'TARGET' : String(i).padStart(2,'0')}</small></div>`).join(''));
+  let readout = missionPanel.querySelector('.route-readout');
+  if (!readout) { readout = document.createElement('div'); readout.className = 'route-readout'; missionPanel.append(readout); }
+  const returning = s.mission.bombed || s.mission.aborted || s.mission.position > outbound, remaining = Math.max(0, (returning ? total : outbound) - s.mission.position);
+  putMarkup(readout, `<strong class="${returning?'homebound':''}">${returning?'↶ ':''}${missionName(s)}</strong><span class="${returning&&remaining<=1?'approach':''}">${s.phase==='ended'?'FLIGHT COMPLETE':s.phase==='bombing'?'TARGET IN SIGHT':remaining===0?'OVER TARGET':`${remaining} ${isV2(s)?'PROGRESS':'STEPS'} TO ${returning?'HOME':'TARGET'}`}</span>`);
   const track = $('#mission-track'), current = $('#mission-track .current');
   if (current) track.scrollLeft = Math.max(0, current.offsetLeft - track.offsetLeft - track.clientWidth / 2 + current.clientWidth / 2);
 }
-function renderCrew(s) { $('#available-count').textContent='AVAILABLE '+availableCount(s)+'/10'; $('#crew-list').innerHTML=crewMarkup(s,selectedCrew,interaction);$('#active-jobs').hidden=!isV2(s)||!s.jobs.length;$('#active-jobs').innerHTML=activeJobsMarkup(s,queue.visual); }
+function renderCrew(s) { $('#available-count').textContent='AVAILABLE '+availableCount(s)+'/10'; putMarkup($('#crew-list'),crewMarkup(s,selectedCrew,interaction));$('#active-jobs').hidden=!isV2(s)||!s.jobs.length;putMarkup($('#active-jobs'),activeJobsMarkup(s,queue.visual)); }
 function renderBoard(s) {
  const beat=queue.current?.beat??queue.current?.sequence;
  const hitMap=hitLocationHeatMap(queue.log);
- $('#board').innerHTML=boardMarkup(s,{selectedCrew,interaction,visual:queue.visual,current:queue.current,previousFighters:beat!==previousBeat?previousFighters:new Map(),hitMap,hitMapEnabled,hitMapStructure,hitMapEmpty});
+ const inputs=[s,selectedCrew,interaction,queue.visual,queue.current,queue.speed,motionPreference.matches,hitMapEnabled,hitMapStructure,hitMapEmpty,hitMapEnabled?queue.log.length:0];
+ if(!boardCache||inputs.some((value,index)=>value!==boardCache[index])) {
+   putMarkup($('#board'),boardMarkup(s,{selectedCrew,interaction,visual:queue.visual,current:queue.current,
+     previousFighters:beat!==previousBeat?previousFighters:new Map(),previousCrew:beat!==previousBeat?previousCrew:new Map(),
+     presentationSpeed:queue.speed,reducedMotion:motionPreference.matches,animate:previousBeat!==null&&beat!==previousBeat,
+     hitMap,hitMapEnabled,hitMapStructure,hitMapEmpty}));
+   boardCache=inputs;
+ }
  const overlayButton=$('[data-ui="hit-map-toggle"]');overlayButton.setAttribute('aria-pressed',String(hitMapEnabled));overlayButton.textContent=hitMapEnabled?'Hide hit-location overlay':'Show hit-location overlay';
  $('#hit-map-structure').disabled=!hitMapEnabled;$('#hit-map-empty').disabled=!hitMapEnabled;
  $('[data-hit-map-count="structure"]').textContent=`Aircraft · ${hitMap.structureRolls}`;
  $('[data-hit-map-count="empty"]').textContent=`Empty space · ${hitMap.emptyRolls}`;
  $('#hit-map-structure').setAttribute('aria-label',`Aircraft structure hit-location rolls: ${hitMap.structureRolls}`);
  $('#hit-map-empty').setAttribute('aria-label',`Empty-space hit-location rolls: ${hitMap.emptyRolls}`);
- if(beat!==previousBeat){previousFighters=fighterPositions(s);previousBeat=beat;}
+ if(beat!==previousBeat){previousFighters=fighterPositions(s);previousCrew=crewPositions(s);previousBeat=beat;}
  $('#board').classList.toggle('targeting',Boolean(interaction));
  $('#altitude-track').classList.toggle('losing',queue.current?.type==='ALTITUDE_LOST');$('#altitude-track').innerHTML=altitudeMarkup(s);
   $('#conditions').innerHTML=s.engines.map(e=>`<div class="engine-status ${e.running?'':'stopped'}"><span>ENGINE ${String(e.id).replace(/\D/g,'')}</span><strong>${e.running?'RUNNING':e.repairReady?'RESTART READY':'OFF · REPAIR'}</strong></div>`).join('');
   $('#section-key').innerHTML=sectionEntries().map(([id,d])=>`<span class="${s.compromised.includes(id)?'compromised':''}"><i style="background:${d.color}"></i>${esc(d.name)}${s.compromised.includes(id)?' !':''}</span>`).join('');
 }
 
-function renderEnemies(s) { $('#fighter-count').textContent=s.fighters.length+' / '+s.config.maxFighters; $('#enemy-shortcut').innerHTML=s.fighters.length+' / '+s.config.maxFighters+' HOSTILES<br>VIEW QUEUE ↓'; $('#enemies').innerHTML=enemyMarkup(s,{selectedCrew,interaction,visual:queue.visual}); }
+function renderEnemies(s) { $('#fighter-count').textContent=s.fighters.length+' / '+s.config.maxFighters; $('#enemy-shortcut').innerHTML=s.fighters.length+' / '+s.config.maxFighters+' HOSTILES<br>VIEW QUEUE ↓'; putMarkup($('#enemies'),enemyMarkup(s,{selectedCrew,interaction,visual:queue.visual})); }
 function renderEvent(s) {
  const markup=eventMarkup(queue.current,queue.visual);$('#event').innerHTML=markup.detail;
  $('#board-stage').className='board-stage category-'+markup.category+(queue.busy?' playing':' resting')+(queue.current?.type==='FIGHTER_BREAKING_OFF'?' fighter-breakoff':'')+(queue.current?.type==='ENEMY_ATTACK_ROLL'&&queue.current.result==='critical'?' critical-hit':'');
- $('#board-stage').innerHTML=interaction?'<div class="beat-icon">⌖</div><div><strong>'+esc(targetTitle(s))+'</strong><small>'+esc(targetHint(s))+'</small></div>':markup.stage;
+ putMarkup($('#board-stage'),interaction?'<div class="beat-icon" aria-hidden="true">⌖</div><div><strong>'+esc(targetTitle(s))+'</strong><small>'+esc(compactCrewFlow(s)?'Highlighted markers are legal. Confirm your selection below.':targetHint(s))+'</small></div>':markup.stage);
 }
 function renderBags(s) {
   const m=s.bags.mission,c=s.bags.combat,count=(bag,t)=>bag.tokens.filter(v=>storyToken(v)===t).length;
@@ -260,14 +314,22 @@ function targetHint(s) {
   const spend=t.action==='opportunityShot'?'1 Opportunity':t.action==='directFire'?'1 Officer for Pilot Direct Fire':'the action';
   return t.targetId?`${s.fighters.find(f=>f.id===t.targetId)?.type} selected. Confirm to spend ${spend}.`:`Tap a highlighted aircraft or queue card · ${options.fighters.length} legal targets`;
 }
+function compactTargetHint(s) {
+  const t=interaction, options=targetOptions(s,t);
+  if(t.stage==='gunner')return `${options.crew.length} eligible gunners · choose a highlighted crew marker or card.`;
+  if(t.stage==='work')return t.workCellId?`Position ${t.workCellId} · ${workTiming(s,t)}.`:'Choose a highlighted safe work position. Shared positions are allowed.';
+  if(['repair','fireControl'].includes(t.action))return `${t.cells.length}/${crisisTargetCap(s,t.crewId,t.action)} connected squares · ${t.cells.join(' + ')||'tap highlighted damage'}${t.cells.length&&!options.work.length?' · no safe work position':''}`;
+  if(t.action==='medical')return t.targetId?`${def(t.targetId).name} · choose your work position next.`:'Choose an injured crew marker or card.';
+  return t.targetId?`${s.fighters.find(f=>f.id===t.targetId)?.type} selected · ${t.action==='rotateFighter'?'Confirm to turn this fighter.':'Confirm to fire.'}`:`${options.fighters.length} legal targets · tap a fighter or its queue card.`;
+}
 function renderAction(s) {
   let text='',sub='',button='';
   if(interaction&&!queue.busy) {
-    const t=interaction,options=targetOptions(s,t);text=targetTitle(s);sub=targetHint(s);
+    const t=interaction,options=targetOptions(s,t);text=targetTitle(s);sub=compactCrewFlow(s)?compactTargetHint(s):targetHint(s);
     button='<button class="quiet" data-ui="cancel-target">Cancel</button>';
     if(needsWorkPosition(t)&&t.stage!=='work')button+=`<button class="primary" data-ui="work-position" ${options.work.length?'':'disabled'}>Choose work position →</button>`;
     else if(t.stage!=='gunner')button+=`<button class="primary" data-ui="confirm-target" ${canConfirm(s,t)?'':'disabled'}>Confirm ${t.stage==='work'?t.workCellId??'position':['basicFire','advancedFire','directFire','opportunityShot'].includes(t.action)?'fire':'target'} →</button>`;
-    const detail=$('#target-detail');detail.hidden=false;detail.innerHTML=`<strong>${esc(def(t.gunnerId??t.crewId)?.name??'Choose a completed gunner')} · ${esc(t.action==='opportunityShot'?'1 Opportunity':availableActions(s,t.crewId).find(a=>a.id===t.action)?.cost??'Free')}</strong><span>${esc(t.cells.join(' + ')||t.targetId&&def(t.targetId)?.name||'Tap highlighted targets')}</span>${needsWorkPosition(t)?`<span>${workTiming(s,t)}</span>`:''}${t.stage==='work'?`<span>Worker${t.assistantId?'s':''}: ${esc(t.workCellId??'choose internal position')} · targets stay on their original squares</span>`:''}${assistantMarkup(s,t)}`;
+    const detail=$('#target-detail');detail.hidden=compactCrewFlow(s);detail.innerHTML=compactCrewFlow(s)?'':`<strong>${esc(def(t.gunnerId??t.crewId)?.name??'Choose a completed gunner')} · ${esc(t.action==='opportunityShot'?'1 Opportunity':availableActions(s,t.crewId).find(a=>a.id===t.action)?.cost??'Free')}</strong><span>${esc(t.cells.join(' + ')||t.targetId&&def(t.targetId)?.name||'Tap highlighted targets')}</span>${needsWorkPosition(t)?`<span>${workTiming(s,t)}</span>`:''}${t.stage==='work'?`<span>Worker${t.assistantId?'s':''}: ${esc(t.workCellId??'choose internal position')} · targets stay on their original squares</span>`:''}${assistantMarkup(s,t)}`;
   }
   else if(queue.busy) { text=describeEvent(queue.current).title;sub=queue.speed==='manual'||queue.paused?'Step through each major beat at your pace.':queue.current?.message??'';button=`<button class="quiet" data-ui="skip">Skip</button>${queue.paused||queue.speed==='manual'?'<button class="quiet" data-ui="play">▶ Play</button>':''}<button class="primary" data-ui="${queue.speed==='manual'||queue.paused?'step':'pause'}">${queue.speed==='manual'||queue.paused?'Next beat →':'Pause beats'}</button>`; }
   else if(isV2(s)&&s.phase==='story'&&s.story?.pending) {text=s.story.pending.title;sub='Inspect the aircraft and Current Conditions, then decide how the crew should respond.';button='<button class="primary" data-ui="story-choice">Resolve situation →</button>';}
@@ -314,7 +376,7 @@ function renderSummary(s) {
   if(!queue.busy&&!resultPresented){resultPresented=true;requestAnimationFrame(()=>$('#summary').scrollIntoView({block:'start',behavior:'instant'}));}
   const telemetry=Object.entries(s.stats).filter(([key])=>!isV2(s)||key!=='rounds');
   const continuous=isV2(s)?`<h3>Playtest telemetry</h3><p class="small muted">Observations for comparing rules. Fighter averages include every spawned fighter, including early kills and fighters still active. Enemy actions completed and Engagement countdown spent are measured separately. Outbound and return Time count drawn Time tokens, not elapsed minutes.</p><div class="telemetry v2-telemetry">${v2TelemetryRows(s).map(row=>`<div><small>${esc(row.label)}</small><strong>${esc(row.value)}</strong></div>`).join('')}</div><h3>Flight record</h3>`:'';
-  $('#summary').innerHTML=`<div class="eyebrow">END OF SORTIE / ${isV2(s)?'V2 — CONTINUOUS TIME · EXPERIMENTAL':'V1 — ROUND-BASED'} / SEED ${esc(s.seed)}</div><div class="sortie-result ${s.outcome==='success'?'returned':'lost'}" role="status"><h2>${esc(result.title)}</h2><p>${esc(result.reason)}</p>${result.distance?`<p>${esc(result.distanceLabel)}</p>`:''}<p>${esc(s.mission.aborted?'ABORTED — NO BOMBING CREDIT':s.mission.bombingResult?bombingOutcomeLabel(s.mission.bombingResult):'Target not reached')}${s.mission.bombRun?.noDropReason?' — '+esc(s.mission.bombRun.noDropReason):''}</p></div><p>${isV2(s)?`${s.stats.turns??0} Turns · ${s.mission.position} Progress`:`${s.round} rounds`} · ${elapsed} minutes · bombing ${s.mission.bombed ? esc(s.mission.bombingResult ?? 'attempted') : 'not reached'}</p>${continuous}<div class="telemetry">${telemetry.map(([k,v])=>`<div><small>${esc(k.replace(/([A-Z])/g,' $1'))}</small><strong>${typeof v==='object'?Object.entries(v).map(([a,b])=>`${a}: ${b}`).join(' · '):esc(v)}</strong></div>`).join('')}</div><button data-ui="export" class="quiet">Export full report</button>${s.campaign?'<button data-ui="campaign" class="primary">Return to Hangar</button>':''}`;
+  $('#summary').innerHTML=`<div class="eyebrow">END OF SORTIE / ${isV2(s)?'V2 — CONTINUOUS TIME · EXPERIMENTAL':'V1 — ROUND-BASED'} / SEED ${esc(s.seed)}</div>${debriefMarkup(s,result)}<p>${isV2(s)?`${s.stats.turns??0} Turns · ${s.mission.position} Progress`:`${s.round} rounds`} · ${elapsed} minutes · bombing ${s.mission.bombed ? esc(s.mission.bombingResult ?? 'attempted') : 'not reached'}</p>${continuous}<div class="telemetry">${telemetry.map(([k,v])=>`<div><small>${esc(k.replace(/([A-Z])/g,' $1'))}</small><strong>${typeof v==='object'?Object.entries(v).map(([a,b])=>`${a}: ${b}`).join(' · '):esc(v)}</strong></div>`).join('')}</div><button data-ui="export" class="quiet">Export full report</button>${s.campaign?'<button data-ui="campaign" class="primary">Return to Hangar</button>':''}`;
   $('#summary .sortie-result').insertAdjacentHTML('afterend',storyFactsMarkup(s.story?.facts));
 }
 
@@ -323,7 +385,7 @@ function openStoryChoice() {
   const s=queue.view,pending=s.story?.pending;
   if(queue.busy||interaction||s.phase!=='story'||!pending)return;
   closeDialog();shownStoryPrompt=pending.id;
-  $('#story-title').textContent=pending.title;$('#story-content').innerHTML=storyChoiceMarkup(pending, storySelection?.pendingId === pending.id ? storySelection.choiceId : null);
+  $('#story-title').textContent=pending.title;$('#story-content').innerHTML=storyChoiceMarkup(pending, storySelection?.pendingId === pending.id ? storySelection.choiceId : null, s);
   openDialog('#story-dialog');
 }
 function openStoryConditions() {
@@ -340,7 +402,8 @@ function send(command) {
   if(unreadableSave){notice('Launch a new sortie to replace the unreadable save. Its original data is still retained.');return false;}
   const prior=interaction;interaction=null;compactChoice=null;targetChooser=null;paletteFocus=null;
   autosaveEnabled = true;
-  try {queue.send(command);closeDialog();if(queue.busy)$('#board-stage').scrollIntoView({block:'start',behavior:'instant'});return true;}
+  viewportFlow.intent();
+  try {queue.send(command);closeDialog();if(queue.busy&&!compactCrewFlow(queue.view))$('#board-stage').scrollIntoView({block:'start',behavior:'instant'});return true;}
   catch(e){interaction=prior;render();notice(e.message);return false;}
 }
 
@@ -352,8 +415,8 @@ function openOpportunity() {
     $('#info-content').innerHTML=`<p><b>${s.opportunity??0} / ${s.config.opportunityCap} Opportunity</b></p><p>${esc(chance.reason)}</p><p>A healthy gunner whose normal activation is complete can take one Basic pull from an operating gun station. Spend Opportunity between crew activations or after an action before its enemy phase. Select a legal gunner and fighter, then confirm; canceling costs nothing. Fighter kills by B-17 gunfire can earn another Opportunity.</p>`;
     openDialog('#info-dialog');return;
   }
-  interaction=beginTargeting('opportunityShot',null);closeDialog();render();
-  $('#crew-list').scrollIntoView({block:'center',behavior:'instant'});
+  viewportFlow.intent();interaction=beginTargeting('opportunityShot',null);closeDialog();render();
+  if(!compactCrewFlow(s))$('#crew-list').scrollIntoView({block:'center',behavior:'instant'});
 }
 
 const actionDescriptions={reclaimHome:'Spend your normal action to relieve the substitute. They return home if free and safe, otherwise stay on this station footprint as Displaced. Their action slot is unchanged.',assistWork:'Join an active Repair, Fire Control or Medical job. Uses this normal action, costs no resources, and reduces its remaining Time to the assisted duration if lower.',basicFire:'One free combat pull against a fighter in your operating gun arc.',advancedFire:'Keep hitting one fighter until a miss. A first-pull miss grants exactly one more pull.',repair:'Select connected damaged squares. Work completes after the configured duration.',fireControl:'Select connected burning squares. Squares under active suppression do not spread.',medical:'Treat one injured crewmate. Care completes after the configured duration.',relocate:'Move to a safe fuselage square. This uses your action.',manCockpit:'Take a vacant pilot seat. This uses your action.',manStation:'Spend this action to occupy a vacant, non-burning gun station or cockpit seat. Your rank and personal abilities stay the same.',returnHome:'Spend this action to return to your vacant, safe home station. Nobody is evicted.',leaveStation:'Spend this action to leave your station for nearby safe interior space. Your next reassignment requires another action.',restartEngine:'Attempt to restart a stopped, fully repaired engine from a pilot seat.',directFire:'Spend 1 Officer → order any healthy gunner at an operational gun station to make one immediate Basic Shot. Does not use that gunner’s activation.',convert:'Change Resource denominations. Enlisted to Officer returns surplus tokens to discard; Officer to Enlisted requires extra Resource tokens from the mission bag. Copilot only.',rotateFighter:'Turn one fighter 90° away from the B-17.',escort:'Call an escort into a random quadrant for the rest of this round.',wait:"Finish this crew member's turn without taking an action."};
@@ -422,7 +485,8 @@ function inspectCrew(id) {
 }
 function compactTile(a) {
   const labels={reclaimHome:'Reclaim Home',assistWork:'Assist',rotateFighter:'Distract',convert:'Convert',escort:'Escort'};
-  return `<button type="button" data-compact-action="${a.id}" aria-disabled="${!a.enabled}" aria-describedby="compact-description" class="action-tile ${paletteFocus===a.id?'highlighted':''}">${actionIconMarkup(a.id)}<strong>${esc(labels[a.id]??a.label)}</strong><span>${esc(compactCost(a.cost))}${a.enabled?'':' · Unavailable'}</span></button>`;
+  const family=['basicFire','advancedFire','directFire','rotateFighter'].includes(a.id)?'combat':['repair','fireControl','medical','assistWork'].includes(a.id)?'crisis':['stations','returnHome','reclaimHome',...STATION_PALETTE].includes(a.id)?'station':'utility';
+  return `<button type="button" data-compact-action="${a.id}" data-family="${family}" aria-disabled="${!a.enabled}" aria-label="${esc(a.label)} · ${esc(compactCost(a.cost))}${a.enabled?'':` · Unavailable: ${esc(a.reason)}`}" aria-describedby="compact-description" class="action-tile ${paletteFocus===a.id?'highlighted':''}">${actionIconMarkup(a.id==='stations'?'manStation':a.id)}<strong>${esc(labels[a.id]??a.label)}</strong><span class="tile-cost">${esc(compactCost(a.cost))}${a.enabled?'':' <i aria-hidden="true">×</i>'}</span></button>`;
 }
 function renderCompactFlow(s) {
   const focusedAction=document.activeElement?.dataset.compactAction;
@@ -430,33 +494,35 @@ function renderCompactFlow(s) {
   dock.dataset.crewFlow=mode;panel.hidden=mode==='legacy'||mode==='selection'||mode==='story';
   panel.dataset.state=mode;
   if(mode==='legacy')return;
-  if(mode==='selection'&&s.phase==='select'&&availableCrew(s).length&&!s.pendingProgress){$('#action-context').innerHTML='<strong>Choose your next crew</strong><small>Tap a crew card to activate · aircraft tokens inspect</small>';$('#primary-action').innerHTML='';}
+  if(mode==='selection'&&s.phase==='select'&&availableCrew(s).length&&!s.pendingProgress){$('#action-context').innerHTML='<strong>Choose your next crew</strong><small>One draw · one action · then the fighters</small>';$('#primary-action').innerHTML='<button class="primary" data-ui="crew-focus">Choose crew ↓</button>';}
   if(panel.hidden)return;
   const actor=s.activeCrew??queue.state.activeCrew??selectedCrew;
-  const heading=`<div class="compact-heading"><strong>${esc(def(actor)?.name??'Crew')} · ${mode==='ready'?'ONE ACTION':mode==='targeting'?'TARGET':mode==='choosing'?'CHOOSE':mode==='activating'?'ACTIVATING':'TOKEN / RESOLUTION'}</strong><span>${s.resources.Enlisted}E · ${s.resources.Officer}O</span></div>`;
+  const heading=`<div class="compact-heading"><strong>${esc(def(actor)?.name??'Crew')}<span class="controller-step">${mode==='ready'?'01 / ONE ACTION':mode==='targeting'?'02 / TARGET':mode==='choosing'?'02 / CHOOSE':mode==='activating'?'ACTIVATING':'TOKEN / RESOLUTION'}</span></strong><span aria-label="${s.resources.Enlisted} Enlisted, ${s.resources.Officer} Officer">${s.resources.Enlisted}E · ${s.resources.Officer}O</span></div>`;
   if(queue.busy){panel.innerHTML=heading+`<p class="compact-beat" role="status">${esc(describeEvent(queue.current).title)} · Actions locked</p>`;return;}
   if(interaction){
     const f=s.fighters.find(f=>f.id===interaction.targetId),gunner=def(interaction.gunnerId??interaction.crewId)?.name;
     const cost=interaction.action==='opportunityShot'?'1 Opportunity':compactCost(availableActions(s,interaction.crewId).find(a=>a.id===interaction.action)?.cost);
     panel.innerHTML=`<div class="compact-heading"><strong>${esc(gunner??'Choose gunner')} → ${esc(f?`#${s.fighters.indexOf(f)+1} ${f.type}`:def(interaction.targetId)?.name??(interaction.cells.join(' + ')||'Choose target'))}</strong><span>${f?`HP ${f.hp}/${f.maxHp} · ENG ${f.engagementRemaining??'—'}<br>`:''}${esc(cost)}</span></div>`;
+    if(interaction.stage==='work')panel.innerHTML+=`<div class="target-work-detail">${assistantMarkup(s,interaction)}</div>`;
     if(targetChooser)panel.innerHTML+=`<div class="target-chooser" aria-label="Select target"><strong>Select target</strong>${targetChooser.ids.map(id=>{const f=s.fighters.find(f=>f.id===id),c=s.crew.find(c=>c.id===id);return `<button data-target-choice="${esc(id)}">${f?`#${s.fighters.indexOf(f)+1} ${esc(f.type)} · HP ${f.hp}/${f.maxHp} · ENG ${f.engagementRemaining??'—'}`:c?`${esc(def(id).name)} · ${esc(c.health)}`:esc(id)}</button>`;}).join('')}</div>`;
     return;
   }
   const actions=availableActions(s,s.activeCrew);
   if(compactChoice){panel.innerHTML=heading+compactChoicesMarkup(s,actions);return;}
   const palette=actionPalette(actions),a=palette.find(a=>a.id===paletteFocus);
-  panel.innerHTML=heading+`<div class="action-palette">${palette.map(compactTile).join('')}</div><div id="compact-description" class="compact-description" role="status">${a?`<b>${esc(a.label)} · ${esc(compactCost(a.cost))}</b> ${esc(a.enabled?(actionDescription(s,a.id)??'Choose a station action.'):a.reason)}`:'Choose an action. Unavailable tiles explain why.'}</div>`;
+  panel.innerHTML=heading+`<div class="action-palette">${palette.map(compactTile).join('')}</div><div id="compact-description" class="compact-description" role="status">${a?`<b>${esc(a.label)} · ${esc(compactCost(a.cost))}</b> ${esc(a.enabled?(actionDescription(s,a.id)??'Choose a station action.'):a.reason)}`:'Choose one action. Tap a dashed tile to learn why it is unavailable.'}</div>`;
   if(focusedAction)panel.querySelector(`[data-compact-action="${focusedAction}"]`)?.focus({preventScroll:true});
 }
 function chooseCompactAction(id) {
   const s=queue.view;if(queue.busy||s.phase!=='action')return;
+  viewportFlow.intent();
   paletteFocus=id;
   if(id==='stations'){compactChoice={action:id,values:{}};render();return;}
   const a=availableActions(s,s.activeCrew).find(a=>a.id===id);
   if(!a?.enabled){render();return;}
   closeDialog();
   if(id==='wait'){send({type:'action',action:id});return;}
-  if(DIRECT_ACTIONS.includes(id)){compactChoice=null;interaction=beginTargeting(id,s.activeCrew);render();$('#board-stage').scrollIntoView({block:'start',behavior:'instant'});return;}
+  if(DIRECT_ACTIONS.includes(id)){compactChoice=null;interaction=beginTargeting(id,s.activeCrew);render();return;}
   compactChoice={action:id,values:{}};render();
 }
 function compactChoicesMarkup(s,actions) {
@@ -699,7 +765,7 @@ document.addEventListener('click', e=>{
   const job=e.target.closest('[data-job]');if(job){inspectJob(job.dataset.job);return;}
   if(handleCompactClick(e))return;
   const fighter=e.target.closest('[data-fighter]');if(fighter){const id=fighter.dataset.fighter;if(interaction&&!queue.busy){interaction=selectTarget(queue.view,interaction,'fighter',id);render();}else{const f=queue.view.fighters.find(f=>f.id===id);if(f){const engagementKey={'BF-109':'v2Bf109Engagement','BF-110':'v2Bf110Engagement','FW-190':'v2Fw190Engagement','Me-262':'v2Me262Engagement'}[f.type];$('#info-title').textContent=`#${queue.view.fighters.indexOf(f)+1} ${f.type}`;$('#info-content').innerHTML=`<p>HP ${f.hp}/${f.maxHp}</p>${isV2(queue.view)&&engagementKey?`<p>Engagement ${f.engagementRemaining}/${queue.view.config[engagementKey]}</p>`:''}<p>${esc(f.quadrant)} / ${esc(f.altitude)} · ${f.facing===0?'Facing B-17: attacks next enemy phase.':`${f.facing}° away: rotates next enemy phase.`}</p><p>Select a gunner and Fire to target this aircraft.</p>`;openDialog('#info-dialog');}}return;}
-  const crew=e.target.closest('[data-crew],[data-crew-id]');if(crew){const id=crew.dataset.crew??crew.dataset.crewId;if(interaction&&!queue.busy){const wasGunner=interaction.stage==='gunner';interaction=selectTarget(queue.view,interaction,'crew',id);if(wasGunner&&interaction.stage==='target')selectedCrew=interaction.gunnerId;render();if(wasGunner&&interaction.stage==='target')$('#board-stage').scrollIntoView({block:'start',behavior:'instant'});}else if(!queue.busy){if(compactCrewFlow(queue.view)&&crew.dataset.crew&&queue.view.phase==='select'&&!queue.view.pendingProgress&&availableCrew(queue.view).some(c=>c.id===id)){selectedCrew=id;send({type:'activate',crewId:id});}else if(compactCrewFlow(queue.view)){inspectCrew(id);}else openActions(id);}return;}
+  const crew=e.target.closest('[data-crew],[data-crew-id]');if(crew){const id=crew.dataset.crew??crew.dataset.crewId;if(interaction&&!queue.busy){const wasGunner=interaction.stage==='gunner';interaction=selectTarget(queue.view,interaction,'crew',id);if(wasGunner&&interaction.stage==='target')selectedCrew=interaction.gunnerId;render();if(wasGunner&&interaction.stage==='target'&&!compactCrewFlow(queue.view))$('#board-stage').scrollIntoView({block:'start',behavior:'instant'});}else if(!queue.busy){if(compactCrewFlow(queue.view)&&crew.dataset.crew&&queue.view.phase==='select'&&!queue.view.pendingProgress&&availableCrew(queue.view).some(c=>c.id===id)){selectedCrew=id;send({type:'activate',crewId:id});}else if(compactCrewFlow(queue.view)){inspectCrew(id);}else openActions(id);}return;}
   const square=e.target.closest('[data-cell]');if(square){if(interaction&&!queue.busy){interaction=selectTarget(queue.view,interaction,'cell',square.dataset.cell);render();}else inspectCell(square.dataset.cell);return;}
   const action=e.target.closest('[data-action]');if(action){chooseAction(action.dataset.action);return;}
   const command=e.target.closest('[data-command]');if(command){send({type:command.dataset.command});return;}
@@ -709,6 +775,7 @@ document.addEventListener('click', e=>{
     case 'story-choice':openStoryChoice();break;
     case 'story-continue':{const selected=storySelection,pending=queue.state.story?.pending;if(!queue.busy&&selected?.pendingId===pending?.id&&pending.choices.some(c=>c.id===selected.choiceId&&!c.disabled)){storySelection=null;send({type:'storyChoice',choiceId:selected.choiceId});}break;}
     case 'status-toggle':compactHudExpanded=!compactHudExpanded;render();break;
+    case 'crew-focus':viewportFlow.crew();break;
     case 'campaign':openCampaign();break;
     case 'campaign-new':newCampaignForm();break;
     case 'campaign-resume':closeDialog();break;
@@ -722,7 +789,7 @@ document.addEventListener('click', e=>{
     case 'choose':case 'back-actions':openActions();break;
     case 'opportunity':openOpportunity();break;
     case 'cancel-target':interaction=null;compactChoice=null;targetChooser=null;render();break;
-    case 'work-position':if(interaction&&targetOptions(queue.view,interaction).work.length){interaction={...interaction,stage:'work'};render();}break;
+    case 'work-position':if(interaction&&targetOptions(queue.view,interaction).work.length){viewportFlow.intent();interaction={...interaction,stage:'work'};render();}break;
     case 'confirm-target':if(canConfirm(queue.view,interaction))send(targetingCommand(interaction));break;
     case 'abort-work':send({type:'abortWork',jobId:control.dataset.abortJob});break;
     case 'close':closeDialog();break;
@@ -774,8 +841,12 @@ document.addEventListener('submit',e=>{
   if(e.target.id==='sortie-form'){e.preventDefault();if(activeCampaignPreventsReplacement())return;const values=new FormData(e.target),ruleset=values.get('ruleset');try{initialize({...devPreferences,preferredRuleset:ruleset},values.get('seed')||'MILK-RUN',null,ruleset,values.get('bombingTarget')||DEFAULT_BOMBING_TARGET);rememberPreferences({...devPreferences,preferredRuleset:ruleset});closeDialog();}catch(error){notice(error.message);}return;}
   if(e.target.id!=='choice-form')return;e.preventDefault();send({type:'action',action:chosenAction,...Object.fromEntries(new FormData(e.target))});
 });
-document.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.matches('svg [role="button"]')){e.preventDefault();e.target.dispatchEvent(new MouseEvent('click',{bubbles:true}));}});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'&&(interaction||compactChoice)&&!document.querySelector('dialog[open]')){e.preventDefault();interaction=null;compactChoice=null;targetChooser=null;render();$('#crew-flow [data-compact-action]')?.focus({preventScroll:true});return;}
+  if((e.key==='Enter'||e.key===' ')&&e.target.matches('svg [role="button"]')){e.preventDefault();e.target.dispatchEvent(new MouseEvent('click',{bubbles:true}));}
+});
 $('#speed').addEventListener('change',e=>{queue.setSpeed(e.target.value);rememberPreferences({...devPreferences,presentationSpeed:e.target.value});});
+motionPreference.addEventListener('change',()=>render());
 $('#dev-form').addEventListener('change',()=>{if(!$('#dev-form').checkValidity())return;try{rememberPreferences(readDevForm());$('#dev-form').closest('.dialog-content').querySelector('.action-error')?.remove();}catch(error){$('#dev-prefs-status').textContent='Not saved: '+error.message;}});
 $('#log-details').addEventListener('toggle',()=>{if($('#log-details').open)renderLog();});
 document.querySelectorAll('dialog').forEach(d=>d.addEventListener('click',e=>{if(e.target===d){const r=d.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)closeDialog();}}));
