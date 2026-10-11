@@ -4,6 +4,8 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "test:milk-run": "node --test src/milk-run/tests/*.test.mjs",
+    "simulate:milk-run": "node src/milk-run/simulation/cli.mjs",
     "dev": "vite --open /ouija-dev.html",
     "dev:bomber": "vite --config vite.bomber.config.ts --open /bomber_command.html",
     "build:bomber": "npm run typecheck:bomber && vite build --config vite.bomber.config.ts",

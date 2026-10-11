@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "id": "short-training",
+  "ruleset": "v2-continuous",
+  "targetId": "wilhelmshaven",
+  "config": {
+    "v2OutboundLength": 2,
+    "v2ReturnLength": 1,
+    "v2StoryMode": false
+  },
+  "tags": ["example", "existing-dev-settings"]
+}

@@ -960,6 +960,143 @@ function validateAction(state, crew, command) {
   }
 }
 
+/** Read-only command catalogue for clients, including headless players.
+ * Target domains come from the same rule helpers as the board; every crew
+ * command passes validateAction. Other phases use transactional dispatch on
+ * a private snapshot, so new phase restrictions have one authority.
+ * Equivalent target orderings are canonical except for the primary work cell
+ * (which determines the work row). Optional defaults are made explicit.
+ * Large catalogues fail explicitly instead of quietly dropping legal choices.
+ */
+export function legalCommands(state, { maxCommands = 50000 } = {}) {
+  requireRule(Number.isSafeInteger(maxCommands) && maxCommands > 0, 'maxCommands must be a positive integer.');
+  if (state.outcome || state.phase === 'ended') return [];
+  const commands = [];
+  const add = command => {
+    if (commands.length >= maxCommands) {
+      const error = new Error(`Legal command catalogue exceeds ${maxCommands} choices.`);
+      error.code = 'LEGAL_COMMAND_LIMIT';
+      throw error;
+    }
+    commands.push(command);
+  };
+  const probe = command => {
+    // dispatch never mutates its argument, including RNG and rejected input.
+    try { dispatch(state, command); } catch { return; }
+    add(command);
+  };
+  if (state.phase === 'action') {
+    const crew = person(state, state.activeCrew);
+    const candidate = command => {
+      try { validateAction(state, crew, command); } catch { return; }
+      add(command);
+    };
+    const work = (action, fields, targets) => {
+      for (const position of legalWorkPositions(state, crew.id, targets)) {
+        const command = { type: 'action', action, ...fields, workCellId: position.id };
+        candidate(command);
+        for (const assistant of eligibleAssistants(state, crew.id)) {
+          for (const other of legalWorkPositions(state, assistant.id, targets)) {
+            candidate({ ...command, assistantId: assistant.id, assistantWorkCellId: other.id });
+          }
+        }
+      }
+    };
+    for (const action of availableActions(state).filter(item => item.enabled).map(item => item.id)) {
+      const base = { type: 'action', action };
+      switch (action) {
+        case 'basicFire': case 'advancedFire':
+          for (const target of legalTargets(state, crew.id)) candidate({ ...base, targetId: target.id });
+          break;
+        case 'directFire':
+          for (const gunner of directFireGunners(state)) for (const target of legalTargets(state, gunner.id))
+            candidate({ ...base, gunnerId: gunner.id, targetId: target.id });
+          break;
+        case 'repair': case 'fireControl': {
+          // Grow only connected sets. Keep the first target explicit, because
+          // selecting a different primary row can change legal work positions.
+          const ids = new Set(eligibleCrisisTargets(state, action).map(cell => cell.id));
+          const groups = [...ids].map(id => [id]), seen = new Set(groups.map(group => JSON.stringify(group)));
+          const cap = crisisTargetCap(state, crew.id, action);
+          for (let index = 0; index < groups.length; index++) {
+            const group = groups[index];
+            for (const primary of group) {
+              const cells = [primary, ...group.filter(id => id !== primary)];
+              work(action, { cells }, cells);
+            }
+            if (group.length >= cap) continue;
+            for (const id of group) for (const neighbor of neighbors(id, state.config.eightWayWork)) {
+              if (!ids.has(neighbor.id) || group.includes(neighbor.id)) continue;
+              const next = [...group, neighbor.id].sort(), key = JSON.stringify(next);
+              if (seen.has(key)) continue;
+              if (groups.length >= maxCommands) {
+                const error = new Error(`Connected work catalogue exceeds ${maxCommands} groups.`);
+                error.code = 'LEGAL_COMMAND_LIMIT'; throw error;
+              }
+              seen.add(key); groups.push(next);
+            }
+          }
+          break;
+        }
+        case 'medical':
+          for (const patient of eligibleMedicalTargets(state, crew.id)) work(action, { targetId: patient.id }, patient.position);
+          break;
+        case 'assistWork':
+          for (const job of eligibleAssistJobs(state, crew.id)) for (const position of legalWorkPositions(state, crew.id, assistWorkTargets(state, job)))
+            candidate({ ...base, jobId: job.id, workCellId: position.id });
+          break;
+        case 'relocate':
+          for (const cell of BOARD.filter(cell => cell.fuselage)) candidate({ ...base, targetId: cell.id });
+          break;
+        case 'manCockpit': case 'manStation':
+          for (const stationId of action === 'manCockpit' ? ['pilot', 'copilot'] : eligibleStations(state, crew.id)) candidate({ ...base, stationId });
+          break;
+        case 'restartEngine':
+          for (const engine of state.engines) candidate({ ...base, targetId: engine.id });
+          break;
+        case 'convert':
+          for (const option of conversionOptions(state).filter(option => option.enabled)) candidate({ ...base, to: option.to });
+          break;
+        case 'rotateFighter':
+          for (const target of state.fighters) candidate({ ...base, targetId: target.id });
+          break;
+        case 'wait': case 'escort': case 'leaveStation': case 'returnHome': case 'reclaimHome': candidate(base); break;
+        default: throw new Error(`No legal command domain registered for action: ${action}`);
+      }
+    }
+    return commands;
+  }
+  switch (state.phase) {
+    case 'ready': probe({ type: 'startRound' }); break;
+    case 'roundEnd': probe({ type: 'endRound' }); break;
+    case 'select':
+      for (const crew of availableCrew(state)) probe({ type: 'activate', crewId: crew.id });
+      for (const job of state.jobs) if (canAbortWork(state, job.id)) probe({ type: 'abortWork', jobId: job.id });
+      if (!availableCrew(state).length) probe({ type: 'advanceUnavailable' });
+      probe({ type: 'continueProgress' });
+      break;
+    case 'opportunity': probe({ type: 'continueEnemyPhase' }); break;
+    case 'betweenOpportunity':
+      probe({ type: 'continueProgress' }); probe({ type: 'continueBetweenOpportunity' }); break;
+    case 'story':
+      for (const choice of state.story?.pending?.choices ?? []) if (!choice.disabled) probe({ type: 'storyChoice', choiceId: choice.id });
+      break;
+    case 'bombing':
+      if (!state.mission.bombRun || !isV2(state)) probe({ type: 'bomb' });
+      else {
+        for (const slot of ['course', 'drift', 'release']) for (const dieIndex of [null, 0, 1, 2, 3]) probe({ type: 'placeBombDie', slot, dieIndex });
+        for (const dieIndex of [0, 1, 2, 3]) for (const source of ['free', 'officer']) probe({ type: 'rerollBombDie', dieIndex, source });
+        probe({ type: 'commitBombRun' });
+      }
+      break;
+    default: throw new Error(`No legal command domain registered for phase: ${state.phase}`);
+  }
+  if (opportunityAvailability(state).enabled) for (const gunner of opportunityGunners(state)) for (const target of legalTargets(state, gunner.id))
+    probe({ type: 'opportunityShot', gunnerId: gunner.id, targetId: target.id });
+  probe({ type: 'turnBack', confirmed: true });
+  return commands;
+}
+
 function resolveAction(state, crew, command, emit) {
   const action = command.action;
   record(emit, 'CREW_ACTION', `${nameOf(crew.id)}: ${availableActions(state, crew.id).find(item => item.id === action).label}.`, { crewId: crew.id, action });
