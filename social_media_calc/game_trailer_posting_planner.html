@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#101622">
+<title>Trailer Time · Weekly Posting Planner</title>
+<style>
+:root{color-scheme:dark;--bg:#0b1019;--surface:#121b29;--surface2:#1a2636;--line:#2a3748;--text:#f1f5fa;--muted:#9baabf;--tk:#64e6de;--ig:#f4a1d4;--yt:#ff9090;--gold:#f4cf81}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 50% -14%,#26384d 0%,var(--bg) 53%);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:var(--text);min-height:100vh}button{font:inherit;cursor:pointer}.shell{max-width:1130px;margin:auto;padding:28px 22px 45px}.eyebrow{color:var(--gold);font-size:11px;font-weight:800;letter-spacing:.18em;text-transform:uppercase}h1{font-size:clamp(26px,4.8vw,40px);letter-spacing:-.055em;line-height:1.1;margin:8px 0 8px;font-weight:800}.subtitle{color:var(--muted);margin:0 0 24px;max-width:725px}.toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:12px;justify-content:space-between;margin:22px 0 14px}.toggle{display:flex;padding:4px;gap:3px;background:#192334;border:1px solid var(--line);border-radius:13px}.toggle button{border:0;border-radius:9px;padding:10px 15px;color:var(--muted);background:transparent;font-weight:700}.toggle button.active{background:#32465d;color:white;box-shadow:0 2px 8px #0005}.toolRight{display:flex;gap:8px;flex-wrap:wrap} .secondary{border:1px solid var(--line);background:var(--surface);color:var(--text);border-radius:11px;padding:10px 13px;font-weight:650}.secondary:hover,.day:hover{border-color:#61758c}.sessionBar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin:0 0 15px}.sessionBar .toggle{margin:0}.sessionDesc{font-size:12px;color:var(--muted);max-width:430px}.sourceBar{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:15px;color:var(--muted);font-size:12px}.sourceBar select{background:var(--surface2);color:var(--text);font:inherit;border:1px solid #46566a;border-radius:10px;padding:7px 10px}.sourceAlert{margin:0 0 17px;padding:10px 12px;border:1px solid #645b38;color:#edd8ac;border-radius:9px;background:#3a30281a;font-size:12px}.sharedHighlight{padding:14px 15px;border:1px solid #74613e;border-radius:12px;background:#30291d;margin-bottom:12px}.sharedHighlight b{font-size:24px;display:block;color:var(--gold);margin:4px 0}.sharedHighlight p{color:#d1c4aa;font-size:12px;margin:0}.meta{font-size:12px;color:var(--muted);margin-bottom:18px}.pills{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}.pill{border:1px solid var(--line);background:var(--surface);color:var(--muted);padding:8px 13px;border-radius:30px;font-weight:700}.pill.active{background:#27384d;color:#fff;border-color:#61778b}.weekGrid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:9px}.day{border:1px solid var(--line);border-radius:13px;background:var(--surface);color:inherit;padding:13px 10px;text-align:left;min-width:0;transition:border-color .15s,background .15s}.day.active{border-color:var(--gold);background:#222c3c}.dayName{display:flex;align-items:center;gap:5px;color:var(--text);font-weight:800;font-size:14px;margin-bottom:14px}.todayMark{color:var(--gold);font-size:10px;font-weight:850;text-transform:uppercase}.platformMini{margin:9px 0}.platformMini .name{display:block;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-size:10px;font-weight:800;margin-bottom:2px}.platformMini .time{font-weight:800;font-size:14px;white-space:nowrap}.platformMini .skip{color:#76869d;font-size:12px;font-weight:650}.platformMini.tk .time{color:var(--tk)}.platformMini.ig .time{color:var(--ig)}.platformMini.yt .time{color:var(--yt)}.strength{display:inline-block;width:7px;height:7px;border-radius:100%;margin-left:auto;background:#4b5a6c}.strength.s3{background:var(--gold)}.strength.s2{background:#72b5b2}.bottom{margin-top:18px;display:grid;grid-template-columns:1fr 310px;gap:15px;align-items:start}.detail{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:19px}.sectionLabel{color:var(--muted);font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase}.detail h2{margin:4px 0 17px;font-size:25px;letter-spacing:-.04em}.detailRow{display:grid;grid-template-columns:140px 1fr;gap:12px;padding:14px 0;border-top:1px solid var(--line)}.platformTitle{font-weight:850;font-size:15px}.platformTitle.tk{color:var(--tk)}.platformTitle.ig{color:var(--ig)}.platformTitle.yt{color:var(--yt)}.bestTime{font-weight:850;font-size:22px;line-height:1.2}.alternates{font-size:12px;color:var(--muted);margin-top:5px}.context{font-size:12px;color:#b7c4d3;margin-top:5px}.tag{font-size:10px;color:var(--gold);letter-spacing:.04em;font-weight:800;text-transform:uppercase;margin-top:7px}.aside{background:#182436;border:1px solid #344357;border-radius:16px;padding:19px}.aside h3{font-size:17px;margin:4px 0 15px}.pick{padding:10px 0;border-top:1px solid var(--line)}.pick small{display:block;font-weight:800;font-size:10px;letter-spacing:.08em;text-transform:uppercase}.pick b{display:block;font-size:17px;margin-top:4px}.pick em{display:block;font-size:12px;color:var(--muted);font-style:normal;margin-top:2px}.notes{color:var(--muted);font-size:12px;margin-top:19px;line-height:1.6}.notes a{color:#b1d3ff}.foot{color:#8493a7;font-size:11px;margin:18px 0 0}#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#e8f5ff;color:#182637;padding:10px 20px;border-radius:30px;font-weight:800;box-shadow:0 9px 30px #0009;display:none;z-index:10}
+@media(max-width:870px){.weekGrid{grid-template-columns:repeat(4,minmax(0,1fr))}.bottom{grid-template-columns:1fr}.aside .picks{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.pick{padding:10px 0}.shell{padding:20px 15px 35px}}
+@media(max-width:560px){.sessionBar{align-items:stretch}.sessionBar .toggle{width:100%}.sessionBar .toggle button{flex:1;padding:9px 8px}.weekGrid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.day{padding:11px 13px}.dayName{margin-bottom:8px}.platformMini{margin:7px 0}.platformMini .name{display:inline;margin-right:6px}.platformMini .time{font-size:13px}.detailRow{grid-template-columns:1fr;gap:4px}.aside .picks{display:block}.toolbar{align-items:stretch}.toggle{width:100%}.toggle button{flex:1;padding:10px 6px}.toolRight{width:100%}.toolRight button{flex:1}.subtitle{font-size:13px}.pills{gap:6px}.pill{padding:7px 11px}.detail{padding:16px}.aside{padding:16px}}
+@media print{body{background:#fff;color:#111}.secondary,.toolbar,.pills,.subtitle{display:none}.day,.detail,.aside{background:#fff;color:#111;border-color:#aaa}.platformMini .name,.notes,.alternates,.context{color:#555}.bottom{grid-template-columns:1fr 300px}.day.active{border-color:#111}}
+</style>
+</head>
+<body>
+<main class="shell">
+<div class="eyebrow">Creator toolkit / 2026 benchmarks</div>
+<h1>TRAILER TIME <span style="color:var(--gold)">↗</span></h1>
+<p class="subtitle">Your daily three-platform game clip posting schedule. Every day gets real times, even on weaker days. Choose the best slot per platform or get it all done in one session.</p>
+<div class="toolbar">
+  <div class="toggle" role="group" aria-label="Audience time setting">
+    <button id="national" class="active" type="button">🇺🇸 Across the U.S.</button>
+    <button id="west" type="button">🌴 Pacific audience</button>
+  </div>
+  <div class="toolRight"><button type="button" id="todayButton" class="secondary">↗ Jump to today</button><button type="button" id="copyButton" class="secondary">⧉ Copy week</button></div>
+</div>
+<div class="sessionBar"><div class="toggle" role="group" aria-label="Posting workflow"><button id="staggered" class="active" type="button">⏱ Best per platform</button><button id="together" type="button">⚡ All 3 together</button></div><span id="sessionDesc" class="sessionDesc">Three posts the same day, each at its preferred hour.</span></div>
+<div class="sourceBar">TikTok data: <select id="tikTokStudy" aria-label="TikTok study"><option value="buffer">Buffer, Sep 2026 (all 7 days)</option><option value="sprout">Sprout Social, Mar 2026 (weekday peaks)</option></select><span>Studies disagree strongly about weekends.</span></div>
+<div class="meta" id="timeNote"></div>
+<div id="sourceAlert" class="sourceAlert"></div>
+<div class="pills" role="group" aria-label="Platform filter">
+  <button type="button" class="pill active" data-filter="all">All platforms</button>
+  <button type="button" class="pill" data-filter="tk">TikTok</button>
+  <button type="button" class="pill" data-filter="ig">Instagram Reels</button>
+  <button type="button" class="pill" data-filter="yt">YouTube Shorts</button>
+</div>
+<div id="weekGrid" class="weekGrid" aria-label="Weekly posting times"></div>
+<div class="bottom">
+ <section class="detail"><div class="sectionLabel">Detailed recommendations</div><h2 id="dayHeading">Wednesday</h2><div id="sharedSlot"></div><div id="details"></div></section>
+ <aside class="aside"><div class="sectionLabel">Your daily workflow</div><h3>One clip, three platforms</h3><div id="powerPicks" class="picks"></div><p class="notes">You can publish a clip to all three platforms every day. Prioritize the <strong>hook in the first two seconds</strong> and post consistency over chasing a perfect minute. These timings are broad engagement benchmarks, <strong>not game-specific guarantees</strong>. Check your own audience retention, clicks and wishlists.</p></aside>
+</div>
+<p class="foot">Sources: <a href="https://buffer.com/resources/best-time-to-post-on-tiktok/" target="_blank" rel="noopener">Buffer TikTok (Sep 2026, 7.1M posts)</a> ·  <a href="https://sproutsocial.com/insights/best-times-to-post-on-tiktok/" target="_blank" rel="noopener">Sprout Social TikTok (Mar 2026)</a> · <a href="https://buffer.com/resources/when-is-the-best-time-to-post-on-instagram/" target="_blank" rel="noopener">Buffer Instagram (Sep 2026)</a> · <a href="https://buffer.com/resources/best-time-to-post-on-youtube/" target="_blank" rel="noopener">Buffer Shorts (Jul 2026)</a>. Published times are audience-local. National mode moves them 90 minutes earlier in Pacific time as a planning heuristic, not a measured U.S.-wide peak. The same-time posting slot is a convenience compromise, not a statistically measured cross-platform optimum. Instagram benchmarks include non-Reels content. The two TikTok studies conflict on weekday/weekend patterns; weekend values in Sprout mode use Buffer as fallback. Updated Oct 17, 2026.</p>
+</main><div id="toast" role="status" aria-live="polite"></div>
+<script>
+(function(){
+'use strict';
+const days=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+const titles={tk:'TikTok',ig:'Instagram Reels',yt:'YouTube Shorts'};
+const data={
+ buffer:[
+ {best:13,alts:[11,8],tier:3,comment:'Buffer: Monday is its second-strongest TikTok day.'},
+ {best:6,alts:[22,7],tier:2,comment:'Buffer: the measured #1 time is 6 AM. Try 10 PM if you prefer not to post before dawn.'},
+ {best:22,alts:[6,21],tier:1,comment:'Buffer: a weaker day overall, but 10 PM and 9 PM are still usable.'},
+ {best:13,alts:[22,6],tier:1,comment:'Buffer: Thursday is weaker overall; the best measured time is 1 PM.'},
+ {best:18,alts:[22,20],tier:2,comment:'Buffer: Friday evening is the leading window.'},
+ {best:17,alts:[16,15],tier:3,comment:'Buffer: Saturday is its strongest TikTok day, despite Sprout Social saying weekends are weak.'},
+ {best:9,alts:[13,12],tier:3,comment:'Buffer: Sunday at 9 AM is its highest-rated single TikTok slot of the week.'}
+ ],
+ sprout:[
+ {best:16,range:[15,17],tier:2,comment:'Sprout Social: Monday 3–5 PM audience-local.'},
+ {best:16,range:[14,18],tier:3,comment:'Sprout Social: Tuesday 2–6 PM audience-local.'},
+ {best:16.5,range:[13,20],tier:3,comment:'Sprout Social: Wednesday 1–8 PM audience-local.'},
+ {best:15,range:[13,17],tier:3,comment:'Sprout Social: Thursday 1–5 PM audience-local.'},
+ {best:16,range:[15,17],tier:2,comment:'Sprout Social: Friday 3–5 PM audience-local.'},
+ {best:17,alts:[16,15],tier:1,fallback:true,comment:'Sprout calls weekends low priority, but does not give a time. Showing Buffer’s Saturday 5 PM recommendation instead.'},
+ {best:9,alts:[13,12],tier:1,fallback:true,comment:'Sprout calls weekends low priority, but does not give a time. Showing Buffer’s Sunday 9 AM recommendation instead.'}
+ ],
+ ig:[
+ {best:19,alts:[18,20],tier:2,comment:'Buffer: Monday evenings tend to do well.'},
+ {best:19,alts:[15,17],tier:2,comment:'Buffer: Tuesday 7 PM is the top measured slot.'},
+ {best:18,alts:[12,8],tier:3,comment:'Buffer: Wednesday is strongest overall for Instagram. Noon is #1; 6 PM is a strong Reels-friendly option.'},
+ {best:9,alts:[8,7],tier:3,extra:'Reels test: 6–9 PM',comment:'Buffer: 9 AM is the strongest all-format Instagram slot. Reels may benefit from evening viewing too.'},
+ {best:22,alts:[21,6],tier:1,comment:'Buffer: weaker Instagram day, but 10 PM is the best measured slot.'},
+ {best:21,alts:[22,20],tier:1,comment:'Buffer: lower-engagement day; evening is still the best bet.'},
+ {best:21,alts:[22,20],tier:2,comment:'Buffer: strongest weekend Instagram slot is Sunday 9 PM.'}
+ ],
+ yt:[
+ {best:20,alts:[17,18],tier:1,comment:'Buffer: Monday is quieter for Shorts; 8 PM is best.'},
+ {best:20,alts:[21,19],tier:1,comment:'Buffer: Tuesday is the weakest Shorts day overall, but 8 PM remains its best slot.'},
+ {best:19,alts:[20,21],tier:2,comment:'Buffer: Wednesday Shorts peak in the evening.'},
+ {best:19,alts:[20,21],tier:3,comment:'Buffer: Thursday is one of the stronger Shorts days.'},
+ {best:16,alts:[18,19],tier:3,comment:'Buffer: Friday 4 PM is the top measured Shorts slot of the week.'},
+ {best:19,alts:[11,18],tier:3,comment:'Buffer: Saturday is strong for Shorts; 11 AM is a secondary option.'},
+ {best:19,alts:[20,17],tier:2,comment:'Buffer: Sunday is solid for evening Shorts.'}
+ ]
+};
+// Convenience picks for people who want one sitting across all 3 apps. These are NOT measured combined peaks.
+const sameSlot=[19,20,20,19,18,17,19];
+let mode='national',filter='all',selected=2,workflow='staggered',study='buffer';
+try{mode=localStorage.getItem('trailerTimeMode')||mode;filter=localStorage.getItem('trailerTimeFilter')||filter;workflow=localStorage.getItem('trailerTimeWorkflow')||workflow;study=localStorage.getItem('trailerTimeTikTokStudy')||study;}catch(e){}
+if(!['national','west'].includes(mode))mode='national';if(!['all','tk','ig','yt'].includes(filter))filter='all';if(!['staggered','together'].includes(workflow))workflow='staggered';if(!['buffer','sprout'].includes(study))study='buffer';
+const $=id=>document.getElementById(id);
+const get=(k,d)=>data[k==='tk'?study:k][d];
+const shift=()=>mode==='national'?-1.5:0;
+const fmt=t=>{if(t==null)return '—';const m=((Math.round((t+shift())*60)%1440)+1440)%1440;const h=Math.floor(m/60),min=m%60;return (h%12||12)+(min?':'+String(min).padStart(2,'0'):'')+(h>=12?' PM':' AM');};
+const fmtRange=r=>r?fmt(r[0])+'–'+fmt(r[1]):'—';
+const keys=()=>filter==='all'?['tk','ig','yt']:[filter];
+function dayNow(){return days.indexOf(new Intl.DateTimeFormat('en-US',{weekday:'long',timeZone:'America/Los_Angeles'}).format(new Date()))}
+function persist(){try{localStorage.setItem('trailerTimeMode',mode);localStorage.setItem('trailerTimeFilter',filter);localStorage.setItem('trailerTimeWorkflow',workflow);localStorage.setItem('trailerTimeTikTokStudy',study)}catch(e){}}
+function render(){
+ $('national').classList.toggle('active',mode==='national');$('west').classList.toggle('active',mode==='west');
+ $('staggered').classList.toggle('active',workflow==='staggered');$('together').classList.toggle('active',workflow==='together');
+ $('tikTokStudy').value=study;
+ document.querySelectorAll('[data-filter]').forEach(el=>el.classList.toggle('active',el.dataset.filter===filter));
+ $('sessionDesc').textContent=workflow==='together'?'One daily publishing session at a practical shared time, rather than each platform’s measured peak.':'Three posts on the same day, at their respective benchmark hours.';
+ $('timeNote').textContent=mode==='national'?'All times Pacific · across-U.S. estimate: 90 minutes earlier than audience-local benchmarks.':'All times Pacific · unshifted audience-local benchmarks for Pacific viewers.';
+ $('sourceAlert').textContent=study==='buffer'?'TikTok source alert: Buffer (Sep 2026) ranks Saturday #1, while Sprout Social (Mar 2026) ranks weekends low. Both are broad, non-gaming-specific studies. Switch sources to compare.':'TikTok source alert: Sprout Social identifies weekday windows but NO weekend hours. Saturday and Sunday therefore show Buffer’s specific time recommendations as labeled fallbacks.';
+ const today=dayNow();
+ $('weekGrid').innerHTML=days.map((day,d)=>`<button type="button" class="day ${d===selected?'active':''}" data-day="${d}" aria-pressed="${d===selected}"><div class="dayName">${day.slice(0,3)}${d===today?'<span class="todayMark">Today</span>':''}<span class="strength s${Math.max(...keys().map(k=>get(k,d).tier))}"></span></div>${workflow==='together'?`<div class="platformMini"><span class="name">All ${keys().length===3?'3 platforms':'selected'}</span><span class="time" style="color:var(--gold)">${fmt(sameSlot[d])}</span></div><div class="platformMini"><span class="name">One session</span></div>`:keys().map(k=>{const x=get(k,d);return `<div class="platformMini ${k}"><span class="name">${k==='tk'?'TikTok':k==='ig'?'Reels':'Shorts'}</span><span class="time">${fmt(x.best)}</span></div>`}).join('')}</button>`).join('');
+ document.querySelectorAll('[data-day]').forEach(el=>el.addEventListener('click',()=>{selected=Number(el.dataset.day);render()}));
+ $('dayHeading').textContent=days[selected];
+ $('sharedSlot').innerHTML=workflow==='together'?`<div class="sharedHighlight"><div class="sectionLabel" style="color:var(--gold)">Publish everything in one session</div><b>${fmt(sameSlot[selected])} Pacific</b><p>Convenience compromise; not an empirically proven combined peak. The three individual benchmark times are listed below.</p></div>`:'';
+ $('details').innerHTML=keys().map(k=>{const x=get(k,selected);const alt=(x.alts||[]).length?'Alternatives: '+x.alts.map(fmt).join(' · '):x.range?'Study window: '+fmtRange(x.range):'';return `<div class="detailRow"><div class="platformTitle ${k}">${titles[k]}</div><div><div class="bestTime">${fmt(x.best)}</div><div class="alternates">${alt}${x.extra?'<br>'+x.extra:''}</div><div class="context">${x.comment}</div><div class="tag">${x.fallback?'↳ Other study fallback · lower priority in Sprout':x.tier===3?'★ Strong day in this study':x.tier===2?'Usable day':'Lower relative engagement · still post'}</div></div></div>`}).join('');
+ $('powerPicks').innerHTML=[{title:'Fastest workflow',main:`${fmt(sameSlot[selected])} · all three`,desc:'One-session compromise, not a measured peak.'},{title:'Your daily clip strategy',main:'Post all 7 days',desc:'Use lighter experiments on comparatively weak days.'},{title:'Highest priorities',main:'Hook · retention · clicks',desc:'Evaluate game wishlists and player interest, not views alone.'}].map(p=>`<div class="pick"><small style="color:var(--gold)">${p.title}</small><b>${p.main}</b><em>${p.desc}</em></div>`).join('');
+}
+$('national').addEventListener('click',()=>{mode='national';persist();render()});$('west').addEventListener('click',()=>{mode='west';persist();render()});
+$('staggered').addEventListener('click',()=>{workflow='staggered';persist();render()});$('together').addEventListener('click',()=>{workflow='together';persist();render()});
+$('tikTokStudy').addEventListener('change',e=>{study=e.target.value;persist();render()});
+document.querySelectorAll('[data-filter]').forEach(el=>el.addEventListener('click',()=>{filter=el.dataset.filter;persist();render()}));
+$('todayButton').addEventListener('click',()=>{selected=dayNow();render();$('weekGrid').scrollIntoView({behavior:'smooth',block:'nearest'})});
+function toast(msg){const el=$('toast');el.textContent=msg;el.style.display='block';setTimeout(()=>el.style.display='none',2600)}
+$('copyButton').addEventListener('click',async()=>{
+ const lines=[`TRAILER TIME — 7-day gameplay clip planner (${mode==='national'?'U.S.-wide approximation':'Pacific audience'}; TikTok: ${study})`];
+ days.forEach((d,i)=>{lines.push('\n'+d);if(workflow==='together')lines.push('  One-session compromise (all 3): '+fmt(sameSlot[i]));keys().forEach(k=>{const x=get(k,i);lines.push('  '+titles[k]+': '+fmt(x.best)+(x.alts?' (other times: '+x.alts.map(fmt).join(', ')+')':'' )+(x.fallback?' (Buffer fallback)':''))})});
+ lines.push('\nSources: Buffer 2026 TikTok, Instagram, YouTube Shorts; optional Sprout TikTok 2026. Times are estimates, not game-specific.');const val=lines.join('\n');
+ try{await navigator.clipboard.writeText(val);toast('Weekly schedule copied')}catch(e){const ta=document.createElement('textarea');ta.value=val;document.body.appendChild(ta);ta.select();try{document.execCommand('copy');toast('Weekly schedule copied')}catch(err){toast('Clipboard unavailable')}ta.remove()}
+});
+render();
+})();
+</script>
+</body></html>
